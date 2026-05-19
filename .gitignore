@@ -1,0 +1,34 @@
+# macOS
+.DS_Store
+
+# Python (presentation chart-rendering)
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+presentation/venv/
+
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Node (in case marp-cli or similar leave anything)
+node_modules/
+
+# Local-only research-paper PDFs (not redistributable)
+references/
+
+# Render caches
+*.pdf.tmp
