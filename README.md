@@ -41,18 +41,27 @@ This repo uses three terms consistently:
 
 ## Programmer guide
 
-A consolidated programmer guide — covering browser usage, Node usage, the three
-contracts, the AxonPubSub five-verb feed API, identity & topic-key derivation,
-runnable examples, and a common-error catalog — is planned for this repo once
-the protocol surface stabilizes (Phase 6 of the integration plan). See the
-deferred items in the [Axona Integration Plan v0.3.51](implementation/Axona-Integration-Plan-v0.3.51.md)
-for context.
+**Ship a pub/sub application against Axona in an afternoon:**
+[`programmer-guide/Axona-Programmer-Guide.md`](programmer-guide/Axona-Programmer-Guide.md).
 
-In the meantime, working examples to read:
+A single-file end-to-end guide for v1.1.2 — quick-start, mental model,
+identity, topics (public / publisher-keyed / region-keyed), pub/sub,
+direct messaging, the bridge, persistence, a worked chat-app example,
+common pitfalls, production checklist, and an API cheat sheet.  Designed
+to be read top-to-bottom by a developer (AI or human) who's never
+touched the codebase.
 
-- **Browser:** [`axona-peer/src/smoke_pubsub.js`](https://github.com/axona-net/axona-peer/blob/main/src/smoke_pubsub.js) and `axona-peer/index.html`.
-- **Node:** [`axona-bridge/src/bridge_axona_node.js`](https://github.com/axona-net/axona-bridge/blob/main/src/bridge_axona_node.js).
-- **In-process:** [`dht-sim/src/main.js`](https://github.com/axona-net/dht-sim/blob/main/src/main.js) and the simulator's pub/sub cascade test.
+A runnable two-process hello-world is at
+[`programmer-guide/examples/minimal-pubsub/`](programmer-guide/examples/minimal-pubsub/)
+— `node publisher.js` in one terminal, `node subscriber.js` in another,
+end-to-end roundtrip in under a minute against `wss://bridge.axona.net`.
+
+For longer-form reference reading: the reference browser peer is
+[`axona-peer/src/client.js`](https://github.com/axona-net/axona-peer/blob/main/src/client.js)
+(~1500 lines, end-to-end), and the bridge's embedded peer is
+[`axona-bridge/src/bridge_axona_node.js`](https://github.com/axona-net/axona-bridge/blob/main/src/bridge_axona_node.js).
+The in-process simulator's pub/sub cascade test lives in
+[`dht-sim/src/main.js`](https://github.com/axona-net/dht-sim/blob/main/src/main.js).
 
 ## Repository map
 
