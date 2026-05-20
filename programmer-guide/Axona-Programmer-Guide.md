@@ -1317,6 +1317,12 @@ UPGRADE_CLOSE_CODE   // 4426
 
 ## Where to go next
 
+- **[Quick Start](Quick-Start.md)** — if someone you're onboarding has
+  five minutes, send them here instead of this 1500-line guide.
+
+- **[API Reference](API-Reference.md)** — when you're past the
+  conceptual material and just need the signature for a specific call.
+
 - **Read the source of the reference peer**:
   [`axona-peer/src/client.js`](https://github.com/axona-net/axona-peer/blob/main/src/client.js)
   is the canonical end-to-end consumer. ~1500 lines, well-commented,

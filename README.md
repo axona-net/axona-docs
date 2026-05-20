@@ -41,20 +41,21 @@ This repo uses three terms consistently:
 
 ## Programmer guide
 
-**Ship a pub/sub application against Axona in an afternoon:**
-[`programmer-guide/Axona-Programmer-Guide.md`](programmer-guide/Axona-Programmer-Guide.md).
+Three companion documents in [`programmer-guide/`](programmer-guide/),
+sized by how deep you want to go:
 
-A single-file end-to-end guide for v1.1.2 — quick-start, mental model,
-identity, topics (public / publisher-keyed / region-keyed), pub/sub,
-direct messaging, the bridge, persistence, a worked chat-app example,
-common pitfalls, production checklist, and an API cheat sheet.  Designed
-to be read top-to-bottom by a developer (AI or human) who's never
-touched the codebase.
+| Doc | Read when | Length |
+|---|---|---|
+| **[Quick Start](programmer-guide/Quick-Start.md)** | You want a working pub/sub roundtrip in 5 minutes. Copy three commands + one file, run, done. | ~150 lines |
+| **[API Reference](programmer-guide/API-Reference.md)** | You're building and need to look up a specific call: signature, params, returns, errors, example for every public export. | ~700 lines |
+| **[Programmer Guide](programmer-guide/Axona-Programmer-Guide.md)** | You're starting a new application against Axona. Mental model, identity, topic addressing, pub/sub semantics, the bridge, a worked chat-app example, common pitfalls, production checklist. | ~1500 lines |
 
-A runnable two-process hello-world is at
+All three are verified against `@axona/protocol` v1.1.2; the
+Quick Start's example runs verbatim from a fresh `npm init`.
+
+A runnable copy of the Quick Start lives at
 [`programmer-guide/examples/minimal-pubsub/`](programmer-guide/examples/minimal-pubsub/)
-— `node publisher.js` in one terminal, `node subscriber.js` in another,
-end-to-end roundtrip in under a minute against `wss://bridge.axona.net`.
+— `npm install && node index.js`, end-to-end roundtrip in under a minute.
 
 For longer-form reference reading: the reference browser peer is
 [`axona-peer/src/client.js`](https://github.com/axona-net/axona-peer/blob/main/src/client.js)
