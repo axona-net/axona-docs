@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small YZ.social\par}
 \vspace{2em}
-{\small An N-DHT Explainer \quad v0.3.51 \quad 2026-05-16\par}
+{\small An Axona Explainer \quad v0.3.54 \quad 2026-05-21\par}
 \end{center}
 \vfill
 \null
@@ -482,9 +482,9 @@ For two decades, no published DHT had been measured at this floor. The best impl
 \label{fig:floor}
 \end{figure*}
 
-NH-1's predecessor, NX-17, hits \textbf{$1.16\times$ the floor} at 25{,}000 nodes. NH-1 hits \textbf{$1.27\times$}. They sit at the theoretical limit. The remaining $\sim$20\% overhead is structural---they take about 4 to 5 hops where an ideal protocol would take 3, and each ``extra'' hop costs about $\delta/2$, exactly as the geometric series predicts.
+Axona hits \textbf{$1.25\times$ the floor} at 25{,}000 nodes ($254$ ms vs a $203$ ms $3\delta$ floor at $\delta = 67.8$ ms). NH-1 hits $1.28\times$, NX-17 hits $1.33\times$. All three sit at the theoretical limit. The remaining $\sim$25\% overhead is structural---they take about 4 to 5 hops where an ideal protocol would take 3, and each ``extra'' hop costs about $\delta/2$, exactly as the geometric series predicts.
 
-For comparison, plain Kademlia \emph{gets worse} as the network grows: $2.01\times$ the floor at 5{,}000 nodes, $2.65\times$ at 50{,}000. It scales the wrong way.
+For comparison, plain Kademlia stays multiple $\delta$ above the floor as the network grows. The neuromorphic protocols approach the floor by learning per-hop locality; Kademlia's distance-only metric ignores RTT, so each hop costs the average inter-node delay rather than the geometric-halved one.
 
 % =====================================================================
 % IX. ABLATION

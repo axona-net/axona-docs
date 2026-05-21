@@ -70,7 +70,7 @@
 {\large David A.~Smith\par}
 {\itshape\small YZ.social\par}
 \vspace{2em}
-{\small Version 0.3.51 \quad Simulator v0.70.22 \quad 2026-05-16\par}
+{\small Version 0.3.54 \quad Simulator v0.91.0 \quad 2026-05-21\par}
 \vfill
 \end{fullwidth}
 \newpage
@@ -4971,22 +4971,27 @@ because if it were true the protocol's contribution beyond
 The performance attribution would belong entirely to the
 prefix.
 
-\textbf{Result.} The hypothesis is falsified. With \emph{zero}
-geographic information, NX-17 still routes $26\%$ faster than
-Kademlia at $25{,}000$ nodes, and NH-1 routes $8\%$ faster. The
-learning mechanisms do real work, attributable cleanly to the
-synaptome shaping itself by traffic.
+\textbf{Result (May 2026, v1.1.2 / sim v0.91.0).} The
+hypothesis is falsified.  With \emph{zero} geographic
+information at $25{,}000$ nodes, all three adaptive
+protocols beat Kademlia by $\sim 40\%$ — Axona by $43\%$,
+NX-17 and NH-1 each by $39\%$.  See
+Table~\ref{tab:geobits-ablation} in the parallel ablation
+section below for the full numbers.  Lookup success
+remains $100\%$ across all five protocols at \texttt{geoBits}
+$= 0$ on every distance band.  The learning mechanisms do
+real work, attributable cleanly to the synaptome shaping
+itself by traffic.
 
-The smaller advantage for NH-1 vs NX-17 in this ablation
-($8\%$ vs $26\%$) is itself informative: NX-17's two-tier
-machinery and Markov pre-learning give it more starting
-structure to exploit when the geographic prefix is removed.
-NH-1, having consolidated those into the unified vitality
-model, has less independent structural redundancy. The
-ablation shows the cost of the consolidation: a small
-performance drop in the no-locality regime, consistent with
-the broader claim that NH-1 trades $\sim 5$--$10\%$ peak
-performance for $\sim 30\%$ parameter-count reduction.
+NH-1 and NX-17 are now indistinguishable at \texttt{geoBits}
+$= 0$ ($524$ vs $523$ ms global), closing the gap NH-1
+carried in earlier sim versions.  The $\sim 30\%$
+parameter-count reduction NH-1 trades for over NX-17 no
+longer comes with a measurable peak-performance cost in the
+no-locality regime.  Axona's $\sim 8\%$ further drop below
+NH-1/NX-17 is the production-Axona dividend from the
+TransportAxonaEngine churn-cleanup work (v0.85.0–v0.89.0)
+and the v1.1.2 per-hop live-RTT lookup-latency change.
 
 % --------------------------------------------------------------------
 \section{Ablation: Highway Percentage}
@@ -5496,37 +5501,51 @@ substantial margin.
 \centering
 \caption{Global lookup latency at $25{,}000$ nodes,
 \textsc{geoBits} $= 8$ (default) vs \textsc{geoBits} $= 0$
-(ablation). The drop with no prefix is what the geographic
+(ablation). All five protocols, \texttt{@axona/protocol}
+v1.1.2 / sim v0.91.0, May 2026.  $100\%$ success on every
+cell.  The drop with no prefix is what the geographic
 mechanism contributes; the residual gap to Kademlia is what
 the learning contributes.}
 \label{tab:geobits-ablation}
 \small
 \begin{tabular}{@{}lrrr@{}}
 \toprule
-\textbf{Protocol} & \textbf{geoBits=8} & \textbf{geoBits=0} & \textbf{Δ vs Kad} \\
+\textbf{Protocol} & \textbf{gB=8 (ms)} & \textbf{gB=0 (ms)} & \textbf{Δ vs Kad (gB=0)} \\
 \midrule
-\KDHT   & $511$ & $511$ & --- \\
-NX-17   & $237$ & $377$ & $26\%$ faster than Kademlia \\
-NH-1    & $260$ & $470$ & $8\%$ faster than Kademlia \\
+\KDHT       & $845$ & $852$ & --- \\
+G-DHT       & $820$ & $1060$ & $24\%$ slower \\
+NX-17       & $270$ & $523$ & $39\%$ faster \\
+NH-1        & $261$ & $524$ & $39\%$ faster \\
+\textbf{Axona} & $\mathbf{254}$ & $\mathbf{482}$ & $\mathbf{43\%}$ \textbf{faster} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The ablation falsifies the hypothesis. With \emph{zero}
-geographic information, both adaptive protocols still beat
-Kademlia. The learning is doing real work, attributable
+The ablation falsifies the hypothesis.  With \emph{zero}
+geographic information, all three adaptive protocols still
+beat Kademlia by $\sim 40\%$; Axona alone leads the field
+at $43\%$.  The learning is doing real work, attributable
 cleanly to the synaptome shaping itself by traffic.
 
-The smaller residual advantage for NH-1 vs NX-17 in this
-ablation ($8\%$ vs $26\%$) is informative: NX-17's two-tier
-machinery and Markov pre-learning give it more starting
-structure to exploit when the geographic prefix is removed. NH-1,
-having consolidated those into the unified vitality model, has
-less independent structural redundancy. The ablation shows the
-\emph{cost} of the consolidation: a $\sim 5$--$10\%$ peak
-performance reduction in the no-locality regime, traded for
-$\sim 30\%$ parameter-count reduction and substantially better
-maintainability.
+G-DHT is the only protocol that gets \emph{worse} at
+\texttt{geoBits} $= 0$ ($820 \to 1060$ ms): its entire
+strategy is ``follow the prefix.''  With no prefix to
+follow, it falls back to a slower no-progress-limited search
+and loses the locality benefit that defines it.
+
+Axona's $43\%$ lead over Kademlia at \texttt{geoBits} $= 0$
+is the production-Axona dividend on top of the research
+NH-1/NX-17 kernel: the TransportAxonaEngine churn-cleanup
+work (dht-sim v0.85.0--v0.89.0) and the v1.1.2 per-hop
+live-RTT lookup-latency change cumulatively dropped Axona
+below the NH-1/NX-17 baseline.  NH-1 and NX-17 are now
+indistinguishable at \texttt{geoBits} $= 0$ ($524$ vs $523$
+ms) — a year of kernel parity work having closed the gap
+NH-1 carried in the earlier 12-rule consolidation.  The
+ablation no longer shows a measurable consolidation cost:
+NH-1 retains its $\sim 30\%$ parameter-count reduction
+vs NX-17 without sacrificing peak performance at
+\texttt{geoBits} $= 0$.
 
 % --------------------------------------------------------------------
 \section{Heading Toward 50,000 and Beyond}

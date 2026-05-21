@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.3.53 · 2026-05-18 · David A. Smith · Axona.net*
+*An Axona explainer · v0.3.54 · 2026-05-21 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
