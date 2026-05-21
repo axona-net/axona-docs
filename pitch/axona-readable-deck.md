@@ -411,14 +411,15 @@ Live network of 25K simulated peers on a geographic globe. Every dot is a node; 
 
 #### Benchmark · 25K nodes · May 2026
 
-| Protocol | global ms | r500 ms |
-|---|---|---|
-| Kademlia | 508 | 513 |
-| G-DHT | 282 | 153 |
-| <span class="num">NX-17</span> | <span class="num">242</span> | <span class="num">79</span> |
-| NH-1 | 256 | 107 |
+| Protocol | global ms | r500 ms | 5% churn ms |
+|---|---|---|---|
+| Kademlia | 845 | 826 | 795 |
+| G-DHT | 820 | 179 | 751 |
+| NX-17 | 270 | 107 | 292 |
+| NH-1 | 261 | 105 | 295 |
+| <span class="num">Axona</span> | <span class="num">255</span> | <span class="num">92</span> | <span class="num">230</span> |
 
-*All success rates 100%.*
+*All success rates 100%. Axona leads on every cell at 25K; widest gap is the 5 % churn band (230 ms · 4.24 hops avg).*
 
 #### Methodology
 

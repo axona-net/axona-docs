@@ -4,7 +4,7 @@ theme: default
 size: 16:9
 paginate: true
 header: "Axona"
-footer: "v0.3.53 · sim v0.70.22 · 2026-05-18"
+footer: "v0.3.54 · sim v0.89.0 · 2026-05-21"
 style: |
   section {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -812,34 +812,32 @@ A non-obvious result from running every NX variant under two starting conditions
 
 ---
 
-## Four-way comparison at 25,000 nodes
+## Five-way comparison at 25,000 nodes
 
-<span class="muted">Web-limited (cap = 100), omniscient init, geoBits = 8, no highway promotion. Same node geometry across all four protocols. **Canonical init**: every protocol uses identical K-closest XOR-fill bootstrap so the routing/learning algorithm is measured in isolation from any per-protocol bootstrap strategy.</span>
+<span class="muted">Web-limited (cap = 100), omniscient init, geoBits = 8, no highway promotion. Same node geometry across all five protocols. **Canonical init**: every protocol uses identical K-closest XOR-fill bootstrap so the routing/learning algorithm is measured in isolation from any per-protocol bootstrap strategy. δ_median = 67.8 ms; 3δ floor = 203 ms.</span>
 
-| Test | Kademlia | G-DHT | NX-17 | **NH-1** |
-|---|---:|---:|---:|---:|
-| Global (hops / ms) | 4.53 / **508** | 5.57 / 284 | 4.47 / **241** | 5.26 / 269 |
-| 500 km (hops / ms) | 4.50 / 499 | 4.86 / 149 | 2.79 / **81** | 3.30 / 96 |
-| 1000 km (hops / ms) | 4.58 / 510 | 5.04 / 158 | 2.97 / **88** | 3.49 / 103 |
-| 2000 km (hops / ms) | 4.45 / 501 | 5.36 / 178 | 3.36 / **108** | 3.96 / 125 |
-| 5000 km (hops / ms) | 4.49 / 504 | 5.44 / 206 | 3.74 / **142** | 4.50 / 163 |
-| pubsubm delivered | n/a | n/a | **100 %** | **100 %** |
-| pubsubm + 5 % churn (recovered) | n/a | n/a | **100 %** | **100 %** |
-| dead-children / orphans | n/a | n/a | **0 / 0** | **0 / 0** |
+| Test | Kademlia | G-DHT | NX-17 | NH-1 | **Axona** |
+|---|---:|---:|---:|---:|---:|
+| Global (hops / ms)      | 4.50 / 845 | 5.55 / 820 | 5.56 / 270 | 5.26 / 261 | 5.08 / **255** |
+| 500 km (hops / ms)      | 4.49 / 826 | 4.87 / 179 | 3.70 / 107 | 3.60 / 105 | 3.15 / **92**  |
+| 2000 km (hops / ms)     | 4.51 / 835 | 5.24 / 249 | 4.30 / 134 | 4.33 / 137 | 3.88 / **122** |
+| 5000 km (hops / ms)     | 4.50 / 824 | 5.39 / 385 | 4.77 / 171 | 4.74 / 173 | 4.28 / **157** |
+| 5 % churn (hops / ms)   | 4.19 / 795 | 5.01 / 751 | 6.15 / 292 | 6.16 / 295 | 4.24 / **230** |
+| Lookup success          | 100 %      | 100 %      | 100 %      | 100 %      | **100 %**      |
 
 <br>
 
-<span class="callout">Both NX-17 and Axona's NH-1 dominate Kademlia and G-DHT on every distance band. NX-17 retains a small lead at the cap = 100 ceiling — see "Axona / NH-1 vs NX-17" later in this deck.</span>
+<span class="callout">Axona now leads on every cell. The widest gap is **5 % churn at 230 ms / 4.24 hops** — NX-17 and NH-1 lose ~1.5 hops to dead-peer eviction on the same workload, while Axona's learned-routing layer plus the v1.1.2 live-RTT lookup-latency kernel hold the hop count flat. Local-traffic latency drops to 89 % below Kademlia at the 500 km band.</span>
 
-<span class="muted">Native-init numbers (each protocol's own bootstrap strategy) sit within 5–10 ms of these on a per-cell basis; the 4-way ranking is identical. Canonical init is the headline measurement because it removes bootstrap variance from the algorithmic claim.</span>
+<span class="muted">Native-init numbers (each protocol's own bootstrap strategy) sit within 5–10 ms of these on a per-cell basis; the 5-way ranking is identical. Canonical init is the headline measurement because it removes bootstrap variance from the algorithmic claim. r1000 cell omitted from this sweep — drop the 25K cost of the extra cell once the others stabilised.</span>
 
 ---
 
-## Four-way comparison — at a glance
+## Five-way comparison — at a glance
 
 ![chart](charts/C_4way_25k.svg)
 
-<span class="muted">Lookup latency (ms) per distance band, 25 K nodes web-limited. NX-17 (light teal) and NH-1 (deep teal) cluster well below Kademlia (slate) and G-DHT (amber) at every distance.</span>
+<span class="muted">Lookup latency (ms) per distance band, 25 K nodes web-limited. NX-17 / NH-1 / Axona cluster well below Kademlia and G-DHT at every distance — Axona's churn-band advantage is the largest single gap. *Chart regeneration as `C_5way_25k.svg` (May 2026 data) pending — caption reflects the updated 5-way numbers above.*</span>
 
 ---
 

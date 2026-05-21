@@ -24,10 +24,10 @@ This repo uses three terms consistently:
 
 | Document | Audience | File |
 |---|---|---|
-| **Paper** | Conference-format research write-up; IEEEtran two-column LaTeX. | [`paper/Axona-Paper.tex`](paper/Axona-Paper.tex) · [PDF](paper/Axona%20Paper%20v0.3.53.pdf) |
-| **Whitepaper** | Complete technical reference. Synthesis edition. | [`whitepaper/Axona-Whitepaper.md`](whitepaper/Axona-Whitepaper.md) · [PDF](whitepaper/Axona%20Whitepaper%20v0.3.53.pdf) |
-| **Explainer** | Popular-audience introduction. Less math, more story. | [`explainer/Axona-Explainer.md`](explainer/Axona-Explainer.md) · [PDF](explainer/Axona%20Explainer%20v0.3.53.pdf) |
-| **Presentation** | Research deck — full benchmark walkthrough at 25K nodes. Marp. | [`presentation/deck.md`](presentation/deck.md) · [PDF](presentation/Axona%20Presentation%20v0.3.53.pdf) |
+| **Paper** | Conference-format research write-up; IEEEtran two-column LaTeX. | [`paper/Axona-Paper.tex`](paper/Axona-Paper.tex) · [PDF](paper/Axona%20Paper%20v0.3.54.pdf) |
+| **Whitepaper** | Complete technical reference. Synthesis edition. | [`whitepaper/Axona-Whitepaper.md`](whitepaper/Axona-Whitepaper.md) · [PDF](whitepaper/Axona%20Whitepaper%20v0.3.54.pdf) |
+| **Explainer** | Popular-audience introduction. Less math, more story. | [`explainer/Axona-Explainer.md`](explainer/Axona-Explainer.md) · [PDF](explainer/Axona%20Explainer%20v0.3.54.pdf) |
+| **Presentation** | Research deck — full benchmark walkthrough at 25K nodes. Marp. | [`presentation/deck.md`](presentation/deck.md) · [PDF](presentation/Axona%20Presentation%20v0.3.54.pdf) |
 | **Readable pitch** | Tufte-style two-column pitch. Concise. | [`pitch/axona-readable-deck.md`](pitch/axona-readable-deck.md) · [PDF](pitch/Axona%20Readable%20Deck%20v0.16.pdf) |
 
 ## Supplementary material
