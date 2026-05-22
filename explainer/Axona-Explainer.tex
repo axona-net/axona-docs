@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.4.05 \quad 2026-05-22\par}
+{\small An Axona Explainer \quad v0.4.06 \quad 2026-05-22\par}
 \end{center}
 \vfill
 \null
@@ -443,9 +443,9 @@ For two decades, no published DHT had been measured at this floor. The best impl
   xlabel={\footnotesize\itshape network size (thousands of nodes)},
   ylabel={\footnotesize\itshape global lookup latency (ms)},
   axis lines*=left,
-  xmin=0, xmax=46,
+  xmin=0, xmax=56,
   ymin=0, ymax=950,
-  xtick={5,10,15,20,25,30,35,40},
+  xtick={5,10,15,20,25,30,35,40,45,50},
   ytick={0,200,400,600,800},
   yticklabel style={font=\footnotesize, color=inkmuted},
   xticklabel style={font=\footnotesize, color=inkmuted},
@@ -456,37 +456,38 @@ For two decades, no published DHT had been measured at this floor. The best impl
   clip=false
 ]
   % 3 delta floor (dashed reference line — δ ≈ 68 ms is essentially
-  % flat across the population sizes we measured)
+  % flat across the population sizes we measured; per-N: 203, 206,
+  % 203, 202, 205, 204, 207, 206, 206, 204)
   \addplot[gray!70, dashed, line width=0.7pt] coordinates
-    {(5,203) (10,206) (15,203) (20,202) (25,205) (30,204) (35,207) (40,206)};
+    {(5,203) (10,206) (15,203) (20,202) (25,205) (30,204) (35,207) (40,206) (45,206) (50,204)};
   \node[font=\scriptsize\itshape, color=inkmuted, anchor=west]
-    at (axis cs:40.5,206) {$3\delta$ floor (\textasciitilde204\,ms)};
+    at (axis cs:50.5,204) {$3\delta$ floor};
 
   % K-DHT (light gray, climbs monotonically with N)
   \addplot[gray, line width=0.9pt, mark=*, mark size=1.5pt] coordinates
-    {(5,716) (10,770) (15,790) (20,818) (25,832) (30,850) (35,876) (40,879)};
-  \node[font=\scriptsize, color=inkmuted, anchor=west] at (axis cs:40.5,879) {Kademlia};
+    {(5,716) (10,770) (15,790) (20,818) (25,832) (30,850) (35,876) (40,879) (45,893) (50,896)};
+  \node[font=\scriptsize, color=inkmuted, anchor=west] at (axis cs:50.5,896) {Kademlia};
 
   % G-DHT (tracks K-DHT closely on global — no locality benefit
   % for global lookups; locality only helps regional cells)
   \addplot[gray!70!black, line width=0.9pt, mark=*, mark size=1.5pt] coordinates
-    {(5,693) (10,769) (15,787) (20,802) (25,816) (30,819) (35,832) (40,851)};
-  \node[font=\scriptsize, color=inkmuted, anchor=west] at (axis cs:40.5,851) {G-DHT};
+    {(5,693) (10,769) (15,787) (20,802) (25,816) (30,819) (35,832) (40,851) (45,845) (50,851)};
+  \node[font=\scriptsize, color=inkmuted, anchor=west] at (axis cs:50.5,851) {G-DHT};
 
-  % Axona (rust accent — flat curve at 240-280 ms; floor-ratio 1.17–1.35×)
+  % Axona (rust accent — flat curve at 240-280 ms; floor-ratio 1.17–1.38×)
   \addplot[rust, line width=1.4pt, mark=*, mark size=2pt] coordinates
-    {(5,239) (10,255) (15,262) (20,266) (25,267) (30,271) (35,270) (40,279)};
-  \node[font=\scriptsize, color=rust, anchor=west] at (axis cs:40.5,279) {Axona};
+    {(5,239) (10,255) (15,262) (20,266) (25,267) (30,271) (35,270) (40,279) (45,281) (50,282)};
+  \node[font=\scriptsize, color=rust, anchor=west] at (axis cs:50.5,282) {Axona};
 
 \end{axis}
 \end{tikzpicture}
-\caption[Latency vs.\ network size]{Global lookup latency versus network size at $5{,}000$, $10{,}000$, $15{,}000$, $20{,}000$, $25{,}000$, $30{,}000$, $35{,}000$, and $40{,}000$ nodes ($8\times$ scaling), plotted against the Dabek $3\delta$ analytical floor (gray dashed). Kademlia climbs from $716$ to $879$\,ms as the log-$N$ hop tax compounds; G-DHT tracks Kademlia almost identically on \emph{global} lookups (the geographic prefix only helps regional cells). Axona hugs the floor in a tight $239$--$279$\,ms band across the whole range ($1.17$--$1.35\times$ the $3\delta$ floor) and is essentially flat from $15{,}000$ nodes onward. All success rates $100\%$. Data: sim v0.93.0 / \texttt{@axona/protocol} v1.1.3, May 2026.}
+\caption[Latency vs.\ network size]{Global lookup latency versus network size at every $5{,}000$ from $5{,}000$ to $50{,}000$ nodes ($10\times$ scaling), plotted against the Dabek $3\delta$ analytical floor (gray dashed). Kademlia climbs from $716$ to $896$\,ms as the log-$N$ hop tax compounds; G-DHT tracks Kademlia almost identically on \emph{global} lookups (the geographic prefix only helps regional cells). Axona hugs the floor in a tight $239$--$282$\,ms band across the whole range ($1.17$--$1.38\times$ the $3\delta$ floor) and is essentially flat from $15{,}000$ nodes onward --- adding $35{,}000$ more nodes raises latency by $20$\,ms total. All success rates $100\%$. Data: sim v0.93.0 / \texttt{@axona/protocol} v1.1.3, May 2026.}
 \label{fig:floor}
 \end{figure*}
 
-\textbf{Axona hugs the floor at $1.17$--$1.35\times$} across an $8\times$ scaling range (5{,}000 to 40{,}000 nodes). At $25{,}000$ nodes it routes a global lookup in $267$~ms vs a $205$~ms $3\delta$ floor ($\delta \approx 68$~ms), and the curve is essentially flat from $15{,}000$ nodes onward: $262$, $266$, $267$, $271$, $270$, $279$~ms across the next $25{,}000$ added nodes. The $\sim$30\% residual overhead has a clean structural explanation: Axona takes about 4--5 hops where an ideal protocol would take 3, and each ``extra'' hop costs about $\delta/2$, exactly as the geometric series predicts.
+\textbf{Axona hugs the floor at $1.17$--$1.38\times$} across a $10\times$ scaling range (5{,}000 to 50{,}000 nodes). At $25{,}000$ nodes it routes a global lookup in $267$~ms vs a $205$~ms $3\delta$ floor ($\delta \approx 68$~ms), and the curve is essentially flat from $15{,}000$ nodes onward: $262$, $266$, $267$, $271$, $270$, $279$, $281$, $282$~ms as the network grows by another $35{,}000$ peers. The $\sim$30\% residual overhead has a clean structural explanation: Axona takes about 4--5 hops where an ideal protocol would take 3, and each ``extra'' hop costs about $\delta/2$, exactly as the geometric series predicts.
 
-Plain Kademlia, by contrast, gets \emph{worse} as the network grows: from $716$~ms at $5{,}000$ nodes to $879$~ms at $40{,}000$. Its log-$N$ hop tax compounds at full per-hop RTT every hop. G-DHT tracks Kademlia almost identically on global lookups---the geographic prefix only helps regional cells, where every hop is short. Axona approaches the floor by learning per-hop locality: its Action-Potential scoring weights short-RTT edges so heavily that even a hop ``inefficient'' by raw count is short in wall-clock time.
+Plain Kademlia, by contrast, gets \emph{worse} as the network grows: from $716$~ms at $5{,}000$ nodes to $896$~ms at $50{,}000$. Its log-$N$ hop tax compounds at full per-hop RTT every hop. G-DHT tracks Kademlia almost identically on global lookups---the geographic prefix only helps regional cells, where every hop is short. Axona approaches the floor by learning per-hop locality: its Action-Potential scoring weights short-RTT edges so heavily that even a hop ``inefficient'' by raw count is short in wall-clock time.
 
 % =====================================================================
 % IX. ABLATION

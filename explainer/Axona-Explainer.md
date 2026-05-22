@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.05 · 2026-05-22 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.06 · 2026-05-22 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -193,9 +193,9 @@ No matter how clever your routing, no matter how big your network, you can't bea
 
 For two decades, no published DHT had been measured at this floor. The best implementations got to maybe 2× the floor.
 
-**Axona hugs the floor at 1.17–1.35×** across an 8× scaling range (5,000 to 40,000 nodes). At 25,000 nodes it routes a global lookup in 267 ms vs a 205 ms 3δ floor (δ ≈ 68 ms), and the curve is essentially flat from 15,000 nodes onward: 262, 266, 267, 271, 270, 279 ms across the next 25,000 added nodes. The ~30% residual overhead has a clean structural explanation: Axona takes about 4–5 hops where an ideal protocol would take 3, and each "extra" hop costs about δ/2, exactly as the geometric series predicts.
+**Axona hugs the floor at 1.17–1.38×** across a 10× scaling range (5,000 to 50,000 nodes). At 25,000 nodes it routes a global lookup in 267 ms vs a 205 ms 3δ floor (δ ≈ 68 ms), and the curve is essentially flat from 15,000 nodes onward: 262, 266, 267, 271, 270, 279, 281, 282 ms as the network grows by another 35,000 peers. The ~30% residual overhead has a clean structural explanation: Axona takes about 4–5 hops where an ideal protocol would take 3, and each "extra" hop costs about δ/2, exactly as the geometric series predicts.
 
-Plain Kademlia, by contrast, gets *worse* as the network grows: from 716 ms at 5,000 nodes to 879 ms at 40,000. Its log-N hop tax compounds at full per-hop RTT every hop. G-DHT tracks Kademlia almost identically on global lookups — the geographic prefix only helps regional cells, where every hop is short. Axona approaches the floor by learning per-hop locality: its Action-Potential scoring weights short-RTT edges so heavily that even a hop "inefficient" by raw count is short in wall-clock time.
+Plain Kademlia, by contrast, gets *worse* as the network grows: from 716 ms at 5,000 nodes to 896 ms at 50,000. Its log-N hop tax compounds at full per-hop RTT every hop. G-DHT tracks Kademlia almost identically on global lookups — the geographic prefix only helps regional cells, where every hop is short. Axona approaches the floor by learning per-hop locality: its Action-Potential scoring weights short-RTT edges so heavily that even a hop "inefficient" by raw count is short in wall-clock time.
 
 ## Is It Really the Learning, or Just the Geography?
 
