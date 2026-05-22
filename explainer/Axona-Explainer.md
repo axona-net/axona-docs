@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.07 · 2026-05-22 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.08 · 2026-05-22 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -280,13 +280,23 @@ This has been an incredibly symbiotic experience.
 
 ---
 
-## Postscript: Counting the Protocols
+## Postscript: How We Got Here
 
-*This section captures a Q&A exchange that surfaced after the main text was complete. It is included verbatim because the answers to these two questions describe how the design got to where it is — which is at least as interesting as where it is.*
+Most simulation work in distributed systems begins with a protocol and writes a testbed to validate it. We did the opposite. We built the simulator first — about 25,000 lines of JavaScript that creates N peers on a virtual globe, runs them through a fixed benchmark grid, and emits one CSV per run. Then we used that lab to design the protocol.
 
-### How many different protocols have we generated, including Axona?
+### Step 1 — The simulator before the protocol
 
-Surveying every protocol label that ever appeared in a benchmark CSV plus what is actively defined today, by family:
+The first commit to `dht-sim` is dated **March 19, 2026**. The first benchmark CSV is dated March 24. From that point forward, every protocol idea had to survive the grid before earning the right to be carried forward to the next iteration.
+
+The grid was deliberately fixed at the start and held stable for the rest of the run. Ten population sizes — 5,000 nodes stepping by 5,000 up to 50,000. Five test cells per population — global lookups, regional 500 km / 2000 km / 5000 km, and 5% per-tick churn. A separate single-bridge partition test ("Slice World") that asks whether the protocol can dissolve a network split by repeated successful crossings. Three metrics per cell — hop count, wall-clock latency, success rate. The simulator runs the whole grid in a single browser tab; the results emit as one CSV per run, archived in `dht-sim/results/`.
+
+The point of fixing the grid early was not measurement aesthetics. It was a methodological commitment: every later protocol idea had to be judged against the same yardstick so that promotion and retirement were measurable, not editorial. The grid is the lab's calibration. If it drifts, the lab stops working.
+
+### Step 2 — Iterate protocols against the grid
+
+With the lab built, we started designing protocols. The first was **N-1** in late March — classical neuromorphic ideas applied to routing: Hebbian long-term potentiation, a routing-table population of "synapses" with adaptive weights, time-based decay. We ran it against the grid. We learned which cells it won and which it lost. We then designed N-2, ran it, kept the parts that improved cells, and threw out the parts that didn't. Then N-3. And so on.
+
+Nine weeks later, by mid-May, we had measured **47 distinct DHT designs**:
 
 | Family | Count | Members |
 |---|--:|---|
@@ -294,33 +304,45 @@ Surveying every protocol label that ever appeared in a benchmark CSV plus what i
 | **G-DHT** (geographic prefix) | 4 historical → 1 current | G-DHT-8, G-DHT-10, G-DHT-a, **G-DHT** (the surviving `geob` variant) |
 | **N-series** (first neuromorphic exploration) | 17 | N-1, N-2, N-2-BP, N-2-SHC, N-3, N-4, N-5, N-5W, N-6W, N-7W, N-8W, N-9W, N-10W, N-11W, N-12W, N-13W, N-15W |
 | **NS-series** (intermediate generation) | 6 | NS-1 … NS-6 |
-| **NX-series** (focused iteration) | 17 | NX-1W, NX-2W, NX-3 … NX-17 (the whole 3-through-17 run, all numbers present) |
+| **NX-series** (focused iteration) | 17 | NX-1W, NX-2W, NX-3 … NX-17 |
 | **NH-series** (final consolidation) | 1 | NH-1 |
 | **Axona** (deployed protocol) | 1 | Axona |
 | **Total distinct protocols** | **47** | — |
 
-Two ways to count: **47 distinct named protocols** if you count every variant ever benchmarked (each one was a real, runnable code path that got measured against the others), or **3 protocols** if you mean the canonical set the paper and explainer present today: K-DHT, G-DHT, Axona.
+The N-series was the original exploration. Branches with suffixes BP (back-propagation), SHC (synaptic-hop cache), and W (weighted) carried experiments that diverged from the trunk and were rolled back when they didn't pay off. NS-1…NS-6 was an intermediate generation focused on the synaptome data structure itself. NX-1…NX-17 was the focused iteration — each NX adding or testing a single mechanism, measuring it against the grid, keeping or retiring. NX-17 was the high-water mark by mechanism count: 18 distinct rules and 44 parameters.
 
-Notes on the lineage. The N-series was the original exploration: N-1 → N-15W, with various branches (BP = back-propagation, SHC = synaptic-hop cache, W = weighted). NS-1…NS-6 was an intermediate "Neuromorphic Synaptome" generation. NX-1…NX-17 was the focused iteration that culminated in NX-17 (the 18-rule / 44-parameter version). NH-1 collapsed NX-17's 18 rules and 44 parameters into 12/12 — the consolidation. Axona wraps NH-1's routing kernel with the production transport layer plus the churn-cleanup work and is what is deployed.
+### Step 3 — What promotion and retirement looked like
 
-NX-14 is interesting — present in old benchmark CSVs but its source file is no longer in the active tree (absorbed into NX-15 during cleanup). NX-16 lives in `axona-docs/dead-ends/` as a preserved cautionary example. Both are real protocols that ran and produced numbers; they just did not make it forward.
+Almost every retirement was the same shape. A candidate mechanism made one cell better and another cell worse. NX-11 added a "second-tier" synaptome scoring — r500 improved by 8 ms, churn-cell success dropped from 99% to 96%. NX-12 tried to fix the churn cell by lengthening the protection window — r500 regressed back. The grid made the trade visible immediately. Most NX revisions died this way: not because they were bad ideas, but because they couldn't simultaneously satisfy seven cells.
 
-So: a lot more than people would guess from looking at the current three-protocol paper. The clean 3-way comparison is the residue of about nine weeks of failed and partially-successful learning-adaptive DHT designs that all got measured against the same benchmark grid before being either kept or retired.
+Promotion looked different. A mechanism would win on its native cell and survive into the next generation even when the protocol around it was retired. **Long-term potentiation** came forward intact from N-5W and has lived in every neuromorphic protocol since. **Surrogate routing** (the "iterative fallback") came from NX-4; every protocol without it failed Slice World at 0%, so every protocol from NX-4 onward kept it. **Hop caching** came from NX-6 because it shortened paths the next iteration could measure. **Triadic closure** came from NX-7. **Two-hop lookahead** came from NX-15. By the time NX-17 consolidated everything that had survived, the rule set was 18 deep — and every one of those 18 had a falsification trail across earlier iterations.
 
-### What does it mean that the clean 3-way comparison is "the residue" of nine weeks of failed designs?
+NH-1 then collapsed NX-17's 18 rules into 12, and 44 parameters into 12, by keeping only the rules with the deepest falsification trails and folding the rest into a single vitality function. NH-1 is not a design choice; it is what was left after the things that didn't work were measurably removed. That is what Axona's routing logic is.
 
-That last sentence is the part of the project I would put on the table first if I were arguing for it intellectually — more than the 1.33× floor number.
+A few dead ends are worth noting because they're informative. NX-3 tried routing without iterative fallback; Slice World success collapsed to 0% and the test caught it immediately. NX-14 lost to NX-15 on r500 by 12 ms and the source file is now retired from the tree (but the CSV is still in `results/`). NX-16 tried to fix routing-table imbalance by masking the low bits of the distance metric; global latency exploded and the protocol now lives in `axona-docs/dead-ends/` as a cautionary example.
 
-**The fixed-grid claim.** Every protocol — from N-1 in late March 2026 (the simulator's first commit was March 19) through to today's Axona, nine weeks later — has been measured against essentially the same benchmark harness: 5K / 25K / 50K nodes × {global, r500, r1000, r2000, r5000, 5% churn, Slice World} × {success rate, hop count, latency}. The harness itself moved a little (the latency model got tightened in v1.1.2, the churn model got more aggressive somewhere around NX-11) but the *cells* are stable. A CSV from April 8, 2026 reading "NX-7 global 5K = 243.6 ms / 3.28 hops / 100%" is directly comparable to today's CSV reading "Axona global 5K = 238.75 ms / 4.33 hops / 100%" — six weeks apart, same benchmark grid, similar wall-clock at different hop counts. That comparability is the whole game.
+### Step 4 — Unbinding the protocol from the simulator
 
-**What "failure" looked like.** Almost always: a candidate mechanism made one cell better and another cell worse. NX-11 added a "second-tier" synaptome scoring; r500 improved by 8 ms, churn-cell success dropped from 99% to 96%. NX-12 tried to fix the churn cell by lengthening the protection window; r500 regressed back. The grid made the trade visible immediately. Most NX revisions died this way — not because they were bad ideas, but because they could not simultaneously satisfy seven cells.
+By early May we had NH-1 — twelve rules, twelve parameters, one vitality function, measurably the strongest variant. But at this point the protocol was still defined by its simulator. The code ran in a single Node.js process where every node had direct access to every other node's state through a god's-eye `nodeMap`. That was useful for development and unacceptable for deployment. A real peer-to-peer system has no god's-eye view; every peer only knows what it learns through actual network messages.
 
-**What "partial success" looked like.** A mechanism wins on its native cell and survives into the next generation even when the protocol around it is retired. LTP came forward intact from N-5W. Surrogate routing (the "iterative fallback") came from NX-4 and has lived in every neuromorphic protocol since. Two-hop lookahead came from NX-15. Hop caching came from NX-6. Triadic closure came from NX-7. When NH-1 consolidated "18 rules into 12," it was not picking favorites — it was keeping the rules that had been preserved by selection across the previous 16 generations and discarding the ones that had been kept around for sentimental reasons.
+So we did something most simulator-first projects never do. We refactored the protocol code until the simulator's view collapsed into the same view a real network would have. Over roughly fifteen commits, every cross-peer read became a `transport.send()` call. Every liveness check became a real heartbeat. Every routing decision was made by the peer that owns the data, not by the source of the lookup. The `nodeMap` survived only in places that orchestrate the simulator itself — spinning a node up, tearing it down — which production replaces with operating-system process startup and shutdown.
 
-**Why this matters epistemically.** In a normal paper, you see the final design. You cannot tell whether the 12 rules were chosen because they work or because the author happens to like them. Here every rule has a falsification trail: NX-3 tried to do without surrogate routing and Slice World success collapsed to 0%. NX-16 tried to fix routing-table imbalance by masking the low bits of the distance metric and global latency exploded; the protocol now lives in `dead-ends/` as a cautionary example. The current rule set is what is left after the things that *do not* work were measurably removed.
+We then ran a parity-gate benchmark: 25,000 nodes, before and after the refactor. The neuromorphic protocols came out within 5% on hop counts and 1% on latency. The small drift upward was the architecturally-honest cost of letting each peer make its own decisions instead of the source orchestrating the walk. K-DHT, G-DHT, and the prior NX variants came out within 1% across the board.
 
-**The methodology is the contribution.** The simulator is open source. Every CSV is in the repository. NX-14 is gone from the source tree, but the benchmark numbers it produced are still in `results/benchmark_2026-04-18T*.csv` — anyone can verify that it lost to NX-15 on r500 by 12 ms and lost it the right way. The retirement of any protocol is a falsifiable claim, not an opinion. That is a different epistemic posture from "we designed Axona and measured it"; it is "we ran 47 designs through the same gauntlet and three survived."
+**After that refactor, the simulator stopped being a simulation of the protocol. It became the protocol.** The same `AxonaPeer.js` that runs inside the 25,000-node browser-tab simulation is the `AxonaPeer.js` that ships in `axona-peer` and runs on `axona.net` over real WebRTC connections. The Transport layer changes — `SimulatedTransport` in the simulator, `WebRTCTransport` in production — but the routing logic is identical, byte-for-byte. Every hop count, every latency curve, every churn-resilience number from the simulator transfers to the real network because the routing decisions that produce those numbers are made in code that doesn't know it's being simulated.
 
-This is also why the v0.93.0 `super.buildRoutingTables` discovery felt so important. The bilateral-cap bug had been silently inflating Axona's apparent advantage for some unknown number of measurement cycles. Once it was found, the gauntlet was reapplied with the fix in place, and the conclusion held — Axona ties NH-1 and NX-17 on routing, wins decisively on churn. Without the grid, that correction would have been a self-report. *With* the grid, every prior measurement that touched the bug becomes re-runnable and the residue becomes more defensible, not less.
+This is the part of the project I would put on the table first if I were arguing for it intellectually. Not the 1.33× floor number. Not the 47-protocols-in-9-weeks pace. **The fact that the lab and the deployed system are the same code.**
 
-The clean 3-way comparison in the paper is not the *design*. It is the *fossil record*. The design is everything that is not in the paper anymore.
+### Step 5 — The fixed-grid claim, in retrospect
+
+All of the above only works because the benchmark grid stayed stable as the protocol churned. The cells the simulator iterates against have been essentially unchanged since week one. The latency model got a small refinement in v1.1.2 (live per-hop RTT instead of a value stamped at synapse admission). The churn-rate model got more aggressive somewhere around NX-11. But the cells are the same. A CSV from April 8, 2026 reading "NX-7 global 5K = 243.6 ms / 3.28 hops / 100%" is directly comparable to today's CSV reading "Axona global 5K = 238.75 ms / 4.33 hops / 100%" — six weeks apart, same grid, similar wall-clock at different hop counts (Axona uses learned RTT routing where NX-7 used pure XOR distance, which is why Axona walks more hops but each one is shorter).
+
+That comparability is what lets the simulator be a falsification tool rather than a proof-of-concept tool. It is what lets us say "47 variants were measured" rather than "47 variants were imagined."
+
+It is also what made the v0.93.0 `super.buildRoutingTables` discovery from earlier this month into a methodological vindication rather than a methodological embarrassment. A bilateral-cap bug had been silently inflating Axona's apparent advantage for some unknown number of measurement cycles. Once we found it, we re-applied the grid with the fix in place, and the conclusion held — Axona ties the underlying NH-1 / NX-17 routing kernels on routing quality, and wins decisively on churn. Without the grid, that correction would have been a self-report. With the grid, every prior measurement that touched the bug became re-runnable and the residue became *more* defensible, not less.
+
+### What it adds up to
+
+In a normal research paper you see the final design. You can't tell whether the 12 rules of NH-1 were chosen because they work or because the author happens to like them. Here every rule has a falsification trail. The lab is open source. Every CSV is in the repository. Every retired protocol's measurements are still on disk. The simulator is the protocol, and the protocol is the deployed network.
+
+The clean 3-way comparison in the paper is not the *design*. It is the *fossil record*. The design is everything that is not in the paper anymore — and the simulator that produced it and the production network running it are the same code.
