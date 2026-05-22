@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.00 · 2026-05-22 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.01 · 2026-05-22 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -61,6 +61,8 @@ The routing algorithm doesn't change at all, but XOR distance now approximately 
 Total: about 91 ms instead of 2 seconds. **Roughly 20× faster** for regional traffic, just from changing the *structure* of the addresses.
 
 The cost: nodes can lie about where they are. This is a "cooperative trust" assumption. Mitigations exist, but for now G-DHT trades some defense against location-spoofing for a large speedup.
+
+Of course a user can choose to associate themselves with any location in the world. This very rough location is a kind area code, but it and the associated address are provably yours independent of actual location.
 
 ## Idea #2: A Network That Learns Like a Brain
 
