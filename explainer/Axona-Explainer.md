@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.06 · 2026-05-22 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.07 · 2026-05-22 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -305,13 +305,13 @@ Notes on the lineage. The N-series was the original exploration: N-1 → N-15W, 
 
 NX-14 is interesting — present in old benchmark CSVs but its source file is no longer in the active tree (absorbed into NX-15 during cleanup). NX-16 lives in `axona-docs/dead-ends/` as a preserved cautionary example. Both are real protocols that ran and produced numbers; they just did not make it forward.
 
-So: a lot more than people would guess from looking at the current three-protocol paper. The clean 3-way comparison is the residue of about three years of failed and partially-successful learning-adaptive DHT designs that all got measured against the same benchmark grid before being either kept or retired.
+So: a lot more than people would guess from looking at the current three-protocol paper. The clean 3-way comparison is the residue of about nine weeks of failed and partially-successful learning-adaptive DHT designs that all got measured against the same benchmark grid before being either kept or retired.
 
-### What does it mean that the clean 3-way comparison is "the residue" of three years of failed designs?
+### What does it mean that the clean 3-way comparison is "the residue" of nine weeks of failed designs?
 
 That last sentence is the part of the project I would put on the table first if I were arguing for it intellectually — more than the 1.33× floor number.
 
-**The fixed-grid claim.** Every protocol — from N-1 in late 2023 through to today's Axona — has been measured against essentially the same benchmark harness: 5K / 25K / 50K nodes × {global, r500, r1000, r2000, r5000, 5% churn, Slice World} × {success rate, hop count, latency}. The harness itself moved a little (the latency model got tightened in v1.1.2, the churn model got more aggressive somewhere around NX-11) but the *cells* are stable. A CSV from April 2024 reading "NX-7 global 25K = 312 ms / 4.8 hops / 100%" is comparable, give or take a small constant, to today's CSV reading "Axona global 25K = 272 ms / 5.5 hops / 100%." That comparability is the whole game.
+**The fixed-grid claim.** Every protocol — from N-1 in late March 2026 (the simulator's first commit was March 19) through to today's Axona, nine weeks later — has been measured against essentially the same benchmark harness: 5K / 25K / 50K nodes × {global, r500, r1000, r2000, r5000, 5% churn, Slice World} × {success rate, hop count, latency}. The harness itself moved a little (the latency model got tightened in v1.1.2, the churn model got more aggressive somewhere around NX-11) but the *cells* are stable. A CSV from April 8, 2026 reading "NX-7 global 5K = 243.6 ms / 3.28 hops / 100%" is directly comparable to today's CSV reading "Axona global 5K = 238.75 ms / 4.33 hops / 100%" — six weeks apart, same benchmark grid, similar wall-clock at different hop counts. That comparability is the whole game.
 
 **What "failure" looked like.** Almost always: a candidate mechanism made one cell better and another cell worse. NX-11 added a "second-tier" synaptome scoring; r500 improved by 8 ms, churn-cell success dropped from 99% to 96%. NX-12 tried to fix the churn cell by lengthening the protection window; r500 regressed back. The grid made the trade visible immediately. Most NX revisions died this way — not because they were bad ideas, but because they could not simultaneously satisfy seven cells.
 
