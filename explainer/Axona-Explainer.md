@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.02 · 2026-05-22 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.03 · 2026-05-22 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -275,3 +275,5 @@ Step back from the technical details. The big idea:
 This isn't just a faster DHT. It's a demonstration that adaptive systems with the right learning rules find their own structure — that ten well-chosen rules grounded in biology can deliver what twenty years of DHT engineering had not, and that you can hit a theoretical limit that's stood for two decades by importing the right idea from a different field.
 
 Code, data, simulator, and the red-team analysis criticizing it are open source.
+
+This has been an incredibly symbiotic experience.
