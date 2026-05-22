@@ -4,7 +4,7 @@ size: 16:9
 theme: default
 paginate: true
 header: ""
-footer: "AXONA · v0.16 · May 2026 · confidential"
+footer: "AXONA · v0.17 · May 2026 · confidential"
 style: |
   /* ── Tufte-inspired typography + cream paper ─────────────────── */
   @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Inconsolata:wght@400;500&display=swap');
@@ -164,7 +164,7 @@ style: |
 
 <div class="meta">
 
-May 2026 · v0.16 · readable deck
+May 2026 · v0.17 · pitch
 Source: <a href="https://github.com/axona-net">github.com/axona-net</a> · live: <a href="https://axona.net">axona.net</a>
 Contact: <a href="mailto:davidasmith@gmail.com">davidasmith@gmail.com</a>
 
@@ -377,7 +377,7 @@ K=5 root replication · lazy cache for publish-before-subscribe · recruits sub-
 
 <code>src/pubsub/AxonPubSub.js</code>
 <code>src/pubsub/AxonManager.js</code>
-<code>src/dht/neuromorphic/NeuromorphicDHTNX17.js</code>
+<code>src/dht/AxonaPeer.js</code>
 
 </div>
 </div>
@@ -389,16 +389,16 @@ K=5 root replication · lazy cache for publish-before-subscribe · recruits sub-
 
 ## 5 / Performance
 
-# Half the latency. 100% delivery. 25,000 nodes.
+# At the theoretical floor. 100% delivery. 25,000 nodes.
 
-- <span class="head">52% lower global lookup latency than Kademlia.</span>
-  At 25,000 simulated nodes: <span class="num">242ms vs 509ms</span>. The simplified production protocol NH-1 is within 5% of SOTA at a fraction of the implementation surface.
-- <span class="head">85% lower latency on regional traffic — locality compounds.</span>
-  500km lookups: <span class="num">79ms vs 513ms</span>. Neuromorphic routing learns geographic clusters from usage; static DHTs cannot.
-- <span class="head">100% delivery under 5% per-tick churn.</span>
-  Still half of Kademlia's wall-clock latency. Churn-resilience is structural — synapses reheat and re-route as topology changes.
+- <span class="head">68% lower global lookup latency than Kademlia.</span>
+  25,000 simulated nodes: <span class="num">272ms vs 842ms</span>. That puts Axona at <strong>1.33× the Dabek 3δ analytical floor</strong> — within 68ms of the theoretical lower bound for any recursive O(log N) DHT. First published DHT measured at this floor.
+- <span class="head">87% lower latency on regional traffic. Learning still wins without geography.</span>
+  500km lookups: <span class="num">107ms vs 843ms</span>. Strip the geographic prefix entirely (random IDs, no locality structure) and Axona <em>still</em> beats Kademlia by 40% from learning alone — the contributions are independent.
+- <span class="head">100% delivery under 5% churn at 239ms — 31% of Kademlia's wall-clock.</span>
+  Production-quality dead-peer cleanup keeps the synaptome clean as topology changes; the routing table tracks the live mesh rather than the historical one.
 
-<img src="../presentation/charts/C_4way_25k.svg" alt="4-way protocol comparison at 25K nodes" height="180" style="max-width: 100%; margin-top: 6px; background: white; padding: 4px; border: 1px solid #d8d4ca; display: block;" />
+<img src="../presentation/charts/C_4way_25k.svg" alt="Protocol comparison at 25K nodes" height="180" style="max-width: 100%; margin-top: 6px; background: white; padding: 4px; border: 1px solid #d8d4ca; display: block;" />
 
 </div>
 <div class="margin">
@@ -415,11 +415,20 @@ Live network of 25K simulated peers on a geographic globe. Every dot is a node; 
 |---|---|---|---|
 | Kademlia | 842 | 843 | 762 |
 | G-DHT | 826 | 177 | 767 |
-| NX-17 | 265 | 105 | 291 |
-| NH-1 | 260 | 103 | 293 |
-| <span class="num">Axona</span> | 272 | 107 | <span class="num">239</span> |
+| <span class="num">Axona</span> | <span class="num">272</span> | <span class="num">107</span> | <span class="num">239</span> |
 
-*All success rates 100%. NX-17 / NH-1 / Axona tie on routing (~3% spread — same kernel). Axona's dividend is the **5 % churn band** at 239 ms / 4.38 hops vs ~292 ms / ~6.1 hops for NX-17 / NH-1 — production-quality dead-peer cleanup vs lazy eviction.*
+*All success rates 100%. 3δ floor at this population = 204ms (δ=68ms one-way). Axona = 1.33× the floor; Kademlia = 4.13×.*
+
+#### Geography ablation
+
+Strip the S2 prefix entirely (random IDs, no locality):
+
+| Protocol | gB=0 global ms |
+|---|---|
+| Kademlia | 852 |
+| <span class="num">Axona</span> | <span class="num">513</span> |
+
+*Axona still ~40% faster than Kademlia from learning alone. Geography is a multiplier, not the source.*
 
 #### Methodology
 
@@ -595,8 +604,8 @@ The result: routing tables that mirror the actual traffic graph of the applicati
    &nbsp;&nbsp;<a href="https://github.com/axona-net/dht-sim"><strong>dht-sim</strong></a> &nbsp;—&nbsp; reference simulator · 25,000-peer protocol evaluation on a 3D globe
 - <span class="head">The wedge: <a href="https://civildefense.io">civildefense.io</a> is the proof. The next 100 apps are the playbook.</span>
   Users tap a map to report immediate concerns; locations propagate over anonymous P2P; reports fade in 24 hours. Built in weeks because protocol primitives — signed posts, geographic locality, implicit expiry — map directly. We don't need Anthropic or OpenAI's blessing; we need <strong>the long tail of independent developers</strong> — civic apps, IoT meshes, agent toolchains — for whom Axona makes cross-vendor integration trivial.
-- <span class="head">Empirical protocol evolution, open source.</span>
-  Seventeen routing variants (NX-1 → NX-17) plus NH-1 evaluated against Kademlia and G-DHT — <strong>the simulator <em>is</em> the protocol</strong>, same JavaScript in production and bench.
+- <span class="head">Empirical protocol evolution. The fossil record is open source.</span>
+  <strong>47 distinct DHT designs</strong> have been measured against the same benchmark grid; three survived (Kademlia baseline, G-DHT geographic, Axona). Every retired variant's CSV is still in the repo as a falsification trail — the design is the residue, not an opinion. <strong>The simulator <em>is</em> the protocol</strong>: same JavaScript in production and bench.
 
 </div>
 <div class="margin">
