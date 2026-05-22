@@ -4,7 +4,7 @@ theme: default
 size: 16:9
 paginate: true
 header: "Axona"
-footer: "v0.3.54 · sim v0.89.0 · 2026-05-21"
+footer: "v0.3.55 · sim v0.93.0 · 2026-05-21"
 style: |
   section {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
@@ -814,22 +814,22 @@ A non-obvious result from running every NX variant under two starting conditions
 
 ## Five-way comparison at 25,000 nodes
 
-<span class="muted">Web-limited (cap = 100), omniscient init, geoBits = 8, no highway promotion. Same node geometry across all five protocols. **Canonical init**: every protocol uses identical K-closest XOR-fill bootstrap so the routing/learning algorithm is measured in isolation from any per-protocol bootstrap strategy. δ_median = 67.8 ms; 3δ floor = 203 ms.</span>
+<span class="muted">Web-limited (cap = 100), omniscient init, geoBits = 8, no highway promotion. Same node geometry across all five protocols. **Canonical init**: every protocol uses identical K-closest XOR-fill bootstrap so the routing/learning algorithm is measured in isolation from any per-protocol bootstrap strategy. δ_median = 67.8 ms; 3δ floor = 204 ms.  Sim v0.93.0 / `@axona/protocol` v1.1.2.</span>
 
-| Test | Kademlia | G-DHT | NX-17 | NH-1 | **Axona** |
+| Test | Kademlia | G-DHT | NX-17 | NH-1 | Axona |
 |---|---:|---:|---:|---:|---:|
-| Global (hops / ms)      | 4.50 / 845 | 5.55 / 820 | 5.56 / 270 | 5.26 / 261 | 5.08 / **255** |
-| 500 km (hops / ms)      | 4.49 / 826 | 4.87 / 179 | 3.70 / 107 | 3.60 / 105 | 3.15 / **92**  |
-| 2000 km (hops / ms)     | 4.51 / 835 | 5.24 / 249 | 4.30 / 134 | 4.33 / 137 | 3.88 / **122** |
-| 5000 km (hops / ms)     | 4.50 / 824 | 5.39 / 385 | 4.77 / 171 | 4.74 / 173 | 4.28 / **157** |
-| 5 % churn (hops / ms)   | 4.19 / 795 | 5.01 / 751 | 6.15 / 292 | 6.16 / 295 | 4.24 / **230** |
-| Lookup success          | 100 %      | 100 %      | 100 %      | 100 %      | **100 %**      |
+| Global (hops / ms)      | 4.46 / 842 | 5.58 / 826 | 5.49 / 265 | 5.36 / **260** | 5.49 / 272 |
+| 500 km (hops / ms)      | 4.49 / 843 | 4.89 / 177 | 3.66 / 105 | 3.54 / **103** | 3.68 / 107 |
+| 2000 km (hops / ms)     | 4.54 / 843 | 5.31 / 249 | 4.21 / **131** | 4.23 / 134 | 4.27 / 134 |
+| 5000 km (hops / ms)     | 4.43 / 813 | 5.40 / 387 | 4.71 / **170** | 4.84 / 175 | 4.91 / 176 |
+| 5 % churn (hops / ms)   | 4.12 / 762 | 5.10 / 767 | 6.19 / 291 | 6.06 / 293 | **4.38 / 239** |
+| Lookup success          | 100 %      | 100 %      | 100 %      | 100 %      | 100 %      |
 
 <br>
 
-<span class="callout">Axona now leads on every cell. The widest gap is **5 % churn at 230 ms / 4.24 hops** — NX-17 and NH-1 lose ~1.5 hops to dead-peer eviction on the same workload, while Axona's learned-routing layer plus the v1.1.2 live-RTT lookup-latency kernel hold the hop count flat. Local-traffic latency drops to 89 % below Kademlia at the 500 km band.</span>
+<span class="callout">Three neuromorphic protocols (NX-17, NH-1, Axona) share the same `AxonaPeer` routing kernel and finish within ~3 % of each other on non-churn cells — the architecture predicts this and the data confirms it.  The decisive Axona dividend is the **5 % churn cell at 239 ms / 4.38 hops** — NX-17 and NH-1 lose ~1.7 hops to stale dead-peer entries in surviving peers' synaptomes, while Axona's `TransportAxonaEngine.removeNode` explicitly sweeps the dying nodeId out of every neighbour's state.  All three protocols still beat Kademlia 3–8× across the board.</span>
 
-<span class="muted">Native-init numbers (each protocol's own bootstrap strategy) sit within 5–10 ms of these on a per-cell basis; the 5-way ranking is identical. Canonical init is the headline measurement because it removes bootstrap variance from the algorithmic claim. r1000 cell omitted from this sweep — drop the 25K cost of the extra cell once the others stabilised.</span>
+<span class="muted">Earlier v0.3.54 numbers briefly placed Axona ahead on every cell — that was a missing `super.buildRoutingTables()` call in TransportAxonaEngine letting bootstrap admit unbounded synapses for Axona only.  v0.93.0 fixes the cap; corrected numbers above.  Native-init numbers sit within 5–10 ms of these per cell; the ranking is unchanged.</span>
 
 ---
 

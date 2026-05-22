@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small YZ.social\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.3.54 \quad 2026-05-21\par}
+{\small An Axona Explainer \quad v0.3.55 \quad 2026-05-21\par}
 \end{center}
 \vfill
 \null
@@ -482,7 +482,7 @@ For two decades, no published DHT had been measured at this floor. The best impl
 \label{fig:floor}
 \end{figure*}
 
-Axona hits \textbf{$1.25\times$ the floor} at 25{,}000 nodes ($254$ ms vs a $203$ ms $3\delta$ floor at $\delta = 67.8$ ms). NH-1 hits $1.28\times$, NX-17 hits $1.33\times$. All three sit at the theoretical limit. The remaining $\sim$25\% overhead is structural---they take about 4 to 5 hops where an ideal protocol would take 3, and each ``extra'' hop costs about $\delta/2$, exactly as the geometric series predicts.
+NH-1 hits \textbf{$1.27\times$ the floor} at 25{,}000 nodes ($260$ ms vs a $204$ ms $3\delta$ floor at $\delta = 68.0$ ms). NX-17 hits $1.30\times$, Axona hits $1.33\times$. All three sit at the theoretical limit ---within $\sim$3\% of each other, as the architecture predicts (they share the same \texttt{AxonaPeer} routing kernel and produce identical routing decisions given the same synaptome state). The remaining $\sim$25--30\% overhead is structural: they take about 4 to 5 hops where an ideal protocol would take 3, and each ``extra'' hop costs about $\delta/2$, exactly as the geometric series predicts.
 
 For comparison, plain Kademlia stays multiple $\delta$ above the floor as the network grows. The neuromorphic protocols approach the floor by learning per-hop locality; Kademlia's distance-only metric ignores RTT, so each hop costs the average inter-node delay rather than the geometric-halved one.
 
@@ -495,7 +495,7 @@ For comparison, plain Kademlia stays multiple $\delta$ above the floor as the ne
 
 An \textbf{ablation study} answers this.\marginnote{An ablation study removes one feature and re-runs everything to see what that feature actually contributed. It's the cleanest way to attribute a result to a specific mechanism.} Strip the geographic prefix entirely---random IDs again---and re-run the comparison.
 
-Result: with \textbf{zero geographic information}, NX-17 still routes \textbf{26\% faster than Kademlia}, and NH-1 routes \textbf{8\% faster}. The learning is doing real work, not sharpening pre-existing geographic structure.
+Result: with \textbf{zero geographic information} at 25{,}000 nodes, all three neuromorphic protocols (NX-17, NH-1, Axona) still route \textbf{$\sim$39--40\% faster than Kademlia} (523 / 524 / 513 ms vs Kademlia's 852 ms). The learning is doing real work, not sharpening pre-existing geographic structure.
 
 This is the kind of clean control experiment that should accompany any claim of this kind.
 

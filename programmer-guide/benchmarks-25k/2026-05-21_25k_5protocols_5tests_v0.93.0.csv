@@ -1,0 +1,32 @@
+# DHT Benchmark — 25,000 nodes · 500 lookups/cell
+# DHT Benchmark — 25,000 nodes · Omniscient Init
+Protocol,global hops,global ms,global success%,500km hops,500km ms,500km success%,2000km hops,2000km ms,2000km success%,5000km hops,5000km ms,5000km success%,5%churn hops,5%churn ms,5%churn success%
+Kademlia,4.458,841.71,100.0%,4.490,842.70,100.0%,4.538,843.45,100.0%,4.426,812.71,100.0%,4.118,762.38,100.0%
+G-DHT,5.580,825.90,100.0%,4.888,176.90,100.0%,5.308,248.99,100.0%,5.402,386.51,100.0%,5.100,767.21,100.0%
+NX-17,5.486,264.99,100.0%,3.662,105.06,100.0%,4.214,131.42,100.0%,4.714,169.55,100.0%,6.190,290.71,100.0%
+NH-1,5.356,260.20,100.0%,3.536,102.67,100.0%,4.230,134.25,100.0%,4.836,175.39,100.0%,6.058,292.85,100.0%
+Axona,5.488,271.59,100.0%,3.682,107.21,100.0%,4.268,134.28,100.0%,4.906,176.42,100.0%,4.380,239.01,100.0%
+
+# Run Parameters
+Parameter,Value
+Timestamp,2026-05-21T22:14:47.210Z
+Bidirectional,yes
+Nodes,25000
+Protocol,kademlia
+K (bucket size),20
+Alpha (parallel queries),3
+ID bits,64
+Node delay (ms),10
+Web limit,yes
+Max connections,100
+Highway %,0
+G-DHT Bits,8
+Lookups per cell,500
+Warmup sessions (neuromorphic),4
+Effective warmup lookups,5000
+Churn rate %,5
+δ median (one-way ms),67.66
+δ mean (one-way ms),69.68
+δ p95 (one-way ms),125.13
+3δ floor — median (ms),202.97
+3δ floor — mean (ms),209.03

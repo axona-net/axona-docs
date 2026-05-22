@@ -70,7 +70,7 @@
 {\large David A.~Smith\par}
 {\itshape\small YZ.social\par}
 \vspace{2em}
-{\small Version 0.3.54 \quad Simulator v0.91.0 \quad 2026-05-21\par}
+{\small Version 0.3.55 \quad Simulator v0.93.0 \quad 2026-05-21\par}
 \vfill
 \end{fullwidth}
 \newpage
@@ -4971,27 +4971,31 @@ because if it were true the protocol's contribution beyond
 The performance attribution would belong entirely to the
 prefix.
 
-\textbf{Result (May 2026, v1.1.2 / sim v0.91.0).} The
+\textbf{Result (May 2026, v1.1.2 / sim v0.93.0).} The
 hypothesis is falsified.  With \emph{zero} geographic
-information at $25{,}000$ nodes, all three adaptive
-protocols beat Kademlia by $\sim 40\%$ — Axona by $43\%$,
-NX-17 and NH-1 each by $39\%$.  See
-Table~\ref{tab:geobits-ablation} in the parallel ablation
-section below for the full numbers.  Lookup success
-remains $100\%$ across all five protocols at \texttt{geoBits}
-$= 0$ on every distance band.  The learning mechanisms do
-real work, attributable cleanly to the synaptome shaping
-itself by traffic.
+information at $25{,}000$ nodes, all three neuromorphic
+protocols beat Kademlia by $\sim 39\%$ on global lookups
+(NX-17 $523$ ms, NH-1 $524$ ms, Axona $513$ ms, vs Kademlia
+$852$ ms).  See Table~\ref{tab:geobits-ablation} in the
+parallel ablation section below for the full numbers.
+Lookup success remains $100\%$ across all five protocols at
+\texttt{geoBits} $= 0$ on every distance band.  The learning
+mechanisms do real work, attributable cleanly to the
+synaptome shaping itself by traffic.
 
-NH-1 and NX-17 are now indistinguishable at \texttt{geoBits}
-$= 0$ ($524$ vs $523$ ms global), closing the gap NH-1
-carried in earlier sim versions.  The $\sim 30\%$
-parameter-count reduction NH-1 trades for over NX-17 no
-longer comes with a measurable peak-performance cost in the
-no-locality regime.  Axona's $\sim 8\%$ further drop below
-NH-1/NX-17 is the production-Axona dividend from the
-TransportAxonaEngine churn-cleanup work (v0.85.0–v0.89.0)
-and the v1.1.2 per-hop live-RTT lookup-latency change.
+NX-17, NH-1, and Axona converge within $\sim 2\%$ on
+non-churn routing at \texttt{geoBits} $= 0$, exactly as the
+shared-\texttt{AxonaPeer}-kernel architecture predicts.
+The deployed-Axona dividend appears in the churn cell:
+$382$ ms vs $585$ (NX-17) / $614$ (NH-1) at $5\%$ churn,
+\texttt{geoBits} $= 0$ --- a $35$--$38\%$ saving from the
+explicit dying-nodeId sweep that
+\texttt{TransportAxonaEngine.removeNode} performs on every
+surviving peer's synaptome (work landed v0.85.0--v0.89.0).
+This cleanup advantage is geometric, not prefix-dependent ---
+it shows at \texttt{geoBits} $= 8$ ($239$ ms vs $\sim 292$ ms)
+and \texttt{geoBits} $= 0$ ($382$ ms vs $\sim 600$ ms) in
+the same architectural proportion.
 
 % --------------------------------------------------------------------
 \section{Ablation: Highway Percentage}
@@ -5512,40 +5516,39 @@ the learning contributes.}
 \toprule
 \textbf{Protocol} & \textbf{gB=8 (ms)} & \textbf{gB=0 (ms)} & \textbf{Δ vs Kad (gB=0)} \\
 \midrule
-\KDHT       & $845$ & $852$ & --- \\
-G-DHT       & $820$ & $1060$ & $24\%$ slower \\
-NX-17       & $270$ & $523$ & $39\%$ faster \\
-NH-1        & $261$ & $524$ & $39\%$ faster \\
-\textbf{Axona} & $\mathbf{254}$ & $\mathbf{482}$ & $\mathbf{43\%}$ \textbf{faster} \\
+\KDHT       & $842$ & $852$ & --- \\
+G-DHT       & $826$ & $1060$ & $24\%$ slower \\
+NX-17       & $265$ & $523$ & $39\%$ faster \\
+NH-1        & $260$ & $524$ & $39\%$ faster \\
+\textbf{Axona} & $272$ & $\mathbf{513}$ & $\mathbf{40\%}$ \textbf{faster} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 The ablation falsifies the hypothesis.  With \emph{zero}
-geographic information, all three adaptive protocols still
-beat Kademlia by $\sim 40\%$; Axona alone leads the field
-at $43\%$.  The learning is doing real work, attributable
-cleanly to the synaptome shaping itself by traffic.
+geographic information, all three neuromorphic protocols
+(NX-17, NH-1, Axona) beat Kademlia by $\sim 39\%$ on global
+lookups, within RNG noise of each other.  The learning is
+doing real work, attributable cleanly to the synaptome shaping
+itself by traffic.
 
 G-DHT is the only protocol that gets \emph{worse} at
-\texttt{geoBits} $= 0$ ($820 \to 1060$ ms): its entire
+\texttt{geoBits} $= 0$ ($826 \to 1060$ ms): its entire
 strategy is ``follow the prefix.''  With no prefix to
 follow, it falls back to a slower no-progress-limited search
 and loses the locality benefit that defines it.
 
-Axona's $43\%$ lead over Kademlia at \texttt{geoBits} $= 0$
-is the production-Axona dividend on top of the research
-NH-1/NX-17 kernel: the TransportAxonaEngine churn-cleanup
-work (dht-sim v0.85.0--v0.89.0) and the v1.1.2 per-hop
-live-RTT lookup-latency change cumulatively dropped Axona
-below the NH-1/NX-17 baseline.  NH-1 and NX-17 are now
-indistinguishable at \texttt{geoBits} $= 0$ ($524$ vs $523$
-ms) — a year of kernel parity work having closed the gap
-NH-1 carried in the earlier 12-rule consolidation.  The
-ablation no longer shows a measurable consolidation cost:
-NH-1 retains its $\sim 30\%$ parameter-count reduction
-vs NX-17 without sacrificing peak performance at
-\texttt{geoBits} $= 0$.
+NX-17, NH-1, and Axona converge within $\sim 2\%$ on
+non-churn routing at \texttt{geoBits} $= 0$ (523 / 524 / 513
+ms global), as the shared-\texttt{AxonaPeer}-kernel
+architecture predicts.  The \emph{deployed} Axona dividend
+appears in the churn cell: at $5\%$ churn, \texttt{geoBits}
+$= 0$, Axona lookups complete at $382$ ms vs NX-17's $585$
+and NH-1's $614$ --- a $35$--$38\%$ saving from the explicit
+dying-nodeId sweep that \texttt{TransportAxonaEngine.removeNode}
+performs on every surviving peer's synaptome (work landed in
+sim v0.85.0--v0.89.0).  The cleanup advantage is geometric,
+not prefix-dependent.
 
 % --------------------------------------------------------------------
 \section{Heading Toward 50,000 and Beyond}

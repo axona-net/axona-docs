@@ -34,7 +34,7 @@
 \newcommand{\NXseventeen}{NX-17\xspace}
 
 % ── Title and authors ────────────────────────────────────────────────────────
-\title{Axona: A Learning-Adaptive Distributed Hash\\Table and Axonal Publish/Subscribe\\[0.3em]{\normalsize\normalfont v0.3.54 \quad 2026-05-21}}
+\title{Axona: A Learning-Adaptive Distributed Hash\\Table and Axonal Publish/Subscribe\\[0.3em]{\normalsize\normalfont v0.3.55 \quad 2026-05-21}}
 
 \author{
 \IEEEauthorblockN{David A. Smith}
@@ -1073,8 +1073,9 @@ without learning, the table cannot improve as the network changes.
 traffic-driven learning on top of \GDHT's structural locality.
 The geography ablation in \S\ref{sec:eval-geo} confirms that the
 two contributions are independent: with the \GDHT prefix removed
-($\mathrm{geoBits} = 0$), \axona still routes $43\%$ faster than
-Kademlia at $25\,000$ nodes purely from learning (\S\ref{sec:eval-geo}).
+($\mathrm{geoBits} = 0$), the neuromorphic chassis still routes
+$\sim 39\%$ faster than Kademlia at $25\,000$ nodes purely from
+learning (\S\ref{sec:eval-geo}).
 
 \subsection{Cooperative trust and security tradeoff}
 \label{sec:gdht-trust}
@@ -1253,27 +1254,30 @@ isolates the contribution of learning under no-geography conditions.}
 \toprule
 \textbf{Protocol} & \textbf{geoBits=0} & \textbf{geoBits=8} & \textbf{Improvement} \\
 \midrule
-K-DHT & $852$ & $845$ & --- (baseline) \\
-\GDHT & $1060$\textsuperscript{$\dagger$} & $820$ & --- (geo is mechanism) \\
-\NXseventeen & $523$ & $270$ & $-39\%$ from learning \\
-\nhone & $524$ & $261$ & $-39\%$ from learning \\
-\axona & $\mathbf{482}$ & $\mathbf{254}$ & $\mathbf{-43\%}$ from learning \\
+K-DHT & $852$ & $842$ & --- (baseline) \\
+\GDHT & $1060$\textsuperscript{$\dagger$} & $826$ & --- (geo is mechanism) \\
+\NXseventeen & $523$ & $265$ & $-39\%$ from learning \\
+\nhone & $524$ & $260$ & $-39\%$ from learning \\
+\axona & $513$ & $272$ & $-40\%$ from learning \\
 \bottomrule
 \multicolumn{4}{l}{\footnotesize\textsuperscript{$\dagger$}\GDHT's
 $\mathrm{geoBits} = 0$ result reflects its $\mathrm{noProgressLimit} = 3$} \\
 \multicolumn{4}{l}{\footnotesize lookup-tuning choice; with no geographic
 gradient the extra} \\
 \multicolumn{4}{l}{\footnotesize ``no progress'' rounds are wasted overhead.
-\texttt{@axona/protocol} v1.1.2.}
+\texttt{@axona/protocol} v1.1.2 / sim v0.93.0.}
 \end{tabular}
 \end{table}
 
 The headline: \emph{with no geographic information whatsoever},
-\axona routes lookups $43\%$ faster than Kademlia at $25\,000$
-nodes; \NXseventeen and \nhone each route $39\%$ faster ---
-purely from LTP-driven path reinforcement. Add the S2 prefix
-back in and the gap widens further. This is the cleanest
-possible ``learning helps'' claim: every confound (bootstrap
+the neuromorphic chassis (NX-17 / NH-1 / Axona) routes lookups
+$\sim 39$--$40\%$ faster than Kademlia at $25\,000$ nodes ---
+purely from LTP-driven path reinforcement. The three
+protocols converge within RNG noise on non-churn routing
+(they share the same \texttt{AxonaPeer} kernel and produce
+identical routing decisions given identical synaptome state).
+Add the S2 prefix back in and the gap widens further. This is the
+cleanest possible ``learning helps'' claim: every confound (bootstrap
 strategy, identifier structure, geographic prefix) is controlled, and
 the routing/learning algorithm still wins. Geography helps; geography
 is not necessary.

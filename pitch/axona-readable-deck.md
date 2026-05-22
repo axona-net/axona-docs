@@ -413,13 +413,13 @@ Live network of 25K simulated peers on a geographic globe. Every dot is a node; 
 
 | Protocol | global ms | r500 ms | 5% churn ms |
 |---|---|---|---|
-| Kademlia | 845 | 826 | 795 |
-| G-DHT | 820 | 179 | 751 |
-| NX-17 | 270 | 107 | 292 |
-| NH-1 | 261 | 105 | 295 |
-| <span class="num">Axona</span> | <span class="num">255</span> | <span class="num">92</span> | <span class="num">230</span> |
+| Kademlia | 842 | 843 | 762 |
+| G-DHT | 826 | 177 | 767 |
+| NX-17 | 265 | 105 | 291 |
+| NH-1 | 260 | 103 | 293 |
+| <span class="num">Axona</span> | 272 | 107 | <span class="num">239</span> |
 
-*All success rates 100%. Axona leads on every cell at 25K; widest gap is the 5 % churn band (230 ms · 4.24 hops avg).*
+*All success rates 100%. NX-17 / NH-1 / Axona tie on routing (~3% spread — same kernel). Axona's dividend is the **5 % churn band** at 239 ms / 4.38 hops vs ~292 ms / ~6.1 hops for NX-17 / NH-1 — production-quality dead-peer cleanup vs lazy eviction.*
 
 #### Methodology
 
