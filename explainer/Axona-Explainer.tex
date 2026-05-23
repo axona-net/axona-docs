@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.4.14 \quad 2026-05-22\par}
+{\small An Axona Explainer \quad v0.4.15 \quad 2026-05-22\par}
 \end{center}
 \vfill
 \null
@@ -428,6 +428,14 @@ In neuroscience, the \emph{output} of a neuron---the long branching cable that d
 \end{itemize}
 
 That part is standard. The useful property is that \textbf{the tree heals itself with no special machinery}. Every member of the tree periodically re-issues its subscribe message. If the tree is intact, nothing changes. If a parent died, the re-subscribe naturally lands on whichever live ancestor is now closest. No heartbeats, no failure detection, no parent tracking. The same mechanism that \emph{builds} the tree \emph{repairs} it.
+
+% --- Figure: axonal tree heals via routed re-subscribe ------------
+\begin{figure*}[h]
+\centering
+\includegraphics[width=0.85\linewidth]{../images/Axonal-PubSub-Healing.png}
+\caption[Axonal tree healing via routed re-subscribe]{When a branch axon dies, its orphans heal the tree by re-issuing their subscribe.  Here, branch $B_1$ has died and its link to the topic root $R$ is broken.  Two of $B_1$'s children---a leaf subscriber $s_1$ and a sub-axon $B_3$---each issue a routed re-subscribe (dashed); both land on the surviving live axon $B_2$, which adopts them.  Crucially, $B_3$'s own subtree ($s_a$, $s_b$) does \emph{not} need to re-subscribe individually: $B_3$ continues publishing to them throughout, and the whole subtree moves intact when $B_3$ re-attaches.  Repair happens at the sub-axon level, not the leaf level---one subscribe per surviving subtree, not one per subscriber.}
+\label{fig:axon-heal}
+\end{figure*}
 
 Result: under 5\% churn (5\% of nodes joining and leaving constantly), Axona still delivers 100\% of messages. After three refresh cycles, it recovers from any disruption.
 

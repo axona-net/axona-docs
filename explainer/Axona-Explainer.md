@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.14 · 2026-05-22 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.15 · 2026-05-22 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -176,6 +176,8 @@ In neuroscience, the *output* of a neuron — the long branching cable that deli
 **Replay on subscribe.** When a subscriber attaches to a K-closest axon, the axon replays its cached messages in a single batch — bounded at 100 messages per topic, with a `lastSeenTs` filter so a re-attaching subscriber only gets what it missed, not everything from scratch. Healing and replay are the same mechanism.
 
 **Tree self-healing.** Subscribers re-issue their subscribe periodically. If an axon died, the re-subscribe naturally lands on whichever K-closest node is now alive — no heartbeats, no failure detection, no parent tracking. Under 5% churn, delivery stays at 100%; after three refresh cycles the tree has fully reformed.
+
+![Axonal tree healing via routed re-subscribe. When branch B₁ dies and its link to the topic root R breaks, two of B₁'s children — a leaf subscriber s₁ and a sub-axon B₃ — each issue a routed re-subscribe. Both land on the surviving live axon B₂, which adopts them. B₃'s own subtree (s_a, s_b) does *not* need to re-subscribe individually: B₃ keeps publishing to them throughout, and the whole subtree moves intact when B₃ re-attaches. Repair happens at the sub-axon level, not the leaf level — one subscribe per surviving subtree, not one per subscriber.](../images/Axonal-PubSub-Healing.png)
 
 **No special "bridge" or relay node.** In a sufficiently meshed network, peers communicate directly. A signaling server (used to introduce browsers to each other when the network is bootstrapping) is not in the data path once direct peer connections exist. If the signaling server dies, ongoing pub/sub keeps working through the peer mesh.
 
