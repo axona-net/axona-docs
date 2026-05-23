@@ -35,7 +35,7 @@
 \newcommand{\NXseventeen}{NX-17\xspace}
 
 % ── Title and authors ────────────────────────────────────────────────────────
-\title{Axona: A Learning-Adaptive Distributed Hash\\Table and Axonal Publish/Subscribe\\[0.3em]{\normalsize\normalfont v0.4.00 \quad 2026-05-22}}
+\title{Axona: A Learning-Adaptive Distributed Hash\\Table and Axonal Publish/Subscribe\\[0.3em]{\normalsize\normalfont v0.4.01 \quad 2026-05-23}}
 
 \author{
 \IEEEauthorblockN{David A. Smith}
@@ -706,7 +706,7 @@ under churn through routed re-subscribe.
 Topics are addressed by deterministic identifiers:
 \[
 \mathrm{topicId} \;=\; \mathrm{publisher}.\mathrm{cellPrefix}_{8}
-\;\Vert\; \mathrm{hash}_{56}(\mathrm{topic\_name})
+\;\Vert\; \mathrm{hash}_{256}(\mathrm{topic\_name})
 \]
 The publisher's S2 cell prefix anchors the topic root inside the
 publisher's geographic neighborhood --- naturally close to the
@@ -815,7 +815,7 @@ prefix with a public-key hash:
 \mathrm{nodeId} =
 \underbrace{\mathrm{S2cell}_{8}}_{\text{8 bits}}
 \;\Vert\;
-\underbrace{H(\mathrm{publicKey})}_{\text{56 bits}}
+\underbrace{H(\mathrm{publicKey})}_{\text{256 bits}}
 \label{eq:gdht-id}
 \end{equation}
 The S2 library~\cite{s2geometry} maps every point on Earth to a
@@ -826,8 +826,8 @@ The Hilbert curve property ensures that geographically adjacent
 points have numerically close cell IDs: \emph{XOR distance in
 identifier space approximates physical distance, for free.}
 
-The remaining $56$ bits are the standard cryptographic hash of
-the node's public key.  There is no other change to Kademlia ---
+The remaining $256$ bits are the SHA-256 cryptographic hash of
+the node's public key (Ed25519).  There is no other change to Kademlia ---
 $K$-buckets, $\alpha$-parallel \textsc{find\_node}, and the
 iterative refinement algorithm are all retained verbatim.  The
 locality property emerges from the ID structure alone.

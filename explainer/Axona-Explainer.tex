@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.4.16 \quad 2026-05-22\par}
+{\small An Axona Explainer \quad v0.4.17 \quad 2026-05-22\par}
 \end{center}
 \vfill
 \null
@@ -234,7 +234,7 @@ The trick uses Google's S2 library, which divides Earth's surface into cells alo
 \label{fig:hilbert}
 \end{figure}
 
-Now your node ID looks like: \texttt{[8-bit geographic cell][56-bit hash of public key]}.
+Now your node ID looks like: \texttt{[8-bit geographic cell][256-bit hash of public key]}---a 264-bit address space, encoded as 66 lowercase hex characters in the wire protocol.
 
 The routing algorithm doesn't change at all, but XOR distance now approximately tracks physical distance. When a node looks for a ``close'' peer in ID space, it tends to find one that's also physically close. Local traffic stays local. The 20-hop world tour becomes a 13-hop journey around the neighborhood, with each hop maybe 7~ms instead of 100.
 
@@ -430,7 +430,7 @@ In neuroscience, the \emph{output} of a neuron---the long branching cable that d
 That part is standard. The useful property is that \textbf{the tree heals itself with no special machinery}. Every member of the tree periodically re-issues its subscribe message. If the tree is intact, nothing changes. If a parent died, the re-subscribe naturally lands on whichever live ancestor is now closest. No heartbeats, no failure detection, no parent tracking. The same mechanism that \emph{builds} the tree \emph{repairs} it.
 
 % --- Figure: axonal tree heals via routed re-subscribe ------------
-% v0.4.16: tufte-handout routes \caption inside figure/figure* to the
+% v0.4.17: tufte-handout routes \caption inside figure/figure* to the
 % right margin, where it collides with the Dabek sidenote on the
 % following page.  Bypass the caption mechanism entirely and render
 % the caption as inline body text directly below the image using
@@ -860,7 +860,7 @@ The point of fixing the grid early was not measurement aesthetics. It was a meth
 
 Before measuring any learning-adaptive protocol, we needed something to measure against. Two classical DHT designs went in first, both implemented as real runnable code paths inside the simulator and both running the same benchmark grid every later protocol would be judged against.
 
-\textbf{K-DHT} is plain Kademlia: 64-bit random node identifiers, XOR distance, $K=20$ buckets, $\alpha=3$ parallel queries.  No locality, no learning.  It is the dominant deployed DHT in production---BitTorrent, IPFS, Ethereum's peer-discovery layer, and Tor v3 hidden services all run Kademlia variants---and therefore the baseline every new design has to beat to justify itself.
+\textbf{K-DHT} is plain Kademlia: random node identifiers in the same 264-bit address space all three protocols share, XOR distance, $K=20$ buckets, $\alpha=3$ parallel queries.  No locality, no learning.  It is the dominant deployed DHT in production---BitTorrent, IPFS, Ethereum's peer-discovery layer, and Tor v3 hidden services all run Kademlia variants---and therefore the baseline every new design has to beat to justify itself.
 
 \textbf{G-DHT} is K-DHT with one structural change: the top 8 bits of every node identifier encode the S2 cell of its claimed position (the construction is in \S``Putting the Address in the Address'').  XOR distance now approximately tracks physical distance for free; the routing algorithm is unchanged.  G-DHT tests an important boundary question---how much of the lookup-latency win comes from \emph{structure} and how much from \emph{learning}---and is also the substrate Axona's learning is eventually layered onto in the deployed protocol.
 

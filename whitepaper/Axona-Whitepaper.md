@@ -2,7 +2,7 @@
 
 ## A Learning-Adaptive Distributed Hash Table with Axonal Publish-Subscribe
 
-**Whitepaper · Synthesis Edition · v0.3.55 · 2026-05-21**
+**Whitepaper · Synthesis Edition · v0.3.56 · 2026-05-23**
 *David A. Smith — Axona.net*
 *davidasmith@gmail.com*
 
@@ -137,7 +137,7 @@ K-buckets were a 2002 answer to "what's a stable routing table?" — static, pre
 
 ### 2.3 G-DHT — Geographic Locality
 
-**The change:** `nodeId = S2 cell prefix (8 bits) ‖ H(publicKey)`.
+**The change:** `nodeId = S2 cell prefix (8 bits) ‖ SHA-256(publicKey) (256 bits)` — a 264-bit address space, encoded on the wire as 66 lowercase hex characters.
 
 XOR in the ID space now approximates XOR in physical distance — the prefix dominates. Same K-bucket routing as Kademlia, no other changes.
 
@@ -464,7 +464,7 @@ A decentralized DHT is the right place for it. Every node is *both* an endpoint 
 | 1 | **Reliable delivery** at steady state | A naïve broadcast = N independent lookups → O(N²) cost | Routed axonal tree, fan-out via direct sends |
 | 2 | **Churn resilience** | K-closest sets drift; publisher/subscriber views diverge | Routed re-subscribe; tree heals on every refresh |
 | 3 | **Deterministic routing** | Subscriber & publisher must agree on the same root without negotiation | Publisher-prefix topic ID — both derive it offline |
-| 4 | **ID stability** | Topic identity can't change as the membership churns | `topicId = publisher.cellPrefix(8b) ‖ hash₅₆(name)` — fixed at publisher's S2 cell |
+| 4 | **ID stability** | Topic identity can't change as the membership churns | `topicId = publisher.cellPrefix(8b) ‖ sha256(name) (256b)` — fixed at publisher's S2 cell |
 | 5 | **Recovery from missed messages** | Subscribers reconnecting want history, not just future messages | Bounded replay cache at every relay; replay piggy-backs on subscribe |
 
 ### 6.3 How We Got Here — The K-closest → Axonal Tree Journey
@@ -481,7 +481,7 @@ The current pub/sub architecture is the fourth attempt. Each earlier attempt fix
 
 **The four NX-17 fixes that work** (and that NH-1 inherits):
 
-1. **Publisher-prefix topic IDs.** `topicId = publisher.cellPrefix(8b) ‖ hash₅₆(name)`. Publisher and subscribers derive the same root deterministically. No negotiation, no drift.
+1. **Publisher-prefix topic IDs.** `topicId = publisher.cellPrefix(8b) ‖ sha256(name) (256b)`. Publisher and subscribers derive the same root deterministically. No negotiation, no drift.
 2. **Terminal globality check.** When greedy routing thinks it has reached the topic, do one `findKClosest(topicId, 1)` to confirm no globally-closer peer exists. Without this, two subscribers can elect different roots.
 3. **External-peer batch adoption on overflow.** When an axon hits its capacity, pick a *synaptome peer* (not an existing child) as the new sub-axon and ship the appropriate subscribers in one batch.
 4. **All-axon periodic re-subscribe.** Every role re-issues its subscribe on a 10s interval. The re-subscribe *is* the liveness check — no separate ping, no parent tracking.
@@ -496,7 +496,7 @@ A pub/sub topic in Axona is rooted at one node (the topic's "soma"). Direct subs
 
 ### 6.5 How Axonal Trees Work
 
-**Topic identity (deterministic).** `topicId = publisher.cellPrefix(8b) ‖ hash₅₆(event_name)`. Both publisher and every subscriber derive the same 64-bit ID with no negotiation. The tree's root pins into the publisher's S2 cell — naturally close to its audience.
+**Topic identity (deterministic).** `topicId = publisher.cellPrefix(8b) ‖ sha256(event_name) (256b)`. Both publisher and every subscriber derive the same 264-bit ID with no negotiation. The tree's root pins into the publisher's S2 cell — naturally close to its audience.
 
 **Subscribe is a routed message** toward `topicId`. The first live axon role encountered on the path *intercepts* and adds the new subscriber to its children. If the walk completes with no axon found, the terminal node opens a new role and becomes the **root**. Every subscribe message also carries the subscriber's `lastSeenTs` and triggers a replay.
 
@@ -982,7 +982,7 @@ Also, triadic closure can introduce loops. If A→B→C→A forms a triangle and
 
 **Specific attacks:**
 - **Cell eclipse:** an attacker generates 100 node IDs all claiming the same S2 cell as a target region. On bootstrap, new nodes get seeded with mostly-attacker nodes. The attacker controls routing into the cell.
-- **Prefix collision:** the attacker claims the same 8-bit prefix as a valuable region but uses a malicious hash function for the low 56 bits. Lookups to targets in that region hit attacker nodes.
+- **Prefix collision:** the attacker claims the same 8-bit prefix as a valuable region but uses a malicious hash function for the low 256 bits. Lookups to targets in that region hit attacker nodes.
 - **Relay hijacking:** the attacker doesn't eclipse a cell; it just sybils into the relay set for a popular topic, intercepts publishes, and drops them.
 
 **Measurement needed:**

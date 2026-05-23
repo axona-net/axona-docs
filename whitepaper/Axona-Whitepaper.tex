@@ -70,7 +70,7 @@
 {\large David A.~Smith\par}
 {\itshape\small YZ.social\par}
 \vspace{2em}
-{\small Version 0.3.55 \quad Simulator v0.93.0 \quad 2026-05-21\par}
+{\small Version 0.3.56 \quad Simulator v0.94.0 \quad 2026-05-23\par}
 \vfill
 \end{fullwidth}
 \newpage
@@ -1353,14 +1353,14 @@ state; the dominant traffic source is annealing's 2-hop probes.
 See Chapter~\ref{ch:eval-bandwidth}.
 
 \item[\textsc{node ID}]
-A 64-bit integer addressing a node in the network. In \GDHT and
+A 264-bit integer addressing a node in the network. In \GDHT and
 \NDHT the high \textsc{geoBits} = 8 bits encode the S2 cell
-prefix; the low 56 bits are derived from a hash of the node's
-public key. See \S\ref{ch:locality}.
+prefix; the low 256 bits are the SHA-256 hash of the node's
+public key (Ed25519). See \S\ref{ch:locality}.
 
 \item[\textsc{publisher-prefix topic ID}]
 The construction $\mathrm{topicId} = (\text{publisher's S2 prefix})
-\Vert H_{56}(\mathrm{topicName})$. The high bits pin the topic's
+\Vert H_{256}(\mathrm{topicName})$. The high bits pin the topic's
 axon root close to the publisher; subscribers and publishers must
 agree on the prefix out-of-band as a topic-naming convention
 (typically encoded as \texttt{@XX/domain/event}). Inherited from
@@ -2407,8 +2407,8 @@ the cell is roughly state-sized. At 30 bits it is roughly
 city-block-sized. At 40+ bits it is metres. \NDHT uses 8 bits
 because that is the right granularity for routing decisions:
 fine enough to distinguish continents, coarse enough that the
-remaining 56 bits of node ID give plenty of intra-cell
-diversity.\marginnote{Earlier experiments tried 4 and 16. Four
+remaining 256 bits of node ID give cryptographic-strength
+intra-cell collision resistance.\marginnote{Earlier experiments tried 4 and 16. Four
 gave too few cells (only $24$ live tiles); routing decisions
 within a tile were near-random. Sixteen gave too many tiny
 cells (tens of thousands), most empty; routing within a tile
@@ -2418,22 +2418,23 @@ collapsed to a single peer. Eight is the empirical knee.}
 \section{Node ID Construction}
 % --------------------------------------------------------------------
 
-\newthought{The node ID} is a 64-bit integer assembled from two
+\newthought{The node ID} is a 264-bit integer assembled from two
 fields:
 
 \[
 \mathit{nodeId} \;=\;
 \underbrace{\mathit{S2~cell~prefix}}_{\text{8 bits}}
 \;\Vert\;
-\underbrace{H_{56}(\mathit{publicKey})}_{\text{56 bits}}
+\underbrace{H_{256}(\mathit{publicKey})}_{\text{256 bits}}
 \]
 
 The high 8 bits come from the S2 cell containing the node's
 claimed lat/lng coordinates (computed by the S2 library's
 \texttt{cellIDFromLatLng()} routine, truncated to 8 bits). The
-low 56 bits are a hash of the node's public key, providing
-intra-cell uniqueness while keeping the ID bound to a stable
-cryptographic identity.
+low 256 bits are the SHA-256 hash of the node's Ed25519 public
+key, providing intra-cell uniqueness while keeping the ID bound
+to a stable cryptographic identity.  On the wire the 264-bit
+identifier is encoded as 66 lowercase hex characters.
 
 \textbf{Why XOR distance approximates physical distance.} The
 XOR metric Kademlia uses (Chapter~\ref{ch:lineage}) is bit-by-bit:
@@ -2450,7 +2451,7 @@ different continents.'' XOR distance, applied to S2-prefixed IDs,
 \emph{approximately tracks} physical distance.
 
 The approximation is loose at fine granularity (intra-cell, the
-56-bit hash dominates and XOR distance is essentially random)
+256-bit hash dominates and XOR distance is essentially random)
 and tight at coarse granularity (cross-cell, XOR distance and
 physical distance are very tightly correlated). This is exactly
 the property a routing table wants: routes within a region need
@@ -2712,18 +2713,18 @@ recover.
 \section{Topic Addressing: The Publisher Prefix}
 % --------------------------------------------------------------------
 
-\newthought{The address} of a topic is a 64-bit integer. \NDHT
+\newthought{The address} of a topic is a 264-bit integer. \NDHT
 constructs it as:
 
 \[
 \mathit{topicId} \;=\;
 \underbrace{\mathit{publisher's~S2~prefix}}_{\text{8 bits}}
 \;\Vert\;
-\underbrace{H_{56}(\mathit{topicName})}_{\text{56 bits}}
+\underbrace{H_{256}(\mathit{topicName})}_{\text{256 bits}}
 \]
 
 The high 8 bits come from the publisher's S2 cell prefix; the low
-56 bits are a hash of the topic name. The address is deterministic:
+256 bits are the SHA-256 hash of the topic name. The address is deterministic:
 given the topic name and the publisher's claimed location, both
 publisher and subscribers can compute the same topic ID without
 coordinating.
@@ -8376,8 +8377,9 @@ DHT. Chapter~\ref{ch:intro}.
 \item[\textsc{NH-1}] The current generation; consolidation of
 NX-17. Twelve rules, twelve parameters. Chapter~\ref{ch:nh1-rules}.
 
-\item[\textsc{node ID}] 64-bit identifier. High 8 bits = S2
-cell prefix; low 56 bits = $H_{56}$(public key).
+\item[\textsc{node ID}] 264-bit identifier. High 8 bits = S2
+cell prefix; low 256 bits = $H_{256}$(public key) (SHA-256 of the
+Ed25519 public key).
 Chapter~\ref{ch:locality}.
 
 \item[\textsc{publisher-prefix topic ID}] Topic ID with high 8

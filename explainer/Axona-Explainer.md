@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.16 · 2026-05-22 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.17 · 2026-05-23 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -56,7 +56,7 @@ G-DHT uses Google's S2 library, which divides Earth's surface into cells along a
 
 ![S2 cell decomposition of Earth's surface, projected through six cube faces along a Hilbert space-filling curve. Nearby points on the globe land at numerically close cell IDs; XOR distance in identifier space therefore approximates physical distance, for free.](../images/S2-Map.png)
 
-Now your node ID looks like: `[8-bit geographic cell][56-bit hash of your public key]`.
+Now your node ID looks like: `[8-bit geographic cell][256-bit hash of your public key]` — a 264-bit address space, encoded as 66 lowercase hex characters in the wire protocol.
 
 The routing algorithm doesn't change at all, but XOR distance now approximately tracks physical distance. When a node looks for a "close" peer in ID space, it tends to find one that's also physically close. Local traffic stays local. The 20-hop world tour becomes a 13-hop journey around the neighborhood, with each hop maybe 7 ms instead of 100.
 
@@ -167,7 +167,7 @@ This is publish/subscribe, or "pub/sub." Think of how YouTube notifies subscribe
 
 In neuroscience, the *output* of a neuron — the long branching cable that delivers signals to many downstream targets — is called an **axon**. Axona builds axonal delivery using a few simple rules — and it is precisely these axonal pub/sub primitives that the protocol takes its name from:
 
-**Topic identity.** Every topic has a 64-bit ID, computed offline by anyone who knows the topic. The top 8 bits are the publisher's geographic prefix (the same S2 cell scheme used for node IDs); the bottom 56 bits are a SHA-256 of the topic name. Publisher and subscriber compute the same ID without coordinating — no central registry.
+**Topic identity.** Every topic has a 264-bit ID, computed offline by anyone who knows the topic. The top 8 bits are the publisher's geographic prefix (the same S2 cell scheme used for node IDs); the bottom 256 bits are a SHA-256 of the topic name. Publisher and subscriber compute the same ID without coordinating — no central registry.
 
 **K-closest replication.** Instead of routing a publish or subscribe to a single "root" node (which would be a single point of failure), the protocol replicates the topic at the **K nodes in the network whose IDs are XOR-closest to the topic ID** — by default K=5. Five different peers each hold a copy of the subscriber list and a small replay cache. A publisher pushes to those K peers; a subscriber registers at those K peers. As long as any one of them is reachable, the topic works.
 
