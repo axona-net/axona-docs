@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.4.11 \quad 2026-05-22\par}
+{\small An Axona Explainer \quad v0.4.12 \quad 2026-05-22\par}
 \end{center}
 \vfill
 \null
@@ -186,22 +186,11 @@ G-DHT changes one thing: the \textbf{first 8 bits} of every node ID encode where
 
 The trick uses Google's S2 library, which divides Earth's surface into cells along a curve called a \textbf{Hilbert curve}.\marginnote{Hilbert curves are space-filling: they trace a single continuous path that visits every cell in a grid. Their useful property is that consecutive points on the curve are also adjacent in space.} Its useful property: places near each other on Earth get cell numbers near each other. So XORing two S2 cell numbers gives a small result for nearby places and a large one for distant places.
 
-% --- Photo: S2 cell decomposition of Earth ------------------------
-% Rendered as a marginfigure (Tufte idiom) so it sits in the margin
-% column next to the S2 discussion without competing with the
-% Hilbert-curve Figure 1 below for main-column float space.
-\begin{marginfigure}
-\centering
-\includegraphics[width=\linewidth]{../images/S2-Map.png}
-\caption[The S2 cell projection]{S2 cell decomposition of Earth's surface, projected through six cube faces along a Hilbert space-filling curve. Nearby points on the globe land at numerically close cell IDs; XOR distance in identifier space therefore approximates physical distance, for free.}
-\label{fig:s2-map}
-\end{marginfigure}
-
-% --- Figure 1: Hilbert curve --------------------------------------
-% Switched from figure* to figure so the caption renders in the
-% margin column (Tufte idiom).  This eliminates the long-caption
-% wrapping bug that produced overlapping lines under figure*'s
-% inline-caption treatment in v0.4.09–v0.4.10.
+% --- Figure 1: Hilbert curve (Random IDs vs S2 IDs grid) ----------
+% Single-column figure with margin caption (tufte idiom).  Comes
+% first in source order so it becomes Figure 1; the S2-Map photo
+% follows as Figure 2 attached to a later paragraph so the two
+% figures' margin captions don't stack on top of each other.
 \begin{figure}[h]
 \centering
 \begin{tikzpicture}[scale=0.75, font=\small]
@@ -215,7 +204,8 @@ The trick uses Google's S2 library, which divides Earth's surface into cells alo
     0.5/1.5/6,  1.5/1.5/0,  2.5/1.5/12, 3.5/1.5/8,
     0.5/0.5/5,  1.5/0.5/11, 2.5/0.5/2,  3.5/0.5/14}
     \node at (\x,\y) {\v};
-  \node[font=\footnotesize\itshape, color=inkmuted] at (2,-0.5) {neighbors in space, strangers in ID};
+  \node[font=\footnotesize\itshape, color=inkmuted, align=center, anchor=north]
+    at (2,-0.3) {neighbors in space,\\strangers in ID};
 
   % RIGHT GRID: Hilbert IDs
   \begin{scope}[shift={(7,0)}]
@@ -236,7 +226,8 @@ The trick uses Google's S2 library, which divides Earth's surface into cells alo
       0.5/1.5/4,  1.5/1.5/7,  2.5/1.5/8,  3.5/1.5/11,
       0.5/0.5/5,  1.5/0.5/6,  2.5/0.5/9,  3.5/0.5/10}
       \node[fill=white, inner sep=1pt, fill opacity=0.85, text opacity=1] at (\x,\y) {\v};
-    \node[font=\footnotesize\itshape, color=inkmuted] at (2,-0.5) {consecutive integers walk a connected path};
+    \node[font=\footnotesize\itshape, color=inkmuted, align=center, anchor=north]
+      at (2,-0.3) {consecutive integers\\walk a connected path};
   \end{scope}
 \end{tikzpicture}
 \caption[Random vs.\ Hilbert IDs]{Two arrangements of the integers 0--15 on a $4\times4$ grid. With random IDs, sequential numbers scatter unpredictably; cells that are spatial neighbors are numerical strangers. With S2's Hilbert-curve IDs, sequential numbers form a connected path---a continuous walk that never leaves a small neighborhood. XOR distance in ID space now approximates distance on the ground.}
@@ -248,6 +239,17 @@ Now your node ID looks like: \texttt{[8-bit geographic cell][56-bit hash of publ
 The routing algorithm doesn't change at all, but XOR distance now approximately tracks physical distance. When a node looks for a ``close'' peer in ID space, it tends to find one that's also physically close. Local traffic stays local. The 20-hop world tour becomes a 13-hop journey around the neighborhood, with each hop maybe 7~ms instead of 100.
 
 Total: about 91~ms instead of 2~seconds. \textbf{Roughly 20$\times$ faster} for regional traffic, just from changing the \emph{structure} of the addresses.
+
+% --- Figure 2: S2 cell decomposition of Earth ---------------------
+% Attached to the "regional traffic" paragraph so the marginfigure
+% lands well below Figure 1's margin caption — gives enough
+% vertical buffer that the two margin captions don't stack.
+\begin{marginfigure}
+\centering
+\includegraphics[width=\linewidth]{../images/S2-Map.png}
+\caption[The S2 cell projection]{S2 cell decomposition of Earth's surface, projected through six cube faces along a Hilbert space-filling curve. Nearby points on the globe land at numerically close cell IDs; XOR distance in identifier space therefore approximates physical distance, for free.}
+\label{fig:s2-map}
+\end{marginfigure}
 
 The cost: nodes can lie about where they are. This is a ``cooperative trust'' assumption.\marginnote{An attacker who falsifies their geographic prefix degrades the locality benefit but not routing correctness. Mitigations exist---learned coordinates, geographic proof-of-work, IP--ASN binding---but G-DHT trades some defense against location-spoofing for a large speedup.} Mitigations exist, but for now G-DHT trades some defense against location-spoofing for a large speedup.
 
