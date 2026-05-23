@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.4.10 \quad 2026-05-22\par}
+{\small An Axona Explainer \quad v0.4.11 \quad 2026-05-22\par}
 \end{center}
 \vfill
 \null
@@ -187,21 +187,22 @@ G-DHT changes one thing: the \textbf{first 8 bits} of every node ID encode where
 The trick uses Google's S2 library, which divides Earth's surface into cells along a curve called a \textbf{Hilbert curve}.\marginnote{Hilbert curves are space-filling: they trace a single continuous path that visits every cell in a grid. Their useful property is that consecutive points on the curve are also adjacent in space.} Its useful property: places near each other on Earth get cell numbers near each other. So XORing two S2 cell numbers gives a small result for nearby places and a large one for distant places.
 
 % --- Photo: S2 cell decomposition of Earth ------------------------
-% Sized at 0.65\linewidth so the Hilbert-curve figure below has
-% room on the same float queue; \FloatBarrier-equivalent
-% \clearpage after this figure prevents the v0.4.09 collision
-% where Figure 1's caption overlapped Figure 2 on page 3.
-\begin{figure*}[!t]
+% Rendered as a marginfigure (Tufte idiom) so it sits in the margin
+% column next to the S2 discussion without competing with the
+% Hilbert-curve Figure 1 below for main-column float space.
+\begin{marginfigure}
 \centering
-\includegraphics[width=0.65\linewidth]{../images/S2-Map.png}
-\caption[The S2 cell projection]{S2 cell decomposition of Earth's surface, projected through six cube faces along a Hilbert space-filling curve. Nearby points on the globe land at numerically close cell IDs; XOR distance in identifier space therefore approximates physical distance, for free.  G-DHT uses the top 8 bits of each node ID to encode the S2 cell of the node's claimed position.}
+\includegraphics[width=\linewidth]{../images/S2-Map.png}
+\caption[The S2 cell projection]{S2 cell decomposition of Earth's surface, projected through six cube faces along a Hilbert space-filling curve. Nearby points on the globe land at numerically close cell IDs; XOR distance in identifier space therefore approximates physical distance, for free.}
 \label{fig:s2-map}
-\end{figure*}
-
-\clearpage
+\end{marginfigure}
 
 % --- Figure 1: Hilbert curve --------------------------------------
-\begin{figure*}[h]
+% Switched from figure* to figure so the caption renders in the
+% margin column (Tufte idiom).  This eliminates the long-caption
+% wrapping bug that produced overlapping lines under figure*'s
+% inline-caption treatment in v0.4.09–v0.4.10.
+\begin{figure}[h]
 \centering
 \begin{tikzpicture}[scale=0.75, font=\small]
   % LEFT GRID: Random IDs
@@ -240,7 +241,7 @@ The trick uses Google's S2 library, which divides Earth's surface into cells alo
 \end{tikzpicture}
 \caption[Random vs.\ Hilbert IDs]{Two arrangements of the integers 0--15 on a $4\times4$ grid. With random IDs, sequential numbers scatter unpredictably; cells that are spatial neighbors are numerical strangers. With S2's Hilbert-curve IDs, sequential numbers form a connected path---a continuous walk that never leaves a small neighborhood. XOR distance in ID space now approximates distance on the ground.}
 \label{fig:hilbert}
-\end{figure*}
+\end{figure}
 
 Now your node ID looks like: \texttt{[8-bit geographic cell][56-bit hash of public key]}.
 
