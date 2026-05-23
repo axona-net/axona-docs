@@ -70,7 +70,7 @@
 {\large David A.~Smith\par}
 {\itshape\small YZ.social\par}
 \vspace{2em}
-{\small Version 0.3.56 \quad Simulator v0.94.0 \quad 2026-05-23\par}
+{\small Version 0.3.57 \quad Simulator v0.94.0 \quad 2026-05-23\par}
 \vfill
 \end{fullwidth}
 \newpage
@@ -6620,32 +6620,38 @@ tap-to-report incident map whose primitives (signed posts,
 geographic locality, 24-hour expiry, anonymous P2P) inherit
 directly from this protocol layer.
 
-\paragraph{Pub/sub application API --- the five verbs.}
-Above the axonal-tree primitive sits a feed-style API in
-\texttt{src/pubsub/AxonPubSub.js} (PR\,1 + PR\,2 in the
-companion implementation notes):
+\paragraph{Pub/sub application API --- the four verbs.}
+Above the axonal-tree primitive sits a feed-style API on the
+kernel \texttt{AxonaPeer} (in \texttt{@axona/protocol} v1.0+;
+the routing-and-fan-out lives in \texttt{AxonManager}):
 
 \begin{itemize}\itemsep2pt
-\item \texttt{publish} --- author a new \texttt{SignedPost}
-  into one of your topics.
-\item \texttt{subscribe} --- attach to a publisher's topic;
-  receive future posts via the axonal tree.
-\item \texttt{pull} --- fetch any post by content hash from
-  its topic's relay tree (single-count \texttt{pull\_count}
-  invariant on the first FOUND response).
-\item \texttt{reshare} --- publish with a reference back to
-  an upstream post; the first role-bearing relay on the
-  notification path bumps \texttt{reshare\_count}.
-\item \texttt{metrics} --- publisher-only query for aggregate
-  \texttt{delivery\_count}, \texttt{pull\_count},
-  \texttt{reshare\_count} over each owned post.
+\item \texttt{peer.pub(topic, message, opts)} --- author a new
+  signed envelope into one of your topics.
+\item \texttt{peer.sub(topic, handler, opts)} --- attach to a
+  topic and receive future posts via the axonal tree, plus
+  any replay-cached messages newer than the subscriber's
+  \texttt{lastSeenTs}.
+\item \texttt{peer.pull(msgId, opts)} --- fetch any post by
+  message id from its topic's relay tree (single-count
+  \texttt{pull\_count} invariant on the first FOUND response).
+\item \texttt{peer.metrics(topic, opts)} --- aggregate
+  \texttt{publishes}, \texttt{subscribers}, and
+  \texttt{reshare\_count} for a topic the caller owns.
 \end{itemize}
 
+Resharing is not a separate verb: an application reshares by
+re-issuing \texttt{peer.pub} on the upstream signed envelope.
+The first role-bearing relay on the notification path sees
+the duplicate \texttt{msgId} and bumps \texttt{reshare\_count},
+which \texttt{metrics} then surfaces back to the publisher.
+
 Encryption, schema, and ordering belong to the application
-above this layer; the protocol carries opaque \texttt{content}
-bytes. A 2001-node cascade test
-(\texttt{src/pubsub/test\_pubsub\_cascade.js}, 13/13 passing)
-verifies the counter invariants end-to-end.
+above this layer; the protocol carries opaque message bytes.
+The kernel's pub/sub cascade smoke test verifies the counter
+invariants end-to-end (see
+\texttt{test/smoke\_kernel\_regression.mjs} and the in-sim
+\texttt{smoke:three} mesh-fail recovery suite).
 
 % --------------------------------------------------------------------
 \section{Friction-Realistic Simulator Extensions}

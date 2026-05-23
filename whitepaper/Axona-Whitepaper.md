@@ -2,7 +2,7 @@
 
 ## A Learning-Adaptive Distributed Hash Table with Axonal Publish-Subscribe
 
-**Whitepaper · Synthesis Edition · v0.3.56 · 2026-05-23**
+**Whitepaper · Synthesis Edition · v0.3.57 · 2026-05-23**
 *David A. Smith — Axona.net*
 *davidasmith@gmail.com*
 
@@ -864,17 +864,18 @@ The protocol code is the same JavaScript that produced the §7 benchmark numbers
 
 **First end-user application:** `civildefense.io`, a tap-to-report incident map. Users tap a location to register a concern; reports propagate over anonymous P2P with 24-hour expiry. The protocol primitives — signed posts, geographic locality via the S2 prefix, implicit expiry through the replay-cache LRU, end-to-end-secure delivery — map directly onto the application's needs, which is why it shipped in weeks.
 
-**Pub/sub application API (the five verbs).** Above the axonal-tree primitive sits a feed-style API in `src/pubsub/AxonPubSub.js`:
+**Pub/sub application API (the four verbs).** Above the axonal-tree primitive sits a feed-style API on the kernel `AxonaPeer` (`@axona/protocol` v1.0+; routing-and-fan-out lives in `AxonManager`):
 
 | Verb | What it does |
 |---|---|
-| `publish` | author a new `SignedPost` into one of your topics |
-| `subscribe` | attach to a publisher's topic; receive future posts via the axonal tree |
-| `pull` | fetch any post by content hash from its topic's relay tree |
-| `reshare` | publish with a reference back to an upstream post; first role-bearing relay on the notification path bumps `reshare_count` |
-| `metrics` | publishers query aggregate `delivery_count`, `pull_count`, `reshare_count` for their own posts |
+| `peer.pub(topic, message, opts)` | author a new signed envelope into one of your topics |
+| `peer.sub(topic, handler, opts)` | attach to a topic; receive future posts via the axonal tree plus any replay-cached messages newer than the subscriber's `lastSeenTs` |
+| `peer.pull(msgId, opts)` | fetch any post by message id from its topic's relay tree |
+| `peer.metrics(topic, opts)` | aggregate `publishes`, `subscribers`, `reshare_count` for a topic the caller owns |
 
-Five verbs cover the application surface. Encryption, schema, and ordering belong to the application above this layer — `SignedPost` carries an opaque `content` field. The cascade test at 2001 nodes (`src/pubsub/test_pubsub_cascade.js`) verifies the counter invariants end-to-end.
+Resharing is not a separate verb: an application reshares by re-issuing `peer.pub` on the upstream signed envelope. The first role-bearing relay on the notification path sees the duplicate `msgId` and bumps `reshare_count`, which `metrics` surfaces back to the publisher.
+
+Four verbs cover the application surface. Encryption, schema, and ordering belong to the application above this layer — the protocol carries opaque message bytes. The kernel's pub/sub cascade smoke (`test/smoke_kernel_regression.mjs`) and the in-sim `smoke:three` mesh-fail recovery suite verify the counter invariants end-to-end.
 
 ---
 
