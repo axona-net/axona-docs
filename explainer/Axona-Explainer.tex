@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.4.12 \quad 2026-05-22\par}
+{\small An Axona Explainer \quad v0.4.13 \quad 2026-05-22\par}
 \end{center}
 \vfill
 \null
@@ -505,6 +505,60 @@ For two decades, no published DHT had been measured at this floor. The best impl
 \textbf{Axona hugs the floor at $1.17$--$1.38\times$} across a $10\times$ scaling range (5{,}000 to 50{,}000 nodes). At $25{,}000$ nodes it routes a global lookup in $267$~ms vs a $205$~ms $3\delta$ floor ($\delta \approx 68$~ms), and the curve is essentially flat from $15{,}000$ nodes onward: $262$, $266$, $267$, $271$, $270$, $279$, $281$, $282$~ms as the network grows by another $35{,}000$ peers. The $\sim$30\% residual overhead has a clean structural explanation: Axona takes about 4--5 hops where an ideal protocol would take 3, and each ``extra'' hop costs about $\delta/2$, exactly as the geometric series predicts.
 
 Plain Kademlia, by contrast, gets \emph{worse} as the network grows: from $716$~ms at $5{,}000$ nodes to $896$~ms at $50{,}000$. Its log-$N$ hop tax compounds at full per-hop RTT every hop. G-DHT tracks Kademlia almost identically on global lookups---the geographic prefix only helps regional cells, where every hop is short. Axona approaches the floor by learning per-hop locality: its Action-Potential scoring weights short-RTT edges so heavily that even a hop ``inefficient'' by raw count is short in wall-clock time.
+
+\bigskip
+
+The picture changes dramatically when we look at \textbf{regional} traffic instead of global.  Figure~\ref{fig:r500} shows the same protocols at the same population sizes, but measured on $500$-kilometer lookups---queries whose source and target are in the same continental neighborhood.
+
+% --- Figure 5: 500km regional latency vs network size -------------
+\begin{figure*}[h]
+\centering
+\begin{tikzpicture}[font=\small]
+\begin{axis}[
+  width=14cm, height=8cm,
+  xlabel={\footnotesize\itshape network size (thousands of nodes)},
+  ylabel={\footnotesize\itshape 500\,km regional lookup latency (ms)},
+  axis lines*=left,
+  xmin=0, xmax=56,
+  ymin=0, ymax=950,
+  xtick={5,10,15,20,25,30,35,40,45,50},
+  ytick={0,200,400,600,800},
+  yticklabel style={font=\footnotesize, color=inkmuted},
+  xticklabel style={font=\footnotesize, color=inkmuted},
+  axis line style={color=inkmuted, line width=0.5pt},
+  tick style={color=inkmuted},
+  ylabel style={yshift=-0.5em},
+  xlabel style={yshift=0.5em},
+  clip=false
+]
+  % K-DHT (light gray, climbs — the prefix doesn't help because
+  % K-DHT doesn't know it's a regional lookup; full per-hop RTT
+  % on every step)
+  \addplot[gray, line width=0.9pt, mark=*, mark size=1.5pt] coordinates
+    {(5,702) (10,769) (15,798) (20,801) (25,819) (30,841) (35,864) (40,866) (45,870) (50,870)};
+  \node[font=\scriptsize, color=inkmuted, anchor=west] at (axis cs:50.5,870) {Kademlia};
+
+  % G-DHT (the geographic prefix kicks in — flat curve in the
+  % 159-190 ms band, roughly 4-5x lower than Kademlia)
+  \addplot[gray!70!black, line width=0.9pt, mark=*, mark size=1.5pt] coordinates
+    {(5,159) (10,159) (15,170) (20,174) (25,178) (30,179) (35,184) (40,188) (45,189) (50,190)};
+  \node[font=\scriptsize, color=inkmuted, anchor=west] at (axis cs:50.5,190) {G-DHT};
+
+  % Axona (learning amplifies locality — drops below G-DHT to
+  % 76-117 ms across the entire range)
+  \addplot[rust, line width=1.4pt, mark=*, mark size=2pt] coordinates
+    {(5,76) (10,93) (15,97) (20,101) (25,107) (30,108) (35,110) (40,113) (45,112) (50,117)};
+  \node[font=\scriptsize, color=rust, anchor=west] at (axis cs:50.5,117) {Axona};
+
+\end{axis}
+\end{tikzpicture}
+\caption[Regional 500\,km lookup latency vs.\ network size]{$500$-kilometer regional lookup latency at every $5{,}000$ from $5{,}000$ to $50{,}000$ nodes.  Kademlia climbs from $702$ to $870$\,ms---essentially the same as its global curve, because K-DHT has no way to know the lookup is regional and routes through full-planet hops anyway.  G-DHT collapses to a $159$--$190$\,ms band purely from the geographic prefix: ${\sim}4$--$5\times$ lower than Kademlia, with the curve nearly flat from $10{,}000$ nodes onward.  Axona drops further to $76$--$117$\,ms by layering learned per-hop locality on top of the structural prefix---roughly $1.6$--$2\times$ better than G-DHT and $7$--$10\times$ better than Kademlia. All success rates $100\%$.}
+\label{fig:r500}
+\end{figure*}
+
+The structural payoff of the G-DHT prefix is most visible here.  On global lookups (Figure~\ref{fig:floor}), G-DHT tracks Kademlia almost identically because the lookup has to traverse the whole identifier space regardless of how the IDs are arranged.  On regional lookups, the prefix is the whole game: a 500\,km lookup walks IDs that are XOR-close to the source, which under the S2 prefix means they are also geographically close, which means each hop is a short-RTT hop instead of an average-pair-of-the-globe hop.  G-DHT routes a 500\,km query in $190$\,ms at $50{,}000$ nodes by paying short-RTT costs on every step.
+
+Axona then adds learning on top.  The Action-Potential scoring weights short-RTT edges so heavily that the synaptome converges to a structure where almost every reinforced edge is a low-latency one.  Regional lookups become two-or-three short hops, and the $76$\,ms at $5{,}000$ nodes is already below the $3\delta$ global floor---because the effective $\delta$ \emph{within} a region is a fraction of the global pairwise median.  G-DHT shows what locality buys you structurally; Axona shows what locality buys you when the protocol also learns.
 
 % =====================================================================
 % IX. ABLATION
