@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.13 · 2026-05-22 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.14 · 2026-05-22 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -199,26 +199,26 @@ For two decades, no published DHT had been measured at this floor. The best impl
 
 Plain Kademlia, by contrast, gets *worse* as the network grows: from 716 ms at 5,000 nodes to 896 ms at 50,000. Its log-N hop tax compounds at full per-hop RTT every hop. G-DHT tracks Kademlia almost identically on global lookups — the geographic prefix only helps regional cells, where every hop is short. Axona approaches the floor by learning per-hop locality: its Action-Potential scoring weights short-RTT edges so heavily that even a hop "inefficient" by raw count is short in wall-clock time.
 
-The picture changes dramatically when we look at **regional** traffic instead of global. The same protocols at the same population sizes, but measured on 500-kilometer lookups (queries whose source and target are in the same continental neighborhood):
+The picture changes dramatically when we look at **regional** traffic instead of global. The same protocols at the same population sizes, but measured on 2,000-kilometer lookups (queries whose source and target are in the same continental neighborhood):
 
 | N | K-DHT | G-DHT | **Axona** |
 |--:|--:|--:|--:|
-| 5,000 | 702 | 159 | **76** |
-| 10,000 | 769 | 159 | **93** |
-| 15,000 | 798 | 170 | **97** |
-| 20,000 | 801 | 174 | **101** |
-| 25,000 | 819 | 178 | **107** |
-| 30,000 | 841 | 179 | **108** |
-| 35,000 | 864 | 184 | **110** |
-| 40,000 | 866 | 188 | **113** |
-| 45,000 | 870 | 189 | **112** |
-| 50,000 | 870 | 190 | **117** |
+| 5,000 | 681 | 222 | **108** |
+| 10,000 | 755 | 240 | **121** |
+| 15,000 | 797 | 244 | **129** |
+| 20,000 | 801 | 243 | **133** |
+| 25,000 | 825 | 255 | **134** |
+| 30,000 | 843 | 253 | **138** |
+| 35,000 | 856 | 257 | **138** |
+| 40,000 | 868 | 261 | **146** |
+| 45,000 | 868 | 267 | **148** |
+| 50,000 | 886 | 263 | **146** |
 
-Kademlia climbs from 702 to 870 ms — essentially the same as its global curve, because K-DHT has no way to know the lookup is regional and routes through full-planet hops anyway. G-DHT collapses to a 159–190 ms band purely from the geographic prefix: ~4–5× lower than Kademlia, with the curve nearly flat from 10,000 nodes onward. Axona drops further to 76–117 ms by layering learned per-hop locality on top of the structural prefix — roughly 1.6–2× better than G-DHT and 7–10× better than Kademlia. All success rates 100%.
+Kademlia climbs from 681 to 886 ms — essentially the same as its global curve, because K-DHT has no way to know the lookup is regional and routes through full-planet hops anyway. G-DHT settles into a 222–267 ms band purely from the geographic prefix: ~3–3.4× lower than Kademlia, with the curve nearly flat from 10,000 nodes onward. Axona drops further to 108–148 ms by layering learned per-hop locality on top of the structural prefix — roughly 1.8–2× better than G-DHT and 6–6.3× better than Kademlia. All success rates 100%.
 
-The structural payoff of the G-DHT prefix is most visible here. On global lookups, G-DHT tracks Kademlia almost identically because the lookup has to traverse the whole identifier space regardless of how the IDs are arranged. On regional lookups, the prefix is the whole game: a 500 km lookup walks IDs that are XOR-close to the source, which under the S2 prefix means they are also geographically close, which means each hop is a short-RTT hop instead of an average-pair-of-the-globe hop. G-DHT routes a 500 km query in 190 ms at 50,000 nodes by paying short-RTT costs on every step.
+The structural payoff of the G-DHT prefix is most visible here. On global lookups, G-DHT tracks Kademlia almost identically because the lookup has to traverse the whole identifier space regardless of how the IDs are arranged. On regional lookups, the prefix is the whole game: a 2,000 km lookup walks IDs that are XOR-close to the source, which under the S2 prefix means they are also geographically close, which means each hop is a short-RTT hop instead of an average-pair-of-the-globe hop. G-DHT routes a 2,000 km query in 263 ms at 50,000 nodes by paying short-RTT costs on every step.
 
-Axona then adds learning on top. The Action-Potential scoring weights short-RTT edges so heavily that the synaptome converges to a structure where almost every reinforced edge is a low-latency one. Regional lookups become two-or-three short hops, and the 76 ms at 5,000 nodes is already below the 3δ global floor — because the effective δ *within* a region is a fraction of the global pairwise median. G-DHT shows what locality buys you structurally; Axona shows what locality buys you when the protocol also learns.
+Axona then adds learning on top. The Action-Potential scoring weights short-RTT edges so heavily that the synaptome converges to a structure where almost every reinforced edge is a low-latency one. Regional lookups become a few short hops, and Axona's 108 ms at 5,000 nodes is already comfortably below the 3δ global floor — because the effective δ *within* a continental region is a fraction of the global pairwise median. G-DHT shows what locality buys you structurally; Axona shows what locality buys you when the protocol also learns.
 
 ## Is It Really the Learning, or Just the Geography?
 
