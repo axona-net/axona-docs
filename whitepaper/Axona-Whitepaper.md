@@ -2,7 +2,7 @@
 
 ## A Learning-Adaptive Distributed Hash Table with Axonal Publish-Subscribe
 
-**Whitepaper · Synthesis Edition · v0.3.57 · 2026-05-23**
+**Whitepaper · Synthesis Edition · v0.3.58 · 2026-05-23**
 *David A. Smith — Axona.net*
 *davidasmith@gmail.com*
 
@@ -873,7 +873,7 @@ The protocol code is the same JavaScript that produced the §7 benchmark numbers
 | `peer.pull(msgId, opts)` | fetch any post by message id from its topic's relay tree |
 | `peer.metrics(topic, opts)` | aggregate `publishes`, `subscribers`, `reshare_count` for a topic the caller owns |
 
-Resharing is not a separate verb: an application reshares by re-issuing `peer.pub` on the upstream signed envelope. The first role-bearing relay on the notification path sees the duplicate `msgId` and bumps `reshare_count`, which `metrics` surfaces back to the publisher.
+Applications implement resharing by re-issuing `peer.pub` on the upstream signed envelope. The first role-bearing relay on the notification path sees the duplicate `msgId` and bumps `reshare_count`, which `metrics` surfaces back to the publisher.
 
 Four verbs cover the application surface. Encryption, schema, and ordering belong to the application above this layer — the protocol carries opaque message bytes. The kernel's pub/sub cascade smoke (`test/smoke_kernel_regression.mjs`) and the in-sim `smoke:three` mesh-fail recovery suite verify the counter invariants end-to-end.
 

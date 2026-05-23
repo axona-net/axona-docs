@@ -70,7 +70,7 @@
 {\large David A.~Smith\par}
 {\itshape\small YZ.social\par}
 \vspace{2em}
-{\small Version 0.3.57 \quad Simulator v0.94.0 \quad 2026-05-23\par}
+{\small Version 0.3.58 \quad Simulator v0.94.0 \quad 2026-05-23\par}
 \vfill
 \end{fullwidth}
 \newpage
@@ -6640,11 +6640,11 @@ the routing-and-fan-out lives in \texttt{AxonManager}):
   \texttt{reshare\_count} for a topic the caller owns.
 \end{itemize}
 
-Resharing is not a separate verb: an application reshares by
-re-issuing \texttt{peer.pub} on the upstream signed envelope.
-The first role-bearing relay on the notification path sees
-the duplicate \texttt{msgId} and bumps \texttt{reshare\_count},
-which \texttt{metrics} then surfaces back to the publisher.
+Applications implement resharing by re-issuing
+\texttt{peer.pub} on the upstream signed envelope. The first
+role-bearing relay on the notification path sees the duplicate
+\texttt{msgId} and bumps \texttt{reshare\_count}, which
+\texttt{metrics} surfaces back to the publisher.
 
 Encryption, schema, and ordering belong to the application
 above this layer; the protocol carries opaque message bytes.

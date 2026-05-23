@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.4.20 \quad 2026-05-22\par}
+{\small An Axona Explainer \quad v0.4.21 \quad 2026-05-22\par}
 \end{center}
 \vfill
 \null
@@ -432,7 +432,7 @@ In neuroscience, the \emph{output} of a neuron---the long branching cable that d
 That part is standard. The useful property is that \textbf{the tree heals itself with no special machinery}. Every member of the tree periodically re-issues its subscribe message. If the tree is intact, nothing changes. If a parent died, the re-subscribe naturally lands on whichever live ancestor is now closest. No heartbeats, no failure detection, no parent tracking. The same mechanism that \emph{builds} the tree \emph{repairs} it.
 
 % --- Figure: axonal tree heals via routed re-subscribe ------------
-% v0.4.20: tufte-handout routes \caption inside figure/figure* to the
+% v0.4.21: tufte-handout routes \caption inside figure/figure* to the
 % right margin, where it collides with the Dabek sidenote on the
 % following page.  Bypass the caption mechanism entirely and render
 % the caption as inline body text directly below the image using
@@ -454,7 +454,7 @@ The two mechanisms compose. Tree-healing keeps the topology correct in the face 
 
 Result: under 5\% churn (5\% of nodes joining and leaving constantly), Axona still delivers 100\% of messages. After three refresh cycles, it recovers from any disruption.
 
-Above the axonal tree sits a feed-style application layer with \textbf{four verbs}---\texttt{pub}, \texttt{sub}, \texttt{pull}, \texttt{metrics}.\sidenote{Earlier drafts of this explainer listed a fifth verb, \texttt{reshare}. It was never a protocol primitive in the shipped v1.0 API. Resharing is built at the application layer by republishing the original signed envelope; the relay sees the duplicate message id and surfaces it through \texttt{metrics} as \texttt{reshare\_count}.} They cover what a real social or agent-collaboration application asks of a substrate: author new content, attach to a topic, fetch a referenced post on demand, and let a publisher see verifiable reach across the cascade---without identifying any individual subscriber. (Out-of-band, the same peer exposes a small \texttt{send}/\texttt{notify}/\texttt{onMessage} surface for unicast, but that is the direct-messaging layer, not the feed.)  Encryption, schema, and ordering belong to the application above this layer; the protocol carries opaque bytes.
+Above the axonal tree sits a feed-style application layer with \textbf{four verbs}---\texttt{pub}, \texttt{sub}, \texttt{pull}, \texttt{metrics}. They cover what a real social or agent-collaboration application asks of a substrate: author new content, attach to a topic, fetch a referenced post on demand, and let a publisher see verifiable reach across the cascade---without identifying any individual subscriber. (Out-of-band, the same peer exposes a small \texttt{send}/\texttt{notify}/\texttt{onMessage} surface for unicast, but that is the direct-messaging layer, not the feed.)  Encryption, schema, and ordering belong to the application above this layer; the protocol carries opaque bytes.
 
 % =====================================================================
 % VIII. THE THEORETICAL FLOOR
