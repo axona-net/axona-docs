@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.17 · 2026-05-23 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.18 · 2026-05-23 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -65,6 +65,8 @@ Total: about 91 ms instead of 2 seconds. **Roughly 20× faster** for regional tr
 The cost: nodes can lie about where they are. This is a "cooperative trust" assumption. Mitigations exist, but for now G-DHT trades some defense against location-spoofing for a large speedup.
 
 Of course a user can choose to associate themselves with any location in the world. This very rough location is a kind of area code, but it and the associated address are provably yours independent of actual location.
+
+The next section addresses this directly. Axona, the neuromorphic protocol layered on top of G-DHT, treats *measured one-way latency* as a first-class signal in its scoring of every connection: a connection's vitality is the product of how often it's used and how recently, but it is gated by how cheap it actually is to send a message across. A node that claims a cell prefix in Frankfurt while actually answering from São Paulo cannot fake the round-trip time. The first few lookups that try to use its synapses see latencies of 200+ ms when the prefix would predict 20. The cheating node's connections accumulate weight slowly and get out-competed by honest neighbors at every eviction decision. The cheat is not blocked — the address space allows the claim — but it is structurally penalized in proportion to how far the lie is from the truth.
 
 ## Idea #2: A Network That Learns Like a Brain
 

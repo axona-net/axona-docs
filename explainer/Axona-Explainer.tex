@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.4.17 \quad 2026-05-22\par}
+{\small An Axona Explainer \quad v0.4.18 \quad 2026-05-22\par}
 \end{center}
 \vfill
 \null
@@ -154,7 +154,7 @@ addressing layer looks like.
 
 The trick: how do you find the closest node when you don't know who's in the network and you only know a handful of peers?
 
-The dominant DHT algorithm is called \textbf{Kademlia}, designed in 2002. Every node has a 160-bit ID---a very large random number. To measure ``distance'' between two IDs, you XOR them, comparing bit by bit.\marginnote{\emph{XOR} is a bitwise operation that returns 1 wherever two bits differ and 0 wherever they match. Two IDs that share many leading bits XOR to a small number; two unrelated IDs XOR to a large one.} To find a target, you ask the closest peer you know. They tell you about peers \emph{they} know that are even closer. You ask one of those. Repeat.
+The dominant DHT algorithm is called \textbf{Kademlia}, designed in 2002.\sidenote{Maymounkov \& Mazi\`eres, ``Kademlia: A Peer-to-Peer Information System Based on the XOR Metric,'' \emph{Proc.\ IPTPS 2002}.} Every node has a 160-bit ID---a very large random number. To measure ``distance'' between two IDs, you XOR them, comparing bit by bit.\marginnote{\emph{XOR} is a bitwise operation that returns 1 wherever two bits differ and 0 wherever they match. Two IDs that share many leading bits XOR to a small number; two unrelated IDs XOR to a large one.} To find a target, you ask the closest peer you know. They tell you about peers \emph{they} know that are even closer. You ask one of those. Repeat.
 
 The math is clean: each step at least \emph{halves} the remaining distance, so you reach any target in about $\log_2(N)$ hops. With a million nodes, that's 20 steps. Provably correct, used in production all over the internet.
 
@@ -255,6 +255,8 @@ The cost: nodes can lie about where they are. This is a ``cooperative trust'' as
 
 Of course a user can choose to associate themselves with any location in the world. This very rough location is a kind of area code, but it and the associated address are provably yours independent of actual location.
 
+\newthought{The next section} addresses this directly. Axona, the neuromorphic protocol layered on top of G-DHT, treats \emph{measured one-way latency} as a first-class signal in its scoring of every connection: a connection's vitality is the product of how often it's used and how recently, but it is gated by how cheap it actually is to send a message across.\sidenote{The Vitality Function on the next page makes this explicit; the per-hop latency probe is part of every routed lookup.} A node that claims a cell prefix in Frankfurt while actually answering from S\~ao Paulo cannot fake the round-trip time. The first few lookups that try to use its synapses see latencies of $200+$~ms when the prefix would predict $20$. The cheating node's connections accumulate weight slowly and get out-competed by honest neighbors at every eviction decision. The cheat is not blocked---the address space allows the claim---but it is structurally penalized in proportion to how far the lie is from the truth.
+
 % =====================================================================
 % V. AXONA
 % =====================================================================
@@ -280,7 +282,7 @@ The brain solved this problem hundreds of millions of years ago. The solution is
 
 \subsection{The Brain's Trick}
 
-In 1973, two scientists---Bliss and L\o mo---ran a now-classic experiment. They zapped a particular pathway in a rabbit's brain with high-frequency electrical pulses. Afterward, that pathway responded \emph{more strongly} to subsequent signals---not for seconds, but for \emph{weeks}. The connections had physically gotten stronger.
+In 1973, two scientists---Bliss and L\o mo---ran a now-classic experiment.\sidenote{Bliss \& L\o mo, ``Long-lasting potentiation of synaptic transmission in the dentate area of the anaesthetized rabbit following stimulation of the perforant path,'' \emph{J.\ Physiology} 232(2), 1973, pp.~331--356.} They zapped a particular pathway in a rabbit's brain with high-frequency electrical pulses. Afterward, that pathway responded \emph{more strongly} to subsequent signals---not for seconds, but for \emph{weeks}. The connections had physically gotten stronger.
 
 Decades of follow-up research filled in the details:
 
@@ -288,11 +290,11 @@ Decades of follow-up research filled in the details:
   \item \textbf{The coincidence detector.} Synapses have a special kind of receptor (called NMDA) that only activates when \emph{both} sides of the connection fire at roughly the same time. It's not ``I fired'' or ``you fired''---it's specifically ``we fired together.''
   \item \textbf{The strengthening signal.} When that coincidence happens, calcium rushes in and triggers the synapse to insert \emph{more} of a different kind of receptor (AMPA), making the connection physically more sensitive.
   \item \textbf{Consolidation.} Over the next half hour or so, new proteins get made and new physical structures grow. The change becomes permanent.
-  \item \textbf{Decay.} Connections that \emph{don't} get used regularly weaken over time, in a process called long-term depression (LTD).
-  \item \textbf{A protective tag.} Recently strengthened synapses get a temporary ``tag'' that protects them from being overwritten by competing changes---but only for a brief window.\marginnote{Without this tag, learning would be self-destructive: the synapses you just learned were useful would be the \emph{first} ones overwritten by the next signal.}
+  \item \textbf{Decay.} Connections that \emph{don't} get used regularly weaken over time, in a process called long-term depression (LTD).\sidenote{Stanton \& Sejnowski, ``Associative long-term depression in the hippocampus induced by Hebbian covariance,'' \emph{Nature} 339(6221), 1989, pp.~215--218.}
+  \item \textbf{A protective tag.} Recently strengthened synapses get a temporary ``tag'' that protects them from being overwritten by competing changes---but only for a brief window.\sidenote{Frey \& Morris, ``Synaptic tagging and the late phase of long-term potentiation,'' \emph{Nature} 385(6616), 1997, pp.~533--536.}\marginnote{Without this tag, learning would be self-destructive: the synapses you just learned were useful would be the \emph{first} ones overwritten by the next signal.}
 \end{enumerate}
 
-Donald Hebb summarized this in 1949---before the molecular details were known---in the rule that's now bedrock in neuroscience and AI:
+Donald Hebb summarized this in 1949---before the molecular details were known---in the rule that's now bedrock in neuroscience and AI:\sidenote{Hebb, \emph{The Organization of Behavior: A Neuropsychological Theory}, Wiley, 1949.}
 
 \begin{quote}\itshape
 Neurons that fire together, wire together.
@@ -430,7 +432,7 @@ In neuroscience, the \emph{output} of a neuron---the long branching cable that d
 That part is standard. The useful property is that \textbf{the tree heals itself with no special machinery}. Every member of the tree periodically re-issues its subscribe message. If the tree is intact, nothing changes. If a parent died, the re-subscribe naturally lands on whichever live ancestor is now closest. No heartbeats, no failure detection, no parent tracking. The same mechanism that \emph{builds} the tree \emph{repairs} it.
 
 % --- Figure: axonal tree heals via routed re-subscribe ------------
-% v0.4.17: tufte-handout routes \caption inside figure/figure* to the
+% v0.4.18: tufte-handout routes \caption inside figure/figure* to the
 % right margin, where it collides with the Dabek sidenote on the
 % following page.  Bypass the caption mechanism entirely and render
 % the caption as inline body text directly below the image using
