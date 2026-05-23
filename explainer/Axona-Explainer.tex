@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.4.08 \quad 2026-05-22\par}
+{\small An Axona Explainer \quad v0.4.09 \quad 2026-05-22\par}
 \end{center}
 \vfill
 \null
@@ -185,6 +185,14 @@ Kademlia node IDs are random. A node in Tokyo and a node in Berlin have IDs with
 G-DHT changes one thing: the \textbf{first 8 bits} of every node ID encode where the node says it is on Earth.
 
 The trick uses Google's S2 library, which divides Earth's surface into cells along a curve called a \textbf{Hilbert curve}.\marginnote{Hilbert curves are space-filling: they trace a single continuous path that visits every cell in a grid. Their useful property is that consecutive points on the curve are also adjacent in space.} Its useful property: places near each other on Earth get cell numbers near each other. So XORing two S2 cell numbers gives a small result for nearby places and a large one for distant places.
+
+% --- Photo: S2 cell decomposition of Earth ------------------------
+\begin{figure*}[h]
+\centering
+\includegraphics[width=0.9\linewidth]{../images/S2-Map.png}
+\caption[The S2 cell projection]{S2 cell decomposition of Earth's surface, projected through six cube faces along a Hilbert space-filling curve. Nearby points on the globe land at numerically close cell IDs; XOR distance in identifier space therefore approximates physical distance, for free.  G-DHT uses the top 8 bits of each node ID to encode the S2 cell of the node's claimed position.}
+\label{fig:s2-map}
+\end{figure*}
 
 % --- Figure 1: Hilbert curve --------------------------------------
 \begin{figure*}[h]
@@ -511,6 +519,14 @@ This is the kind of clean control experiment that should accompany any claim of 
 
 \newthought{The sharpest} demonstration is the \textbf{Slice World} test. The network gets cut almost in half---Eastern hemisphere on one side, Western on the other, connected only through a \emph{single node} near Hawaii. Every other cross-hemisphere connection is severed.
 
+% --- Photo: Slice World partition ---------------------------------
+\begin{figure*}[h]
+\centering
+\includegraphics[width=0.9\linewidth]{../images/Slice-World.png}
+\caption[Slice World]{Slice World, the single-bridge partition test. The simulator removes every cross-hemisphere edge except those incident on one node near Hawaii.  The question is not whether the protocol can find the bridge (it's a one-shot routing problem) but whether repeated successful crossings dissolve the partition.}
+\label{fig:slice-world-photo}
+\end{figure*}
+
 Can the protocol still route messages between hemispheres?
 
 \begin{itemize}
@@ -667,6 +683,14 @@ The protocol doesn't keep finding the bridge---it \emph{uses} the bridge to rebu
 \section{How Does This Become Real Software?}
 
 \newthought{The simulator} is the lab---fifty thousand simulated peers in a single browser tab, no real network underneath. The same code has to eventually run on the actual internet, where messages take real milliseconds and connections occasionally die. How do you get there?
+
+% --- Photo: DHT simulator on a 3D globe ---------------------------
+\begin{figure*}[h]
+\centering
+\includegraphics[width=0.9\linewidth]{../images/DHT-SIM-Image.png}
+\caption[The DHT simulator]{The simulator at $25{,}000$ peers on a 3D globe.  Every dot is a node; edges are synapses (peer-to-peer routing connections).  The visualization runs in a single browser tab---the same JavaScript that ships in the production peer.  This is what ``the simulator is the protocol'' looks like.}
+\label{fig:dht-sim}
+\end{figure*}
 
 The trick is keeping two things separate that everyone \emph{wants} to merge: \textbf{the protocol} (the rules of routing---AP scoring, hop caching, vitality, axonal trees) and \textbf{the network} (the actual machinery that moves bytes between machines). If you tangle them together, the simulator becomes useless the moment you deploy, because the protocol code was wired into a fake network. If you keep them apart, the simulator becomes the deployment vehicle: same protocol, different network underneath.
 

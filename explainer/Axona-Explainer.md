@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.08 · 2026-05-22 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.09 · 2026-05-22 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -53,6 +53,8 @@ Kademlia node IDs are random. A node in Tokyo and a node in Berlin have IDs with
 G-DHT changes one thing: the **first 8 bits** of every node ID encode where the node says it is on Earth.
 
 G-DHT uses Google's S2 library, which divides Earth's surface into cells along a curve called a **Hilbert curve**. Its useful property: places near each other on Earth get cell numbers near each other. So XORing two S2 cell numbers gives a small result for nearby places and a large one for distant places.
+
+![S2 cell decomposition of Earth's surface, projected through six cube faces along a Hilbert space-filling curve. Nearby points on the globe land at numerically close cell IDs; XOR distance in identifier space therefore approximates physical distance, for free.](../images/S2-Map.png)
 
 Now your node ID looks like: `[8-bit geographic cell][56-bit hash of your public key]`.
 
@@ -213,6 +215,8 @@ This is the kind of clean control experiment that should accompany any claim of 
 
 The sharpest demonstration is the **Slice World** test. The network gets cut almost in half — Eastern hemisphere on one side, Western on the other, connected only through a *single node* near Hawaii. Every other cross-hemisphere connection is severed.
 
+![Slice World — the network cut almost in half. Eastern and Western hemispheres are connected only through a single bridge node near Hawaii; every other cross-hemisphere edge has been severed. The question is whether the protocol can dissolve the partition by repeated successful crossings, not just find the bridge.](../images/Slice-World.png)
+
 Can the protocol still route messages between hemispheres?
 
 - **Plain Kademlia: 0% success.** With no learning, the partition is permanent. Messages can't find the bridge.
@@ -226,6 +230,8 @@ The protocol doesn't keep finding the bridge — it *uses* the bridge to rebuild
 ## How Does This Become Real Software?
 
 The simulator is the lab — fifty thousand simulated peers in a single browser tab, no real network underneath. The same code has to eventually run on the actual internet, where messages take real milliseconds and connections occasionally die. How do you get there?
+
+![The DHT simulator running 25,000 peers on a 3D globe. Every dot is a node; edges are synapses (peer-to-peer routing connections). The visualization runs in a single browser tab — the same JavaScript that ships in the production peer. This is what "the simulator is the protocol" looks like.](../images/DHT-SIM-Image.png)
 
 The trick is keeping two things separate that everyone *wants* to merge: **the protocol** (the rules of routing — AP scoring, hop caching, vitality, axonal trees) and **the network** (the actual machinery that moves bytes between machines). If you tangle them together, the simulator becomes useless the moment you deploy, because the protocol code was wired into a fake network. If you keep them apart, the simulator becomes the deployment vehicle: same protocol, different network underneath.
 

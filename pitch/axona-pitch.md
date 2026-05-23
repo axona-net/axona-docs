@@ -405,7 +405,7 @@ K=5 root replication · lazy cache for publish-before-subscribe · recruits sub-
 
 #### The simulator
 
-<img src="../presentation/images/DHT-SIM-Image.png" alt="DHT simulator on a 3D globe" style="width: 100%; border: 1px solid #d8d4ca; margin-bottom: 6px;" />
+<img src="../images/DHT-SIM-Image.png" alt="DHT simulator on a 3D globe" style="width: 100%; border: 1px solid #d8d4ca; margin-bottom: 6px;" />
 
 Live network of 25K simulated peers on a geographic globe. Every dot is a node; edges are synapses. Used to evaluate every protocol revision against fixed test cells before code ships.
 
@@ -521,7 +521,7 @@ A Claude agent subscribing to a Gemini agent's feed is **the same code path** as
 
 #### Slice World
 
-<img src="../presentation/images/Slice World.png" alt="Slice World partition — globe split East/West with single bridge node" style="width: 100%; border: 1px solid #d8d4ca; margin-bottom: 6px;" />
+<img src="../images/Slice-World.png" alt="Slice World partition — globe split East/West with single bridge node" style="width: 100%; border: 1px solid #d8d4ca; margin-bottom: 6px;" />
 
 A globe split East / West with one bridge node (Hawaii-equivalent) holding the only cross-hemisphere connections. Cross-hemisphere lookups must find the bridge to succeed — proves the protocol survives real-world partitions.
 
@@ -612,7 +612,7 @@ The result: routing tables that mirror the actual traffic graph of the applicati
 
 #### civildefense.io
 
-<img src="../presentation/images/civildefense.png" alt="civildefense.io — tap-to-report incident map" style="width: 100%; border: 1px solid #d8d4ca; margin-bottom: 6px;" />
+<img src="../images/civildefense.png" alt="civildefense.io — tap-to-report incident map" style="width: 100%; border: 1px solid #d8d4ca; margin-bottom: 6px;" />
 
 First social-utility application running on Axona. Anonymous P2P, geographic locality, 24-hour fade — every primitive directly inherited from the protocol layer.
 

@@ -223,7 +223,7 @@ We have attempted to build as fair and realistic environment simulation as we co
 
 ## The lab bench
 
-![bg right:55% fit](images/DHT-SIM-Image.png)
+![bg right:55% fit](../images/DHT-SIM-Image.png)
 
 Purpose-built simulator · ~25 K lines of JavaScript · open-source.
 
@@ -368,7 +368,7 @@ But G-DHT is still a *static* routing algorithm — no learning, no dynamics. Th
 
 ## The S2 library — what the cell prefix actually is
 
-![bg right:42% fit](images/S2%20Map.png)
+![bg right:42% fit](../images/S2-Map.png)
 
 **S2 (Google, 2011)** is a hierarchical decomposition of the sphere onto a Hilbert space-filling curve, projected through six cube faces. Every point on Earth maps to a 64-bit cell ID; every prefix length defines a successively coarser tile.
 
@@ -980,7 +980,7 @@ The Slice World test partitions the network into Eastern and Western hemispheres
 
 ## Slice World — visualized
 
-![bg right:55% fit](images/Slice%20World.png)
+![bg right:55% fit](../images/Slice-World.png)
 
 The simulator after Slice World setup at 5 K nodes.
 
