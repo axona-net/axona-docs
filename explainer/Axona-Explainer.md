@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.09 · 2026-05-22 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.10 · 2026-05-22 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -298,11 +298,21 @@ The grid was deliberately fixed at the start and held stable for the rest of the
 
 The point of fixing the grid early was not measurement aesthetics. It was a methodological commitment: every later protocol idea had to be judged against the same yardstick so that promotion and retirement were measurable, not editorial. The grid is the lab's calibration. If it drifts, the lab stops working.
 
-### Step 2 — Iterate protocols against the grid
+### Step 2 — Build the baselines: K-DHT and G-DHT
 
-With the lab built, we started designing protocols. The first was **N-1** in late March — classical neuromorphic ideas applied to routing: Hebbian long-term potentiation, a routing-table population of "synapses" with adaptive weights, time-based decay. We ran it against the grid. We learned which cells it won and which it lost. We then designed N-2, ran it, kept the parts that improved cells, and threw out the parts that didn't. Then N-3. And so on.
+Before measuring any learning-adaptive protocol, we needed something to measure against. Two classical DHT designs went in first, both implemented as real runnable code paths inside the simulator and both running the same benchmark grid every later protocol would be judged against.
 
-Nine weeks later, by mid-May, we had measured **47 distinct DHT designs**:
+**K-DHT** is plain Kademlia: 64-bit random node identifiers, XOR distance, K=20 buckets, α=3 parallel queries. No locality, no learning. It is the dominant deployed DHT in production — BitTorrent, IPFS, Ethereum's peer-discovery layer, and Tor v3 hidden services all run Kademlia variants — and therefore the baseline every new design has to beat to justify itself.
+
+**G-DHT** is K-DHT with one structural change: the top 8 bits of every node identifier encode the S2 cell of its claimed position (the construction is in §"Idea #1: Put the Address in the Address"). XOR distance now approximately tracks physical distance for free; the routing algorithm is unchanged. G-DHT tests an important boundary question — how much of the lookup-latency win comes from *structure* and how much from *learning* — and is also the substrate Axona's learning is eventually layered onto in the deployed protocol.
+
+Both were running against the grid by early April. Their CSV rows became the reference lines every subsequent protocol's measurements would be compared against. The "Axona vs. Kademlia" claims you see throughout this explainer are the residue of forty-five later protocols measured against these two baselines.
+
+### Step 3 — Iterate the neuromorphic family against the grid
+
+With the lab built and the baselines fixed, we started designing learning-adaptive protocols. The first was **N-1** in late March — classical neuromorphic ideas applied to routing: Hebbian long-term potentiation, a routing-table population of "synapses" with adaptive weights, time-based decay. We ran it against the grid. We learned which cells it won and which it lost. We then designed N-2, ran it, kept the parts that improved cells, and threw out the parts that didn't. Then N-3. And so on.
+
+Nine weeks later, by mid-May, we had measured **47 distinct DHT designs** (counting the two baselines, the eventual deployed protocol, and 44 retired variants in between):
 
 | Family | Count | Members |
 |---|--:|---|
@@ -317,7 +327,7 @@ Nine weeks later, by mid-May, we had measured **47 distinct DHT designs**:
 
 The N-series was the original exploration. Branches with suffixes BP (back-propagation), SHC (synaptic-hop cache), and W (weighted) carried experiments that diverged from the trunk and were rolled back when they didn't pay off. NS-1…NS-6 was an intermediate generation focused on the synaptome data structure itself. NX-1…NX-17 was the focused iteration — each NX adding or testing a single mechanism, measuring it against the grid, keeping or retiring. NX-17 was the high-water mark by mechanism count: 18 distinct rules and 44 parameters.
 
-### Step 3 — What promotion and retirement looked like
+### Step 4 — What promotion and retirement looked like
 
 Almost every retirement was the same shape. A candidate mechanism made one cell better and another cell worse. NX-11 added a "second-tier" synaptome scoring — r500 improved by 8 ms, churn-cell success dropped from 99% to 96%. NX-12 tried to fix the churn cell by lengthening the protection window — r500 regressed back. The grid made the trade visible immediately. Most NX revisions died this way: not because they were bad ideas, but because they couldn't simultaneously satisfy seven cells.
 
@@ -327,7 +337,7 @@ NH-1 then collapsed NX-17's 18 rules into 12, and 44 parameters into 12, by keep
 
 A few dead ends are worth noting because they're informative. NX-3 tried routing without iterative fallback; Slice World success collapsed to 0% and the test caught it immediately. NX-14 lost to NX-15 on r500 by 12 ms and the source file is now retired from the tree (but the CSV is still in `results/`). NX-16 tried to fix routing-table imbalance by masking the low bits of the distance metric; global latency exploded and the protocol now lives in `axona-docs/dead-ends/` as a cautionary example.
 
-### Step 4 — Unbinding the protocol from the simulator
+### Step 5 — Unbinding the protocol from the simulator
 
 By early May we had NH-1 — twelve rules, twelve parameters, one vitality function, measurably the strongest variant. But at this point the protocol was still defined by its simulator. The code ran in a single Node.js process where every node had direct access to every other node's state through a god's-eye `nodeMap`. That was useful for development and unacceptable for deployment. A real peer-to-peer system has no god's-eye view; every peer only knows what it learns through actual network messages.
 
@@ -339,7 +349,7 @@ We then ran a parity-gate benchmark: 25,000 nodes, before and after the refactor
 
 This is the part of the project I would put on the table first if I were arguing for it intellectually. Not the 1.33× floor number. Not the 47-protocols-in-9-weeks pace. **The fact that the lab and the deployed system are the same code.**
 
-### Step 5 — The fixed-grid claim, in retrospect
+### Step 6 — The fixed-grid claim, in retrospect
 
 All of the above only works because the benchmark grid stayed stable as the protocol churned. The cells the simulator iterates against have been essentially unchanged since week one. The latency model got a small refinement in v1.1.2 (live per-hop RTT instead of a value stamped at synapse admission). The churn-rate model got more aggressive somewhere around NX-11. But the cells are the same. A CSV from April 8, 2026 reading "NX-7 global 5K = 243.6 ms / 3.28 hops / 100%" is directly comparable to today's CSV reading "Axona global 5K = 238.75 ms / 4.33 hops / 100%" — six weeks apart, same grid, similar wall-clock at different hop counts (Axona uses learned RTT routing where NX-7 used pure XOR distance, which is why Axona walks more hops but each one is shorter).
 
