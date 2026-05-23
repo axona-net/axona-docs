@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.4.23 \quad 2026-05-22\par}
+{\small An Axona Explainer \quad v0.4.24 \quad 2026-05-22\par}
 \end{center}
 \vfill
 \null
@@ -436,7 +436,7 @@ That scaling is exactly what makes self-healing essential. A tree with a few nod
 Tree-building this way is standard pub/sub fabric. The useful property---the one that lets the tree get arbitrarily large without falling apart---is that \textbf{the tree heals itself with no special machinery}. Every member of the tree periodically re-issues its subscribe message. If the tree is intact, nothing changes. If a parent died, the re-subscribe naturally lands on whichever live ancestor is now closest. No heartbeats, no failure detection, no parent tracking. The same mechanism that \emph{builds} the tree \emph{repairs} it.
 
 % --- Figure: axonal tree heals via routed re-subscribe ------------
-% v0.4.23: tufte-handout routes \caption inside figure/figure* to the
+% v0.4.24: tufte-handout routes \caption inside figure/figure* to the
 % right margin, where it collides with the Dabek sidenote on the
 % following page.  Bypass the caption mechanism entirely and render
 % the caption as inline body text directly below the image using
@@ -782,15 +782,27 @@ The protocol doesn't keep finding the bridge---it \emph{uses} the bridge to rebu
 \label{fig:dht-sim}
 \end{figure*}
 
-The trick is keeping two things separate that everyone \emph{wants} to merge: \textbf{the protocol} (the rules of routing---AP scoring, hop caching, vitality, axonal trees) and \textbf{the network} (the actual machinery that moves bytes between machines). If you tangle them together, the simulator becomes useless the moment you deploy, because the protocol code was wired into a fake network. If you keep them apart, the simulator becomes the deployment vehicle: same protocol, different network underneath.
+\newthought{Axona's architecture} stacks into \textbf{three layers}, with a contract at each interface (Figure~\ref{fig:layers}). Everything above the top contract is \emph{the application}; everything between the two contracts is \emph{the protocol}; everything below the bottom contract is \emph{the network}. The contracts are deliberately rigid---neither side is allowed to reach across---which is what makes the simulator's numbers transfer to real deployment.
 
-Axona keeps them apart with \textbf{two contracts}.\sidenote{The DHT contract is the public surface of the \texttt{AxonaPeer} class in the \texttt{@axona/protocol} kernel; the Transport contract is the abstract base alongside it. Concrete Transports include \texttt{Transport.sim()} for the in-browser simulator, \texttt{Transport.web()} for WebRTC in real browsers, and \texttt{Transport.node()} for headless servers.}
+% --- Figure: three-layer architecture ----------------------------
+\begin{figure*}[h]
+\centering
+\includegraphics[width=0.85\linewidth]{../images/Architecture-Layers.png}%
+\refstepcounter{figure}\label{fig:layers}%
+\par\medskip
+\begin{minipage}{0.85\linewidth}%
+\footnotesize\setlength{\parindent}{0pt}%
+\textbf{Figure~\thefigure}.~~The three-layer architecture.  The application layer (chat clients, civildefense.io, agent-collaboration backends) sits above the \emph{DHT contract}---the \texttt{AxonaPeer} surface, organised into lifecycle, pub/sub, direct-messaging, mesh-introspection, and telemetry clusters.  Below the DHT contract lives the \emph{protocol layer}: the routing decisions and learning rules---Axona, or K-DHT, or G-DHT.  Below \emph{that} is the \emph{Transport contract}, a twelve-method surface that the network has to provide.  Concrete Transports plug in underneath: \texttt{Transport.sim()} for the in-browser lab, \texttt{Transport.web()} for WebRTC in real browsers, \texttt{Transport.node()} for headless servers.  Calls travel downward; events travel upward.  Neither contract permits the layers on either side to know what the other is doing internally.
+\end{minipage}
+\end{figure*}
 
-The first contract---call it the \textbf{DHT contract}---is what the application above sees. An app like a chat client doesn't care how routing works internally; it just wants to \emph{do things}. So the DHT exposes an \texttt{AxonaPeer} surface organised into five clusters: \textbf{lifecycle} (\texttt{start}, \texttt{stop}, \texttt{join}, \texttt{leave}); \textbf{pub/sub} (the four verbs from Section~VII---\texttt{pub}, \texttt{sub}, \texttt{pull}, \texttt{metrics}); \textbf{direct messaging} (\texttt{send}, \texttt{notify}, \texttt{onMessage}) for unicast traffic outside the feed; \textbf{mesh introspection} (\texttt{peers}, \texttt{onPeerJoin}, \texttt{onPeerLeave}, \texttt{lookup}) so the application can see what's around it; and \textbf{telemetry} (\texttt{health}, \texttt{onLog}, \texttt{onError})---a way for the application to \emph{watch} what the protocol is doing without being able to mess with it.
+At the top is the \textbf{application layer}---the code that wants to do something with a peer-to-peer network. A chat client, an incident-reporting map, an agent-collaboration backend. The application layer doesn't care how routing works internally; it just wants to \emph{do things}. What it sees is the \textbf{DHT contract}---the \texttt{AxonaPeer} surface\sidenote{\texttt{AxonaPeer} and the \texttt{Transport} abstract base both live in the \texttt{@axona/protocol} kernel package; the routing logic and learning rules sit on top of \texttt{AxonaPeer} and call through \texttt{Transport}.} from Section~VII, organised into five clusters: \textbf{lifecycle} (\texttt{start}, \texttt{stop}, \texttt{join}, \texttt{leave}); \textbf{pub/sub} (\texttt{pub}, \texttt{sub}, \texttt{pull}, \texttt{metrics}); \textbf{direct messaging} (\texttt{send}, \texttt{notify}, \texttt{onMessage}); \textbf{mesh introspection} (\texttt{peers}, \texttt{onPeerJoin}, \texttt{onPeerLeave}, \texttt{lookup}); and \textbf{telemetry} (\texttt{health}, \texttt{onLog}, \texttt{onError})---a way for the application to \emph{watch} what the protocol is doing without being able to mess with it.
 
-The second contract---the \textbf{Transport contract}---is what the network underneath has to provide. It's deliberately small: open a channel to a peer, close a channel, send a message and wait for the reply, send a message and don't wait, register a callback for when a peer dies, ask for a peer's measured latency. Twelve methods. That's it.
+In the middle is the \textbf{protocol layer}---the routing decisions. This is where Axona's actual algorithms live: AP scoring, hop caching, vitality function, axonal trees, all the brain-inspired machinery. The same slot can hold a different routing protocol entirely---plain Kademlia (K-DHT) or geographic-prefix Kademlia (G-DHT)---and the layers above and below don't notice. That interchangeability is what made the benchmark grid possible: each candidate protocol drops into the same slot and runs against the same application code and the same Transport, so the numbers compare directly.
 
-The protocol---the routing logic, the learning rules, all the brain-inspired machinery---sits in between. It calls \emph{down} into the Transport (``send this peer a message asking for its closest synapses to target X'') and emits events \emph{up} through the DHT contract (``a lookup just completed; here's the result''). It doesn't know whether the Transport beneath it is the simulator's in-process fake or a real WebRTC connection over the internet. \textbf{It can't tell the difference}, by design.
+At the bottom is the \textbf{transport layer}---the actual machinery that moves bytes between machines. What the protocol layer sees of it is the \textbf{Transport contract}: open a channel to a peer, close a channel, send a message and wait for the reply, send a message and don't wait, register a callback for when a peer dies, ask for a peer's measured latency. Twelve methods. That's it.
+
+Three concrete Transports plug into the same contract. \texttt{Transport.sim()} runs the network in-process inside a single browser tab---this is what produces the 25{,}000-peer benchmark numbers from earlier sections. \texttt{Transport.web()} runs WebRTC data channels between real browsers. \texttt{Transport.node()} runs raw sockets on headless servers. The protocol layer calls \emph{down} into whichever Transport is plugged in (``send this peer a message asking for its closest synapses to target X'') and emits events \emph{up} through the DHT contract (``a lookup just completed; here's the result''). It doesn't know which Transport is underneath, and \textbf{it can't tell the difference}, by design.
 
 That last point is what matters. When the simulator says ``Axona takes about 5 hops on average to find a target in a 25{,}000-node network,'' that number isn't a simulator artifact. It's a property of the protocol code, which is the same code that will run when this gets deployed. The Transport changes; the protocol doesn't. The simulator's hop counts, latency curves, churn-resilience numbers---they all transfer to the real internet because the routing decisions that produce those numbers are made in code that doesn't know it's being simulated.
 
