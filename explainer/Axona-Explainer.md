@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.19 · 2026-05-23 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.20 · 2026-05-23 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -185,7 +185,7 @@ In neuroscience, the *output* of a neuron — the long branching cable that deli
 
 In production validation, 100 peers in a single network deliver pub/sub messages with 100% success across multiple topics, including the case where five subscribers join *after* the publishes have already happened and pull them from the axons' replay caches. Each peer plays its own role — pure subscriber, axon role-holder, occasional relay — and the load distributes naturally as the K-closest set varies per topic.
 
-Above this delivery layer sits a feed-style application surface with **five verbs** — `publish`, `subscribe`, `pull`, `reshare`, `metrics`. They cover what a real social or agent-collaboration application asks of a substrate: author new content, attach to a topic, fetch a referenced post on demand, forward with provenance, and let a publisher see verifiable reach without identifying any individual subscriber. Encryption, schema, and ordering belong to the application above this layer; the protocol carries opaque bytes.
+Above this delivery layer sits a feed-style application surface with **four verbs** — `pub`, `sub`, `pull`, `metrics`. They cover what a real social or agent-collaboration application asks of a substrate: author new content, attach to a topic, fetch a referenced post on demand, and let a publisher see verifiable reach without identifying any individual subscriber. Resharing is built at the application layer by republishing the original signed envelope; the relay sees the duplicate `msgId` and surfaces it through `metrics` as `reshare_count`. (For 1-to-1 traffic outside the feed, the peer also exposes `send` / `notify` / `onMessage`, but that's the direct-messaging surface, not pub/sub.) Encryption, schema, and ordering belong to the application above this layer; the protocol carries opaque bytes.
 
 ## The Big Result: Hitting the Theoretical Floor
 
