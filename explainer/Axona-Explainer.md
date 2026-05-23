@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.24 · 2026-05-23 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.25 · 2026-05-23 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -315,7 +315,21 @@ This has been an incredibly symbiotic experience.
 
 ---
 
-## Postscript: How We Got Here
+## Postscript: Symbiotic Development
+
+As you may have guessed, this work heavily relied on AI — Claude Code Opus 4.7, to be specific. Though I am confident I could have designed and built this system without that help, I also know I could not have done it as quickly or as robustly as I did here. Virtually every design decision and algorithm was mine alone, or based upon existing systems and processes, with guidance and criticism on the actual coding. That said, this has been an incredibly symbiotic experience. Claude acted not as a passive implementor but as an *idea amplifier*. In fact, the AI played many roles — application and system coder, graduate student performing the research activities, advisor on technical questions, critic on design directions, co-author (usually main author) of the documents — a true collaborator enabling us to jointly create something that had only existed, in a vague form, in my mind and in my notes. Like a few programmers, I have the ability to see the "machine" I wish to create in my head, and even operate it there to a degree; but transferring that working virtual system into reality is always a challenge. I have always looked at code as the unimportant-but-necessary part of the creation process.
+
+I should make clear that my own expertise in code was essential to this task. **This is not a "vibe-coding" project.** There is a meta-level of functionality that we worked to bring to life, but the actual functionality is determined by the implementation and the details of that implementation. With a system like this, built inside a simulation of the world, it is extremely easy to design things in ways that take advantage of the architecture of the simulator itself — information and access that is simply unavailable in real life. That leads to extraordinary performance increases that cannot survive reality when it shows up. AI coders work to optimise the system in front of them and have no real conception of the boundaries between systems; they are extremely good at leveraging the gaps between those boundaries to achieve a particular goal. This behaviour was a huge challenge, because like any human I had the desire to see the magic happen. I was a believer, and the AI would regularly reward my belief in how amazing the system would be. But that magic almost always proved to be a mirage.
+
+Luckily, I was well equipped to address this. I am a particularly good programmer and system architect, but oddly, my greatest talent may be that I am an extraordinarily good debugger. **Great debugging is based upon one thing — scepticism.** Every new line of code you write probably has a bug. Every algorithm has a side effect you can't see. Every system has invisible holes just waiting for your application to step into them and die. The current system, I have no doubt, has countless numbers of these, and they will certainly become readily visible as we deploy. Reality is an unforgiving bitch.
+
+In perhaps the same way the three-layer Axona system works — application / protocol / transport — the process here was *concept and design (Smith)* / *coding and documentation (Claude)* / *criticism, quality assurance, and debugging (Smith)*. This iterative loop led to a new use for an old mantra:
+
+> *If it is too good to be true, then it is not true.*
+
+The development of the Axona system was not magical — it was very complex, very tedious, and frankly more than a little scary. When I discovered that the system had "cheated" in its performance — which happened numerous times — each instance could have meant the entire architecture was a house of cards that would never stand in reality. Usually these cheats were applied uniformly across all protocols, so that when the fix landed every protocol now showed more reliable numbers, and the *ratios* of performance between them held constant. That repeated pattern is what kept the comparative claims in this paper alive even as the absolute numbers shifted underneath them.
+
+This development required numerous systems and subsystems just to provide a laboratory within which the design could be explored. That laboratory was easily the most important part of the process.
 
 Most simulation work in distributed systems begins with a protocol and writes a testbed to validate it. We did the opposite. We built the simulator first — about 25,000 lines of JavaScript that creates N peers on a virtual globe, runs them through a fixed benchmark grid, and emits one CSV per run. Then we used that lab to design the protocol.
 
