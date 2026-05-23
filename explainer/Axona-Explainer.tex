@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.4.22 \quad 2026-05-22\par}
+{\small An Axona Explainer \quad v0.4.23 \quad 2026-05-22\par}
 \end{center}
 \vfill
 \null
@@ -429,10 +429,14 @@ In neuroscience, the \emph{output} of a neuron---the long branching cable that d
   \item When a publisher publishes, the message flows from the root down through all the branches.
 \end{itemize}
 
-That part is standard. The useful property is that \textbf{the tree heals itself with no special machinery}. Every member of the tree periodically re-issues its subscribe message. If the tree is intact, nothing changes. If a parent died, the re-subscribe naturally lands on whichever live ancestor is now closest. No heartbeats, no failure detection, no parent tracking. The same mechanism that \emph{builds} the tree \emph{repairs} it.
+\newthought{Why a tree at all} is a scaling question. A topic with a few dozen subscribers doesn't really need one---a single relay node, or maybe two or three, can absorb every publish and fan it out directly. The tree only earns its complexity once a topic's audience grows. At hundreds, thousands, or tens of thousands of subscribers, no small set of relays can carry that much traffic: every publish would compete for the same outbound bandwidth at the root, and a browser peer's hard 50--190-connection WebRTC cap would put a ceiling on the audience well before then. So when a relay starts to overload, it \textbf{splits}: it picks one of its synaptome peers as a new \textbf{sub-axon} and hands that sub-axon a batch of its existing children. Future subscribers route to whichever live axon is now closest---increasingly a sub-axon, not the root. The tree therefore grows \emph{in the direction of its audience}: branches sprout where subscribers cluster, and stay sparse where they don't. There is no architectural ceiling on subscriber count---the tree adds branches as needed.
+
+That scaling is exactly what makes self-healing essential. A tree with a few nodes can ride out churn by luck---if the relay doesn't happen to die, nothing notices. A tree spanning thousands of nodes loses pieces \emph{continuously}, simply because there are more nodes for churn to strike. The bigger the tree, the more surface area churn has to chew on. Self-healing is therefore not a feature added on top of the tree; it is the precondition that lets the tree get large at all.
+
+Tree-building this way is standard pub/sub fabric. The useful property---the one that lets the tree get arbitrarily large without falling apart---is that \textbf{the tree heals itself with no special machinery}. Every member of the tree periodically re-issues its subscribe message. If the tree is intact, nothing changes. If a parent died, the re-subscribe naturally lands on whichever live ancestor is now closest. No heartbeats, no failure detection, no parent tracking. The same mechanism that \emph{builds} the tree \emph{repairs} it.
 
 % --- Figure: axonal tree heals via routed re-subscribe ------------
-% v0.4.22: tufte-handout routes \caption inside figure/figure* to the
+% v0.4.23: tufte-handout routes \caption inside figure/figure* to the
 % right margin, where it collides with the Dabek sidenote on the
 % following page.  Bypass the caption mechanism entirely and render
 % the caption as inline body text directly below the image using

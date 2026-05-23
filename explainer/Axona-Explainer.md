@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.22 · 2026-05-23 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.23 · 2026-05-23 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -176,6 +176,8 @@ In neuroscience, the *output* of a neuron — the long branching cable that deli
 **Lazy axon promotion.** A node that receives a publish but isn't yet hosting the topic *promotes itself* to a role-holder and starts caching messages immediately. When subscribers arrive later, they find the cache already populated. This makes publish-before-subscribe work: a publisher can broadcast even when nobody is listening yet, and the messages wait for up to ~60 seconds in case someone shows up.
 
 **Replay on subscribe.** When a subscriber attaches to a K-closest axon, the axon replays its cached messages in a single batch — bounded at 100 messages per topic, with a `lastSeenTs` filter so a re-attaching subscriber only gets what it missed, not everything from scratch. Healing and replay are the same mechanism.
+
+**Tree growth by overload-split.** A topic with a few dozen subscribers needs nothing more than the K=5 replicas above; they absorb every publish and fan it out directly. Once an audience reaches hundreds or thousands, no small set of relays can keep up — the browser's 50–190-connection WebRTC cap would put a ceiling on the audience well before that. So when a relay overloads, it **splits**: it picks one of its synaptome peers as a new sub-axon and hands that sub-axon a batch of its children. Future subscribers route to whichever live axon is now closest — increasingly a sub-axon, not the root. The tree grows *in the direction of its audience*: branches sprout where subscribers cluster, stay sparse where they don't. There's no architectural ceiling on subscriber count — but a tree spanning thousands of nodes loses pieces continuously under churn, which is what the next bullet is for.
 
 **Tree self-healing.** Subscribers re-issue their subscribe periodically. If an axon died, the re-subscribe naturally lands on whichever K-closest node is now alive — no heartbeats, no failure detection, no parent tracking. Under 5% churn, delivery stays at 100%; after three refresh cycles the tree has fully reformed.
 
