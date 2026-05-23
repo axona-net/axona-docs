@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.21 · 2026-05-23 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.22 · 2026-05-23 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -262,7 +262,7 @@ The trick is keeping two things separate that everyone *wants* to merge: **the p
 
 Axona keeps them apart with **two contracts**.
 
-The first contract — call it the **DHT contract** — is what the application above sees. An app like a chat client doesn't care how routing works internally; it just wants to *do things*. So the DHT exposes eight verbs: `start`, `stop`, `join`, `leave` (lifecycle); `lookup`, `subscribe`, `unsubscribe`, `publish` (the actual operations); plus `getMetrics`, `getSynaptome`, and `onEvent` for telemetry — a way for the application to *watch* what the protocol is doing without being able to mess with it.
+The first contract — call it the **DHT contract** — is what the application above sees. An app like a chat client doesn't care how routing works internally; it just wants to *do things*. So the DHT exposes an `AxonaPeer` surface organised into five clusters: **lifecycle** (`start`, `stop`, `join`, `leave`); **pub/sub** (the four verbs from the Axonal Pub/Sub section — `pub`, `sub`, `pull`, `metrics`); **direct messaging** (`send`, `notify`, `onMessage`) for unicast traffic outside the feed; **mesh introspection** (`peers`, `onPeerJoin`, `onPeerLeave`, `lookup`) so the application can see what's around it; and **telemetry** (`health`, `onLog`, `onError`) — a way for the application to *watch* what the protocol is doing without being able to mess with it.
 
 The second contract — the **Transport contract** — is what the network underneath has to provide. It's deliberately small: open a channel to a peer, close a channel, send a message and wait for the reply, send a message and don't wait, register a callback for when a peer dies, ask for a peer's measured latency. Twelve methods. That's it.
 

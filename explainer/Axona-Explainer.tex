@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.4.21 \quad 2026-05-22\par}
+{\small An Axona Explainer \quad v0.4.22 \quad 2026-05-22\par}
 \end{center}
 \vfill
 \null
@@ -432,7 +432,7 @@ In neuroscience, the \emph{output} of a neuron---the long branching cable that d
 That part is standard. The useful property is that \textbf{the tree heals itself with no special machinery}. Every member of the tree periodically re-issues its subscribe message. If the tree is intact, nothing changes. If a parent died, the re-subscribe naturally lands on whichever live ancestor is now closest. No heartbeats, no failure detection, no parent tracking. The same mechanism that \emph{builds} the tree \emph{repairs} it.
 
 % --- Figure: axonal tree heals via routed re-subscribe ------------
-% v0.4.21: tufte-handout routes \caption inside figure/figure* to the
+% v0.4.22: tufte-handout routes \caption inside figure/figure* to the
 % right margin, where it collides with the Dabek sidenote on the
 % following page.  Bypass the caption mechanism entirely and render
 % the caption as inline body text directly below the image using
@@ -780,9 +780,9 @@ The protocol doesn't keep finding the bridge---it \emph{uses} the bridge to rebu
 
 The trick is keeping two things separate that everyone \emph{wants} to merge: \textbf{the protocol} (the rules of routing---AP scoring, hop caching, vitality, axonal trees) and \textbf{the network} (the actual machinery that moves bytes between machines). If you tangle them together, the simulator becomes useless the moment you deploy, because the protocol code was wired into a fake network. If you keep them apart, the simulator becomes the deployment vehicle: same protocol, different network underneath.
 
-Axona keeps them apart with \textbf{two contracts}.\sidenote{The contracts live at \texttt{src/contracts/DHT.js} and \texttt{src/contracts/Transport.js} in the codebase; both are abstract base classes whose every method throws \texttt{not implemented}. Concrete implementations live in the simulator (\texttt{SimulatedTransport}) and, when deployed, in production (\texttt{WebRTCTransport}).}
+Axona keeps them apart with \textbf{two contracts}.\sidenote{The DHT contract is the public surface of the \texttt{AxonaPeer} class in the \texttt{@axona/protocol} kernel; the Transport contract is the abstract base alongside it. Concrete Transports include \texttt{Transport.sim()} for the in-browser simulator, \texttt{Transport.web()} for WebRTC in real browsers, and \texttt{Transport.node()} for headless servers.}
 
-The first contract---call it the \textbf{DHT contract}---is what the application above sees. An app like a chat client doesn't care how routing works internally; it just wants to \emph{do things}. So the DHT exposes eight verbs: \texttt{start}, \texttt{stop}, \texttt{join}, \texttt{leave} (lifecycle); \texttt{lookup}, \texttt{subscribe}, \texttt{unsubscribe}, \texttt{publish} (the actual operations); plus \texttt{getMetrics}, \texttt{getSynaptome}, and \texttt{onEvent} for telemetry---a way for the application to \emph{watch} what the protocol is doing without being able to mess with it.
+The first contract---call it the \textbf{DHT contract}---is what the application above sees. An app like a chat client doesn't care how routing works internally; it just wants to \emph{do things}. So the DHT exposes an \texttt{AxonaPeer} surface organised into five clusters: \textbf{lifecycle} (\texttt{start}, \texttt{stop}, \texttt{join}, \texttt{leave}); \textbf{pub/sub} (the four verbs from Section~VII---\texttt{pub}, \texttt{sub}, \texttt{pull}, \texttt{metrics}); \textbf{direct messaging} (\texttt{send}, \texttt{notify}, \texttt{onMessage}) for unicast traffic outside the feed; \textbf{mesh introspection} (\texttt{peers}, \texttt{onPeerJoin}, \texttt{onPeerLeave}, \texttt{lookup}) so the application can see what's around it; and \textbf{telemetry} (\texttt{health}, \texttt{onLog}, \texttt{onError})---a way for the application to \emph{watch} what the protocol is doing without being able to mess with it.
 
 The second contract---the \textbf{Transport contract}---is what the network underneath has to provide. It's deliberately small: open a channel to a peer, close a channel, send a message and wait for the reply, send a message and don't wait, register a callback for when a peer dies, ask for a peer's measured latency. Twelve methods. That's it.
 
