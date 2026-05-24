@@ -36,6 +36,7 @@ This repo uses three terms consistently:
 
 ## Supplementary material
 
+- **[`applications/`](applications/)** — product briefs for applications built on the Axona protocol (Hum — adaptive social feed).
 - **[`architecture/`](architecture/)** — the two-layer-API architecture reference (DHT contract + Transport contract + BootstrapService).
 - **[`implementation/`](implementation/)** — integration plans, wire-protocol spec, per-node refactor plan, NX-17 → NH-1 punchlist.
 - **[`red team/`](red%20team/)** — independent red-team analyses including the protocol-layer god's-eye audit and the v0.3.38 13-issue priority list.
