@@ -4,7 +4,7 @@ size: 16:9
 theme: default
 paginate: true
 header: ""
-footer: "AXONA · v0.18 · May 2026 · confidential"
+footer: "AXONA · v0.18 · May 2026"
 style: |
   /* ── Tufte-inspired typography + cream paper ─────────────────── */
   @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Inconsolata:wght@400;500&display=swap');
@@ -530,18 +530,16 @@ Each step signed, addressable, counted. Analyst sees full-cascade reach without 
 <div class="tufte">
 <div class="main">
 
-## 9 / Live today + the road ahead
+## 9 / Live today
 
-# Three deployments running. 47 protocols measured. One survived.
+# 47 protocols — only one survived.
 
 - <span class="head">The protocol is live and running.</span>
-  &nbsp;&nbsp;<a href="https://axona.net"><strong>axona.net</strong></a> &nbsp;—&nbsp; browser peer · signed messages, reshare, <code>pull</code>, QR-code join, cross-NAT mesh<br/>
-  &nbsp;&nbsp;<a href="https://bridge.axona.net/healthz"><strong>bridge.axona.net</strong></a> &nbsp;—&nbsp; signaling broker for browser-to-browser P2P<br/>
-  &nbsp;&nbsp;<a href="https://axona-net.github.io/dht-sim/"><strong>dht-sim</strong></a> &nbsp;—&nbsp; reference simulator · 25,000-peer protocol evaluation on a 3D globe
+  <a href="https://axona.net"><strong>axona.net</strong></a> (browser peer) &nbsp;·&nbsp; <a href="https://bridge.axona.net/healthz"><strong>bridge.axona.net</strong></a> (signaling) &nbsp;·&nbsp; <a href="https://axona-net.github.io/dht-sim/"><strong>dht-sim</strong></a> (25K-peer reference simulator).
 - <span class="head">The wedge is real: <a href="https://civildefense.io">civildefense.io</a>.</span>
-  Tap-to-report incident map running on Axona. Users mark a location; reports propagate over anonymous P2P; expire in 24 hours. Built in weeks because every protocol primitive — signed messages, geographic locality, implicit expiry, anonymous reach — maps directly to what the app needs. <strong>The wedge is independent developers</strong> — civic apps, IoT meshes, agent toolchains — for whom Axona makes cross-vendor integration trivial.
+  Tap-to-report incident map running on Axona — anonymous P2P, geographic locality, 24-hour expiry. Built in weeks because every protocol primitive maps directly. <strong>The wedge is independent developers</strong> — civic apps, IoT meshes, agent toolchains — for whom Axona makes cross-vendor integration trivial.
 - <span class="head">Empirical evolution. The fossil record is open source.</span>
-  <strong>47 distinct DHT designs</strong> measured against the same benchmark grid; three carried forward (Kademlia baseline, G-DHT geographic, Axona). Every retired variant's CSV is still in the repo as a falsification trail — the design is the residue, not an opinion.
+  <strong>47 distinct DHT designs</strong> measured against the same benchmark grid; three carried forward (Kademlia baseline, G-DHT geographic, Axona). Every retired variant's CSV is in the repo as a falsification trail — the design is the residue, not an opinion.
 
 </div>
 <div class="margin">
@@ -556,22 +554,50 @@ Led by <strong>David A. Smith</strong> — Computer Scientist and System Archite
 - <strong>Virtus Walkthrough</strong> — desktop VR before VR was a category
 - <strong>DoD Virtual World Framework</strong> — Pentagon's standard for distributed simulation
 
-#### Roadmap
-
-| Quarter | Milestone |
-|---|---|
-| <strong>Q3 2026</strong> | Agent SDK + reference adapters for MCP, A2A, OpenAI Agents · <span class="num">1,000 active nodes</span> |
-| <strong>Q4 2026</strong> | Federated bridge mesh (no single point of dependency) · <span class="num">10,000 active nodes</span> |
-| <strong>Q1 2027</strong> | Hybrid post-quantum identity (Ed25519 + ML-DSA) · adversarial-hardening pass · <span class="num">100,000 active nodes</span> |
-
-Success metric: <strong>active nodes on the network</strong> — every human, agent, IoT device, sensor, and service that needs dynamic end-to-end-secure communication.
-
 #### Open source
 
 - <a href="https://github.com/axona-net/axona-peer">axona-net/axona-peer</a>
 - <a href="https://github.com/axona-net/axona-bridge">axona-net/axona-bridge</a>
 - <a href="https://github.com/axona-net/dht-sim">axona-net/dht-sim</a>
 - <a href="https://github.com/axona-net/axona-docs">axona-net/axona-docs</a> — whitepaper, paper, explainer, programmer's guide
+
+</div>
+</div>
+
+---
+
+<div class="tufte">
+<div class="main">
+
+## 10 / Roadmap
+
+# Become the standard protocol for ad-hoc secure communication.
+
+Every node — human, AI agent, IoT device, sensor, service — that needs dynamic, end-to-end secure communication speaks Axona. Success metric: <strong>active nodes on the network</strong>. We don't wait for the model labs to bless an interop layer; we make cross-vendor integration trivial for the long tail.
+
+- <span class="head">Q3 2026 — Agent SDK + reference adapters.</span>
+  Adapters for MCP, A2A, OpenAI Agents alongside the SDK. Target: <span class="num">1,000 active nodes</span>.
+- <span class="head">Q4 2026 — Federated bridge mesh.</span>
+  No single point of dependency; any operator can run a bridge. Target: <span class="num">10,000 active nodes</span>.
+- <span class="head">Q1 2027 — Hybrid post-quantum identity + adversarial hardening.</span>
+  Ed25519 + ML-DSA; adversarial pass on partition, eclipse, sybil. Target: <span class="num">100,000 active nodes</span>.
+
+</div>
+<div class="margin">
+
+#### Active-node targets
+
+| Date | Active nodes | Kind |
+|---|---|---|
+| Q3 2026 | <span class="num">1,000</span> | early agents |
+| Q4 2026 | <span class="num">10,000</span> | agents + humans + IoT |
+| Q1 2027 | <span class="num">100,000</span> | every category |
+
+#### Known risks
+
+1. <strong>Walled gardens may successfully wall.</strong> Mitigation: target the long tail, not the giants.
+2. <strong>Routing under adversarial conditions untested.</strong> Mitigation: Q1 2027 adversarial pass.
+3. <strong>Network effect may not compound before vendor stacks entrench.</strong> Mitigation: faster cadence than vendor SDK iteration.
 
 #### Contact
 
