@@ -173,6 +173,8 @@ def md_to_flowables(md_text):
     in_code = False
     code_lines = []
     title_done = False
+    fresh_page = True   # Tracks whether we're at the top of a document/page
+                        # so the next H1/subtitle line gets title styling.
 
     while i < len(lines):
         line = lines[i]
@@ -196,6 +198,17 @@ def md_to_flowables(md_text):
 
         stripped = line.strip()
 
+        # Page breaks — explicit markers force a new page.  After a page
+        # break the next H1/subtitle/version line should be styled as if
+        # at the top of a fresh document.
+        if stripped in ('<!-- pagebreak -->', '<!--pagebreak-->',
+                        '<!-- new page -->', '\\newpage'):
+            flowables.append(PageBreak())
+            fresh_page = True
+            title_done = False
+            i += 1
+            continue
+
         # Skip horizontal rules
         if stripped == '---':
             i += 1
@@ -214,10 +227,8 @@ def md_to_flowables(md_text):
             i += 1
             continue
 
-        # Subtitle (bold italic line after title)
-        if stripped.startswith('**') and stripped.endswith('**') and not any(
-            isinstance(f, Paragraph) and f.style.name == 'Body' for f in flowables
-        ):
+        # Subtitle (bold line immediately after the title on a fresh page)
+        if fresh_page and stripped.startswith('**') and stripped.endswith('**'):
             text = stripped.strip('*')
             flowables.append(Paragraph(text, styles['DocSubtitle']))
             i += 1
@@ -227,8 +238,12 @@ def md_to_flowables(md_text):
         if stripped.startswith('*Version') and stripped.endswith('*'):
             text = stripped.strip('*')
             flowables.append(Paragraph(text, styles['DocVersion']))
+            fresh_page = False
             i += 1
             continue
+
+        # Any other content closes the fresh-page window
+        fresh_page = False
 
         # Chapter headings (## Chapter or ## Introduction or ## References or ## Appendix)
         if stripped.startswith('## '):

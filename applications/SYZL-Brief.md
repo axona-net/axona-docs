@@ -1,21 +1,18 @@
-# Product Brief — *SYZL*
+# Product Brief — SYZL
 
-*A peer-to-peer adaptive social feed built on Axona.*
+**A peer-to-peer adaptive social feed built on Axona.**
 
-**Version**: 0.2 draft · 2026-05-24 · *working name; alternatives still in play*
-**Owner**: David A. Smith · `davidasmith@gmail.com`
-
----
+*Version 0.3 · 2026-05-24 · David A. Smith · davidasmith@gmail.com*
 
 ## One-line pitch
 
-A swipe-based social feed where every gesture trains your network — `syzl` the posts you like, `fyzl` the ones you don't — and the ranking algorithm runs transparently on your own device, not on a server.
+A swipe-based social feed where every gesture trains your network — `SYZL` the posts you like, `FYZL` the ones you don't — and the ranking algorithm runs transparently on your own device, not on a server.
 
 ## The product, in two paragraphs
 
-SYZL is a swipe-based decentralised social feed. Users see a card stack of posts from publishers they're connected to. **Swipe right** to `syzl` (sizzle) — the post forwards to your followers with your endorsement, and your connection to the publisher strengthens. **Swipe left** to `fyzl` (fizzle) — the post stops there, and the connection weakens. **Tap** to open the post and add a comment; comments forward alongside the reshare.
+SYZL is a swipe-based decentralised social feed. Users see a card stack of posts from publishers they're connected to. **Swipe right** to `SYZL` (sizzle) — the post forwards to your followers with your endorsement, and your connection to the publisher strengthens. **Swipe left** to `FYZL` (fizzle) — the post stops there, and the connection weakens. **Tap** to open the post and add a comment; comments forward alongside the reshare.
 
-The trick is that the connection graph is *alive*. When a connection's strength drops below a threshold, it's quietly dropped and replaced with a probe — a candidate publisher discovered through your high-strength connections' graphs (hill-climbing) or a random distant peer (simulated annealing). Over weeks, your feed becomes a curated graph of publishers your actual behaviour says you want to hear from. There is no algorithm operator; there is no server-side ranking; the only learning signal is your swipes.
+The trick is that the connection graph is alive. When a connection's strength drops below a threshold, it's quietly dropped and replaced with a probe — a candidate publisher discovered through your high-strength connections' graphs (hill-climbing) or a random distant peer (simulated annealing). Over weeks, your feed becomes a curated graph of publishers your actual behaviour says you want to hear from. There is no algorithm operator; there is no server-side ranking; the only learning signal is your swipes.
 
 ## Core UX
 
@@ -23,20 +20,17 @@ The trick is that the connection graph is *alive*. When a connection's strength 
 
 | Gesture | Verb | Effect |
 |---|---|---|
-| Swipe right | `syzl` it | Like → reshare to your followers → +1 connection strength to publisher |
-| Swipe left | `fyzl` it | Dislike → don't propagate → −1 connection strength |
-| Tap | `syzl` + comment | Open detail; add a comment (rides with the reshare) |
-| Swipe up | save | Private bookmark (no propagation, no strength change) |
+| Swipe right | `SYZL` it | Like → reshare to your followers → +1 connection strength |
+| Swipe left | `FYZL` it | Dislike → don't propagate → −1 connection strength |
+| Tap | `SYZL` + comment | Open detail; add a comment (rides with the reshare) |
+| Swipe up | Save | Private bookmark (no propagation, no strength change) |
 
 ### Content creation
 
 A **+ button** opens the composer. Two paths into content creation:
 
-1. **Original posts** — a single-screen composer with three input types:
-   - **Text** — up to ~2,000 characters
-   - **Image** — paste or upload; signed envelope carries the bytes; the axonal tree fans them out
-   - **Link** — paste a URL; client renders an Open Graph preview card
-2. **Reshare with comment** — from any post in your feed, tap to open detail, write a comment, and `syzl` it. The original post body rides with the reshare; your comment is the new added value.
+1. **Original posts** — a single-screen composer with three input types: **text** (up to ~2,000 characters), **image** (paste or upload; signed envelope carries the bytes; the axonal tree fans them out), and **link** (paste a URL; client renders an Open Graph preview card).
+2. **Reshare with comment** — from any post in your feed, tap to open detail, write a comment, and `SYZL` it. The original post body rides with the reshare; your comment is the new added value.
 
 Posts publish to one of the author's named topics (default: one topic per user; advanced users can have several, e.g., `tech`, `books`).
 
@@ -44,16 +38,14 @@ Posts publish to one of the author's named topics (default: one topic per user; 
 
 Every user's connection list is a curated, shareable asset. Two mechanics for v1:
 
-- **Publish your connection list.** A user can publish a *connection-list post* — a special card type that shows their current high-strength connections to followers. Recipients see it as a card in their feed.
-- **Selectively adopt connections from someone else's list.** Tapping a connection-list card opens a browser of the publisher's connections; one-tap "add to my graph" adopts the connection. **New connections are subject to the same `syzl` / `fyzl` rules** — they earn their place or get rotated out.
+- **Publish your connection list.** A user can publish a connection-list post — a special card type that shows their current high-strength connections to followers. Recipients see it as a card in their feed.
+- **Selectively adopt connections from someone else's list.** Tapping a connection-list card opens a browser of the publisher's connections; one-tap "add to my graph" adopts the connection. New connections are subject to the same `SYZL` / `FYZL` rules — they earn their place or get rotated out.
 
-This is the viral super-loop: every user's well-curated graph becomes a discoverable resource. *Following someone's taste* is the new follow. A `v1.5` enhancement could make this a live subscription ("when my friend strengthens a connection past a threshold, offer it to me too") — deferred to keep v1 scope tight.
+This is the viral super-loop: every user's well-curated graph becomes a discoverable resource. *Following someone's taste* is the new follow. A v1.5 enhancement could make this a live subscription ("when my friend strengthens a connection past a threshold, offer it to me too") — deferred to keep v1 scope tight.
 
 ### Connection management
 
-- Lock individual connections (locked = exempt from auto-rotation)
-- See your full connection list with current strength scores; manual override at any time
-- Manual block / unblock
+Lock individual connections (locked = exempt from auto-rotation). See your full connection list with current strength scores; manual override at any time. Manual block / unblock.
 
 ## Out of scope for v1
 
@@ -74,12 +66,7 @@ This is the viral super-loop: every user's well-curated graph becomes a discover
 
 ## Technical scope (v1)
 
-- Web-first PWA, single-page app (React or Svelte)
-- Built directly on `@axona/protocol` v1.0 — *no protocol work*, all application layer
-- `peer.pub` / `peer.sub` for posts, reshares, and connection-list publications
-- `peer.pull` for fetching referenced bodies; `peer.metrics` for the publisher's reach dashboard
-- Local IndexedDB for: connection strengths, swipe history, bookmark stash
-- The hill-climb + annealing exploration logic is ~200 lines of JavaScript on top of `peer.lookup` and `peer.peers`
+Web-first PWA, single-page app (React or Svelte). Built directly on `@axona/protocol` v1.0 — *no protocol work*, all application layer. `peer.pub` / `peer.sub` for posts, reshares, and connection-list publications. `peer.pull` for fetching referenced bodies; `peer.metrics` for the publisher's reach dashboard. Local IndexedDB for connection strengths, swipe history, and bookmark stash. The hill-climb + annealing exploration logic is roughly 200 lines of JavaScript on top of `peer.lookup` and `peer.peers`.
 
 ## Build estimate
 
@@ -93,7 +80,7 @@ This is the viral super-loop: every user's well-curated graph becomes a discover
 | 11–12 | Polish: image handling, Open Graph link previews |
 | 13 | Invite-only beta launch |
 
-**Total**: ~3 months to a credible v1, single developer.
+Total: ~3 months to a credible v1, single developer.
 
 ## Success metrics
 
@@ -103,14 +90,85 @@ This is the viral super-loop: every user's well-curated graph becomes a discover
 
 ## Open questions (decide before week 1)
 
-1. **Final name** — committing to SYZL/FYZL? Alternatives still on the table: FLARE/FADE (natural verbs, light metaphor, Axona-thematic) · SPARK/SNUFF (natural verbs, but SPARK is trademark-crowded) · LIT/NIX (uses current slang) · BLAZE/DOUSE (heat metaphor; BLAZE has cannabis-slang conflict).
-2. **Cold-start bootstrap** — how does a new user get their first 5–10 publishers? Curated starter list per topic? Geographic-prefix popularity? Both?
-3. **Image hosting** — bytes-in-envelope (simpler, per-post payload bigger) or content-hash-and-pull (smaller publish, slower view)? Affects bandwidth budget per post.
-4. **Connection-strength decay** — does an old `syzl` count the same as a recent one? Exponential decay (e.g., half-life ~30 days) or step function?
-5. **Reshare-with-comment shape** — does the comment become part of the reshared envelope, or a separate post referencing the original? Affects how comments aggregate.
-6. **Connection-list semantics** — should a published connection list snapshot the publisher's current high-strength connections, or include the strength scores too? The former is simpler; the latter lets recipients prioritise.
-7. **Public-only floor** — should v1 explicitly signal "private posts and DMs are coming" so early users don't expect them now?
+1. **Cold-start bootstrap** — how does a new user get their first 5–10 publishers? Curated starter list per topic? Geographic-prefix popularity? Both?
+2. **Image hosting** — bytes-in-envelope (simpler, per-post payload bigger) or content-hash-and-pull (smaller publish, slower view)? Affects bandwidth budget per post.
+3. **Connection-strength decay** — does an old `SYZL` count the same as a recent one? Exponential decay (e.g., half-life ~30 days) or step function?
+4. **Reshare-with-comment shape** — does the comment become part of the reshared envelope, or a separate post referencing the original? Affects how comments aggregate.
+5. **Connection-list semantics** — should a published connection list snapshot the publisher's current high-strength connections, or include the strength scores too? The former is simpler; the latter lets recipients prioritise.
+6. **Public-only floor** — should v1 explicitly signal "private posts and DMs are coming" so early users don't expect them now?
 
----
+<!-- pagebreak -->
 
-**Adjacent ship (separate brief)**: a browser extension that lets users highlight any web page and one-click-share to their SYZL feed. Solves the content-creation friction problem and is independently viral. Recommended to ship alongside the v1 beta launch.
+# Product Brief — SYZL Anywhere
+
+**The browser-extension content on-ramp for SYZL.**
+
+*Version 0.1 · 2026-05-24 · Ships alongside the SYZL v1 beta launch*
+
+## One-line pitch
+
+A browser extension that lets users `SYZL` any web page, selected text, or image with one click — pre-filled composer, optional commentary, one publish action.
+
+## The product, in two paragraphs
+
+Most social apps die at the content-creation step. People consume on Twitter; they don't post. SYZL Anywhere closes that gap by living where content already is — in the user's browser. See an interesting article, a tweet, a photo, a paragraph — one click and it's on your SYZL feed. The extension owns the friction-reduction job so the main app doesn't have to.
+
+The extension runs the user's Axona peer in the background, so even passive web browsing keeps the network warm. Sharing is one click after onboarding; reshare-with-comment is two. The extension is independently viral: every time you `SYZL` an article, it's an implicit endorsement of the source, and a follower can `SYZL` the same article back to their own followers with one click of their own.
+
+## Three modes of "SYZL it"
+
+| Trigger | What gets shared |
+|---|---|
+| Toolbar button | The current page (title + Open Graph image + URL) |
+| Highlight + floating action | The selected text quote + page URL + Open Graph image |
+| Right-click on image | The image + page URL |
+
+In every mode, a small popup opens with the pre-filled content and an empty commentary field. Type, tap publish, done. The popup also lets the user pick which of their topics to publish to.
+
+## First-time setup
+
+1. Install from the Chrome Web Store or Firefox Add-ons.
+2. Sign in with the user's SYZL Axona identity (paste a QR-code pairing string or sign in via the SYZL web app on the same browser).
+3. The extension runs the user's `AxonaPeer` in a background service worker — same identity as the main SYZL app.
+
+## Why this matters
+
+1. **Friction is the killer.** Every successful content app solves a friction problem (Twitter = 140 chars; Instagram = phone-first photos; TikTok = vertical autoplay). SYZL Anywhere collapses content creation to one click.
+2. **It rides on existing publisher infrastructure.** Every blog, news site, tweet, GitHub repo, and Wikipedia article is a potential source. The user doesn't need to leave their existing browsing habit.
+3. **Background peer = more reachable network.** Power users who keep the extension active are online and routable even when they're not actively in the SYZL app. The active-node count benefits without any user effort.
+
+## Out of scope for v1
+
+- **Edge / Safari** — Chrome and Firefox first (~85% of desktop browsers); Edge follows automatically as it accepts MV3; Safari ports later.
+- **Mobile browser extensions** — no useful WebExtensions API on iOS Safari; Android Firefox has it but adoption is small.
+- **In-page overlays** showing "who in your network has `SYZL`-ed this page" — would need to query `peer.metrics` on every page visit. Bandwidth concern, deferred.
+- **Bulk-share** from a tab list or bookmarks file — manual one-at-a-time only.
+
+## Technical scope (v1)
+
+Manifest V3 Chrome / Firefox extension. Background service worker runs `@axona/protocol` v1.0 `AxonaPeer` (same kernel as the main app, no new code). Popup UI mirrors the SYZL composer (text + image + link inputs). Right-click context menu for selection / image modes. Shared identity store with the main SYZL PWA via either QR-code pairing on first install OR a pull from `localStorage` if the user is already signed in to the SYZL web app on the same browser.
+
+## Build estimate
+
+| Weeks | Milestone |
+|---|---|
+| 1–2 | Manifest V3 scaffold, popup composer UI, identity setup |
+| 3 | Toolbar-button "SYZL this page" with Open Graph metadata extraction |
+| 4 | Right-click context menu (selection + image modes) |
+| 5 | Background service worker hosting the Axona peer |
+| 6 | Chrome Web Store + Firefox Add-ons submission; polish |
+
+Total: ~6 weeks, single developer. Shares roughly 70% of code with the SYZL PWA composer.
+
+## Success metrics
+
+- **30 days post-launch** — 30% of SYZL active users have the extension installed
+- **90 days** — extension install ratio > 50%; extension-originated posts > 25% of all SYZL posts
+- **180 days** — extension-originated posts > 50% (i.e., most content created from the wider web, not from inside SYZL)
+
+## Open questions (decide before week 1)
+
+1. **Identity sharing model** — QR-code pairing on install, `localStorage` handshake, or both?
+2. **Page metadata extraction** — Open Graph, Twitter Cards, oEmbed — which providers do we trust, and what's the fallback when none are present?
+3. **Image extraction privacy** — strip EXIF and location metadata from uploaded images by default?
+4. **Background peer mode** — always-on (better network reach, more battery use) or paused-when-idle (better battery, less reach)?
