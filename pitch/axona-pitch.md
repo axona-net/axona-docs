@@ -352,12 +352,9 @@ Every peer-to-peer connection carries a <em>vitality</em> score that increases w
 
 # At the theoretical floor. 100% delivery. 25,000 nodes.
 
-- <span class="head">68% lower global lookup latency than Kademlia.</span>
-  25,000 simulated nodes: <span class="num">272 ms vs 842 ms</span>. That puts Axona at <strong>1.33× the Dabek 3δ analytical floor</strong> — within 68 ms of the theoretical lower bound for any recursive O(log N) DHT. <strong>First published DHT to be measured at the floor.</strong>
-- <span class="head">87% lower latency on regional traffic. Learning still wins without geography.</span>
-  500 km lookups: <span class="num">107 ms vs 843 ms</span>. Strip the geographic prefix entirely (random IDs, no locality structure) and Axona <em>still</em> beats Kademlia by ~40% from learning alone — the two contributions are independent.
-- <span class="head">100% delivery under 5% per-tick churn at 239 ms — 31% of Kademlia's wall-clock.</span>
-  Production-quality dead-peer cleanup keeps the synaptome aligned with the live mesh, not the historical one.
+Axona lands at <strong>1.33× the Dabek 3δ analytical floor</strong> on global lookups — the <em>first published DHT measured at the floor</em>. <strong>68% lower latency than Kademlia</strong> globally (<span class="num">272 ms vs 842 ms</span>), <strong>87% lower</strong> on 500-km regional traffic, and <strong>100% delivery under 5% per-tick churn</strong> at 31% of Kademlia's wall-clock. Strip the geographic prefix entirely and Axona still beats Kademlia by ~40% from learning alone — the two contributions are independent.
+
+<img src="../presentation/charts/C_3way_axona_25k.svg" alt="Lookup latency by cell — K-DHT vs G-DHT vs Axona at 25,000 nodes, with the Dabek 3-delta theoretical floor" style="width: 100%; margin-top: 14px; background: white; padding: 4px; border: 1px solid #d8d4ca;" />
 
 </div>
 <div class="margin">
@@ -367,16 +364,6 @@ Every peer-to-peer connection carries a <em>vitality</em> score that increases w
 <img src="../images/DHT-SIM-Image.png" alt="DHT simulator on a 3D globe" style="width: 100%; border: 1px solid #d8d4ca; margin-bottom: 6px;" />
 
 25,000 simulated peers on a geographic globe. Every dot is a node; edges are synapses. Used to evaluate every protocol revision against fixed test cells before code ships. Runs in any browser: <a href="https://axona-net.github.io/dht-sim/">axona-net.github.io/dht-sim</a>.
-
-#### Benchmark · 25K nodes · May 2026
-
-| Protocol | global ms | r500 ms | 5% churn ms |
-|---|---|---|---|
-| Kademlia | 842 | 843 | 762 |
-| G-DHT | 826 | 177 | 767 |
-| <span class="num">Axona</span> | <span class="num">272</span> | <span class="num">107</span> | <span class="num">239</span> |
-
-<em>All success rates 100%. 3δ floor at this population = 204 ms (δ = 68 ms one-way). Axona = 1.33× the floor; Kademlia = 4.13×.</em>
 
 #### Geography ablation
 
@@ -391,7 +378,7 @@ Strip the S2 prefix entirely (random IDs, no locality):
 
 #### Methodology
 
-500 lookups per cell · k=20 · α=3 · 264-bit IDs (8-bit S2 prefix + 256-bit SHA-256). Open-source repo: <a href="https://github.com/axona-net/dht-sim">github.com/axona-net/dht-sim</a>.
+25,000 nodes · 500 lookups per cell · k=20 · α=3 · 264-bit IDs (8-bit S2 prefix + 256-bit SHA-256) · δ median 68 ms one-way · 3δ floor 204 ms. Source CSV: <code>programmer-guide/benchmarks-25k/2026-05-21_25k_5protocols_5tests_v0.93.0.csv</code>. Open-source repo: <a href="https://github.com/axona-net/dht-sim">github.com/axona-net/dht-sim</a>.
 
 </div>
 </div>
