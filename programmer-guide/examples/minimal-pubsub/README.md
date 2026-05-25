@@ -57,5 +57,5 @@ build against it will port to real transports unchanged.
 
 | File | What it is |
 |---|---|
-| `package.json` | Pin to `@axona/protocol` v1.1.2. |
-| `index.js` | Full demo — two peers, pub/sub roundtrip, ~80 lines. |
+| `package.json` | Pin to `@axona/protocol` v1.1.3. |
+| `index.js` | Full demo — two peers, pub/sub roundtrip, ~150 lines (with comments). |

@@ -1,11 +1,11 @@
 {
   "name": "axona-minimal-pubsub",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "description": "Hello-world Axona pub/sub: two peers in one process via SimNetwork.",
   "engines": { "node": ">=20" },
   "dependencies": {
-    "@axona/protocol": "github:axona-net/axona-protocol#v1.1.2"
+    "@axona/protocol": "github:axona-net/axona-protocol#v1.1.3"
   }
 }
