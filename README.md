@@ -37,7 +37,7 @@ This repo uses three terms consistently:
 ## Supplementary material
 
 - **[`applications/`](applications/)** — product briefs for applications built on the Axona protocol (SYZL — adaptive social feed).
-- **[`architecture/`](architecture/)** — the full-stack architecture note: kernel · protocol · transport · bridge, the wire protocol, the complete application API, and the demo-app source. [PDF](architecture/Axona%20Architecture%20v0.4.2.pdf) · [`.tex`](architecture/Axona-Architecture.tex)
+- **[`architecture/`](architecture/)** — the full-stack architecture note: kernel · protocol · transport · bridge, the wire protocol, the complete application API, and the demo-app source. [PDF](architecture/Axona%20Architecture%20v0.4.3.pdf) · [`.tex`](architecture/Axona-Architecture.tex)
 - **[`implementation/`](implementation/)** — integration plans, wire-protocol spec, per-node refactor plan, NX-17 → NH-1 punchlist.
 - **[`red team/`](red%20team/)** — independent red-team analyses including the protocol-layer god's-eye audit and the v0.3.38 13-issue priority list.
 - **[`dead-ends/`](dead-ends/)** — preserved failures kept as cautionary examples (NX-16's masked-distance experiment; relevant smoke tests).

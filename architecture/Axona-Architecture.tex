@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.4.2 \quad 2026-05-26\par}
+{\small An Axona Architecture Note \quad v0.4.3 \quad 2026-05-27\par}
 \end{center}
 \vfill
 \null
@@ -1080,6 +1080,48 @@ What's coming sits inside the existing seams:
 geographic regions, gossiping peer-lists so a peer connected to
 one bridge can be reached from another. Single-bridge today is a
 deployment simplification, not a protocol constraint.
+
+\item[\textbf{Bridge directory.}] A well-known public topic
+(\texttt{deriveTopicId(\{public:\,true, seed:\,"axona.bridge-directory"\})})
+where every bridge republishes itself once per hour: URL, region,
+kernel version, advertised TURN credentials, last-seen
+timestamp.\sidenote{Subscribers keep the newest entry per
+\texttt{signerPubkey} and prune entries older than 24 hours. Pull
+from the global S2 cell (top byte \texttt{0x00}) so every peer
+sees the same directory regardless of geography.} Peers subscribe
+at startup and cache the directory; a peer whose primary bridge
+disappears has a list of alternates to try without out-of-band
+coordination. To prevent spam and DDoS of the channel, the topic
+uses an \emph{allowed-signer set}: only Ed25519 keys with a valid
+attestation chain back to one of the genesis bridge keys (baked
+into the kernel) can publish. Subscribers verify the chain on
+every publish and drop unattested envelopes at the AxonaManager
+layer, before they reach the application. Genesis keys can sign
+attestations admitting new bridges without a kernel release. This
+turns ``federated bridges'' from a deployment story into something
+clients can actually discover at runtime.
+
+\item[\textbf{Capability hardening (endo / SES).}] Adopt the
+Agoric and MetaMask object-capability stack to harden the
+host-side surface, in three landings: \texttt{@endo/marshal} for
+envelope payloads (so payloads can carry BigInt, remotable
+references, and the slot-and-body wire shape captp
+expects);\sidenote{Marshal output is JSON-shaped with
+\texttt{@qclass} annotations on typed values, so legacy peers see
+plain objects and capability-aware peers see typed data.
+Negotiated per-envelope via a \texttt{payloadFormat} tag.} an
+opt-in \texttt{AxonaPeer.create(\{secure:\,true\})} that calls
+\texttt{lockdown()} to freeze JavaScript primordials before
+kernel init, defending against prototype pollution and
+supply-chain mutation; and \texttt{@endo/captp} layered over
+\texttt{peer.send}\,/\,\texttt{peer.onMessage} to upgrade direct
+messaging from string-handler RPC to capability-style RPC with
+promise pipelining and revocable handles. A later phase ships
+\texttt{@endo/import-bundle} for content-addressed,
+signature-verified code distribution --- the substrate for
+running third-party agents and creator-published filters inside
+peer compartments with only the authority each receiver chose to
+grant.
 
 \item[\textbf{Persistent topics.}] Today's replay cache survives
 in-memory only. A pluggable persistence layer for axon
