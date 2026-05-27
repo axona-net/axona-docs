@@ -21,6 +21,21 @@
 \usepackage{fancyhdr}
 \usepackage{etoolbox}
 \usepackage{needspace}
+\usepackage{listings}
+
+\lstdefinestyle{axonacode}{
+  basicstyle=\ttfamily\fontsize{7.5}{9}\selectfont,
+  breaklines=true,
+  breakatwhitespace=false,
+  columns=fullflexible,
+  keepspaces=true,
+  showstringspaces=false,
+  frame=none,
+  xleftmargin=0pt,
+  aboveskip=0.4em,
+  belowskip=0.4em,
+}
+\lstset{style=axonacode}
 
 \pretocmd{\section}{\needspace{6\baselineskip}}{}{}
 \pretocmd{\subsection}{\needspace{4\baselineskip}}{}{}
@@ -58,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.4.0 \quad 2026-05-25\par}
+{\small An Axona Architecture Note \quad v0.4.1 \quad 2026-05-26\par}
 \end{center}
 \vfill
 \null
@@ -239,7 +254,7 @@ extends \texttt{Transport}; a database-backed persistence
 
 \item[\texttt{src/dht/}.] The active routing layer: \texttt{NeuronNode},
 \texttt{Synapse}, \texttt{AxonaPeer}, \texttt{AxonaDomain},
-\texttt{Subscription}. This is where the NH-1 routing logic lives,
+\texttt{Subscription}. This is where the Axona routing logic lives,
 and where the developer-facing API surface (\texttt{peer.pub},
 \texttt{peer.sub}, \texttt{peer.lookup}) is declared.
 
@@ -321,7 +336,7 @@ one that's served us well before wins the tiebreak.
 \begin{itemize}
 \setlength{\itemsep}{0pt}
 \item The handler installation. On \texttt{peer.start()} it
-registers the NH-1 routing handlers
+registers the Axona routing handlers
 (\texttt{lookup\_step}, \texttt{lookahead\_probe},
 \texttt{find\_closest\_set}, \texttt{route\_msg},
 \texttt{local\_probe}, \texttt{triadic\_introduce},
@@ -531,17 +546,21 @@ result on the delivered envelope so applications can decide whether
 to trust unsigned or unverifiable publishes.
 
 % =====================================================================
-% IX. ROUTING: NH-1
+% IX. ROUTING
 % =====================================================================
-\section{Routing: NH-1}
+\section{Routing}
 
-\newthought{NH-1 is the learning-adaptive routing layer.} It
-replaces Kademlia's $k$-bucket array with a dynamic synaptome that
-adjusts edge weights based on observed latency. The basic shape ---
-iterative lookup, $\log_2(N)$ hop count --- is unchanged from
-Kademlia; what changes is which peer you ask at each hop.
+\newthought{Axona's routing is learning-adaptive.}\marginnote{The
+research codename for this design is NH-1, the routing implementation
+benchmarked in dht-sim against Kademlia and other DHTs. In the
+deployed production code there's just one routing layer --- the one
+described here --- and we call it Axona routing.} It replaces
+Kademlia's $k$-bucket array with a dynamic synaptome that adjusts
+edge weights based on observed latency. The basic shape --- iterative
+lookup, $\log_2(N)$ hop count --- is unchanged from Kademlia; what
+changes is which peer you ask at each hop.
 
-The five wire operations that drive NH-1 are:
+The five wire operations that drive Axona routing are:
 
 \begin{description}
 \setlength{\itemsep}{0pt}
@@ -587,7 +606,7 @@ in the companion paper \emph{Axona: A Learning-Adaptive DHT}.}
 \section{Pub/Sub: K-Closest}
 
 \newthought{The pub/sub overlay is its own structure.} It sits on
-top of NH-1 routing but doesn't reuse the synaptome for state ---
+top of Axona routing but doesn't reuse the synaptome for state ---
 each peer maintains a separate set of \emph{axon roles}, one per
 topic it's chosen as an axon for. A role holds a topic ID, a set of
 children (subscribers), a replay cache, and a $K$-replicated peer
@@ -641,7 +660,325 @@ covered by the four other axons. The Activation Potential weighting
 makes high-quality axons dominate the K-closest set over time.
 
 % =====================================================================
-% XI. IDENTITY AND SECURITY
+% XI. THE APPLICATION API
+% =====================================================================
+\section{The Application API}
+
+\newthought{Every Axona application talks to the protocol through one
+import.} The barrel export at \texttt{@axona/protocol} is the entire
+contract surface --- a small set of factory functions, one peer
+class, and a handful of helpers. This section is the field-by-field
+reference.
+
+\subsection*{Identity}
+
+\smallskip
+\noindent\texttt{deriveIdentity(\{ lat, lng \})}\quad
+\emph{generate a fresh peer identity}
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{lat}] number. Latitude in decimal degrees.
+\item[\texttt{lng}] number. Longitude in decimal degrees.
+\end{description}
+
+\noindent Returns a Promise resolving to
+\texttt{\{ id, pubkey, pubkeyHex, privkey, privateKey, region \}}.
+\texttt{id} is the 66-char hex \texttt{nodeId} (8-bit S2 prefix from
+\texttt{(lat,lng)} + 256-bit SHA-256 of the public key).
+\texttt{privateKey} is the in-memory \texttt{CryptoKey} ready for
+signing; \texttt{privkey} is the base64-encoded export for
+persistence. The whole envelope is what \texttt{AxonaPeer} expects as
+\texttt{identity}.
+
+\smallskip
+\noindent\texttt{dumpIdentity(identity)}\quad
+\emph{serialize for storage}
+
+\smallskip
+\noindent Returns a Promise resolving to a plain JSON object you can
+write to disk or IndexedDB. The reciprocal
+\texttt{loadIdentity(envelope)} reconstructs the
+\texttt{CryptoKey}-bearing form on the next launch.
+
+\subsection*{Transports}
+
+\smallskip
+\noindent\texttt{webTransport(\{ ... \})}\quad
+\emph{browser transport: WebSocket to the bridge + WebRTC mesh}
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{bridgeUrl}] string. e.g.\ \texttt{wss://bridge.axona.net}.
+\item[\texttt{identity}] identity envelope from \texttt{deriveIdentity}.
+\item[\texttt{log}] \emph{(optional, default} \texttt{() => \{\}}\emph{)}\;
+function \texttt{(event, data)} that receives transport-internal
+diagnostic events.
+\item[\texttt{WebSocketImpl}] \emph{(optional)}\; constructor for the
+\texttt{WebSocket} class. Defaults to \texttt{globalThis.WebSocket}.
+\item[\texttt{autoHandshake}] \emph{(optional, default} \texttt{true}\emph{)}\;
+when true, \texttt{transport.start()} drives the full bridge
+admission sequence end-to-end --- the WebSocket version gate, the
+application-level \texttt{hello}/\texttt{hello-ack} exchange, and
+binding the bridge as a peer. Set to false only if you're driving
+the handshake yourself.
+\item[\texttt{peerVersion}] \emph{(optional, default} \texttt{KERNEL\_VERSION}\emph{)}\;
+semver string sent in \texttt{client-hello}.
+\item[\texttt{handshakeTimeoutMs}] \emph{(optional, default} \texttt{15000}\emph{)}\;
+how long to wait for the bridge's \texttt{hello} before rejecting
+\texttt{start()}.
+\end{description}
+
+\noindent Returns a \texttt{CompositeTransport}. After
+\texttt{await transport.start(identity.id)} the bridge is reachable
+as a peer (\texttt{transport.bridgeNodeId}) and the WebRTC mesh is
+ready to accept channels.
+
+\smallskip
+\noindent\texttt{nodeTransport.server(\{ ... \})}\quad
+\emph{server-side WebSocket transport (Node 20+)}\\
+\noindent\texttt{nodeTransport.client(\{ ... \})}\quad
+\emph{Node WebSocket client}
+
+\smallskip
+\noindent Used by \texttt{axona-bridge}'s embedded peer and by Node
+applications. Same \texttt{Transport} contract as the browser
+transport; no WebRTC.
+
+\smallskip
+\noindent\texttt{simTransport(\{ network, identity \})}\quad
+\emph{in-process simulation transport}
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{network}] \texttt{SimNetwork} shared across peers.
+\item[\texttt{identity}] identity envelope.
+\end{description}
+
+\noindent For tests and \texttt{dht-sim}. Messages are scheduled in
+the event loop with synthetic latency from a real internet topology
+dataset.
+
+\subsection*{AxonaPeer}
+
+\smallskip
+\noindent\texttt{new AxonaPeer(\{ ... \})}\quad
+\emph{the per-node DHT instance}
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{node}] \texttt{NeuronNode} instance for this peer
+(carries id, lat, lng, the synaptome).
+\item[\texttt{domain}] \texttt{AxonaDomain} the peer joins. Construct
+one per network with \texttt{new AxonaDomain(\{ k: 20 \})}, where
+\texttt{k} \emph{(default 20)} is the $K$-replication factor.
+\item[\texttt{transport}] the transport instance from
+\texttt{webTransport}, \texttt{nodeTransport}, or \texttt{simTransport}.
+\item[\texttt{identity}] \emph{(optional)}\; identity envelope. Required
+for signed publishes (the default). Apps that only call
+\texttt{peer.pub(t, m, \{ sign: false \})} can omit it.
+\item[\texttt{axonManager}] \emph{(optional)}\; explicit
+\texttt{AxonManager}. When omitted, one is built automatically on
+\texttt{peer.start()}.
+\item[\texttt{persist}] \emph{(optional)}\; \texttt{PersistenceAdapter}
+for synaptome / subscription / replay-cache checkpoints. Default:
+no persistence.
+\end{description}
+
+\subsection*{Lifecycle}
+
+\smallskip
+\noindent\texttt{await peer.start()}\quad
+\emph{wire handlers, install delivery hook}\\
+\noindent\texttt{await peer.stop()}\quad
+\emph{detach handlers and event listeners}
+
+\smallskip
+\noindent\texttt{await peer.join(sponsor?)}\quad
+\emph{production bootstrap path}
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{sponsor}] \emph{(optional)}\; 66-char hex node ID. If
+given, opens a transport channel to that peer and seeds the
+synaptome from it. If omitted, returns immediately --- the peer
+is ``joined'' but isolated; inbound connections from other peers
+populate the synaptome.
+\end{description}
+
+\smallskip
+\noindent\texttt{await peer.leave(opts?)}\quad
+\emph{leave the network gracefully}
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{opts.drain}] \emph{(default} \texttt{true}\emph{)}\; wait
+for in-flight publishes to settle.
+\item[\texttt{opts.notify}] \emph{(default} \texttt{true}\emph{)}\; send a
+\texttt{peer-leaving} notification to every peer in the synaptome.
+\item[\texttt{opts.timeoutMs}] \emph{(default} \texttt{5000}\emph{)}\;
+maximum drain window in ms.
+\end{description}
+
+\subsection*{Pub / Sub}
+
+\smallskip
+\noindent\texttt{await peer.pub(topic, message, opts?)}\quad
+\emph{publish to a topic}
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{topic}] string. Application-level topic name (any
+non-empty string).
+\item[\texttt{message}] JSON-serializable payload.
+\item[\texttt{opts.sign}] \emph{(default} \texttt{true}\emph{)}\; sign
+the envelope with the identity's Ed25519 key.
+\item[\texttt{opts.publisher}] \emph{(default: this peer's nodeId)}\;
+controls where the topic is anchored in the DHT.
+\texttt{undefined} means this peer publishes its own topic;
+\texttt{null} means the public well-known mode
+($\texttt{topicId}=\textsc{sha256}(\texttt{topic})$, anyone can
+publish); a 66-char hex string lets a peer relay under that
+publisher's anchor (rare).
+\end{description}
+
+\noindent Returns a Promise resolving to the \texttt{msgId} ---
+the 64-char hex content hash of the envelope. Throws \texttt{PublishError}
+on invalid inputs or signing failure.
+
+\smallskip
+\noindent\texttt{await peer.sub(topic, handler, opts?)}\quad
+\emph{subscribe to a topic}
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{topic}] string.
+\item[\texttt{handler}] function \texttt{(envelope) => void}\;
+invoked for each delivery. The envelope is
+\texttt{\{ msgId, ts, topic, message, publisher, signerPubkey \}}.
+\item[\texttt{opts.publisher}] \emph{(default: this peer's nodeId)}\;
+same semantics as \texttt{pub} --- must match the publisher's
+\texttt{publisher} value for the subscription to land at the right
+topic ID.
+\item[\texttt{opts.since}] \emph{(default: live tail)}\; replay
+control. Pass \texttt{'latest'} for the most-recent cached message
+plus future deliveries, \texttt{'all'} for the full replay cache
+plus future, or a Unix-ms \texttt{number} for everything newer
+than that timestamp.
+\end{description}
+
+\noindent Returns a Promise resolving to a \texttt{Subscription}
+handle. Call \texttt{sub.unsubscribe()} to stop receiving.
+
+\smallskip
+\noindent\texttt{await peer.pull(msgId, opts)}\quad
+\emph{fetch a single message by ID from the relay's replay cache}
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{msgId}] 64-char hex content hash.
+\item[\texttt{opts.topic}] string. The topic name (required, used to
+locate the relay).
+\item[\texttt{opts.publisher}] 66-char hex publisher ID, or
+\texttt{null} for public topics.
+\item[\texttt{opts.timeoutMs}] \emph{(default} \texttt{1000}\emph{)}.
+\end{description}
+
+\noindent Returns the envelope or \texttt{null} if not found.
+
+\smallskip
+\noindent\texttt{await peer.metrics(topic, opts)}\quad
+\emph{aggregate counters across the relay tree}
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{topic}] string.
+\item[\texttt{opts.publisher}] 66-char hex publisher ID, or \texttt{null}.
+\item[\texttt{opts.timeoutMs}] \emph{(default} \texttt{500}\emph{)}.
+\end{description}
+
+\noindent Returns \texttt{\{ publishes, subscribers, deliveries,
+pulls, reshares, relayCount \}}.
+
+\subsection*{Direct messaging}
+
+\smallskip
+\noindent\texttt{await peer.send(targetId, message)}\quad
+\emph{RPC-style; awaits the remote handler's return value}\\
+\noindent\texttt{peer.notify(targetId, message)}\quad
+\emph{fire-and-forget}\\
+\noindent\texttt{peer.onMessage(handler)}\quad
+\emph{register a handler for incoming direct messages}
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{targetId}] 66-char hex node ID. The peer must already
+be in the synaptome.
+\item[\texttt{message}] JSON-serializable payload.
+\item[\texttt{handler}] function \texttt{(fromId, message) => result}.
+The return value is sent back to the caller on \texttt{send}; ignored
+on \texttt{notify}. Async handlers are awaited.
+\end{description}
+
+\subsection*{Mesh introspection}
+
+\smallskip
+\noindent\texttt{peer.peers()}\;
+returns an array of 66-char hex node IDs currently in the synaptome.\\
+\noindent\texttt{peer.onPeerJoin(handler)}\;
+registers \texttt{(nodeId) => void} for new arrivals.\\
+\noindent\texttt{peer.onPeerLeave(handler)}\;
+registers \texttt{(nodeId) => void} for departures.\\
+\noindent\texttt{peer.health()}\;
+returns
+\texttt{\{ started, transportConnected, synapseCount, subscriptionCount, kernelVersion \}}.\\
+\noindent\texttt{peer.onLog(level, handler)}\;
+\texttt{level} is \texttt{'info'}, \texttt{'warn'}, or
+\texttt{'error'}.\\
+\noindent\texttt{peer.onError(handler)}\;
+registers \texttt{(err) => void} for unhandled errors.
+
+\subsection*{Lookup}
+
+\smallskip
+\noindent\texttt{await peer.lookup(targetKey)}\quad
+\emph{iterative K-closest walk}
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{targetKey}] 66-char hex 264-bit key. Usually a topic ID
+or a node ID.
+\end{description}
+
+\noindent Returns \texttt{\{ found, path, hops, peerId, latency \}}.
+\texttt{found} is the closest reachable peer; \texttt{path} is the
+list of nodes traversed; \texttt{hops} is the count; \texttt{latency}
+is wall-clock ms.
+
+\subsection*{Snapshots}
+
+\smallskip
+\noindent\texttt{await peer.snapshot()}\;
+returns a JSON object capturing identity, synaptome, axon roles,
+subscriptions, replay caches. Symmetric with
+\texttt{AxonaPeer.fromSnapshot(snap, deps)}, which reconstructs a
+peer from one of these dumps without touching the network.
+
+\subsection*{Helpers}
+
+\smallskip
+\noindent\texttt{await deriveTopicId(publisher, topic)}\;
+returns the 66-char hex topic ID. \texttt{publisher} may be
+\texttt{null} (public mode) or a 66-char hex node ID. Useful for
+displaying the publish location in a UI.
+
+\smallskip
+\noindent\texttt{geoCellId(lat, lng, bits)}\;
+returns the integer S2 cell at the given precision. \texttt{bits =
+8} matches the top 8 bits of every Axona nodeId.
+
+% =====================================================================
+% XII. IDENTITY AND SECURITY
 % =====================================================================
 \section{Identity and Security}
 
@@ -686,7 +1023,7 @@ deployment enforces HTTPS at the Pages level; the demo at
 before identity derivation would run at all.
 
 % =====================================================================
-% XII. PRODUCTION DEPLOYMENT
+% XIII. PRODUCTION DEPLOYMENT
 % =====================================================================
 \section{Production Deployment}
 
@@ -732,7 +1069,7 @@ it did, ``which kernel is everyone on?'' required SSH-ing into the
 bridge and grepping \texttt{node\_modules}.}
 
 % =====================================================================
-% XIII. FUTURE DIRECTIONS
+% XIV. FUTURE DIRECTIONS
 % =====================================================================
 \section{Future Directions}
 
@@ -780,5 +1117,387 @@ they do.
 Overview} (v0.4.0), \emph{AxonaPeer Overview} (v0.4.0), \emph{Axona
 Explainer} (v0.4.25), and the source repositories at
 \texttt{github.com/axona-net}.}
+
+% =====================================================================
+% APPENDIX A. THE DEMO APPLICATION
+% =====================================================================
+\renewcommand{\thesection}{\Alph{section}}
+\setcounter{section}{0}
+\section{Appendix: The Demo Application}
+
+\newthought{This is the complete source} of the minimal-pubsub demo
+deployed at \texttt{demo.axona.net}. The file lives in the kernel
+repository under
+\texttt{examples/}\linebreak\texttt{minimal-pubsub-browser/index.html}.
+Three hundred and seventy-six lines of HTML and JavaScript, no
+build step, no dependencies outside the kernel barrel export. Open
+it in two tabs; one publishes, the other receives. The structure
+maps to the API reference in \S XI section by section: identity,
+transport, peer construction, lifecycle, subscribe, publish.
+
+\bigskip
+\noindent\textit{\footnotesize
+\texttt{examples/minimal-pubsub-browser/index.html}}
+
+\begin{lstlisting}[language=HTML]
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>@axona/protocol -- webTransport pub/sub demo</title>
+  <style>
+    :root {
+      --rust: #2d7373;  --rust-soft: #d4a896;
+      --ink: #1a1a1a;   --muted: #666;
+      --bg: #fffff8;    --card-bg: #fbfbf6;
+      --border: #d8d4ca; --code-bg: #f0ecdf;
+      --green: #2d7373; --red: #c0392b; --amber: #b07d3a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'EB Garamond', Georgia, serif;
+      max-width: 1100px; margin: 0 auto;
+      padding: 2rem 1.5rem;
+      background: var(--bg); color: var(--ink); line-height: 1.5;
+    }
+    h1 { font-weight: 500; letter-spacing: -0.015em; margin-bottom: 0.3em; }
+    .lede { color: var(--muted); margin-top: 0; }
+    code { font-family: 'Inconsolata', ui-monospace, Menlo, monospace;
+           background: var(--code-bg); padding: 1px 4px;
+           border-radius: 2px; font-size: 0.92em; }
+
+    .status { background: var(--card-bg); border: 1px solid var(--border);
+              border-radius: 6px; padding: 0.6rem 0.9rem; margin-top: 1rem;
+              font-size: 14px; display: flex; align-items: center; gap: 0.7rem; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+    .dot.connecting { background: var(--amber); }
+    .dot.connected  { background: var(--green); }
+    .dot.failed     { background: var(--red); }
+    .status-text { flex: 1; }
+    .status-text code { font-size: 12px; }
+
+    .panes { display: grid; grid-template-columns: 1fr 1fr;
+             gap: 1.2rem; margin-top: 1.2rem; }
+    .pane { background: var(--card-bg); border: 1px solid var(--border);
+            border-radius: 8px; padding: 1rem 1.2rem; }
+    .pane h2 { font-size: 18px; margin: 0 0 0.5rem 0;
+               color: var(--rust); font-weight: 600; }
+    .label { color: var(--muted); font-size: 13px; margin: 0.7rem 0 0.3rem 0; }
+    .nodeId { font-family: 'Inconsolata', ui-monospace, monospace;
+              font-size: 11px; color: var(--muted); word-break: break-all;
+              padding: 0.3rem 0.5rem; background: var(--code-bg); border-radius: 3px; }
+    .row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+    input[type=text] { padding: 0.5rem 0.7rem; border: 1px solid var(--border);
+                       border-radius: 4px; font-family: inherit; font-size: 15px;
+                       background: white; width: 100%; }
+    .row input[type=text] { flex: 1; }
+    button { background: var(--rust); color: white; border: none;
+             padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer;
+             font-family: inherit; font-size: 15px; font-weight: 500;
+             white-space: nowrap; }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+    .received { background: white; border: 1px solid var(--border);
+                border-radius: 4px; padding: 0.6rem 0.9rem;
+                font-family: 'Inconsolata', ui-monospace, monospace;
+                font-size: 12.5px; min-height: 260px; max-height: 420px;
+                overflow-y: auto; white-space: pre-wrap; color: #333; }
+    .received .empty { color: var(--muted); font-style: italic; }
+    .arrived { color: var(--rust); font-weight: 600; }
+    .self    { color: var(--rust-soft); font-style: italic; margin-left: 0.5em; }
+
+    .bootlog { background: var(--card-bg); border: 1px solid var(--border);
+               border-radius: 6px; padding: 0.6rem 0.9rem;
+               font-family: 'Inconsolata', ui-monospace, Menlo, monospace;
+               font-size: 12px; color: var(--muted); margin-top: 1.5rem;
+               min-height: 1.5rem; max-height: 260px; overflow-y: auto;
+               white-space: pre-wrap; }
+    .bootlog .heading { color: var(--rust); font-weight: 600;
+                        letter-spacing: 0.05em; text-transform: uppercase;
+                        font-size: 11px; margin-bottom: 0.4em; }
+
+    footer { margin-top: 1.5rem; font-size: 13px; color: var(--muted);
+             text-align: center; }
+    footer a { color: var(--rust); }
+  </style>
+</head>
+<body>
+  <h1>@axona/protocol -- pub/sub demo on the live bridge</h1>
+  <p class="lede">
+    This tab is an Axona peer connected to <code>wss://bridge.axona.net</code> via
+    <code>webTransport</code>. Open this page in multiple tabs (or share the URL
+    with a friend) and every connected peer publishing to
+    <code>hello-world</code> shows up in the received list.
+  </p>
+
+  <div class="status">
+    <span class="dot" id="dot"></span>
+    <span class="status-text" id="statusText">connecting...</span>
+  </div>
+
+  <div class="panes">
+    <div class="pane">
+      <h2>Publish</h2>
+      <div class="label">Your name</div>
+      <input type="text" id="nameInput" value="Alice" />
+      <div class="label">Message</div>
+      <div class="row">
+        <input type="text" id="msgInput" placeholder="message"
+               value="hello from alice" />
+        <button id="pubBtn" disabled>Publish</button>
+      </div>
+      <div class="label">Topic ID (publish location -- deterministic
+        from publisher + topic name; MUST match on every peer)</div>
+      <div class="nodeId" id="topicIdDisplay">...</div>
+      <div class="label">Last published msgId (per-message content hash
+        -- changes every publish)</div>
+      <div class="nodeId" id="lastMsgId">--</div>
+      <div class="label">Your nodeId</div>
+      <div class="nodeId" id="myId">...</div>
+      <div class="label">Your location (top 8 bits of nodeId = S2 cell
+        of this lat/lng)</div>
+      <div class="nodeId" id="myLocation">...</div>
+      <div class="label">Synaptome (peers known to your DHT)</div>
+      <div class="nodeId" id="synSize">...</div>
+      <div class="label">Bridge</div>
+      <div class="nodeId" id="bridgeUrl">...</div>
+    </div>
+
+    <div class="pane">
+      <h2>Subscribe -- <code>hello-world</code></h2>
+      <div class="label">Subscribed to topic ID (must match publisher's)</div>
+      <div class="nodeId" id="subTopicId">...</div>
+      <div class="received" id="receivedLog">
+        <span class="empty">(waiting for messages...)</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="bootlog">
+    <div class="heading">console</div>
+    <div id="bootlog">Booting...</div>
+  </div>
+
+  <footer>
+    Source: <code>axona-protocol/src/</code> served live -- kernel
+    v<span id="kernelVer">...</span> -- <code>webTransport({ bridgeUrl })</code>
+    + <code>peer.pub</code>/<code>peer.sub</code>
+  </footer>
+
+  <script type="module">
+    import {
+      AxonaPeer, AxonaDomain, NeuronNode,
+      deriveIdentity, deriveTopicId, geoCellId,
+    } from '/src/index.js';
+    import { webTransport } from '/src/transport/web/index.js';
+
+    // -- Bridge URL: ?bridge= override, default to the live bridge --
+    function getBridgeUrl() {
+      const fromQs = new URLSearchParams(location.search).get('bridge');
+      if (fromQs) return fromQs;
+      return 'wss://bridge.axona.net';
+    }
+    const BRIDGE_URL = getBridgeUrl();
+    document.getElementById('bridgeUrl').textContent = BRIDGE_URL;
+
+    const bootlogEl = document.getElementById('bootlog');
+    const log = (msg, extra) => {
+      const line = extra != null
+        ? `${msg}  ${typeof extra === 'object' ? JSON.stringify(extra) : extra}`
+        : msg;
+      bootlogEl.textContent += '\n' + line;
+      bootlogEl.scrollTop = bootlogEl.scrollHeight;
+      console.log('[demo]', msg, extra ?? '');
+    };
+    bootlogEl.textContent = 'Booting...';
+
+    const dotEl    = document.getElementById('dot');
+    const statusEl = document.getElementById('statusText');
+    function setStatus(state, text) {
+      dotEl.className = 'dot ' + state;
+      statusEl.textContent = text;
+    }
+    setStatus('connecting', `connecting to ${BRIDGE_URL}...`);
+
+    // Pull kernel version for footer
+    try {
+      const pkg = await fetch('/package.json').then(r => r.json());
+      document.getElementById('kernelVer').textContent = pkg.version;
+    } catch { document.getElementById('kernelVer').textContent = '?'; }
+
+    // -- 1. Geolocation -----------------------------------------------
+    // The top 8 bits of every Axona nodeId are the S2 cell of the peer's
+    // lat/lng, so peers in the same region are naturally XOR-closest to
+    // topics anchored at that region.  Ask the browser; fall back to
+    // (0,0) if denied.
+    function getLocation() {
+      const FALLBACK = { lat: 0, lng: 0, source: 'fallback (Gulf of Guinea)' };
+      if (!navigator.geolocation) return Promise.resolve(FALLBACK);
+      return new Promise(resolve => {
+        navigator.geolocation.getCurrentPosition(
+          pos => resolve({
+            lat: pos.coords.latitude,
+            lng: pos.coords.longitude,
+            source: 'browser geolocation',
+          }),
+          err => { log('geolocation denied', { reason: err.message });
+                   resolve(FALLBACK); },
+          { enableHighAccuracy: false, timeout: 8000, maximumAge: 600_000 },
+        );
+      });
+    }
+
+    const location = await getLocation();
+    document.getElementById('myLocation').textContent =
+      `${location.lat.toFixed(4)}, ${location.lng.toFixed(4)} -- ${location.source}`;
+    log('location resolved', location);
+
+    // Regional synthetic publisher: nodeId-shaped hash whose top 8 bits
+    // are the S2 cell of this lat/lng and whose bottom 256 bits are zero.
+    function regionSynthPublisher({ lat, lng }) {
+      const s2 = geoCellId(lat, lng, 8);
+      return s2.toString(16).padStart(2, '0') + '0'.repeat(64);
+    }
+
+    // -- 2. Identity (264-bit Ed25519, anchored at the resolved location)
+    const identity = await deriveIdentity({
+      lat: location.lat, lng: location.lng });
+    document.getElementById('myId').textContent = identity.id;
+    log('identity derived', { id: identity.id.slice(0, 16) + '...' });
+
+    // -- 3. Transport + peer -----------------------------------------
+    // webTransport's autoHandshake (default) drives the bridge version
+    // gate AND the application-level hello/hello-ack admission as part
+    // of start().  AxonaPeer.start() then asks the transport for its
+    // boundPeers() and auto-admits them into the synaptome.
+    const transport = webTransport({
+      bridgeUrl: BRIDGE_URL,
+      identity,
+      log: (evt, extra) => log('wt:' + evt, extra),
+    });
+
+    const node = new NeuronNode({
+      id:  BigInt('0x' + identity.id),
+      lat: location.lat,
+      lng: location.lng,
+    });
+    node.transport = transport;
+    const domain = new AxonaDomain({ k: 20 });
+    const peer = new AxonaPeer({ domain, node, identity, transport });
+
+    await transport.start(identity.id);   // does the bridge handshake
+    await peer.start();                   // auto-admits boundPeers()
+
+    window.__axona = { peer, transport, identity, node };
+    log('peer ready -- bridge:', transport.bridgeNodeId.slice(0, 16) + '...');
+    setStatus('connected',
+      `connected -- bridge ${transport.bridgeNodeId.slice(0, 8)}...`);
+
+    // -- 4. Topic ID + live synaptome size ---------------------------
+    // The topic ID is the DETERMINISTIC publish location in the DHT.
+    // For this hello-world demo we use a GLOBAL topic (publisher = null
+    // -> topicId = sha256(topicName)), so anyone running the demo
+    // anywhere in the world lands at the same topicId and can chat.
+    const TOPIC     = 'hello-world';
+    const publisher = null;   // global public topic
+    const topicId   = await deriveTopicId(publisher, TOPIC);
+    document.getElementById('topicIdDisplay').textContent = topicId;
+    log('topicId derived',
+        { topicId, publisher, topicName: TOPIC });
+
+    const synSizeEl = document.getElementById('synSize');
+    function renderSyn() { synSizeEl.textContent = String(node.synaptome.size); }
+    renderSyn();
+    const synTimer = setInterval(renderSyn, 250);
+
+    // -- 5. Subscribe (deferred until mesh stabilises) ---------------
+    // Gate: synaptome.size >= READY_SYNAPSE_COUNT (or timeout).
+    const READY_SYNAPSE_COUNT = 4;   // bridge + ~3 mesh peers
+    const READY_TIMEOUT_MS    = 10000;
+
+    const receivedEl = document.getElementById('receivedLog');
+    let receivedCount = 0;
+
+    async function waitForMeshReady() {
+      const t0 = Date.now();
+      while (Date.now() - t0 < READY_TIMEOUT_MS) {
+        if (node.synaptome.size >= READY_SYNAPSE_COUNT)
+          return node.synaptome.size;
+        await new Promise(r => setTimeout(r, 200));
+      }
+      return node.synaptome.size;
+    }
+
+    setStatus('connecting', 'waiting for mesh to stabilise...');
+    const finalSynSize = await waitForMeshReady();
+    log('mesh ready', { synaptomeSize: finalSynSize });
+
+    const sub = await peer.sub(TOPIC, (envelope) => {
+      // Show every message we subscribe to, including our own publishes
+      // -- the kernel loops them back through K-closest, and a
+      // subscriber on a topic genuinely received the message regardless
+      // of who signed it.  Self-published envelopes are tagged "(you)".
+      const fromMe = envelope.signerPubkey === identity.pubkeyHex;
+      if (receivedCount === 0) receivedEl.textContent = '';
+      receivedCount++;
+      const ts = new Date().toLocaleTimeString();
+      receivedEl.innerHTML +=
+        '<span class="arrived">[' + ts + ']</span> ' +
+        escapeHtml(envelope.message) +
+        (fromMe ? '<span class="self"> (you)</span>' : '') + '\n' +
+        '  msgId:  ' + envelope.msgId + '\n' +
+        '  signer: ' + (envelope.signerPubkey || '') + '\n\n';
+      receivedEl.scrollTop = receivedEl.scrollHeight;
+    }, { publisher, since: 'all' });
+    document.getElementById('subTopicId').textContent = sub.topicId;
+    log('subscribed',
+        { topicId: sub.topicId, synaptomeSize: node.synaptome.size });
+    setStatus('connected',
+      `subscribed -- topicId=${sub.topicId.slice(0, 8)}...` +
+      ` -- synaptome=${node.synaptome.size}`);
+
+    // -- 6. Publish button -------------------------------------------
+    const pubBtn    = document.getElementById('pubBtn');
+    const msgInput  = document.getElementById('msgInput');
+    const nameInput = document.getElementById('nameInput');
+    pubBtn.disabled = false;
+
+    const lastMsgIdEl = document.getElementById('lastMsgId');
+    async function publishOnce() {
+      const name = (nameInput.value || 'Alice').trim();
+      const msg  = (msgInput.value  || '').trim();
+      if (!msg) { msgInput.focus(); return; }
+      const wireMsg = name + ': ' + msg;
+      pubBtn.disabled = true;
+      try {
+        const msgId = await peer.pub(TOPIC, wireMsg, { publisher });
+        lastMsgIdEl.textContent = msgId;
+        log('published', {
+          wireMsg, topicId, msgId,
+          synaptomeSize: node.synaptome.size,
+        });
+      } catch (err) {
+        lastMsgIdEl.textContent = '(error: ' + err.message + ')';
+        log('publish error', err.message);
+      }
+      pubBtn.disabled = false;
+      msgInput.focus();
+      msgInput.select();
+    }
+    pubBtn.addEventListener('click', publishOnce);
+    msgInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !pubBtn.disabled) publishOnce();
+    });
+
+    function escapeHtml(s) {
+      return String(s)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;');
+    }
+  </script>
+</body>
+</html>
+\end{lstlisting}
 
 \end{document}
