@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.4.1 \quad 2026-05-26\par}
+{\small An Axona Architecture Note \quad v0.4.2 \quad 2026-05-26\par}
 \end{center}
 \vfill
 \null
@@ -171,7 +171,7 @@ the peer UI.
   meta/.style={font=\scriptsize\itshape, inkmuted, align=left}
 ]
   \node[layer] (app)    {Application (chat, social, agentic)};
-  \node[layer, below=0.3 of app] (peer)   {AxonaPeer \,+\, AxonManager (kernel)};
+  \node[layer, below=0.3 of app] (peer)   {AxonaPeer \,+\, AxonaManager (kernel)};
   \node[layer, below=0.3 of peer] (node)   {NeuronNode \,+\, Synaptome};
   \node[layer, below=0.3 of node] (txp)    {Transport (web / node / sim)};
   \node[layer, below=0.3 of txp] (wire)   {Wire (WebSocket / DataChannel / in-proc)};
@@ -198,8 +198,8 @@ contract has a smoke-test suite.}
 
 \newthought{Every Axona participant} has a 264-bit identifier. The
 top 8 bits are an S2 geographic cell\sidenote{S2 is Google's
-hierarchical cell decomposition of the sphere. At level 8 the world
-splits into 256 cells of roughly 800~km radius each; an S2 prefix
+hierarchical cell decomposition of the sphere. The top 8 bits split
+the world into 192 cells of roughly 800~km radius each; an S2 prefix
 gives Axona a region-aware address without leaking GPS-level
 precision.} computed from the peer's latitude and longitude; the
 bottom 256 bits are the SHA-256 of the peer's Ed25519 public key. A
@@ -258,10 +258,10 @@ extends \texttt{Transport}; a database-backed persistence
 and where the developer-facing API surface (\texttt{peer.pub},
 \texttt{peer.sub}, \texttt{peer.lookup}) is declared.
 
-\item[\texttt{src/pubsub/}.] The pub/sub overlay: \texttt{AxonManager},
+\item[\texttt{src/pubsub/}.] The pub/sub overlay: \texttt{AxonaManager},
 \texttt{post.js} (topic ID derivation), \texttt{envelope.js} (signed
 publish envelopes), \texttt{ed25519.js} (Ed25519 binding for
-\texttt{crypto.subtle}). AxonManager owns the K-closest tree, the
+\texttt{crypto.subtle}). AxonaManager owns the K-closest tree, the
 replay caches, the dedup LRU, the metrics counters.
 
 \item[\texttt{src/transport/}.] Concrete transports:
@@ -326,7 +326,7 @@ frequently-used one. Two random hops with similar latency tie; the
 one that's served us well before wins the tiebreak.
 
 % =====================================================================
-% V. THE PROTOCOL LAYER: AxonaPeer + AxonManager
+% V. THE PROTOCOL LAYER: AxonaPeer + AxonaManager
 % =====================================================================
 \section{The Protocol Layer}
 
@@ -350,7 +350,7 @@ seeds them into the synaptome; it subscribes to
 
 \item The pub/sub surface. \texttt{peer.pub}, \texttt{peer.sub},
 \texttt{peer.pull}, \texttt{peer.metrics}: the developer-facing API.
-Each delegates to the AxonManager after deriving the topic ID and
+Each delegates to the AxonaManager after deriving the topic ID and
 (for \texttt{pub}) building a signed envelope.
 
 \item The direct-message surface. \texttt{peer.send},
@@ -361,7 +361,7 @@ For protocols that aren't topic-shaped.
 \item The lookup primitive. \texttt{peer.lookup(targetKey)} runs an
 iterative K-closest walk and returns
 \texttt{\{found, path, hops, peerId, latency\}}. This is what
-AxonManager uses internally on every \texttt{pub}/\texttt{sub} to
+AxonaManager uses internally on every \texttt{pub}/\texttt{sub} to
 find the topic's axons.
 \end{itemize}
 
@@ -370,13 +370,13 @@ the companion document \emph{AxonaPeer Overview} (v0.4.0). This
 section is the architectural placement; the field-by-field
 description lives there.}
 
-\texttt{AxonManager} is a separate object owned by the peer. Its job
+\texttt{AxonaManager} is a separate object owned by the peer. Its job
 is the pub/sub overlay: when a subscriber sends
 \texttt{pubsub:subscribe-k} to the K-closest axons for a topic, the
-receiving AxonManager stores the subscriber in its
+receiving AxonaManager stores the subscriber in its
 \texttt{role.children} for that topic. When a publisher fans
 \texttt{pubsub:publish-k} to its own K-closest, each receiving
-AxonManager iterates its \texttt{role.children} and forwards
+AxonaManager iterates its \texttt{role.children} and forwards
 \texttt{pubsub:deliver} to each subscriber. The publisher's signed
 envelope flows through unchanged; per-hop dedup prevents the
 fan-out tree from delivering duplicates.
@@ -550,11 +550,7 @@ to trust unsigned or unverifiable publishes.
 % =====================================================================
 \section{Routing}
 
-\newthought{Axona's routing is learning-adaptive.}\marginnote{The
-research codename for this design is NH-1, the routing implementation
-benchmarked in dht-sim against Kademlia and other DHTs. In the
-deployed production code there's just one routing layer --- the one
-described here --- and we call it Axona routing.} It replaces
+\newthought{Axona's routing is learning-adaptive.} It replaces
 Kademlia's $k$-bucket array with a dynamic synaptome that adjusts
 edge weights based on observed latency. The basic shape --- iterative
 lookup, $\log_2(N)$ hop count --- is unchanged from Kademlia; what
@@ -576,10 +572,10 @@ committing.
 
 \item[\texttt{find\_closest\_set} (req).] ``Give me your $K$
 peers closest to this target.'' The K-closest harvester used by
-AxonManager's pub/sub axon discovery.
+AxonaManager's pub/sub axon discovery.
 
 \item[\texttt{route\_msg} (req).] Generic routed-message
-forwarder. Used by AxonManager for \texttt{\_\_tunneled\_direct\_\_}
+forwarder. Used by AxonaManager for \texttt{\_\_tunneled\_direct\_\_}
 delivery when the target isn't directly bound.
 
 \item[\texttt{reinforce} (ntf).] ``This lookup succeeded; bump
@@ -777,8 +773,8 @@ one per network with \texttt{new AxonaDomain(\{ k: 20 \})}, where
 \item[\texttt{identity}] \emph{(optional)}\; identity envelope. Required
 for signed publishes (the default). Apps that only call
 \texttt{peer.pub(t, m, \{ sign: false \})} can omit it.
-\item[\texttt{axonManager}] \emph{(optional)}\; explicit
-\texttt{AxonManager}. When omitted, one is built automatically on
+\item[\texttt{axonaManager}] \emph{(optional)}\; explicit
+\texttt{AxonaManager}. When omitted, one is built automatically on
 \texttt{peer.start()}.
 \item[\texttt{persist}] \emph{(optional)}\; \texttt{PersistenceAdapter}
 for synaptome / subscription / replay-cache checkpoints. Default:
