@@ -1,0 +1,784 @@
+% =====================================================================
+% Axona Architecture
+% David A. Smith, Axona.net
+%
+% Compile with:  pdflatex Axona-Architecture.tex   (run twice)
+% Requires: tufte-latex, tikz, pgfplots, xcolor, booktabs, microtype
+% =====================================================================
+
+\documentclass[nobib]{tufte-handout}
+
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{positioning, calc, arrows.meta, shapes.geometric}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{fancyhdr}
+\usepackage{etoolbox}
+\usepackage{needspace}
+
+\pretocmd{\section}{\needspace{6\baselineskip}}{}{}
+\pretocmd{\subsection}{\needspace{4\baselineskip}}{}{}
+
+\definecolor{rust}{RGB}{185,78,54}
+\definecolor{rustsoft}{RGB}{212,168,150}
+\definecolor{inkmuted}{RGB}{102,102,102}
+\definecolor{codebg}{RGB}{240,236,223}
+
+\setcounter{secnumdepth}{1}
+\renewcommand{\thesection}{\Roman{section}}
+
+\title{Axona Architecture}
+\author[David A. Smith]{David A. Smith \\[0.3em] \emph{\small Axona.net}}
+\date{}
+
+\begin{document}
+
+\fancypagestyle{ndhtplain}{%
+  \fancyhf{}%
+  \renewcommand{\headrulewidth}{0pt}%
+  \fancyfoot[C]{\thepage}%
+}
+
+% --------------------------------------------------------------------
+% Title page
+% --------------------------------------------------------------------
+\thispagestyle{empty}
+\null\vfill
+\begin{center}
+{\fontsize{48}{52}\selectfont \textsc{Axona}\par}
+\vspace{0.6em}
+{\Large\itshape Architecture\par}
+\vspace{4em}
+{\large David A.~Smith\par}
+{\itshape\small Axona.net\par}
+\vspace{2em}
+{\small An Axona Architecture Note \quad v0.4.0 \quad 2026-05-25\par}
+\end{center}
+\vfill
+\null
+\newpage
+
+% --------------------------------------------------------------------
+% Mission epigraph page
+% --------------------------------------------------------------------
+\thispagestyle{empty}
+\null\vfill
+\begin{flushright}
+\itshape A protocol is the contract between layers that don't trust each other.\par
+\end{flushright}
+\vfill
+\null\newpage
+
+% --------------------------------------------------------------------
+% Body opens with page numbers
+% --------------------------------------------------------------------
+\pagestyle{ndhtplain}
+\thispagestyle{ndhtplain}
+\setcounter{page}{1}
+
+% --------------------------------------------------------------------
+% Body epigraph
+% --------------------------------------------------------------------
+\begin{quote}
+  \itshape What I cannot create, I do not understand.\\[0.3em]
+  \normalfont\textsc{\footnotesize Richard Feynman} \,$\cdot$\, 1988
+\end{quote}
+
+\vspace{1em}
+
+% =====================================================================
+% I. THE STACK
+% =====================================================================
+\section{The Stack}
+
+\newthought{Axona ships as three repositories} that compose into one
+running system. Each layer has a single
+responsibility,\sidenote{The pattern is intentional. A peer's
+business logic should never need to know the wire format; a bridge
+should never need to know what topic a subscriber cares about; the
+kernel should never need to know which application is using it. Every
+interface in this document is a place where one layer was given the
+right to be wrong about the layer below.} a single canonical version
+identifier (\texttt{KERNEL\_VERSION}), and a contract surface narrow
+enough to fit on a postcard.
+
+\begin{description}
+\item[\texttt{@axona/protocol} (kernel).] The pure-JS library. Owns
+the DHT routing, the pub/sub overlay, the cryptography, and the
+transport contracts. No browser DOM, no Node-specific I/O, no
+network code outside abstract transport classes. Runs identically in
+browsers, in Node, in dht-sim's simulated network.
+
+\item[\texttt{axona-peer} (browser application).] The reference
+end-user app. Provides identity persistence, region selection,
+WebRTC mesh formation, a chat-style UI for pub/sub. Imports the
+kernel as a vendored copy under \texttt{vendor/axona-protocol/} so
+the version that ran when the page was built is the version that
+runs in the browser.
+
+\item[\texttt{axona-bridge} (deployed server).] The signaling +
+introducer service at \texttt{bridge.axona.net}. Runs an embedded
+\texttt{AxonaPeer} of its own (so it's a full DHT participant, not
+just a relay), gates connecting peers behind a version handshake,
+relays WebRTC signaling between browsers, and forwards Axona wire
+frames addressed to its own embedded peer.
+\end{description}
+
+\marginnote{A fourth component, \texttt{dht-sim}, runs the kernel
+against a simulated network for protocol research and regression
+benchmarks. It's not part of the production stack but shares the
+same \texttt{@axona/protocol} library; every change that ships to
+production also has to pass the simulator's 25{,}000-node battery.}
+
+The three components carry their own semver tracks because each
+ships to a different audience: kernel changes need API-level
+discipline; peer changes are user-visible UI; bridge changes are
+operational deploys. But they all share the same kernel version,
+visible at runtime through \texttt{/healthz} (bridge), the
+\texttt{welcome} frame (any peer connecting), and the version row in
+the peer UI.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  layer/.style={
+    draw=rust!70!black, fill=codebg, thick, rounded corners,
+    minimum width=5.2cm, minimum height=0.9cm, align=center,
+    font=\small
+  },
+  conn/.style={-{Stealth[length=2mm]}, rust!70!black, thick},
+  meta/.style={font=\scriptsize\itshape, inkmuted, align=left}
+]
+  \node[layer] (app)    {Application (chat, social, agentic)};
+  \node[layer, below=0.3 of app] (peer)   {AxonaPeer \,+\, AxonManager (kernel)};
+  \node[layer, below=0.3 of peer] (node)   {NeuronNode \,+\, Synaptome};
+  \node[layer, below=0.3 of node] (txp)    {Transport (web / node / sim)};
+  \node[layer, below=0.3 of txp] (wire)   {Wire (WebSocket / DataChannel / in-proc)};
+
+  \draw[conn] (app)  -- (peer);
+  \draw[conn] (peer) -- (node);
+  \draw[conn] (node) -- (txp);
+  \draw[conn] (txp)  -- (wire);
+
+  \node[meta, right=0.4 of app]   {app surface: \texttt{peer.pub/sub/send}};
+  \node[meta, right=0.4 of peer]  {protocol layer};
+  \node[meta, right=0.4 of node]  {local routing state};
+  \node[meta, right=0.4 of txp]   {pluggable transport};
+  \node[meta, right=0.4 of wire]  {hex-on-wire serialisation};
+\end{tikzpicture}
+\caption*{Five layers in one peer. Every arrow is a contract; every
+contract has a smoke-test suite.}
+\end{figure}
+
+% =====================================================================
+% II. IDENTITY AND ADDRESSING
+% =====================================================================
+\section{Identity and Addressing}
+
+\newthought{Every Axona participant} has a 264-bit identifier. The
+top 8 bits are an S2 geographic cell\sidenote{S2 is Google's
+hierarchical cell decomposition of the sphere. At level 8 the world
+splits into 256 cells of roughly 800~km radius each; an S2 prefix
+gives Axona a region-aware address without leaking GPS-level
+precision.} computed from the peer's latitude and longitude; the
+bottom 256 bits are the SHA-256 of the peer's Ed25519 public key. A
+peer in London has an ID starting with \texttt{0x4f}; a peer in
+Virginia starts with \texttt{0xdf}. Two peers in the same region
+share a leading byte; two random peers share only the bits their
+keys happen to share.
+
+The address space is treated as \texttt{BigInt} in every line of
+running code. The wire format is 66-character lowercase hex --- the
+\textsc{only} representation that ever appears in JSON. The
+conversion happens at exactly two places: when the transport
+serialises an outgoing frame, and when the dispatcher parses an
+incoming one.\sidenote{This rule didn't exist in versions 1.0 through
+1.4. The kernel mixed hex strings and BigInts in different layers
+and the boundaries weren't enforced; pub/sub silently failed because
+\texttt{transport.notify(bigint)} returned without sending against a
+hex-keyed Map. v1.5.0 made BigInt-internal canonical; \texttt{\_normPeerId}
+helpers and \texttt{typeof v === 'bigint'} defensive branches are
+gone.}
+
+\textbf{Topic identifiers share the address space.} A topic is named
+by the application (a string like \texttt{us-east/hello-world}) and
+optionally anchored at a publisher: \texttt{topicId =
+sha256(publisher~||~topic-name)}. When the publisher is null the
+topic is global (top byte \texttt{00}); when it's a regional
+synthetic publisher (top byte = S2 cell, bottom bits zero), the
+topic inherits the region. That's what makes regional pub/sub route
+naturally: peers in the same region are XOR-closest to topics
+anchored at that region.
+
+The Activation Potential (AP) routing formula, the K-closest
+selector, and the synaptome's stratum buckets all operate on this
+one space. There is no separate ``topic ID space'' or ``peer ID
+space''; they share addresses because they share routing.
+
+% =====================================================================
+% III. THE KERNEL: @axona/protocol
+% =====================================================================
+\section{The Kernel: \texttt{@axona/protocol}}
+
+\newthought{The kernel is the protocol.} Everything else is its
+clients. The directory structure mirrors the contract surface:
+
+\begin{description}
+\item[\texttt{src/contracts/}.] Abstract base classes: \texttt{Transport},
+\texttt{DHT}, \texttt{DHTNode}, \texttt{BootstrapService},
+\texttt{PersistenceAdapter}. These are the seams where alternate
+implementations plug in. A custom transport (libp2p, QUIC, embedded)
+extends \texttt{Transport}; a database-backed persistence
+(IndexedDB, SQLite) extends \texttt{PersistenceAdapter}.
+
+\item[\texttt{src/dht/}.] The active routing layer: \texttt{NeuronNode},
+\texttt{Synapse}, \texttt{AxonaPeer}, \texttt{AxonaDomain},
+\texttt{Subscription}. This is where the NH-1 routing logic lives,
+and where the developer-facing API surface (\texttt{peer.pub},
+\texttt{peer.sub}, \texttt{peer.lookup}) is declared.
+
+\item[\texttt{src/pubsub/}.] The pub/sub overlay: \texttt{AxonManager},
+\texttt{post.js} (topic ID derivation), \texttt{envelope.js} (signed
+publish envelopes), \texttt{ed25519.js} (Ed25519 binding for
+\texttt{crypto.subtle}). AxonManager owns the K-closest tree, the
+replay caches, the dedup LRU, the metrics counters.
+
+\item[\texttt{src/transport/}.] Concrete transports:
+\texttt{transport/web/} (browser: BridgeTransport over WebSocket +
+WebRTCTransport over DataChannels), \texttt{transport/node/}
+(server-side WebSocket), \texttt{transport/sim/} (in-process
+simulation for dht-sim and tests). All implement the abstract
+\texttt{Transport} contract identically.
+
+\item[\texttt{src/utils/}.] Pure helpers: \texttt{hexid.js}
+(BigInt$\leftrightarrow$hex conversions, XOR distance, leading-zero
+count), \texttt{s2.js} (S2 cell computation), JSON codec
+(\texttt{transport/wire.js}).
+
+\item[\texttt{src/identity/}.] Ed25519 keypair derivation +
+persistence envelope. The single entry point \texttt{deriveIdentity}
+takes a \texttt{\{lat, lng\}} or full options object and returns
+\texttt{\{id, pubkey, pubkeyHex, privateKey, region, \ldots\}}.
+\end{description}
+
+The whole kernel has zero runtime dependencies beyond the host
+JavaScript environment (browser or Node 20+). No bundler, no
+transpilation, no build step. The same source files run in the
+browser via ES modules, in Node via direct \texttt{import}, and in
+the simulator via the in-process transport.
+
+% =====================================================================
+% IV. THE LOCAL NODE: NeuronNode + Synaptome
+% =====================================================================
+\section{The Local Node}
+
+\newthought{Each peer's view of the network} lives in two data
+structures on the \texttt{NeuronNode}: the \emph{synaptome} (its
+outgoing connections) and the \emph{incoming synapse index} (peers
+known to point at it). Both are keyed by 264-bit BigInt nodeId.
+
+A \texttt{Synapse} is a routing edge --- it carries a peer ID, a
+measured latency, a learned weight, a stratum (the XOR-distance
+bucket), an inertia lock, and provenance (was this synapse added via
+handshake, hop-cache, triadic introduction, or sponsor bootstrap?).
+The synaptome is unbounded by design; the routing layer evicts
+synapses through the \emph{Structural Survival Rule},\marginnote{The
+rule, in one sentence: a synapse may only be pruned if at least one
+other synapse with the same stratum exists. The effect: every
+populated stratum keeps at least one live route, so the address
+space stays globally navigable even after heavy decay.} which
+guarantees navigability even under aggressive weight decay.
+
+Routing decisions don't pick the XOR-closest synapse blindly. Each
+candidate is scored by Activation Potential:
+
+\[
+AP_c \;=\; \frac{\Delta \text{Distance}_c}{L_c} \times (1 + w \cdot W_c)
+\]
+
+The first factor is progress velocity --- how much XOR distance the
+hop closes per millisecond of measured latency. The second is a
+mild boost for synapses that have historically led to fast lookups.
+Weight only accrues on at-or-below-average-latency paths, so a
+high-W synapse genuinely represents a fast route, not just a
+frequently-used one. Two random hops with similar latency tie; the
+one that's served us well before wins the tiebreak.
+
+% =====================================================================
+% V. THE PROTOCOL LAYER: AxonaPeer + AxonManager
+% =====================================================================
+\section{The Protocol Layer}
+
+\newthought{\texttt{AxonaPeer} is the active object} that turns a
+\texttt{NeuronNode} into a network participant. It owns:
+
+\begin{itemize}
+\setlength{\itemsep}{0pt}
+\item The handler installation. On \texttt{peer.start()} it
+registers the NH-1 routing handlers
+(\texttt{lookup\_step}, \texttt{lookahead\_probe},
+\texttt{find\_closest\_set}, \texttt{route\_msg},
+\texttt{local\_probe}, \texttt{triadic\_introduce},
+\texttt{hop\_cache}, \texttt{lateral\_spread}, \texttt{reinforce})
+on the transport.
+
+\item The auto-admission loop. It asks
+\texttt{transport.boundPeers()} for currently-bound nodeIds and
+seeds them into the synaptome; it subscribes to
+\texttt{transport.onPeerBound} for future admissions.
+
+\item The pub/sub surface. \texttt{peer.pub}, \texttt{peer.sub},
+\texttt{peer.pull}, \texttt{peer.metrics}: the developer-facing API.
+Each delegates to the AxonManager after deriving the topic ID and
+(for \texttt{pub}) building a signed envelope.
+
+\item The direct-message surface. \texttt{peer.send},
+\texttt{peer.notify}, \texttt{peer.onMessage}: per-peer
+request/response and fire-and-forget, outside the pub/sub overlay.
+For protocols that aren't topic-shaped.
+
+\item The lookup primitive. \texttt{peer.lookup(targetKey)} runs an
+iterative K-closest walk and returns
+\texttt{\{found, path, hops, peerId, latency\}}. This is what
+AxonManager uses internally on every \texttt{pub}/\texttt{sub} to
+find the topic's axons.
+\end{itemize}
+
+\marginnote{The \texttt{AxonaPeer} surface is described in detail in
+the companion document \emph{AxonaPeer Overview} (v0.4.0). This
+section is the architectural placement; the field-by-field
+description lives there.}
+
+\texttt{AxonManager} is a separate object owned by the peer. Its job
+is the pub/sub overlay: when a subscriber sends
+\texttt{pubsub:subscribe-k} to the K-closest axons for a topic, the
+receiving AxonManager stores the subscriber in its
+\texttt{role.children} for that topic. When a publisher fans
+\texttt{pubsub:publish-k} to its own K-closest, each receiving
+AxonManager iterates its \texttt{role.children} and forwards
+\texttt{pubsub:deliver} to each subscriber. The publisher's signed
+envelope flows through unchanged; per-hop dedup prevents the
+fan-out tree from delivering duplicates.
+
+The K-closest replication is what makes the system tolerant. A
+publisher sends to \emph{five} root axons in parallel; a subscriber
+subscribes at \emph{five} root axons in parallel. As long as one
+axon in each set overlaps, delivery succeeds. With $K=5$ and
+synaptomes that converge under the bridge's peer-list dissemination,
+overlap is typically 4 or 5 of 5 --- so a publish that loses two
+axons to transient WebRTC failures still delivers cleanly.
+
+% =====================================================================
+% VI. THE TRANSPORT LAYER
+% =====================================================================
+\section{The Transport Layer}
+
+\newthought{Transport is where addresses meet sockets.} The kernel's
+\texttt{Transport} contract is a small surface: \texttt{start},
+\texttt{stop}, \texttt{send} (request/response), \texttt{notify}
+(fire-and-forget), \texttt{isConnected}, \texttt{bindPeer},
+\texttt{boundPeers}, \texttt{onPeerBound}, \texttt{onRequest},
+\texttt{onNotification}, \texttt{onPeerDied}. Every concrete
+transport implements this surface and the upper layers don't care
+which one is wired in.
+
+Three concrete implementations ship:
+
+\begin{description}
+\item[\texttt{transport/web/}.] The browser stack. A
+\texttt{CompositeTransport} fans out to two sub-transports based on
+which one owns each nodeId: a \texttt{BridgeTransport} that carries
+Axona wire frames over the same WebSocket the bridge uses for
+signaling, and a \texttt{WebRTCTransport} over a
+\texttt{MeshManager} that owns the data-channel pool. The factory
+\texttt{webTransport(\{bridgeUrl, identity\})} composes the two,
+drives the bridge's version gate, runs the hello/hello-ack
+admission, threads TURN credentials from the welcome frame into the
+mesh's ICE config, and resolves once everything is up.
+
+\item[\texttt{transport/node/}.] A Node-side WebSocket transport.
+Used by the bridge's embedded peer to talk to connected browsers
+without simulating WebRTC --- the bridge \emph{is} the signaling
+server, so it doesn't need WebRTC to reach any browser; the
+WebSocket is direct.
+
+\item[\texttt{transport/sim/}.] The simulator transport. Used by
+dht-sim's \texttt{TransportAxonaEngine} and by the kernel's smoke
+tests. Identical Transport contract, but messages are scheduled in
+the event loop with simulated latency derived from a real internet
+topology dataset.
+\end{description}
+
+\marginnote{The same kernel test suite runs against all three
+transports. Cross-transport bugs --- which is to say, the kind of
+bug where a fix lands in one transport's call path but not the
+others --- can't ship.}
+
+The wire format is JSON, with a single quirk: BigInt is serialised
+as \texttt{"<digits>n"} (decimal digits with an \texttt{n} suffix)
+and revived back to BigInt on decode. NodeId fields are always
+hex strings on the wire --- they never appear as bigint-suffixed
+literals because the kernel converts them at frame construction.
+
+% =====================================================================
+% VII. THE BRIDGE
+% =====================================================================
+\section{The Bridge}
+
+\newthought{The bridge is an introducer}, not a server. Its job is
+to let browsers find each other; once they've found each other,
+WebRTC data channels carry every byte of application traffic
+peer-to-peer. The bridge stays in the picture only for two reasons:
+(1)~it's the rendezvous for the version handshake before peers can
+talk at all; (2)~it's a guaranteed-reachable mesh peer, which makes
+it a useful K-closest axon in small networks where two browsers
+might otherwise fail to find common axons.
+
+The bridge handles three kinds of frames over the WebSocket:
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\textbf{Signaling.}] \texttt{welcome},
+\texttt{peer-list}, \texttt{peer-joined}, \texttt{peer-left},
+\texttt{signal}, \texttt{ping}/\texttt{pong}. Routes WebRTC SDP
+offers/answers and ICE candidates between browsers, broadcasts join/leave
+events, supplies short-lived TURN credentials in the welcome frame.
+
+\item[\textbf{Version handshake.}] \texttt{client-hello}/
+\texttt{server-hello}. Enforces a minimum peer version. Rejects
+sub-minimum peers with WebSocket close code 4426 and a
+human-readable reason; the peer's UI shows a ``please reload''
+banner.
+
+\item[\textbf{Axona wire.}] \texttt{\{type: 'axona', payload: ...\}}
+frames carrying \texttt{req}/\texttt{res}/\texttt{ntf} messages
+between any connected browser and the bridge's embedded peer.
+These are the same frames any two browsers exchange over WebRTC ---
+the bridge embeds a full \texttt{AxonaPeer} of its own
+(\texttt{BridgeAxonaNode}) and participates in routing just like
+any other node, which is why it can be in K-closest sets and why it
+can hold subscriber children for pub/sub topics.
+\end{description}
+
+The bridge's embedded peer has a fixed identity (cf3138... in
+production, anchored at London). Its \texttt{health} surface
+exposes the kernel version it's running and the synaptome it has
+built up, available at \texttt{/healthz} JSON. Operators check that
+endpoint to confirm a deploy.
+
+% =====================================================================
+% VIII. THE WIRE PROTOCOL
+% =====================================================================
+\section{The Wire Protocol}
+
+\newthought{Every frame on the wire} is JSON. Every nodeId or topic
+ID field is a 66-character lowercase hex string. There's no binary
+framing, no protobuf, no length-prefixed records --- the discipline
+of having one wire format that any of the three transports can carry
+is worth the few percent of size you give up.
+
+Three kinds of message-typed envelopes flow over the wire:
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\textbf{Request} (\texttt{k: 'req'}).] A correlated
+request expecting a response. Carries an integer \texttt{id} for
+correlation, a \texttt{type} string naming the handler
+(\texttt{lookup\_step}, \texttt{route\_msg},
+\texttt{find\_closest\_set}, \ldots), and an opaque \texttt{body}.
+
+\item[\textbf{Response} (\texttt{k: 'res'}).] The reply to a
+\texttt{req}. Echoes the \texttt{id} and adds an \texttt{ok}
+boolean and a \texttt{body}.
+
+\item[\textbf{Notification} (\texttt{k: 'ntf'}).] Fire-and-forget.
+No \texttt{id}, no response. Used for hello/hello-ack admission,
+\texttt{pubsub:subscribe-k}, \texttt{pubsub:publish-k},
+\texttt{pubsub:deliver}, \texttt{triadic\_introduce},
+\texttt{hop\_cache}, \texttt{lateral\_spread},
+\texttt{reinforce}.
+\end{description}
+
+The handler types are versioned implicitly through the kernel ---
+the bridge's \texttt{minPeerVersion} gate excludes peers running an
+older protocol that wouldn't understand newer messages. Major
+protocol changes bump \texttt{KERNEL\_VERSION}'s minor; minor
+changes are additive (a peer that doesn't know a handler type
+silently drops the message).
+
+A pub/sub message envelope is signed:
+
+\begin{verbatim}
+{
+  msgId:        "<sha256 of canonical(envelope) hex>",
+  ts:           1716638400000,
+  topic:        "us-east/hello-world",
+  message:      <application payload>,
+  signerPubkey: "<Ed25519 pubkey hex>",
+  signature:    "ed25519:<128 hex chars>"
+}
+\end{verbatim}
+
+Receivers verify the signature against the signer's pubkey using
+\texttt{crypto.subtle.verify}; the kernel surfaces verification
+result on the delivered envelope so applications can decide whether
+to trust unsigned or unverifiable publishes.
+
+% =====================================================================
+% IX. ROUTING: NH-1
+% =====================================================================
+\section{Routing: NH-1}
+
+\newthought{NH-1 is the learning-adaptive routing layer.} It
+replaces Kademlia's $k$-bucket array with a dynamic synaptome that
+adjusts edge weights based on observed latency. The basic shape ---
+iterative lookup, $\log_2(N)$ hop count --- is unchanged from
+Kademlia; what changes is which peer you ask at each hop.
+
+The five wire operations that drive NH-1 are:
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{lookup\_step} (req).] ``Here's a target. What's
+your best next hop?'' The receiver evaluates AP across its
+synaptome's progress candidates, returns the winning synapse + its
+own routing state.
+
+\item[\texttt{lookahead\_probe} (req).] ``If I forward to you for
+target $T$, who would you forward to?'' A one-deep peek that lets
+the caller compare expected hop costs across candidates before
+committing.
+
+\item[\texttt{find\_closest\_set} (req).] ``Give me your $K$
+peers closest to this target.'' The K-closest harvester used by
+AxonManager's pub/sub axon discovery.
+
+\item[\texttt{route\_msg} (req).] Generic routed-message
+forwarder. Used by AxonManager for \texttt{\_\_tunneled\_direct\_\_}
+delivery when the target isn't directly bound.
+
+\item[\texttt{reinforce} (ntf).] ``This lookup succeeded; bump
+the weight on the synapse I used.'' Fire-and-forget LTP signal
+back along the path. Only flows when the lookup hit at-or-below
+average latency for the path's region.
+\end{description}
+
+Two structural-plasticity messages let the network rewire itself
+without explicit instruction: \texttt{triadic\_introduce}
+(``introduce me to your friend at $X$'') and \texttt{hop\_cache}
+(``I've forwarded to $X$ several times; install a direct synapse to
+$X$''). Both are fire-and-forget notifications that obey the
+synaptome's admission rule (\texttt{\_addByVitality}).
+
+\marginnote{The performance claim of Axona over Kademlia is roughly
+40\% fewer wall-clock milliseconds per lookup at 25{,}000 nodes,
+mostly from latency-weighted hop selection. The figure is documented
+in the companion paper \emph{Axona: A Learning-Adaptive DHT}.}
+
+% =====================================================================
+% X. PUB/SUB: K-CLOSEST
+% =====================================================================
+\section{Pub/Sub: K-Closest}
+
+\newthought{The pub/sub overlay is its own structure.} It sits on
+top of NH-1 routing but doesn't reuse the synaptome for state ---
+each peer maintains a separate set of \emph{axon roles}, one per
+topic it's chosen as an axon for. A role holds a topic ID, a set of
+children (subscribers), a replay cache, and a $K$-replicated peer
+set (the other root axons for the same topic).
+
+Subscriber-side flow:
+
+\begin{enumerate}
+\setlength{\itemsep}{0pt}
+\item Compute \texttt{topicId = sha256(publisher~||~topic-name)}.
+\item Find the $K$ peers closest to \texttt{topicId} in the local
+synaptome. (No network walk --- the local reachable peer set is
+what matters; remote-walk K-closest returns ghost IDs that route
+fan-out into dead ends.)
+\item Send \texttt{pubsub:subscribe-k} to each, carrying the
+subscriber's nodeId and an optional \texttt{lastSeenTs} for
+replay.
+\item Each receiver runs \texttt{\_addOrRecruitChild}, stores the
+subscriber under \texttt{role.children}, and optionally serves a
+\texttt{pubsub:replay-batch} of cached messages newer than
+\texttt{lastSeenTs}.
+\end{enumerate}
+
+Publisher-side flow:
+
+\begin{enumerate}
+\setlength{\itemsep}{0pt}
+\item Compute the same \texttt{topicId}.
+\item Build a signed envelope.
+\item Find the same $K$ peers closest to \texttt{topicId} locally.
+\item Send \texttt{pubsub:publish-k} to each.
+\item Each receiver runs \texttt{\_onPublishDirect}: dedup against
+\texttt{\_seenPublishes}, add to replay cache, fan
+\texttt{pubsub:deliver} to every child in \texttt{role.children}.
+\item Each child receives \texttt{pubsub:deliver}, dedups, fires
+the local \texttt{\_deliveryCallback} which routes to the
+application's subscription handler.
+\end{enumerate}
+
+\marginnote{Per-hop \texttt{\_alreadySeenPublish} dedup is keyed on
+\texttt{publishId} (a string like \texttt{nodeId:counter}), separate
+from the content-hash \texttt{msgId} the application sees. Multiple
+arrivals of the same \texttt{publishId} at one peer collapse to a
+single \texttt{\_deliveryCallback} firing.}
+
+When a publisher's K-closest peers also happen to be in the
+subscribers' K-closest sets, the tree converges and delivery is
+single-hop from publisher to axon to subscriber. When they don't,
+the system relies on the redundancy: a missing axon's subtree is
+covered by the four other axons. The Activation Potential weighting
+makes high-quality axons dominate the K-closest set over time.
+
+% =====================================================================
+% XI. IDENTITY AND SECURITY
+% =====================================================================
+\section{Identity and Security}
+
+\newthought{Identity is an Ed25519 keypair.} The kernel uses
+\texttt{crypto.subtle.generateKey} to produce a curve-Ed25519 pair;
+the public key is hashed with SHA-256 to produce the bottom 256 bits
+of the nodeId; the top 8 bits are the S2 cell of the user's
+\texttt{(lat, lng)}. The private key never leaves the host
+environment, but the public key is broadcast on every connection
+(in hello/hello-ack) so peers can verify each other.
+
+Every signed publish carries the publisher's public key
+(\texttt{signerPubkey}) inline. The kernel verifies the
+\texttt{ed25519:<hex>} signature against \texttt{signerPubkey} using
+\texttt{crypto.subtle.verify}. Verification is per-envelope, not
+per-peer --- a peer that's untrusted can still relay signed
+publishes from a trusted publisher unchanged, and any receiver
+along the way can verify the chain of custody.
+
+Persistence is opt-in. The kernel's
+\texttt{PersistenceAdapter} contract exposes
+\texttt{write(namespace, value)} and \texttt{read(namespace)};
+concrete adapters target IndexedDB (browser) and the filesystem
+(Node). When wired, AxonaPeer checkpoints identity, synaptome
+seeds, and pending subscriptions on a 5-second debounce. On
+restart, the identity envelope is reloaded and validated (the
+stored nodeId must match the freshly-derived one); subscriptions
+are reinstalled as soon as the mesh has stabilised.
+
+\marginnote{Because identity is bound to a region prefix, moving
+geographic location changes the nodeId. axona-peer's identity.js
+preserves the existing identity across reloads unless the user
+explicitly re-selects a different region. A roaming user keeps the
+same DHT identity for the life of the browser profile.}
+
+The \texttt{crypto.subtle} dependency is a hard requirement: the
+demo and the peer fail to boot in insecure contexts (HTTP pages
+outside localhost) because the Web Crypto API simply isn't
+available. The bridge serves over HTTPS; the peer's GitHub Pages
+deployment enforces HTTPS at the Pages level; the demo at
+\texttt{demo.axona.net} required Let's Encrypt cert provisioning
+before identity derivation would run at all.
+
+% =====================================================================
+% XII. PRODUCTION DEPLOYMENT
+% =====================================================================
+\section{Production Deployment}
+
+\newthought{The public stack runs at three URLs.}
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{bridge.axona.net}.] The deployed bridge. Runs on a
+DigitalOcean droplet, started by systemd, kept current via
+\texttt{git pull \&\& npm ci --omit=dev \&\& systemctl restart}.
+Exposes \texttt{/healthz} for monitoring. Listens on
+\texttt{wss://} only; HTTP requests are redirected.
+
+\item[\texttt{axona.net}.] The reference peer application, served
+via GitHub Pages from the \texttt{axona-peer} repo's main branch.
+Every push redeploys. The vendored \texttt{axona-protocol} kernel
+ships with the app; the version row in the UI confirms which
+kernel an open tab is running.
+
+\item[\texttt{demo.axona.net}.] The minimal pub/sub demo, served
+via GitHub Pages from the \texttt{axona-protocol} repo's main
+branch (where \texttt{examples/minimal-pubsub-browser/} lives).
+Same Pages deployment pattern; HTTPS-enforced because
+\texttt{crypto.subtle} requires a secure context.
+\end{description}
+
+A coordinated release works as follows: a fix lands in
+\texttt{axona-protocol}, bumps \texttt{KERNEL\_VERSION} and the
+package version, tags the commit. \texttt{axona-peer} resyncs its
+\texttt{vendor/axona-protocol/} from the new kernel, bumps
+\texttt{PEER\_VERSION}, and pushes (Pages picks up). The bridge
+updates its \texttt{@axona/protocol} dependency in
+\texttt{package.json}, bumps \texttt{VERSION} in \texttt{server.js},
+pushes, and the operator runs the deploy script. Every component
+ends up reporting the same \texttt{kernelVersion} in its visible
+metadata.
+
+\marginnote{Every Axona component is required to surface its
+\texttt{KERNEL\_VERSION} at a runtime-inspectable point: the bridge
+in \texttt{/healthz} and the welcome frame, the peer in its UI
+version row, the demo in its footer. The rule exists because before
+it did, ``which kernel is everyone on?'' required SSH-ing into the
+bridge and grepping \texttt{node\_modules}.}
+
+% =====================================================================
+% XIII. FUTURE DIRECTIONS
+% =====================================================================
+\section{Future Directions}
+
+\newthought{The architecture is stable.} The shape of the layering,
+the wire format, the BigInt-canonical address discipline, the
+K-closest pub/sub semantics --- these are not expected to change.
+What's coming sits inside the existing seams:
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\textbf{Federated bridges.}] Multiple bridges in different
+geographic regions, gossiping peer-lists so a peer connected to
+one bridge can be reached from another. Single-bridge today is a
+deployment simplification, not a protocol constraint.
+
+\item[\textbf{Persistent topics.}] Today's replay cache survives
+in-memory only. A pluggable persistence layer for axon
+\texttt{role.replayCache} (with a TTL) lets late subscribers
+catch up across bridge restarts.
+
+\item[\textbf{Topic access control.}] Public-mode topics
+(\texttt{publisher: null}) let anyone publish. Private topics
+(\texttt{publisher: <fixed-pubkey>}) accept publishes only from
+that key. A capability layer where subscribers verify per-publish
+signatures against an allowed-signer set lives at the application
+layer today; lifting it into the kernel is straightforward.
+
+\item[\textbf{Cross-tab state sharing.}] Multiple tabs on the
+same browser today derive the same identity and form independent
+peers; a BroadcastChannel-based shared peer would reduce mesh
+load proportional to tab count.
+
+\item[\textbf{Native transport.}] A C-based or Rust-based
+embedded kernel for IoT-class devices, sharing the wire format
+with the JS kernel so existing peers can talk to it without
+adaptation.
+\end{description}
+
+The job of the architecture is to make these additions land
+cleanly. The job of the existing layers is to keep working while
+they do.
+
+\vspace{2em}
+\noindent\textit{\footnotesize Companion documents: \emph{NeuronNode
+Overview} (v0.4.0), \emph{AxonaPeer Overview} (v0.4.0), \emph{Axona
+Explainer} (v0.4.25), and the source repositories at
+\texttt{github.com/axona-net}.}
+
+\end{document}
