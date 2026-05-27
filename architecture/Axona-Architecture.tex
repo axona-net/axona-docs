@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.4.3 \quad 2026-05-27\par}
+{\small An Axona Architecture Note \quad v0.5.0 \quad 2026-05-27\par}
 \end{center}
 \vfill
 \null
@@ -197,16 +197,20 @@ contract has a smoke-test suite.}
 \section{Identity and Addressing}
 
 \newthought{Every Axona participant} has a 264-bit identifier. The
-top 8 bits are an S2 geographic cell\sidenote{S2 is Google's
-hierarchical cell decomposition of the sphere. The top 8 bits split
-the world into 192 cells of roughly 800~km radius each; an S2 prefix
-gives Axona a region-aware address without leaking GPS-level
-precision.} computed from the peer's latitude and longitude; the
-bottom 256 bits are the SHA-256 of the peer's Ed25519 public key. A
-peer in London has an ID starting with \texttt{0x4f}; a peer in
-Virginia starts with \texttt{0xdf}. Two peers in the same region
-share a leading byte; two random peers share only the bits their
-keys happen to share.
+top 8 bits are a Google S2 cell prefix\sidenote{S2 projects the
+sphere onto the six faces of a cube and partitions each face along
+a Hilbert curve. We bin to level 3 (8\,$\times$\,8 per face, 384
+cells globally), then truncate to 8 bits --- equivalent to taking
+the top 8 bits of Google's 64-bit level-3 cell ID. Result: 192
+valid cells, with byte values 192--255 reserved for future system
+use. The cube projection keeps cell areas within $\sim$1.4$\times$
+of each other globally --- no polar shrinkage --- and any standard
+S2 library can recompute our prefixes by truncation.} computed from
+the peer's latitude and longitude; the bottom 256 bits are the
+SHA-256 of the peer's Ed25519 public key. A peer in London has an
+ID starting with \texttt{0x44}; a peer in Virginia starts with
+\texttt{0x89}. Two peers in the same region share a leading byte;
+two random peers share only the bits their keys happen to share.
 
 The address space is treated as \texttt{BigInt} in every line of
 running code. The wire format is 66-character lowercase hex --- the
