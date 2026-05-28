@@ -4,7 +4,7 @@ size: 16:9
 theme: default
 paginate: true
 header: ""
-footer: "AXONA · v0.18 · May 2026"
+footer: "AXONA · v0.19 · May 2026"
 style: |
   /* ── Tufte-inspired typography + cream paper ─────────────────── */
   @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Inconsolata:wght@400;500&display=swap');
@@ -164,7 +164,7 @@ style: |
 
 <div class="meta">
 
-May 2026 · v0.18 · pre-seed pitch
+May 2026 · v0.19 · pre-seed pitch
 Source: <a href="https://github.com/axona-net">github.com/axona-net</a> · live: <a href="https://axona.net">axona.net</a> · simulator: <a href="https://axona-net.github.io/dht-sim/">axona-net.github.io/dht-sim</a>
 Contact: <a href="mailto:davidasmith@gmail.com">davidasmith@gmail.com</a>
 
@@ -306,7 +306,7 @@ Publishers see aggregate <code>publishes</code>, <code>subscribers</code>, and <
 
 #### Live now
 
-<code>@axona/protocol</code> v1.0 kernel · <code>axona.net</code> browser peers · <code>bridge.axona.net</code> signaling · <code>dht-sim</code> 50,000-node simulator. All open source, MIT-licensed.
+<code>@axona/protocol</code> v2.1.0 kernel · <code>axona.net</code> browser peers · <code>bridge.axona.net</code> signaling · <code>dht-sim</code> 50,000-node simulator. All open source, MIT-licensed.
 
 </div>
 </div>
@@ -325,7 +325,7 @@ Publishers see aggregate <code>publishes</code>, <code>subscribers</code>, and <
 - <span class="head">Protocol layer.</span>
   Where the routing decisions live. Axona's brain-inspired learning rules (vitality, hop caching, axonal trees) sit in this slot. <strong>So does K-DHT. So does G-DHT.</strong> Same slot, swappable protocol — the architectural property that made the 47-design benchmark grid possible.
 - <span class="head">Transport layer.</span>
-  Bytes on wires. Twelve methods. <code>Transport.sim()</code> for the in-browser laboratory; <code>Transport.web()</code> for WebRTC in real browsers; <code>Transport.node()</code> for headless servers. <strong>The protocol layer can't tell which one it's running on</strong> — which is why the simulator's hop counts and latency curves transfer to production unchanged.
+  Bytes on wires. Twelve methods. <code>simTransport()</code> for the in-browser laboratory; <code>webTransport()</code> for WebRTC in real browsers; <code>nodeTransport.server()</code> for headless servers. <strong>The protocol layer can't tell which one it's running on</strong> — which is why the simulator's hop counts and latency curves transfer to production unchanged.
 
 </div>
 <div class="margin">
@@ -338,7 +338,7 @@ Every peer-to-peer connection carries a <em>vitality</em> score that increases w
 
 #### Where the code lives
 
-<code>@axona/protocol</code> v1.0 kernel package (<code>AxonaPeer</code>, <code>AxonaDomain</code>, <code>Transport</code>) — npm-published, MIT-licensed, gated by the kernel-regression and pub/sub-cascade smoke suites.
+<code>@axona/protocol</code> v2.1.0 kernel package (<code>AxonaPeer</code>, <code>AxonaDomain</code>, <code>Transport</code>) — npm-published, MIT-licensed, gated by the kernel-regression and pub/sub-cascade smoke suites.
 
 </div>
 </div>
@@ -535,7 +535,7 @@ Each step signed, addressable, counted. Analyst sees full-cascade reach without 
 # 47 protocols — only one survived.
 
 - <span class="head">The protocol is live and running.</span>
-  <a href="https://axona.net"><strong>axona.net</strong></a> (browser peer) &nbsp;·&nbsp; <a href="https://bridge.axona.net/healthz"><strong>bridge.axona.net</strong></a> (signaling) &nbsp;·&nbsp; <a href="https://axona-net.github.io/dht-sim/"><strong>dht-sim</strong></a> (25K-peer reference simulator).
+  <a href="https://axona.net"><strong>axona.net</strong></a> (browser peer) &nbsp;·&nbsp; <a href="https://demo.axona.net"><strong>demo.axona.net</strong></a> (reference app) &nbsp;·&nbsp; <a href="https://bridge.axona.net/healthz"><strong>bridge.axona.net</strong></a> (signaling) &nbsp;·&nbsp; <a href="https://axona-net.github.io/dht-sim/"><strong>dht-sim</strong></a> (25K-peer reference simulator).
 - <span class="head">The wedge is real: <a href="https://civildefense.io">civildefense.io</a>.</span>
   Tap-to-report incident map running on Axona — anonymous P2P, geographic locality, 24-hour expiry. Built in weeks because every protocol primitive maps directly. <strong>The wedge is independent developers</strong> — civic apps, IoT meshes, agent toolchains — for whom Axona makes cross-vendor integration trivial.
 - <span class="head">Empirical evolution. The fossil record is open source.</span>
