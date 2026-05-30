@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.6.1 \quad 2026-05-28\par}
+{\small An Axona Architecture Note \quad v0.6.2 \quad 2026-05-30\par}
 \end{center}
 \vfill
 \null
@@ -1239,6 +1239,25 @@ load proportional to tab count.
 embedded kernel for IoT-class devices, sharing the wire format
 with the JS kernel so existing peers can talk to it without
 adaptation.
+
+\item[\textbf{Connection-time optimization.}] The
+authenticated-identity handshake costs only sub-millisecond
+crypto (one Ed25519 sign plus one verify per link); the felt
+cost of a cold start is dominated instead by WebRTC ICE/DTLS
+bring-up, un-bundled module loading, and the few added
+round-trips of the mesh handshake --- none of which touches
+steady-state routing or delivery latency. The recovery levers
+all sit at the client and transport layer, independent of the
+wire protocol: bundle the kernel modules, render the UI and
+authenticate in the background, and fold the mesh handshake into
+the DTLS/SDP setup so the signed hello rides the first
+data-channel frame.\sidenote{The last lever pairs naturally with
+binding the channel-binding value to the DTLS certificate
+fingerprint: once the CBV derives from the fingerprint already
+exchanged in the SDP, no nonce round-trip is needed and the
+handshake adds no extra latency --- security and speed land
+together.} Not yet mission-critical; deferred until adoption
+makes first-connect time the binding constraint.
 \end{description}
 
 The job of the architecture is to make these additions land
