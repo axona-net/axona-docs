@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.26 · 2026-05-28 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.27 · 2026-05-30 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -64,7 +64,7 @@ Total: about 91 ms instead of 2 seconds. **Roughly 20× faster** for regional tr
 
 The cost: nodes can lie about where they are. This is a "cooperative trust" assumption. Mitigations exist, but for now G-DHT trades some defense against location-spoofing for a large speedup.
 
-Of course a user can choose to associate themselves with any location in the world. This very rough location is a kind of area code, but it and the associated address are provably yours independent of actual location.
+Of course a user can choose to associate themselves with any location in the world. This very rough location is a kind of area code — but the address it is attached to is provably yours, independent of where you actually are, because the address is derived from your cryptographic key and proven the moment you connect. The section *Identity You Can't Fake*, after the pub/sub discussion, explains exactly how.
 
 The next section addresses this directly. Axona, the neuromorphic protocol layered on top of G-DHT, treats *measured one-way latency* as a first-class signal in its scoring of every connection: a connection's vitality is the product of how often it's used and how recently, but it is gated by how cheap it actually is to send a message across. A node that claims a cell prefix in Frankfurt while actually answering from São Paulo cannot fake the round-trip time. The first few lookups that try to use its synapses see latencies of 200+ ms when the prefix would predict 20. The cheating node's connections accumulate weight slowly and get out-competed by honest neighbors at every eviction decision. The cheat is not blocked — the address space allows the claim — but it is structurally penalized in proportion to how far the lie is from the truth.
 
@@ -145,7 +145,7 @@ That's it. That's the core.
 
 Every behavior in Axona falls into one of five categories — and the categories mirror how *any* adaptive system works:
 
-**1. NAVIGATE** — pick the next hop for a lookup. Axona scores each candidate by combining XOR distance progress, learned weight, and observed latency. The latency factor halves the score every 100 ms — so a peer that's mathematically a *bit* further but physically a *lot* closer wins.
+**1. NAVIGATE** — pick the next hop for a lookup. Axona scores each candidate by combining XOR distance progress, learned weight, and observed latency. We call this combined score the candidate's **activation potential** (AP) — borrowing the neuroscience term for how strongly a neuron is driven to fire; the higher a connection's AP, the more likely it is to "fire" the lookup down that path. The latency factor halves the score every 100 ms — so a peer that's mathematically a *bit* further but physically a *lot* closer wins.
 
 **2. LEARN** — strengthen what works. Three learning mechanisms run on every successful lookup:
 
@@ -169,7 +169,7 @@ This is publish/subscribe, or "pub/sub." Think of how YouTube notifies subscribe
 
 In neuroscience, the *output* of a neuron — the long branching cable that delivers signals to many downstream targets — is called an **axon**. Axona builds axonal delivery using a few simple rules — and it is precisely these axonal pub/sub primitives that the protocol takes its name from:
 
-**Topic identity.** Every topic has a 264-bit ID, computed offline by anyone who knows the topic. The top 8 bits are the publisher's geographic prefix (the same S2 cell scheme used for node IDs); the bottom 256 bits are a SHA-256 of the topic name. Publisher and subscriber compute the same ID without coordinating — no central registry.
+**Topic identity.** Every topic has a 264-bit ID, computed offline by anyone who knows the topic. The top 8 bits are a geographic prefix (the same S2 cell scheme used for node IDs); the bottom 256 bits are a SHA-256 — of just the topic name for an open "anyone-can-publish" topic, or of the publisher's public key combined with the name for a publisher-owned topic. Either way, publisher and subscriber compute the same ID without coordinating — no central registry.
 
 **K-closest replication.** Instead of routing a publish or subscribe to a single "root" node (which would be a single point of failure), the protocol replicates the topic at the **K nodes in the network whose IDs are XOR-closest to the topic ID** — by default K=5. Five different peers each hold a copy of the subscriber list and a small replay cache. A publisher pushes to those K peers; a subscriber registers at those K peers. As long as any one of them is reachable, the topic works.
 
@@ -183,15 +183,29 @@ In neuroscience, the *output* of a neuron — the long branching cable that deli
 
 ![Axonal tree healing via routed re-subscribe. When branch B₁ dies and its link to the topic root R breaks, two of B₁'s children — a leaf subscriber s₁ and a sub-axon B₃ — each issue a routed re-subscribe. Both land on the surviving live axon B₂, which adopts them. B₃'s own subtree (s_a, s_b) does *not* need to re-subscribe individually: B₃ keeps publishing to them throughout, and the whole subtree moves intact when B₃ re-attaches. Repair happens at the sub-axon level, not the leaf level — one subscribe per surviving subtree, not one per subscriber.](../images/Axonal-PubSub-Healing.png)
 
-**No special "bridge" or relay node.** In a sufficiently meshed network, peers communicate directly. A signaling server (used to introduce browsers to each other when the network is bootstrapping) is not in the data path once direct peer connections exist. If the signaling server dies, ongoing pub/sub keeps working through the peer mesh.
+**No privileged "bridge" or relay node.** In a sufficiently meshed network, peers communicate directly. A signaling server introduces browsers to each other while the network bootstraps, and in today's deployment it also runs an ordinary peer of its own — but it holds no special authority (identity is proven by keys, not granted by the bridge) and it is not a required hop once direct peer connections exist. If it dies, ongoing pub/sub keeps working through the peer mesh.
 
 In production validation, 100 peers in a single network deliver pub/sub messages with 100% success across multiple topics, including the case where five subscribers join *after* the publishes have already happened and pull them from the axons' replay caches. Each peer plays its own role — pure subscriber, axon role-holder, occasional relay — and the load distributes naturally as the K-closest set varies per topic.
 
 Above this delivery layer sits a feed-style application surface with **four verbs** — `pub`, `sub`, `pull`, `metrics`. They cover what a real social or agent-collaboration application asks of a substrate: author new content, attach to a topic, fetch a referenced post on demand, and let a publisher see verifiable reach without identifying any individual subscriber. (For 1-to-1 traffic outside the feed, the peer also exposes `send` / `notify` / `onMessage`, but that's the direct-messaging surface, not pub/sub.) Encryption, schema, and ordering belong to the application above this layer; the protocol carries opaque bytes.
 
+## Identity You Can't Fake
+
+A network with no boss has no central authority to vouch for anyone. So how do you know the peer answering you is who it claims to be — and that a message really came from its author? Axona's answer uses cryptography the same way the address scheme uses geography: the guarantee is baked into the identifier itself, checked by everyone, owned by no one.
+
+Recall the node address: `[8-bit region][256-bit hash of your public key]`. That second part isn't random — it's a SHA-256 hash of your **public key** (one half of a cryptographic key pair; the other half, the *private* key, never leaves your device). Your key *is* your address. Three things follow, with no server in the loop:
+
+- **You can't wear someone else's address.** When two peers connect, each must prove it holds the private key matching the address it claims, by signing a fresh one-time challenge tied to that exact connection. Claim an address whose key you don't hold and the signature doesn't check out — the connection is refused. So no peer can impersonate another, and no peer can park itself at a chosen address to intercept a victim's traffic. (Under the hood this is the `axona/4` handshake.)
+
+- **Every published message is signed.** A publish carries its author's public key and a signature over the contents. Any receiver verifies that signature itself before handing the message to the application. Alter the message and the signature breaks; forge the author and it breaks. Receivers trust the math, not the messenger — even if the message arrived relayed through a dozen strangers.
+
+- **The region is the one thing you *don't* prove — on purpose.** The 8-bit prefix is a hint you choose, your "area code," so you're free to claim any region. But as Idea #1 showed, lying about it only makes your *own* connections slower. Identity is math you can't fake; location is a hint you're free to pick.
+
+What this buys the mission: the network can let *anyone* join with no gatekeeper, no account, no login server — while still guaranteeing that "who you're talking to" and "who wrote this" are real. No certificate authority, no reputation bureau; just keys and signatures, checked end to end. (The cost is small and paid once: proving your key at connect time is a few thousandths of a second of math, and it never touches the speed of routing or delivery afterward.)
+
 ## The Big Result: Hitting the Theoretical Floor
 
-In 2004, Frank Dabek and colleagues proved a beautiful, depressing result: **no recursive DHT can be faster than 3δ**, where δ is the median one-way latency between random pairs of nodes on the Internet.
+In 2004, Frank Dabek and colleagues proved a beautiful, depressing result: **no recursive DHT can be faster than 3δ**, where δ is the median one-way latency between random pairs of nodes on the Internet. (δ is the Greek letter *delta*; on today's internet it's roughly 68 thousandths of a second — the time a single message takes to travel one way between two random computers.)
 
 The proof is geometric. The final hop costs a full δ. Each hop *before* that closes half the remaining ID space and, on average, half the remaining geographic distance — so the second-to-last hop costs δ, the third-to-last δ/2, the fourth-to-last δ/4, and so on. The series δ + δ/2 + δ/4 + ... sums to 2δ. The total is the final hop plus the prior chain:
 
@@ -203,7 +217,7 @@ For two decades, no published DHT had been measured at this floor. The best impl
 
 **Axona hugs the floor at 1.17–1.38×** across a 10× scaling range (5,000 to 50,000 nodes). At 25,000 nodes it routes a global lookup in 267 ms vs a 205 ms 3δ floor (δ ≈ 68 ms), and the curve is essentially flat from 15,000 nodes onward: 262, 266, 267, 271, 270, 279, 281, 282 ms as the network grows by another 35,000 peers. The ~30% residual overhead has a clean structural explanation: Axona takes about 4–5 hops where an ideal protocol would take 3, and each "extra" hop costs about δ/2, exactly as the geometric series predicts.
 
-Plain Kademlia, by contrast, gets *worse* as the network grows: from 716 ms at 5,000 nodes to 896 ms at 50,000. Its log-N hop tax compounds at full per-hop RTT every hop. G-DHT tracks Kademlia almost identically on global lookups — the geographic prefix only helps regional cells, where every hop is short. Axona approaches the floor by learning per-hop locality: its Action-Potential scoring weights short-RTT edges so heavily that even a hop "inefficient" by raw count is short in wall-clock time.
+Plain Kademlia, by contrast, gets *worse* as the network grows: from 716 ms at 5,000 nodes to 896 ms at 50,000. Its log-N hop tax compounds at full per-hop RTT every hop. G-DHT tracks Kademlia almost identically on global lookups — the geographic prefix only helps regional cells, where every hop is short. Axona approaches the floor by learning per-hop locality: its AP scoring weights short-RTT edges so heavily that even a hop "inefficient" by raw count is short in wall-clock time.
 
 The picture changes dramatically when we look at **regional** traffic instead of global. The same protocols at the same population sizes, but measured on 2,000-kilometer lookups (queries whose source and target are in the same continental neighborhood):
 
@@ -224,7 +238,9 @@ Kademlia climbs from 681 to 886 ms — essentially the same as its global curve,
 
 The structural payoff of the G-DHT prefix is most visible here. On global lookups, G-DHT tracks Kademlia almost identically because the lookup has to traverse the whole identifier space regardless of how the IDs are arranged. On regional lookups, the prefix is the whole game: a 2,000 km lookup walks IDs that are XOR-close to the source, which under the S2 prefix means they are also geographically close, which means each hop is a short-RTT hop instead of an average-pair-of-the-globe hop. G-DHT routes a 2,000 km query in 263 ms at 50,000 nodes by paying short-RTT costs on every step.
 
-Axona then adds learning on top. The Action-Potential scoring weights short-RTT edges so heavily that the synaptome converges to a structure where almost every reinforced edge is a low-latency one. Regional lookups become a few short hops, and Axona's 108 ms at 5,000 nodes is already comfortably below the 3δ global floor — because the effective δ *within* a continental region is a fraction of the global pairwise median. G-DHT shows what locality buys you structurally; Axona shows what locality buys you when the protocol also learns.
+Axona then adds learning on top. The AP scoring weights short-RTT edges so heavily that the synaptome converges to a structure where almost every reinforced edge is a low-latency one. Regional lookups become a few short hops, and Axona's 108 ms at 5,000 nodes is already comfortably below the 3δ global floor — because the effective δ *within* a continental region is a fraction of the global pairwise median. G-DHT shows what locality buys you structurally; Axona shows what locality buys you when the protocol also learns.
+
+*A note on these figures: the per-size sweeps in this section are from the v0.93.0 benchmark, run on the project's earlier "flat-Hilbert" geographic partition. The current build uses Google's standard S2 cells, which shifts regional latencies by a few percent without changing the ordering or the flat-with-scale shape. On the current partition the 25,000-node reference points are **268 ms** for a global lookup and **152 ms** for a 2,000 km regional lookup — still hugging the same floor.*
 
 ## Is It Really the Learning, or Just the Geography?
 
@@ -310,8 +326,6 @@ Step back from the technical details. The big idea:
 This isn't just a faster DHT. It's a demonstration that adaptive systems with the right learning rules find their own structure — that ten well-chosen rules grounded in biology can deliver what twenty years of DHT engineering had not, and that you can hit a theoretical limit that's stood for two decades by importing the right idea from a different field.
 
 Code, data, simulator, and the red-team analysis criticizing it are open source.
-
-This has been an incredibly symbiotic experience.
 
 ---
 
