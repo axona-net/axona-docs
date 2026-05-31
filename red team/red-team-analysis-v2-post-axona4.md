@@ -74,7 +74,7 @@ Severity: Crit / High / Med / Low. "Prior?" = relation to the first analysis.
 | **A‑2** | Handshake transcript is undirected (no recipient/role id); `expectNodeId` usually null | High | new | CRY‑5 |
 | **B‑1** ✅v2.7.0 | Routed `pubsub:subscribe` still allows `subscriberId ≠ fromId` → reflection/amplification (full feed + ≤100-msg replay blast at a victim) | Crit | C4 *residual (direct path only was fixed)* | DOS‑1 |
 | **B‑2** ✅v2.7.0 | Lazy-axon promotion has no self-proximity gate → unbounded role allocation for random topicIds (memory DoS) | Crit | C5 | DOS‑2 |
-| **B‑3** | Routing learning handlers (`triadic_introduce`, `hop_cache`, `lateral_spread`, `reinforce`) trust message *content*, discard proven `fromId` → table poisoning / eclipse / unevictable self-reinforce | High | H1 (broader) | RTE‑1/2/3/7 |
+| **B‑3** ✅v2.8.0 | Routing learning handlers (`triadic_introduce`, `hop_cache`, `lateral_spread`, `reinforce`) trust message *content*, discard proven `fromId` → table poisoning / eclipse / unevictable self-reinforce | High | H1 (broader) | RTE‑1/2/3/7 |
 | **B‑4** ✅v2.7.0 | `_onPublishDirect` lets any peer inject into any topic; publisher signature only checked at app layer *after* network fan-out | High | C2 (partial) | DOS‑3 |
 | **C‑1** ✅v2.7.0 | `canonical()` emits literal `undefined`, maps `NaN/Infinity/-0` lossily, non-JSON output → signature collisions + cross-impl verify divergence | High | **new** | CRY‑2/3 |
 | **C‑2** | Signed envelopes have no freshness (no nonce/seq/expiry) → unlimited replay to fresh subscribers / restarted nodes | High | H2 | CRY‑4 |

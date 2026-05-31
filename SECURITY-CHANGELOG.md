@@ -16,6 +16,44 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.8.0 — 2026-05-31
+
+### A peer earns its place in the routing table — gossip can't poison it (eclipse prevention)
+
+Hardening of how a node builds and maintains its routing table, to resist an
+**eclipse attack** (an adversary surrounding a node so it can only talk through
+attacker-controlled hops):
+
+- **Routing entries now require first-party verification.** A peer named in a
+  routing-gossip message (a "you should know this node" hint) is treated only as
+  a *candidate*. On the production transports it becomes an actual routing entry
+  only after this node has itself connected to it and completed the `axona/4`
+  identity handshake — so a peer that can't prove the identity it claims is never
+  admitted, and forged gossip can't inject hops into the table. Candidate
+  verification is budget-limited so a flood of hints can't induce a connection
+  storm.
+- **Reinforcement can't pin an unverified entry.** A "this route was useful"
+  signal now only applies to an entry whose peer is currently identity-bound,
+  so it can't be used to keep a stale or unverified entry artificially alive in
+  the table.
+- **Neighbourhood disclosure is bounded.** A query for "who do you know" returns
+  a small, capped sample rather than the node's whole neighbour set, so an
+  attacker can't cheaply map the topology to plan a surrounding.
+
+This is the routing-layer complement to the v2.6.0 channel binding: that stops a
+broker interposing on a link; this stops an adversary capturing which links a
+node has at all. As before, it's local enforcement — fully interoperable with
+earlier peers (no flag-day) — and applies on the identity-binding transports;
+the in-process simulator keeps its prior behavior. Eclipse resistance in any
+open, permissionless network is a matter of raising cost, not a binary: this
+turns "forge a gossip message" into "run, identity-verify, and sustain real
+well-positioned nodes," which is a dramatically higher bar. (The buildup cost of
+verified admission was measured first — a ~2 s join-time warm-up traded for
+flat steady-state latency, no failure tail, and ~5× less connection load — and
+pairs with staggered bootstrap so the join experience doesn't regress.)
+
+---
+
 ## Kernel v2.7.0 — 2026-05-31
 
 ### Pub/sub trust boundary: a peer can only act for itself, and only where it belongs

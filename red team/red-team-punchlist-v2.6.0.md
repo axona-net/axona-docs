@@ -23,7 +23,7 @@ about where to spend effort first.
 |---|---|---|---|
 | B-1 Routed-subscribe reflection/amplification | B-1 | **Critical** | **✅ resolved v2.7.0** |
 | B-2 Lazy-axon promotion memory DoS | B-2 | **Critical** | **✅ resolved v2.7.0** |
-| B-3 Unauthenticated routing-table mutation (LTP poisoning/eclipse) | B-3 | High | open |
+| B-3 Unauthenticated routing-table mutation (LTP poisoning/eclipse) | B-3 | High | **✅ resolved v2.8.0** |
 | B-4 Deferred publisher-signature verification | B-4 | High | **✅ resolved v2.7.0** |
 | C-2 Envelope freshness / replay | C-2 | High | open |
 | E-1 Targeted address grinding (Sybil placement) | E-1 | Medium | open |
@@ -72,7 +72,7 @@ Effort key: **S** ≤ half-day · **M** ~1–2 days · **L** multi-day / archite
 | 6 | **C-2** | High | Add per-publisher monotonic sequence + strict TTL window (reject `|ts − now| > 300s`) to the signed envelope; enforce at the routing layer. | **M** | Envelope-format change ⇒ mild flag-day (verification side). Closes replay-to-fresh-subscribers. |
 | 7 | **E-4** | Low | Explicit domain-separation tag on envelope/post signing; remove `:`-delimiter ambiguity in CBV construction. | **S** | Cheap hardening; pairs with the envelope work. |
 
-### Wave 3 — Routing integrity  *(`dht/AxonaPeer.js`, NH-1 learning handlers)*
+### Wave 3 — Routing integrity  *(`dht/AxonaPeer.js`, NH-1 learning handlers)* — ✅ B-3 SHIPPED v2.8.0 (verified-only admission + reinforce gate + local_probe cap; D-4 folded in)
 
 | # | ID | Sev | Fix | Effort | Notes |
 |---|----|-----|-----|--------|-------|
