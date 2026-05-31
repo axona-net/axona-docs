@@ -18,7 +18,7 @@ from reportlab.lib.units import inch
 from reportlab.lib.enums import TA_LEFT, TA_CENTER, TA_JUSTIFY
 from reportlab.lib.colors import HexColor
 from reportlab.platypus import (
-    SimpleDocTemplate, Paragraph, Spacer, PageBreak, Preformatted,
+    SimpleDocTemplate, Paragraph, Spacer, PageBreak, Preformatted, XPreformatted,
     Table, TableStyle, KeepTogether
 )
 
@@ -97,6 +97,20 @@ def escape_xml(text):
 
 def inline_format(text):
     """Convert markdown inline formatting to reportlab XML."""
+    # Drop emoji / dingbats / variation selectors — reportlab's base fonts
+    # have no glyph for them, so they'd render as tofu boxes. The
+    # surrounding prose carries the meaning (e.g. a "⚠️ ..." warning reads
+    # fine without the symbol). Scoped to the emoji plane (U+1F000+), the
+    # VS-16 selector, and Misc-Symbols+Dingbats (U+2600–U+27BF, incl.
+    # ⚠ ✅ ✗ ✓) — deliberately NOT the Arrows block, so the '→' used in
+    # API signatures and the em-dash are preserved.
+    text = re.sub('[\U0001F000-\U0001FAFF️☀-➿]', '', text)
+    # Escape XML special chars FIRST so inline prose/code containing '<',
+    # '>' or '&' (e.g. `Promise<{…}>`, `a < b`, `Map<k,v>`) can't produce
+    # malformed reportlab mini-HTML (the "unclosed font/para tag" error).
+    # The markup tags inserted below are literal and added AFTER escaping,
+    # so they remain valid. Mirrors escape_xml() used on code blocks.
+    text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
     # Bold + italic
     text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<b><i>\1</i></b>', text)
     # Bold
@@ -182,8 +196,13 @@ def md_to_flowables(md_text):
         # Code blocks
         if line.strip().startswith('```'):
             if in_code:
+                # XPreformatted (not Preformatted) decodes XML entities, so
+                # escape_xml's &lt;/&gt;/&amp; render as < > & rather than
+                # showing literally — while the escaping still prevents a raw
+                # '<' in code (e.g. Promise<void>, Map<k,v>) from being parsed
+                # as a stray tag. Plain Preformatted does neither.
                 code_text = escape_xml('\n'.join(code_lines))
-                flowables.append(Preformatted(code_text, styles['CodeBlock']))
+                flowables.append(XPreformatted(code_text, styles['CodeBlock']))
                 code_lines = []
                 in_code = False
             else:
