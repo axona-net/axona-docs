@@ -28,7 +28,7 @@ Save this as `index.js`:
 
 ```js
 import {
-  AxonaPeer, AxonaDomain, NeuronNode, AxonManager, Synapse,
+  AxonaPeer, AxonaDomain, NeuronNode, AxonaManager, Synapse,
   SimNetwork, simTransport,
   deriveIdentity, geoCellId, clz264,
 } from '@axona/protocol';
@@ -59,7 +59,7 @@ async function makePeer(network) {
   const peer = new AxonaPeer({ domain, node, identity, transport });
   await peer.start();
 
-  // Wire AxonManager (pub/sub layer) to AxonaPeer's DHT primitives.
+  // Wire AxonaManager (pub/sub layer) to AxonaPeer's DHT primitives.
   const dht = {
     getSelfId:       () => peer.getNodeId(),
     findKClosest:    (...a) => peer.findKClosest(...a),
@@ -76,7 +76,7 @@ async function makePeer(network) {
     onRoutedMessage: (t, h) => peer.onRoutedMessage(t, h),
     onDirectMessage: (t, h) => peer.onDirectMessage(t, h),
   };
-  peer._axonManager = new AxonManager({ dht });
+  peer._axonaManager = new AxonaManager({ dht });
   return { peer, identity };
 }
 
@@ -134,7 +134,7 @@ You should see:
 **That's it.** You just ran:
 
 - Ed25519 identity derivation (264-bit nodeIds, S2-cell-prefixed for us-east)
-- A signed envelope publish through `AxonManager`'s K-closest replication
+- A signed envelope publish through `AxonaManager`'s K-closest replication
 - A `since: 'all'` subscriber receiving the cached message
 
 The full version of this with comments and a verifier is at
@@ -148,7 +148,7 @@ The full version of this with comments and a verifier is at
    peer.pub(TOPIC, …)                 peer.sub(TOPIC, handler, since:'all')
        │                                  │
        ▼                                  ▼
-   AxonManager                        AxonManager
+   AxonaManager                        AxonaManager
      ├─ derive 264-bit topic id        ├─ derive same topic id
      │   from the synth publisher      │   (same publisher arg → same id)
      ├─ build signed envelope          ├─ send 'subscribe-k' to K-closest

@@ -185,7 +185,7 @@ malformed or the pubkey doesn't match the `id`'s hash.
 
 The peer is the per-node DHT contract implementation.
 
-#### `new AxonaPeer({ domain, node, identity, transport?, axonManager?, persistence?, engine? })`
+#### `new AxonaPeer({ domain, node, identity, transport?, axonaManager?, persist?, engine? })`
 
 Construct a peer. Required:
 
@@ -197,9 +197,9 @@ Optional:
 
 - `transport` — overrides `node.transport`. The peer uses it directly
   for `send`/`notify`/`lookup` round-trips.
-- `axonManager` — pre-built `AxonManager`. If omitted, the peer
-  resolves one on first `pub`/`sub` via `engine.axonManagerFor(node)`.
-- `persistence` — a `PersistenceAdapter`; enables auto-checkpointing of
+- `axonaManager` — pre-built `AxonaManager`. If omitted, the peer
+  resolves one on first `pub`/`sub` via `engine.axonaManagerFor(node)`.
+- `persist` — a `PersistenceAdapter`; enables auto-checkpointing of
   identity envelope, subscriptions, and synaptome snapshots.
 - `engine` — legacy; pass `null` for new code.
 
@@ -778,7 +778,7 @@ The full contract surface is in
 
 #### `DHT` (abstract class)
 
-Used by `AxonManager`'s `dht` adapter. Defines `getSelfId`,
+Used by `AxonaManager`'s `dht` adapter. Defines `getSelfId`,
 `findKClosest`, `routeMessage`, `sendDirect`, `onRoutedMessage`,
 `onDirectMessage`. See `axona-peer/src/browser_engine.js` for a
 concrete adapter that wraps `AxonaPeer`'s methods.

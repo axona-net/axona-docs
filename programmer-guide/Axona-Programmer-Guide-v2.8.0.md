@@ -117,7 +117,7 @@ Create `node.js`:
 ```js
 // node.js — minimal Axona node connected to a bridge over a WebSocket.
 import {
-  AxonaPeer, AxonaDomain, NeuronNode, AxonManager,
+  AxonaPeer, AxonaDomain, NeuronNode, AxonaManager,
   deriveIdentity, deriveTopicId,
   WIRE_VERSION, KERNEL_VERSION,
 } from '@axona/protocol';
@@ -132,7 +132,7 @@ const identity = await deriveIdentity({ lat: 38.0, lng: -77.0 });
 console.log('My nodeId:', identity.id);   // 66-char hex
 console.log('My region S2 prefix:', identity.id.slice(0, 2));   // "df"
 
-// 2. Build the local DHT node + AxonManager (the pubsub engine).
+// 2. Build the local DHT node + AxonaManager (the pubsub engine).
 const node    = new NeuronNode({ id: BigInt('0x' + identity.id),
                                  lat: 38.0, lng: -77.0 });
 const domain  = new AxonaDomain({ k: 20 });
@@ -569,7 +569,7 @@ subscribed for >60 seconds, replay history can be lost.
 
 1. `peer.pub` builds a signed envelope, JSON-encodes it.
 2. `am.pubsubPublish(topicId, json, meta)` is called on the local
-   `AxonManager`.
+   `AxonaManager`.
 3. `_asyncPublish` calls `findKClosest(topicId, K)` to identify the
    axon set.
 4. For each axon, `dht.sendDirect(peerId, 'pubsub:publish-k', {...})`
@@ -579,7 +579,7 @@ subscribed for >60 seconds, replay history can be lost.
    (creating a role on the fly if needed) and forwards to any
    children registered for the topic.
 
-The publisher's own AxonManager does NOT cache the publish unless its
+The publisher's own AxonaManager does NOT cache the publish unless its
 own ID is among the K-closest. If you publish and want to be sure
 your own subsequent `peer.sub` sees the message, either subscribe
 first or include yourself in the dht adapter's findKClosest result
@@ -1146,7 +1146,7 @@ For durable history you need either:
 
 Default replay-cache size is **100 messages per topic**. For chat
 rooms with high volume, you'll lose history past the last 100 messages.
-Increase it on busy topics by configuring the AxonManager
+Increase it on busy topics by configuring the AxonaManager
 construction in your transport / engine wrapper, or paginate at the
 application layer.
 
