@@ -1150,6 +1150,25 @@ Increase it on busy topics by configuring the AxonaManager
 construction in your transport / engine wrapper, or paginate at the
 application layer.
 
+### 13.6b Message size limit (and the silent-drop trap)
+
+A published message is capped at **256 KiB** (kernel ≥ v2.8.1; 64 KiB
+before), measured on the *serialized envelope*. Two things to know:
+
+- **There's no client-side size error.** `peer.pub` does not pre-check
+  size — an oversized publish is signed, sent, and then **silently
+  dropped at the first root axon** (logged `publish-oversize-dropped`).
+  The publisher sees no rejection. So a "message that never arrives" is
+  often just over the cap. (The `PUBLISH_PAYLOAD_TOO_LARGE` error,
+  confusingly, fires only on *non-serializable* payloads — circular
+  refs, `BigInt` — not on size.)
+- **Don't ship blobs over pub/sub even under the cap.** Every publish is
+  replicated to K root axons, cached in their replay rings, and fanned to
+  *all* subscribers — so a large message multiplies across the whole
+  delivery tree. For images/documents, publish a small **content
+  reference** (content hash + size + mime) and transfer the bytes
+  out-of-band, content-addressed, fetched only by peers that want them.
+
 ### 13.7 Cross-version wire incompatibility
 
 The bridge enforces a `MIN_PEER_VERSION` gate. Pre-1.1.0 peers send

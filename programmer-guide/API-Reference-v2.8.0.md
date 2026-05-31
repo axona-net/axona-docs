@@ -262,12 +262,29 @@ Publish a message to a topic.
 | Arg | Type | Notes |
 |---|---|---|
 | `topicName` | `string` | Application-defined name (gets hashed). |
-| `message` | `any` | JSON-serializable. Strings, numbers, objects, arrays all OK. |
+| `message` | `any` | JSON-serializable. Strings, numbers, objects, arrays all OK. **Size: see below.** |
 | `opts.publisher` | `string \| null \| undefined` | Addressing mode. See [§6](#6-topic-ids). |
 | `opts.sign` | `boolean` | Default `true`. Set `false` for anonymous publishes (no `signerPubkey`/`signature` in envelope). |
 
 **Returns**: 64-char hex `msgId` — `sha256` of the canonical envelope
 inputs. Subscribers see this same id in `env.msgId`.
+
+**Maximum message size: 256 KiB** (kernel ≥ v2.8.1; was 64 KiB before).
+The limit is on the *serialized envelope* (`JSON.stringify({ msgId, ts,
+topic, message, signature, signerPubkey })`), so your usable payload is
+256 KiB minus a few hundred bytes of envelope overhead. It's measured on
+string length, so heavily multi-byte (CJK/emoji) content can exceed
+256 KiB on the wire.
+
+⚠️ The cap is currently enforced **at the receiving root axon**, not at
+`peer.pub`: an oversized publish is **silently dropped network-side**
+(logged `publish-oversize-dropped`) — the publisher gets **no error**. So
+if a large message "doesn't arrive," check its size first.
+
+Pub/sub is a *broadcast* path (replicated to K root axons, cached, fanned
+to all subscribers), so it is the wrong place for images/documents even
+under 256 KiB. For binary content, publish a small **content-reference**
+(hash + size + mime) and transfer the bytes out-of-band, content-addressed.
 
 ```js
 const synth = '<region S2 hex>' + '0'.repeat(64);
@@ -281,7 +298,11 @@ const msgId = await peer.pub('news/world', { title: 'hi' }, {
 - `PUBLISH_INVALID_TOPIC` — empty topic name.
 - `PUBLISH_SIGN_FAILED` — signing failed (identity missing privateKey,
   Web Crypto unavailable, etc).
-- `PUBLISH_PAYLOAD_TOO_LARGE` — envelope > kernel limit.
+- `PUBLISH_PAYLOAD_TOO_LARGE` — the message is **not JSON-serializable**
+  (circular reference, `BigInt`, etc.), so the envelope can't be encoded.
+  Despite the name, this does **not** fire on size — there is no
+  client-side size check today; oversized publishes are dropped at the
+  receiving root axon instead (see "Maximum message size" above).
 
 #### `peer.sub(topicName, handler, opts?)` → `Promise<Subscription>`
 
