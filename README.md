@@ -40,7 +40,7 @@ This repo uses three terms consistently:
 - **[`applications/`](applications/)** — product briefs for applications built on the Axona protocol (SYZL — adaptive social feed).
 - **[`architecture/`](architecture/)** — the full-stack architecture note: kernel · protocol · transport · bridge, the wire protocol, the complete application API, and the demo-app source. [PDF](architecture/Axona%20Architecture%20v0.6.2.pdf) · [`.tex`](architecture/Axona-Architecture.tex)
 - **[`implementation/`](implementation/)** — integration plans, wire-protocol spec, per-node refactor plan, NX-17 → NH-1 punchlist.
-- **[`red team/`](red%20team/)** — independent red-team analyses including the protocol-layer god's-eye audit and the v0.3.38 13-issue priority list.
+- **[`red team/`](red%20team/)** — independent red-team analyses including the protocol-layer god's-eye audit, the v0.3.38 13-issue priority list, the post-`axona/4` v2 sweep, an external v2.6.0 assessment, and the **consolidated, prioritized [punch list](red%20team/red-team-punchlist-v2.6.0.md)** that merges them.
 - **[`dead-ends/`](dead-ends/)** — preserved failures kept as cautionary examples (NX-16's masked-distance experiment; relevant smoke tests).
 - **[`history/`](history/)** — superseded versions of all documents, preserved as project-evolution context.
 - Loose architecture notes at the repo root (`01_*.md`…`07_*.md`, `NX-10-Architecture.md`, `Phase3-Membership-Protocol-Plan.md`) — early-stage design documents that pre-date the synthesis whitepaper.
