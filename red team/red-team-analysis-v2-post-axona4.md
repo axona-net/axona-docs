@@ -21,6 +21,22 @@ only.
 
 ## 1. The headline
 
+> **✅ RESOLVED in kernel v2.6.0 (2026-05-30).** The mesh CBV now folds each side's
+> DTLS certificate fingerprint (parsed from local/remote SDP via
+> `MeshManager.fingerprintsFor`) alongside the nonce pair, through the existing
+> `cbvFromFingerprints`. A fingerprint-rewriting bridge presents a different cert
+> on each leg, so the two endpoints derive divergent CBVs and the mutual signature
+> fails — the untrusted-bridge premise is restored. The binding fails **closed**
+> (no fingerprints ⇒ no bind on the real mesh path; nonce-only is reserved for the
+> sim/loopback paths that have no DTLS to bind to, and callback presence is a
+> local, non-negotiated decision so a peer can't be downgraded remotely).
+> Verified by `smoke_mesh_auth_loopback` (honest fingerprints bind; a simulated
+> MITM rewrite leaves both sides unbound) and end-to-end by the real-WebRTC
+> `test/integration/mesh_multipeer.mjs` harness. Note this is a flag-day change:
+> v2.6.0 and pre-2.6.0 peers compute different mesh CBVs and won't bind to each
+> other directly during the rollout window (bridge link + relayed pub/sub
+> unaffected); a dual-mode verify was rejected as a downgrade vector.
+
 **A‑1 — The WebRTC mesh channel binding is not bound to the channel → a malicious
 bridge is a transparent MITM on all "direct" peer traffic.** (Critical)
 
@@ -54,7 +70,7 @@ Severity: Crit / High / Med / Low. "Prior?" = relation to the first analysis.
 
 | ID | Finding | Sev | Prior | Auditor IDs |
 |----|---------|-----|-------|-------------|
-| **A‑1** | Mesh CBV not bound to DTLS fingerprint → bridge MITM of mesh | Crit | C3 (deferred) | CRY‑1, BRG‑1/2, MESH‑1 |
+| ~~**A‑1**~~ | Mesh CBV not bound to DTLS fingerprint → bridge MITM of mesh — **✅ RESOLVED v2.6.0** | Crit | C3 (deferred) | CRY‑1, BRG‑1/2, MESH‑1 |
 | **A‑2** | Handshake transcript is undirected (no recipient/role id); `expectNodeId` usually null | High | new | CRY‑5 |
 | **B‑1** | Routed `pubsub:subscribe` still allows `subscriberId ≠ fromId` → reflection/amplification (full feed + ≤100-msg replay blast at a victim) | Crit | C4 *residual (direct path only was fixed)* | DOS‑1 |
 | **B‑2** | Lazy-axon promotion has no self-proximity gate → unbounded role allocation for random topicIds (memory DoS) | Crit | C5 | DOS‑2 |
@@ -110,7 +126,7 @@ good — the gaps are in *what the signature binds to* (A‑1/A‑2/C‑1/C‑2)
 
 ## 5. Recommended re-prioritized roadmap
 
-1. **A‑1** channel-bind the mesh CBV to DTLS fingerprints (wire up `cbvFromFingerprints`) — restores the untrusted-bridge premise. *(promote from deferred)*
+1. ~~**A‑1** channel-bind the mesh CBV to DTLS fingerprints (wire up `cbvFromFingerprints`) — restores the untrusted-bridge premise.~~ **✅ DONE — kernel v2.6.0.** Next critical is **B‑1**.
 2. **B‑1 + B‑2** — extend the C4 origin check to the routed subscribe path; add a self-proximity gate on role adoption.
 3. **C‑1 + C‑2** — make `canonical()` total/JSON-valid (target RFC 8785); add signed freshness (per-signer seq + expiry) to envelopes.
 4. **B‑3** — bind routing mutations to first-party observation / proven `fromId`.
