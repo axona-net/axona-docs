@@ -16,6 +16,45 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.10.0 — 2026-05-31
+
+### Message lifecycle you control — retract, remove, and bounded retention
+
+The pub/sub layer gained owner/creator-controlled lifecycle operations and
+bounded retention. Each new authority is **self-authenticating** — proven by
+the same keypair that proved authorship/ownership, with no registry or central
+gatekeeper:
+
+- **Retract a message (creator-only).** A publisher can retract a message it
+  sent; the topic's hosting nodes accept the retraction only if it's signed by
+  the **same key that signed the original message**, drop it, and forward a
+  delete marker to current subscribers so they can clear their local copy. A
+  short-lived tombstone stops a lagging node from re-circulating it. (It is
+  best-effort redaction, not a cryptographic un-send — a reader who already
+  received a message can keep it — and an anonymous/unsigned message has no
+  provable creator and so can't be retracted.)
+- **Remove a topic's queue (owner-only).** The topic owner — the identity whose
+  key the topic id is derived from — can clear, or fully destroy, the topic's
+  message queue. Ownership is verified two ways at once: the signer's key must
+  bind to the claimed owner id, and that id must derive the topic id. No one
+  else can clear another's topic.
+- **Anti-flood quota on open topics.** On open (anyone-may-publish) topics, a
+  single publisher can occupy only a bounded fraction of the message queue, so
+  one party can't flush everyone else's messages out. Owner-gated topics are
+  governed by their publisher rules instead.
+- **Bounded retention + hold time.** Every topic holds a bounded number of
+  messages with deterministic, replica-consistent eviction, and each message
+  has a hold time with a hard ceiling (default 24 h, max 48 h) after which it
+  expires and is swept — so nothing is retained indefinitely, and a read can
+  extend a message's life only up to that ceiling.
+
+All of the above is **additive and interoperable** — older peers simply don't
+honor the new control messages — so it shipped without a flag-day. It builds
+on the v2.9.0 signed sequence/timestamp: eviction order, "latest", and hold-
+time are all anchored to fields under the publisher's signature.
+
+---
+
 ## Kernel v2.9.0 — 2026-05-31
 
 ### A captured message can't be replayed back into the feed (envelope freshness)

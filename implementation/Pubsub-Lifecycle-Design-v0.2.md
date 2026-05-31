@@ -1,8 +1,8 @@
 # Axona Pub/Sub Lifecycle & Access-Control Design — v0.2
 
-**Status:** decisions locked (2026-05-31) — ready to implement · **Target kernel:**
-v2.10.0+ · **Builds on:** kernel v2.9.1 (envelope format v2 — signed per-publisher
-`seq` + freshness window, findings C-2/E-4).
+**Status:** **Phase A SHIPPED in kernel v2.10.0 (2026-05-31)**; Phases B/C pending ·
+**Builds on:** kernel v2.9.1 (envelope format v2 — signed per-publisher `seq` +
+freshness window, findings C-2/E-4).
 
 This document specifies a set of additions to the Axona pub/sub layer:
 
@@ -402,7 +402,7 @@ Each signed object carries its **own domain tag** (E-4 discipline): `axona:pubsu
 
 ## 9. Phasing
 
-1. **Phase A — lifecycle on the existing single-owner model** (no ACL yet):
+1. **Phase A — ✅ SHIPPED (kernel v2.10.0)** — lifecycle on the existing single-owner model (no ACL yet):
    `peer.unsub` (formalize) → `peer.kill` + tombstones → `peer.unpub` (+ `{destroy:true}`
    total removal) → bounded queue (ordered eviction, default `maxMessages=100`) +
    **per-publisher quota on open topics** + absolute-ceiling TTL (default/ceiling
