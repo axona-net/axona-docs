@@ -1,13 +1,13 @@
 # Axona API Reference
 
 Reference for every public symbol exported from `@axona/protocol`
-v2.8.2. Organized by what application developers actually reach for;
+v2.10.0. Organized by what application developers actually reach for;
 deep-customization surfaces are at the end.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v2.8.2.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v2.8.2.md) — mental model + worked
+- [Quick Start](Quick-Start-v2.10.0.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v2.10.0.md) — mental model + worked
   example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects (authenticated handshake, channel binding, pub/sub
@@ -85,6 +85,7 @@ level 8); the bottom 256 bits are `sha256(pubkey)`.
 ```ts
 {
   msgId:        string;        // 64-char hex sha256 of canonical inputs
+  seq:          number;        // per-publisher monotonic sequence (kernel ≥ v2.9.0)
   ts:           number;        // ms epoch when published
   topic:        string;        // the application-level topic name
   message:      any;           // any JSON-serializable payload
@@ -92,6 +93,20 @@ level 8); the bottom 256 bits are `sha256(pubkey)`.
   signature?:   string;        // "ed25519:<128 hex>"; present iff signed
 }
 ```
+
+`seq` (envelope format **v2**, kernel ≥ v2.9.0) is folded under the
+signature alongside `ts`. The kernel uses it for **replay/freshness** (a
+captured envelope can't be re-injected as live once its signed `ts` ages
+out of the ~5-min window) and for **deterministic ordering** ("latest",
+bounded-queue eviction). You don't set it — `peer.pub` stamps it.
+
+A **retraction** (see `peer.kill`) is delivered to your `sub` handler as a
+minimal marker instead of a full envelope:
+
+```ts
+{ deleted: true, msgId: string, topic: string | null }
+```
+Branch on `env.deleted === true` to drop your local copy of `msgId`.
 
 #### `Subscription` (type) {#subscription-type}
 
@@ -335,34 +350,71 @@ const sub = await peer.sub('news/world', (env) => {
 await sub.stop();
 ```
 
+Your handler also receives **retraction markers** — `{ deleted: true,
+msgId, topic }` — when a publisher kills a message (see `peer.kill`).
+Branch on `env.deleted === true` to drop your local copy:
+
+```js
+const sub = await peer.sub('news/world', (env) => {
+  if (env.deleted) { dropFromUI(env.msgId); return; }
+  render(env.message);
+}, { publisher: synth, since: 'all' });
+```
+
 **Throws** `SubscribeError`:
 
 - `SUBSCRIBE_INVALID_TOPIC`
 - `SUBSCRIBE_HANDLER_MISSING`
 
-#### `peer.pull(msgId, opts)` → `Promise<Envelope | null>`
+#### `peer.unsub(topicName, opts?)` → `Promise<{ ok, removed }>`
 
-Fetch a specific envelope by its `msgId` from the K-closest axons.
-Returns `null` if it's not in any reachable cache window.
+Unsubscribe from a topic by name (kernel ≥ v2.10.0) — the counterpart to
+`peer.sub`. Stops **every** local subscription you hold for the topic (no
+need to keep the `Subscription` handle) and, once the last one goes, sends
+the network unsubscribe so the topic's root axons drop you. Idempotent:
+unsubscribing a topic you're not on returns `{ ok: true, removed: 0 }`.
 
 | Arg | Notes |
 |---|---|
-| `msgId` | 64-char hex from `pub` or a previous delivery. |
+| `topicName` | The topic to leave. |
+| `opts.publisher` | **Must match** what you passed to `sub` (default = your own feed, `null` = public, hex = another publisher's feed). |
+
+```js
+await peer.unsub('news/world', { publisher: synth });
+```
+
+Self-only by construction — it removes only *your* subscriberId (the
+network enforces this), so it can't be used to unsubscribe anyone else.
+Throws `SubscribeError(SUBSCRIBE_INVALID_TOPIC)` on an empty topic.
+
+#### `peer.pull(msgId, opts)` → `Promise<Envelope | null>`
+
+Fetch an envelope from the K-closest axons. Returns `null` if it's not in
+any reachable cache window (which includes a message that has **expired**
+past its hold time — see [Topic limits](#topic-limits)).
+
+| Arg | Notes |
+|---|---|
+| `msgId` | 64-char hex from `pub` / a previous delivery — **or `null`/omitted to fetch the topic's most-recent message** (kernel ≥ v2.10.0). |
 | `opts.topic` | The topic name. |
 | `opts.publisher` | Same addressing mode used to publish. |
 | `opts.timeoutMs` | Default 1000. |
 
 ```js
-const env = await peer.pull(msgId, {
-  topic:     'news/world',
-  publisher: synth,
-  timeoutMs: 1000,
-});
-if (env) console.log('found:', env.message);
+// a specific message…
+const env = await peer.pull(msgId, { topic: 'news/world', publisher: synth });
+// …or the latest on the topic (no msgId):
+const latest = await peer.pull(null, { topic: 'news/world', publisher: synth });
 ```
 
+"Latest" is the highest-ordered message by signed `seq` (then `ts`,
+`msgId`). A successful pull also **slides the message's hold time** forward
+(now + hold), bounded by its absolute 48 h ceiling — reads keep a hot
+message alive, but can't pin it forever.
+
 **Throws** `PullError` on transport failure (not on cache miss — that
-returns `null`).
+returns `null`). Passing a non-null, non-64-hex `msgId` throws
+`PULL_INVALID_MSGID`.
 
 #### `peer.metrics(topicName, opts?)` → `Promise<metricsObj>`
 
@@ -382,6 +434,74 @@ const m = await peer.metrics('news/world', {
 
 Values are aggregated from whichever axons reply within `timeoutMs`.
 Use for UX ("12 people in this room"), not for billing.
+
+#### `peer.kill(topicName, msgId, opts?)` → `Promise<{ ok }>`
+
+Retract a message you published (kernel ≥ v2.10.0) — "unsend". The topic's
+root axons accept the kill **only if it's signed by the same key that
+signed the original message** (creator-only, self-authenticating), drop it
+from their replay caches, tombstone the `msgId` so a lagging replica can't
+resurrect it, and forward a delete marker to current subscribers (which
+arrives on their `sub` handler as `{ deleted: true, msgId, topic }`).
+
+| Arg | Notes |
+|---|---|
+| `topicName` | The topic you published to. |
+| `msgId` | **Required** 64-char hex (the value `pub` returned). No "kill latest". |
+| `opts.publisher` | Must match what you passed to `pub`. |
+
+```js
+const msgId = await peer.pub('news/world', { title: 'oops' }, { publisher: synth });
+await peer.kill('news/world', msgId, { publisher: synth });
+```
+
+> ⚠️ Best-effort redaction, **not** a cryptographic un-send. A subscriber
+> who already received the message can keep it; an offline subscriber may
+> never see the purge. And an anonymous (`sign: false`) message has no
+> provable creator and so **cannot** be killed.
+
+**Throws** `KillError`: `KILL_INVALID_TOPIC`, `KILL_INVALID_MSGID`,
+`KILL_SIGN_FAILED` (no identity — kills must be signed).
+
+#### `peer.unpub(topicName, opts?)` → `Promise<{ ok }>`
+
+Remove a topic's whole message queue (kernel ≥ v2.10.0) — **owner-only**.
+The owner is the identity whose nodeId seeds the topic id; root axons verify
+ownership self-authenticatingly (the signer's pubkey must bind to the owner
+nodeId, and that nodeId must derive the topic id).
+
+| Arg | Notes |
+|---|---|
+| `opts.destroy` | `false` (default) drops the messages, keeps the topic config; `true` is **total removal** (messages + config/ACL + ownership state). |
+| `opts.publisher` | Owner selector; default = this peer. |
+
+```js
+await peer.unpub('news/world');                 // clear the queue
+await peer.unpub('news/world', { destroy: true }); // remove the topic entirely
+```
+
+Public (ownerless) topics have no owner to prove ownership and **cannot**
+be unpublished. **Throws** `UnpubError`: `UNPUB_INVALID_TOPIC`,
+`UNPUB_PUBLIC_TOPIC`, `UNPUB_SIGN_FAILED`.
+
+#### Topic limits — queue size & hold time {#topic-limits}
+
+Every topic's replay queue is bounded (kernel ≥ v2.10.0):
+
+- **Max messages** — default **100**, max **256**. When full, the
+  lowest-ordered message (by signed `seq`) is evicted — deterministic, so
+  all replicas converge. A max of **1** is a *retained / latest-value*
+  slot (each publish replaces the prior one); pair it with
+  `peer.pull(null, …)`.
+- **Hold time** — default **24 h**, hard ceiling **48 h**. A message past
+  its hold expires and is swept; it stops being delivered or pulled. A
+  `pull` slides the hold forward, bounded by the ceiling.
+- **Per-publisher quota (open topics only)** — on a public/anyone-may-publish
+  topic, one publisher can occupy at most ¼ of the queue, so a single
+  flooder can't evict everyone else. Owner-gated topics aren't quota'd.
+
+> In Phase A these are protocol defaults; owner-set per-topic values arrive
+> with the topic-config object in a later phase.
 
 ---
 
@@ -596,7 +716,7 @@ need them.
 
 ### 7. Envelopes + verification
 
-#### `buildEnvelope({ topic, message, ts?, identity, sign? })` → `Promise<Envelope>`
+#### `buildEnvelope({ topic, message, ts?, seq?, identity, sign? })` → `Promise<Envelope>`
 
 Construct an envelope explicitly. Useful when you want to sign a DM
 payload before sending it via `peer.send`, or to test verification
@@ -606,19 +726,27 @@ flows.
 const env = await buildEnvelope({
   topic:    'dm:to-bob',
   message:  { text: 'hi' },
+  seq:      Date.now(),     // per-publisher monotonic; 0 if omitted
   identity, sign: true,
 });
-// env = { msgId, ts, topic, message, signerPubkey, signature }
+// env = { msgId, seq, ts, topic, message, signerPubkey, signature }
 ```
+
+`seq` (envelope format v2) is folded under the signature. `peer.pub`
+supplies a monotonic value automatically; you only pass it when building
+envelopes by hand. The signature covers a **domain-tagged** core
+(`axona:pubsub-envelope:v2`) so it can't be replayed as another kind of
+signature.
 
 **Throws** `TypeError` if `identity` is missing privateKey or
 `pubkeyHex` when `sign: true`.
 
 #### `verifyEnvelope(envelope)` → `Promise<{ ok, reason?, signed }>`
 
-Verify that `envelope.signature` is valid for the
-`(envelope.topic, envelope.ts, envelope.message)` canonical inputs
-against `envelope.signerPubkey`, and that `msgId` matches.
+Verify that `envelope.signature` is valid for the domain-tagged
+`(seq, ts, topic, message)` canonical inputs against
+`envelope.signerPubkey`, and that `msgId` matches. Requires `seq`
+(envelope format v2) — a pre-v2 envelope fails with `missing_seq`.
 
 **Returns a result object, not a boolean** — check `.ok`:
 
@@ -632,21 +760,29 @@ if (!res.ok) console.warn('forged/invalid envelope', env.msgId, res.reason);
 > ⚠️ A common mistake: `if (!(await verifyEnvelope(env)))` is **always
 > false** — the return value is an object (truthy). Always test `.ok`.
 
-`reason` (when `!ok`) is one of `not_an_object` / `missing_*` /
-`unknown_signature_scheme` / `wrong_key_or_signature_length` /
-`bad_signature` / `bad_msgid`. As of kernel v2.7.0, root axons also
-verify the publisher signature at ingress before fan-out (finding B-4),
-so spoofed-signature traffic is dropped network-side — but apps should
-still verify what they consume.
+`reason` (when `!ok`) is one of `not_an_object` / `missing_*` (incl.
+`missing_seq`) / `unknown_signature_scheme` /
+`wrong_key_or_signature_length` / `bad_signature` / `bad_msgid`. As of
+kernel v2.7.0, root axons also verify the publisher signature at ingress
+before fan-out (finding B-4); as of v2.9.0 they additionally reject stale
+replays (freshness window + per-publisher `seq`, finding C-2) — but apps
+should still verify what they consume.
 
-#### `computeMsgId({ topic, ts, message, publisher? })` → `Promise<string>`
+> `verifyEnvelope` checks the signature and msgId; it does **not** check
+> freshness (that's intentional — the legitimate replay-to-late-subscribers
+> path serves cached history). Freshness is enforced only at live-publish
+> ingress inside the kernel; the `checkFreshness(envelope, { now?, maxSkewMs? })`
+> helper is exported if you need it.
 
-Stand-alone msgId computation matching what `buildEnvelope` does.
-Useful for verifying a msgId server-side.
+#### `computeMsgId({ seq, topic, ts, message, signature? })` → `Promise<string>`
+
+Stand-alone msgId computation matching what `buildEnvelope` does (the
+canonical hash now binds `seq`). Useful for verifying a msgId server-side.
 
 ```js
 const msgId = await computeMsgId({
-  topic: env.topic, ts: env.ts, message: env.message,
+  seq: env.seq, topic: env.topic, ts: env.ts, message: env.message,
+  signature: env.signature,   // include for a signed envelope
 });
 console.log(msgId === env.msgId);  // true
 ```
@@ -673,8 +809,10 @@ Subclasses:
 | `TransportError` | `TRANSPORT_NOT_STARTED`, `TRANSPORT_TIMEOUT`, `TRANSPORT_NOT_BOUND`, `TRANSPORT_CLOSED` |
 | `PublishError` | `PUBLISH_INVALID_TOPIC`, `PUBLISH_SIGN_FAILED`, `PUBLISH_PAYLOAD_TOO_LARGE`, `PUBLISH_INVALID_MESSAGE` |
 | `SubscribeError` | `SUBSCRIBE_INVALID_TOPIC`, `SUBSCRIBE_HANDLER_MISSING` |
-| `PullError` | `PULL_TIMEOUT`, `PULL_MALFORMED_MSGID` |
-| `MetricsError` | `METRICS_TIMEOUT` |
+| `KillError` | `KILL_INVALID_TOPIC`, `KILL_INVALID_MSGID`, `KILL_SIGN_FAILED` |
+| `UnpubError` | `UNPUB_INVALID_TOPIC`, `UNPUB_PUBLIC_TOPIC`, `UNPUB_SIGN_FAILED` |
+| `PullError` | `PULL_INVALID_MSGID`, `PULL_AXONS_UNREACHABLE` |
+| `MetricsError` | `METRICS_AXONS_UNREACHABLE` |
 | `UpgradeRequiredError` | `UPGRADE_REQUIRED` (bridge close code 4426) |
 
 The full code list is in `ErrorCodes`:
@@ -1018,7 +1156,7 @@ is informational and corresponds to the npm release tag.
 
 The full, versioned record is the [security
 changelog](../SECURITY-CHANGELOG.md); this is the developer-facing
-summary of what's enforced as of kernel v2.8.2. Everything here is
+summary of what's enforced as of kernel v2.10.0. Everything here is
 **self-authenticating** — no certificate authority, no central trust
 server, no reputation service.
 

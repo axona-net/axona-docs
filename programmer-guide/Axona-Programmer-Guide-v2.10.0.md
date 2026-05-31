@@ -8,9 +8,9 @@ The guide assumes you already know JavaScript + Node + a browser. It does
 not assume any DHT / WebRTC / cryptography background — concepts are
 introduced where they're needed.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v2.8.2)
-- **Browser SDK**: [@axona-net/axona-peer](https://github.com/axona-net/axona-peer) (v3.13.0)
-- **WebSocket bridge**: [@axona-net/axona-bridge](https://github.com/axona-net/axona-bridge) (v2.4.1)
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v2.10.0)
+- **Browser SDK**: [@axona-net/axona-peer](https://github.com/axona-net/axona-peer) (v3.16.0)
+- **WebSocket bridge**: [@axona-net/axona-bridge](https://github.com/axona-net/axona-bridge) (v2.6.0)
 - **Live network**: `wss://bridge.axona.net`
 - **Security model**: see §3.5 below and the [security changelog](../SECURITY-CHANGELOG.md) — the v2 line adds an authenticated-identity handshake, channel binding, a pub/sub trust boundary, and verified routing admission.
 
@@ -105,7 +105,7 @@ only.
 ```
 mkdir my-axona-app && cd my-axona-app
 npm init -y
-npm install @axona/protocol@github:axona-net/axona-protocol#v2.8.2
+npm install @axona/protocol@github:axona-net/axona-protocol#v2.10.0
 ```
 
 You now have `node_modules/@axona/protocol/src/` with the full kernel.
@@ -251,7 +251,7 @@ useful for genuinely public, anonymous topics.
 Axona is **self-authenticating**: every guarantee is enforced by
 cryptography the peers carry themselves — there is no certificate
 authority, central trust server, or reputation service. A node's
-identity *is* its keypair. As of kernel v2.8.2:
+identity *is* its keypair. As of kernel v2.10.0:
 
 - **Identity is provable, not asserted.** A nodeId's bottom 256 bits are
   `SHA-256(pubkey)`, and every connection runs the `axona/4` handshake:
@@ -271,6 +271,13 @@ identity *is* its keypair. As of kernel v2.8.2:
   gossip can suggest peers but cannot inject attacker-controlled hops
   (eclipse resistance). You can watch this via `peer.health().meshDegraded`
   and `boundCount` (§8.3).
+- **Messages are fresh, ordered, and yours to control.** Every signed
+  publish carries a per-publisher `seq` + timestamp under its signature, so
+  a captured message can't be replayed as live once it ages out, and topics
+  have a deterministic order (v2.9.0). You can **retract** a message you
+  signed and **remove** a topic you own — each authorized by that same
+  keypair, no gatekeeper (v2.10.0, §6.6). On open topics a per-publisher
+  quota stops one party flooding out the rest.
 
 **What it does NOT do:** encrypt your application payload — `message` is
 opaque bytes; if you need confidentiality, encrypt inside it end-to-end.
@@ -555,15 +562,29 @@ subscribe registration:
 For chat / forum UX you almost always want `since: 'all'` — new
 subscribers expect to see history.
 
-### 6.4 Cache size and TTL
+### 6.4 Queue size and hold time
 
-The axon's replay cache is a bounded ring; default size is **100
-messages per topic**. Older messages fall off. The cache is in-memory
-and disappears when an axon disconnects or restarts.
+Each topic's replay queue is bounded (kernel ≥ v2.10.0):
 
-A topic with no children for `rootGraceMs` (default 60 seconds) is
-swept by the maintenance loop. Practical implication: if no one is
-subscribed for >60 seconds, replay history can be lost.
+- **Max messages** — default **100**, ceiling **256**. When the queue is
+  full the **lowest-ordered** message is evicted, ordered by the signed
+  `seq` (then `ts`, `msgId`). Because the order comes from signed fields,
+  every replica evicts the *same* message — caches stay consistent. A max
+  of **1** is a *retained / latest-value* slot: each new publish replaces
+  the prior one (pair it with `peer.pull(null, …)` for "give me the current
+  value").
+- **Hold time** — default **24 h**, hard ceiling **48 h**. A message past
+  its hold expires, is swept, and stops being delivered or pulled. A
+  `peer.pull` slides the hold forward (now + hold), bounded by the ceiling
+  — reads keep a hot message alive but can't pin it forever.
+- **Per-publisher quota (open topics only)** — on a public/anyone-may-publish
+  topic one publisher can hold at most ¼ of the queue, so a single flooder
+  can't evict everyone else. Owner-gated topics aren't quota'd.
+
+The cache is in-memory and disappears when an axon disconnects or restarts.
+A topic with no children for `rootGraceMs` (default 60 s) is swept by the
+maintenance loop — so if no one is subscribed for >60 s, replay history can
+be lost before its hold time even elapses.
 
 ### 6.5 Publishing flow (what happens under the hood)
 
@@ -584,6 +605,43 @@ own ID is among the K-closest. If you publish and want to be sure
 your own subsequent `peer.sub` sees the message, either subscribe
 first or include yourself in the dht adapter's findKClosest result
 (see [§13](#13-common-pitfalls)).
+
+### 6.6 Message lifecycle: unsubscribe, retract, remove
+
+Beyond pub/sub, the kernel (≥ v2.10.0) gives you three lifecycle controls,
+all **self-authenticating** — the authority to act is proven by the same
+keypair that proved authorship/ownership, with no central gatekeeper:
+
+```js
+// Leave a topic (counterpart to sub; stops all your local subs for it).
+await peer.unsub('rooms/london', { publisher: synth });
+
+// Retract a message YOU published ("unsend"). Creator-only: the network
+// accepts it only if signed by the same key that signed the original.
+await peer.kill('rooms/london', msgId, { publisher: synth });
+
+// Remove a topic's whole queue. OWNER-only (the identity whose nodeId
+// seeds the topic id). `{ destroy: true }` removes the topic entirely.
+await peer.unpub('rooms/london', { destroy: true });
+```
+
+Subscribers see a retraction as a **delete marker** on their existing
+handler, so branch on it:
+
+```js
+await peer.sub('rooms/london', (env) => {
+  if (env.deleted) { ui.remove(env.msgId); return; }   // a kill arrived
+  ui.render(env.message);
+}, { publisher: synth, since: 'all' });
+```
+
+Two honesty notes worth designing around:
+
+- `kill` is **best-effort redaction, not a cryptographic un-send** — a
+  subscriber that already has the plaintext can keep it, and an offline one
+  may never see the purge. An **anonymous (`sign: false`) message can't be
+  killed** at all (no provable creator).
+- `unpub` is **owner-only** and unavailable on public (ownerless) topics.
 
 ---
 
@@ -699,7 +757,7 @@ open" from "channels are open *and* carrying authenticated routing." A
 sustained `true` (across several polls) means the mesh looks connected
 but isn't actually routing; `boundCount`/`meshBound` are the honest
 usable-peer counts. Cheap; safe for a status dashboard. See the
-[API reference §8 health()](API-Reference-v2.8.2.md) for the full shape.
+[API reference §8 health()](API-Reference-v2.10.0.md) for the full shape.
 
 ### 8.4 Logs and errors
 
@@ -718,7 +776,7 @@ useful when debugging mesh behavior.
 
 ## 9. Pull and metrics
 
-### 9.1 Pull — fetch a single envelope by msgId
+### 9.1 Pull — fetch a single envelope, or the latest
 
 ```js
 const envelope = await peer.pull(msgId, {
@@ -727,11 +785,19 @@ const envelope = await peer.pull(msgId, {
   timeoutMs: 1000,
 });
 // envelope or null if not in any reachable axon's cache window
+
+// Or, with no msgId (kernel ≥ v2.10.0), the topic's most-recent message:
+const latest = await peer.pull(null, { topic: 'us-east/world-news', publisher: regionSynth });
 ```
 
 `pull` is useful when you have a `msgId` but missed the live delivery
-(e.g., a reshare link). It queries the K-closest axons for that topic
-and returns the cached envelope.
+(e.g., a reshare link). It queries the K-closest axons for that topic and
+returns the cached envelope. Pass **`null` instead of a msgId** to fetch the
+latest message (highest signed `seq`) — handy with a `maxMessages: 1`
+retained-slot topic for "current value" reads. A successful pull also slides
+the message's hold time forward (bounded by its 48 h ceiling). A pull never
+returns an **expired** message (past its hold) — that's a `null`, same as a
+cache miss.
 
 ### 9.2 Metrics — coarse delivery counters
 
@@ -1272,16 +1338,28 @@ peer.pub(name, message, { publisher?, sign? })
   → Promise<msgId>
 
 peer.sub(name, handler, { publisher?, since? })
-  → Promise<Subscription>
+  → Promise<Subscription>   // handler also gets { deleted, msgId, topic } on a kill
 
-peer.pull(msgId, { topic, publisher, timeoutMs })
-  → Promise<Envelope | null>
+peer.unsub(name, { publisher? })
+  → Promise<{ ok, removed }>                       // leave a topic (v2.10.0)
+
+peer.pull(msgId | null, { topic, publisher, timeoutMs })
+  → Promise<Envelope | null>                       // null msgId → latest (v2.10.0)
+
+peer.kill(name, msgId, { publisher? })
+  → Promise<{ ok }>                                // creator-only retract (v2.10.0)
+
+peer.unpub(name, { destroy?, publisher? })
+  → Promise<{ ok }>                                // owner-only queue removal (v2.10.0)
 
 peer.metrics(topic, { publisher, timeoutMs })
   → Promise<{ publishes, subscribers, reshare_count }>
 
 await subscription.stop();
 ```
+
+Topic limits (v2.10.0): max 100 (≤256) messages / 24 h hold (≤48 h ceiling)
+/ deterministic seq-ordered eviction / per-publisher ¼ quota on open topics.
 
 ### 15.4 Direct messaging
 
@@ -1323,13 +1401,16 @@ deriveTopicId(publisherIdOrNull, name)
 ### 15.7 Envelope helpers
 
 ```js
-buildEnvelope({ topic, message, ts?, identity, sign? })
-  → Promise<Envelope>
+buildEnvelope({ topic, message, ts?, seq?, identity, sign? })
+  → Promise<Envelope>                  // env carries seq (format v2)
 
 verifyEnvelope(envelope)
-  → Promise<{ ok, reason?, signed }>   // check .ok, NOT truthiness
+  → Promise<{ ok, reason?, signed }>   // check .ok, NOT truthiness; needs seq
 
-computeMsgId({ topic, ts, message, publisher? })
+checkFreshness(envelope, { now?, maxSkewMs? })
+  → { ok, reason? }                    // C-2 window; ingress-only, not in verify
+
+computeMsgId({ seq, topic, ts, message, signature? })
   → Promise<'<64 hex>'>
 ```
 
@@ -1375,8 +1456,10 @@ All thrown errors are subclasses of `AxonaError` with a stable `.code`:
 | `TransportError` | `TRANSPORT_CLOSED`, `TRANSPORT_NOT_BOUND`, `TRANSPORT_TIMEOUT`, … |
 | `PublishError` | `PUBLISH_INVALID_TOPIC`, `PUBLISH_SIGN_FAILED`, `PUBLISH_PAYLOAD_TOO_LARGE`, … |
 | `SubscribeError` | `SUBSCRIBE_INVALID_TOPIC`, `SUBSCRIBE_HANDLER_MISSING`, … |
-| `PullError` | `PULL_TIMEOUT`, `PULL_MALFORMED_MSGID`, … |
-| `MetricsError` | `METRICS_TIMEOUT`, … |
+| `KillError` | `KILL_INVALID_TOPIC`, `KILL_INVALID_MSGID`, `KILL_SIGN_FAILED` |
+| `UnpubError` | `UNPUB_INVALID_TOPIC`, `UNPUB_PUBLIC_TOPIC`, `UNPUB_SIGN_FAILED` |
+| `PullError` | `PULL_INVALID_MSGID`, `PULL_AXONS_UNREACHABLE` |
+| `MetricsError` | `METRICS_AXONS_UNREACHABLE` |
 | `UpgradeRequiredError` | `UPGRADE_REQUIRED` (the 4426 close) |
 
 Switch on `err.code` rather than `err.message` when handling
@@ -1386,7 +1469,7 @@ programmatically.
 
 ```js
 WIRE_VERSION         // '1.0'
-KERNEL_VERSION       // '1.1.2'
+KERNEL_VERSION       // '2.10.0'
 UPGRADE_CLOSE_CODE   // 4426
 ```
 
@@ -1394,10 +1477,10 @@ UPGRADE_CLOSE_CODE   // 4426
 
 ## Where to go next
 
-- **[Quick Start](Quick-Start-v2.8.2.md)** — if someone you're onboarding has
+- **[Quick Start](Quick-Start-v2.10.0.md)** — if someone you're onboarding has
   five minutes, send them here instead of this 1500-line guide.
 
-- **[API Reference](API-Reference-v2.8.2.md)** — when you're past the
+- **[API Reference](API-Reference-v2.10.0.md)** — when you're past the
   conceptual material and just need the signature for a specific call.
 
 - **Read the source of the reference peer**:

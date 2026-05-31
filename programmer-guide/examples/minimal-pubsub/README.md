@@ -5,7 +5,7 @@ process, connected by an in-process `SimNetwork`. One peer publishes,
 the other subscribes, and you see the envelope arrive.
 
 This is the right starting point for understanding the API. Once you've
-read this and the [programmer guide](../../Axona-Programmer-Guide-v2.8.2.md),
+read this and the [programmer guide](../../Axona-Programmer-Guide-v2.10.0.md),
 graduate to:
 
 - **[axona-peer/](https://github.com/axona-net/axona-peer)** — the
