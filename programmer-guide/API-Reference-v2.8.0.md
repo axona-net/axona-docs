@@ -6,8 +6,8 @@ deep-customization surfaces are at the end.
 
 Companion documents:
 
-- [Quick Start](Quick-Start.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide.md) — mental model + worked
+- [Quick Start](Quick-Start-v2.8.0.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v2.8.0.md) — mental model + worked
   example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects (authenticated handshake, channel binding, pub/sub
