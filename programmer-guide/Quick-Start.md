@@ -19,7 +19,7 @@ That's it. No build step, no DB, no bridge.
 mkdir my-axona-demo && cd my-axona-demo
 npm init -y
 npm pkg set type=module
-npm install github:axona-net/axona-protocol#v1.1.2
+npm install github:axona-net/axona-protocol#v2.8.0
 ```
 
 ## 2. Write the demo (one file)
@@ -194,4 +194,4 @@ above).
 **`UPGRADE_REQUIRED` close code (4426)** — only happens when connecting
 to a bridge; not relevant for the in-process demo. If you see it when
 expanding to a bridge connection, your peer is older than the bridge's
-`MIN_PEER_VERSION`. Update both to v1.1.2+.
+`MIN_PEER_VERSION`. Update both to v2.8.0+.

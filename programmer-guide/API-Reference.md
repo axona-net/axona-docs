@@ -1,7 +1,7 @@
 # Axona API Reference
 
 Reference for every public symbol exported from `@axona/protocol`
-v1.1.2. Organized by what application developers actually reach for;
+v2.8.0. Organized by what application developers actually reach for;
 deep-customization surfaces are at the end.
 
 Companion documents:
@@ -9,6 +9,10 @@ Companion documents:
 - [Quick Start](Quick-Start.md) — 5-minute working roundtrip.
 - [Programmer Guide](Axona-Programmer-Guide.md) — mental model + worked
   example + pitfalls.
+- [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
+  version protects (authenticated handshake, channel binding, pub/sub
+  trust boundary, verified routing admission). See §17 below for the
+  developer-facing summary of the security model.
 
 Imports throughout assume:
 
@@ -117,10 +121,13 @@ input.
 
 ### 1. Identity
 
-#### `deriveIdentity({ lat, lng, keypair? })` → `Promise<Identity>`
+#### `deriveIdentity({ lat, lng, extractable? })` → `Promise<Identity>`
 
 Generate a fresh 264-bit Ed25519 identity. Top 8 bits of the resulting
-`id` encode the S2 cell containing `(lat, lng)`.
+`id` encode the S2 cell containing `(lat, lng)`; the bottom 256 bits are
+`SHA-256(pubkey)`, so the nodeId is **self-authenticating** — a peer can
+only claim an id it holds the private key for (this is what the `axona/4`
+handshake checks; see §17).
 
 ```js
 const id = await deriveIdentity({ lat: 38.0, lng: -77.0 });
@@ -128,9 +135,16 @@ console.log(id.id);             // 'df7c5e…' (66 hex chars, us-east prefix)
 console.log(id.id.slice(0, 2)); // 'df'      (us-east S2)
 ```
 
-**Optional `keypair`**: pass an existing `{ pubkey, privateKey }` to
-re-derive a deterministic identity for that key. Useful when porting
-an identity across runtimes.
+**Optional `extractable`** (default `true`): pass `false` to hold the
+signing key as a **non-extractable** `CryptoKey` — it can sign but cannot
+be read back out by page script, so an XSS incident or a malicious
+dependency cannot exfiltrate the long-term identity. Recommended for
+ephemeral browser identities. Leave `true` only when you need to
+`dumpIdentity` it for persistence.
+
+Returned `Identity`: `{ id (66-hex), pubkey (Uint8Array), pubkeyHex
+(64-hex), privateKey (CryptoKey), region, createdAt, sign(bytes),
+verify(bytes, sig) }`.
 
 **Throws** `IdentityError` if Web Crypto isn't available or
 `lat`/`lng` are out of range.
@@ -446,34 +460,57 @@ converts internally.
 
 #### `peer.health()` → `healthObj`
 
-A diagnostic snapshot:
+A cheap, synchronous diagnostic snapshot — safe to poll on a UI tick or
+from a status endpoint:
 
 ```js
 peer.health();
 // {
 //   nodeId:        '<66 hex>',
-//   alive:         true,
-//   region:        { lat, lng },
-//   synaptomeSize: 6,
-//   transports:    [...],
-//   lookups:       { attempted, succeeded, avgHops, avgMs },
-//   pubsub:        { publishesIn, publishesOut, deliveries, subscribers },
-//   uptimeMs:      <ms>,
+//   synaptomeSize: 6,                 // routing-table entries
+//   peers:         ['<66 hex>', …],   // same, as a list
+//   subscriptions: 2,
+//   axonRoles:     [{ topic, isRoot, children, cacheSize }],
 //   wireVersion:   '1.0',
-//   kernelVersion: '1.1.2',
+//   started:       true,
+//   transport: {                      // null on sim/node; populated on web
+//     boundCount:   9,                // peers authenticated via axona/4
+//     meshChannels: 8,                // WebRTC data channels (any state)
+//     meshOpen:     8,                // open data channels
+//     meshBound:    8,                // open AND axona/4-authenticated
+//     bridgeState:  'open',
+//   },
+//   meshDegraded:  false,             // true ⇒ channels open but NOT bound
 // }
 ```
 
-Cheap; safe to call from a status endpoint.
+`meshDegraded` is the **routing-truth** signal: `true` means data
+channels are open but the `axona/4` handshake hasn't authenticated them,
+so no verified routing is flowing. A single `true` tick can be a normal
+mid-handshake transient; treat a value that stays `true` across several
+polls as the real signal. (`boundCount`/`meshBound` are the honest
+"usable peers" counts — distinct from the raw channel count.)
 
-#### `peer.onLog(handler)` / `peer.onError(handler)` → `() => void`
+#### `peer.onLog(level, handler)` → `() => void`
 
-Subscribe to structured log events / error notifications. Useful for
-debugging mesh behavior. Handler signature:
+Subscribe to structured log events at a given level. **The level comes
+first**; returns an unsubscribe function.
 
 ```js
-peer.onLog((event, detail) => {});     // event = string, detail = object
-peer.onError((err) => {});             // err = AxonaError or Error
+const off = peer.onLog('warn', (msg, ctx) => console.warn(msg, ctx));
+// level ∈ 'debug' | 'info' | 'warn' | 'error'
+```
+
+#### `peer.onError(handler)` / `peer.onUpgradeRequired(handler)` → `() => void`
+
+`onError` fires on background `AxonaError` emissions; `onUpgradeRequired`
+fires (and also fan-routes through `onError`) on a wire-version mismatch,
+carrying the `UpgradeRequiredError` with `{ reason, serverVersion,
+clientVersion, downloadUrl }`.
+
+```js
+peer.onError((err) => {});                  // err = AxonaError
+peer.onUpgradeRequired((err) => showUpgradeBanner(err.context.downloadUrl));
 ```
 
 ---
@@ -557,20 +594,30 @@ const env = await buildEnvelope({
 **Throws** `TypeError` if `identity` is missing privateKey or
 `pubkeyHex` when `sign: true`.
 
-#### `verifyEnvelope(envelope)` → `Promise<boolean>`
+#### `verifyEnvelope(envelope)` → `Promise<{ ok, reason?, signed }>`
 
 Verify that `envelope.signature` is valid for the
 `(envelope.topic, envelope.ts, envelope.message)` canonical inputs
-against `envelope.signerPubkey`.
+against `envelope.signerPubkey`, and that `msgId` matches.
+
+**Returns a result object, not a boolean** — check `.ok`:
 
 ```js
-const ok = await verifyEnvelope(env);
-if (!ok) console.warn('forged envelope', env.msgId);
+const res = await verifyEnvelope(env);
+if (!res.ok) console.warn('forged/invalid envelope', env.msgId, res.reason);
+// res.signed === false for an unsigned envelope that is otherwise valid
+// (res.ok === true). Your application decides whether to accept unsigned.
 ```
 
-Returns `true` for unsigned envelopes (no `signature` field) so it
-can be called unconditionally — your application decides whether
-unsigned envelopes are acceptable.
+> ⚠️ A common mistake: `if (!(await verifyEnvelope(env)))` is **always
+> false** — the return value is an object (truthy). Always test `.ok`.
+
+`reason` (when `!ok`) is one of `not_an_object` / `missing_*` /
+`unknown_signature_scheme` / `wrong_key_or_signature_length` /
+`bad_signature` / `bad_msgid`. As of kernel v2.7.0, root axons also
+verify the publisher signature at ingress before fan-out (finding B-4),
+so spoofed-signature traffic is dropped network-side — but apps should
+still verify what they consume.
 
 #### `computeMsgId({ topic, ts, message, publisher? })` → `Promise<string>`
 
@@ -785,6 +832,56 @@ silently, useless for in-process synchronous flows).
 
 ---
 
+### 11b. Web transport (browser)
+
+The production browser transport: a WebSocket to the bridge for
+bootstrap + signaling, and a WebRTC mesh for direct peer-to-peer
+traffic. It owns the bridge socket lifecycle (reconnect/backoff,
+ping/pong, stale detection), the version-gate handshake, and the
+`axona/4` authenticated-identity handshake on both the bridge link and
+every mesh link.
+
+#### `webTransport(opts)` → `CompositeTransport`
+
+```js
+import { webTransport } from '@axona/protocol/transport/web/index.js';
+
+const transport = webTransport({
+  bridgeUrl:   'wss://bridge.axona.net',  // required
+  identity,                               // from deriveIdentity() — signs the handshake
+  peerVersion: '3.11.0',                  // your app version (gated by the bridge)
+  reconnect:   true,                      // auto-reconnect with backoff (default)
+  // log, autoHandshake, handshakeTimeoutMs, pingIntervalMs,
+  // reconnectInitialMs, reconnectMaxMs, WebSocketImpl …
+});
+await transport.start();                  // resolves after the bridge handshake
+```
+
+Beyond the `Transport` contract (`send`/`notify`/`onRequest`/
+`onNotification`/`boundPeers`/`onPeerBound`/`start`/`stop`), it exposes
+an observability surface for the UI:
+
+```js
+transport.bridgeState        // 'connecting'|'open'|'stale'|'disconnected'|'upgrade-required'
+transport.bridgeInfo         // { connId, version, kernelVersion, turn } | null
+transport.bridgeRtt          // last ping→pong ms (null until first pong)
+transport.bridgeRttAvg       // mean of the recent RTT window
+transport.bridgeNodeId       // bridge's 66-hex nodeId (null pre-handshake)
+transport.onBridgeState((state, detail) => {});   // → unsub
+transport.onWelcome((info) => {});                 // → unsub (replays last)
+transport.onPingTraffic((dir) => {});              // 'sent' | 'recv'
+transport.reconnectNow();                          // force an immediate reconnect (tab resume)
+transport.boundPeers();                            // bigint[] — axona/4-authenticated peers
+```
+
+Channel binding (finding A-1): each mesh link's `axona/4` proof is
+bound to that connection's DTLS certificate fingerprint, so a
+fingerprint-rewriting bridge cannot transparently MITM "direct" peer
+traffic. The bridge is trusted for signaling only, never for the
+contents of peer-to-peer links. See §17.
+
+---
+
 ### 12. Handshake
 
 Wire-version handshake helpers used by transports on a fresh signaling
@@ -885,7 +982,8 @@ needed by app code.
 
 ```js
 WIRE_VERSION         // '1.0'        — wire format major.minor
-KERNEL_VERSION       // '1.1.2'      — kernel semver
+KERNEL_VERSION       // '2.8.0'      — kernel semver
+AUTH_PROTO           // 'axona/4'    — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426         — WebSocket close code for version mismatch
 ID_BITS              // 264
 HEX_CHARS            // 66
@@ -896,10 +994,52 @@ is informational and corresponds to the npm release tag.
 
 ---
 
+### 17. Security model (what the protocol guarantees)
+
+The full, versioned record is the [security
+changelog](../SECURITY-CHANGELOG.md); this is the developer-facing
+summary of what's enforced as of kernel v2.8.0. Everything here is
+**self-authenticating** — no certificate authority, no central trust
+server, no reputation service.
+
+- **Authenticated identity (`axona/4`).** A nodeId's bottom 256 bits are
+  `SHA-256(pubkey)`, and every connection runs a handshake proving the
+  peer holds that key (BIND: pubkey hashes to the id · POSSESS: Ed25519
+  signature · CHANNEL: the signature is bound to this live connection so
+  a captured proof can't be replayed onto another link). A peer cannot
+  claim an id it doesn't own.
+- **Channel binding (untrusted bridge).** Mesh links fold each side's
+  DTLS certificate fingerprint into the signed handshake, so a bridge
+  that terminates DTLS to interpose on a "direct" link produces
+  divergent bindings and the handshake fails. The bridge is trusted for
+  *signaling only*.
+- **Pub/sub trust boundary.** A peer can only subscribe *itself* (every
+  path checks the authenticated sender, not a payload-named id) — no
+  reflection/amplification at a victim. A node only hosts topics it's
+  among the K-closest to — no memory-exhaustion via random-topic floods.
+  Publisher signatures are verified at root-axon ingress before fan-out.
+- **Verified routing admission (eclipse resistance).** Routing-table
+  entries are *earned*: a peer named in routing gossip is a candidate,
+  admitted only after this node connects and the peer authenticates via
+  `axona/4`. Forged gossip cannot inject hops. (Observe this via
+  `health().meshDegraded` and `boundCount`.)
+- **Key hygiene.** Browser identities can hold a **non-extractable**
+  signing key (`deriveIdentity({ extractable: false })`); `loadIdentity`
+  verifies the private key matches its public key on load.
+
+What the protocol does **not** do: encrypt your application payload
+(it's opaque bytes — encrypt inside `message` if you need
+confidentiality), or vouch for what an authenticated peer *says* beyond
+what cryptography proves. Open security work is tracked privately; the
+public changelog lists only resolved items.
+
+---
+
 ## A word on stability
 
-`@axona/protocol` v1.x is stable for the application surface
-documented in §§1–9. The transport + protocol surface (§§10–12) is
+`@axona/protocol` v2.x is stable for the application surface
+documented in §§1–9. The transport + protocol surface (§§10–12, incl.
+the browser `webTransport` and the `axona/4` security model in §17) is
 also stable but expect occasional additions (new transport factories,
 new bootstrap services). Low-level utilities (§§13–16) may grow but
 won't change incompatibly.

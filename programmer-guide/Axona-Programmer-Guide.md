@@ -8,10 +8,11 @@ The guide assumes you already know JavaScript + Node + a browser. It does
 not assume any DHT / WebRTC / cryptography background — concepts are
 introduced where they're needed.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v1.1.2)
-- **Browser SDK**: [@axona-net/axona-peer](https://github.com/axona-net/axona-peer) (v1.1.2)
-- **WebSocket bridge**: [@axona-net/axona-bridge](https://github.com/axona-net/axona-bridge) (v1.1.0, kernel v1.1.2)
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v2.8.0)
+- **Browser SDK**: [@axona-net/axona-peer](https://github.com/axona-net/axona-peer) (v3.11.0)
+- **WebSocket bridge**: [@axona-net/axona-bridge](https://github.com/axona-net/axona-bridge) (v2.4.0)
 - **Live network**: `wss://bridge.axona.net`
+- **Security model**: see §3.5 below and the [security changelog](../SECURITY-CHANGELOG.md) — the v2 line adds an authenticated-identity handshake, channel binding, a pub/sub trust boundary, and verified routing admission.
 
 ---
 
@@ -104,7 +105,7 @@ only.
 ```
 mkdir my-axona-app && cd my-axona-app
 npm init -y
-npm install @axona/protocol@github:axona-net/axona-protocol#v1.1.2
+npm install @axona/protocol@github:axona-net/axona-protocol#v2.8.0
 ```
 
 You now have `node_modules/@axona/protocol/src/` with the full kernel.
@@ -244,6 +245,43 @@ delivery on signature verification.
 
 You can also pass `{sign: false}` to `peer.pub` for unsigned messages —
 useful for genuinely public, anonymous topics.
+
+### 3.5 What the protocol secures (and what it doesn't)
+
+Axona is **self-authenticating**: every guarantee is enforced by
+cryptography the peers carry themselves — there is no certificate
+authority, central trust server, or reputation service. A node's
+identity *is* its keypair. As of kernel v2.8.0:
+
+- **Identity is provable, not asserted.** A nodeId's bottom 256 bits are
+  `SHA-256(pubkey)`, and every connection runs the `axona/4` handshake:
+  the peer proves it holds the key (Ed25519 signature), and the proof is
+  bound to *that specific live connection* so it can't be replayed onto
+  another link. A peer cannot claim an id it doesn't own.
+- **The bridge is trusted for introductions only.** It bootstraps peers
+  and relays WebRTC signaling, but mesh links bind their handshake to the
+  connection's DTLS fingerprint, so the bridge cannot transparently sit
+  in the middle of "direct" peer traffic.
+- **You can only act for yourself.** A peer can subscribe only *itself*
+  (no naming a victim as the subscriber), nodes only host topics they're
+  routing-responsible for, and publisher signatures are checked at the
+  topic's ingress before fan-out.
+- **The routing table is earned.** A peer becomes one of your routing
+  hops only after you've connected to it and it has authenticated — so
+  gossip can suggest peers but cannot inject attacker-controlled hops
+  (eclipse resistance). You can watch this via `peer.health().meshDegraded`
+  and `boundCount` (§8.3).
+
+**What it does NOT do:** encrypt your application payload — `message` is
+opaque bytes; if you need confidentiality, encrypt inside it end-to-end.
+And authentication proves *who* a peer is, not that what it *says* about
+the network is true beyond what the cryptography checks. The full
+versioned record is the [security changelog](../SECURITY-CHANGELOG.md).
+
+For most apps this is transparent — `peer.pub` signs, the network
+verifies, and you just check `(await verifyEnvelope(env)).ok` on what you
+consume (§6.2). The guarantees are there whether or not you think about
+them.
 
 ---
 
@@ -479,18 +517,28 @@ the wire layer.
 import { verifyEnvelope } from '@axona/protocol';
 
 const sub = await peer.sub(topic, async (env) => {
-  if (env.signature && !(await verifyEnvelope(env))) {
-    console.warn('rejected forged envelope', env.msgId);
-    return;
+  if (env.signature) {
+    const res = await verifyEnvelope(env);   // returns { ok, reason, signed }
+    if (!res.ok) {
+      console.warn('rejected forged envelope', env.msgId, res.reason);
+      return;
+    }
   }
   appendToFeed(env);
 });
 ```
 
+> ⚠️ `verifyEnvelope` returns a **result object**, not a boolean — test
+> `.ok`. Writing `if (!(await verifyEnvelope(env)))` is always false (an
+> object is truthy), so that guard would silently never reject anything.
+
 `verifyEnvelope` reconstructs the canonical signing input and verifies
 against `env.signerPubkey`. It does NOT decide whether you trust that
 pubkey — your application controls that (whitelist, web of trust,
-TOFU, etc.).
+TOFU, etc.). As of kernel v2.7.0 the network *also* verifies publisher
+signatures at the topic's ingress before fan-out, so spoofed-signature
+traffic is dropped mesh-side — but verifying what you consume is still
+good practice.
 
 ### 6.3 Replay vs live tail (`since`)
 
@@ -634,21 +682,32 @@ local synaptome with the discovered route.
 ```js
 peer.health();
 // {
-//   nodeId, region, synaptomeSize, alive,
-//   transports: [...],
-//   lookups: { attempted, succeeded, avgHops, avgMs },
-//   pubsub:  { publishesIn, publishesOut, deliveries, subscribers },
-//   ...
+//   nodeId, synaptomeSize, peers: [...], subscriptions,
+//   axonRoles: [{ topic, isRoot, children, cacheSize }],
+//   wireVersion, started,
+//   transport: {           // null on sim/node; populated on the web transport
+//     boundCount,          // peers authenticated via axona/4
+//     meshChannels, meshOpen, meshBound,   // raw vs open vs authenticated channels
+//     bridgeState,
+//   },
+//   meshDegraded,          // true ⇒ channels open but NOT yet authenticated
 // }
 ```
 
-Useful for status dashboards and debugging.
+`meshDegraded` is the routing-truth signal — distinguish "channels are
+open" from "channels are open *and* carrying authenticated routing." A
+sustained `true` (across several polls) means the mesh looks connected
+but isn't actually routing; `boundCount`/`meshBound` are the honest
+usable-peer counts. Cheap; safe for a status dashboard. See the
+[API reference §8 health()](API-Reference.md) for the full shape.
 
 ### 8.4 Logs and errors
 
 ```js
-peer.onLog((event, detail) => { /* … */ });
-peer.onError((err) => { /* … */ });
+// onLog takes the LEVEL first, then the handler:
+peer.onLog('warn', (msg, ctx) => { /* … */ });   // 'debug'|'info'|'warn'|'error'
+peer.onError((err) => { /* … */ });               // background AxonaError
+peer.onUpgradeRequired((err) => { /* show upgrade banner */ });
 ```
 
 The protocol emits structured log events for routing decisions,
@@ -1250,7 +1309,7 @@ buildEnvelope({ topic, message, ts?, identity, sign? })
   → Promise<Envelope>
 
 verifyEnvelope(envelope)
-  → Promise<boolean>
+  → Promise<{ ok, reason?, signed }>   // check .ok, NOT truthiness
 
 computeMsgId({ topic, ts, message, publisher? })
   → Promise<'<64 hex>'>
