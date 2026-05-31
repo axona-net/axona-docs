@@ -21,13 +21,19 @@ about where to spend effort first.
 
 | Antigravity ID | Internal ID | Severity (both) | Status |
 |---|---|---|---|
-| B-1 Routed-subscribe reflection/amplification | B-1 | **Critical** | open |
-| B-2 Lazy-axon promotion memory DoS | B-2 | **Critical** | open |
+| B-1 Routed-subscribe reflection/amplification | B-1 | **Critical** | **✅ resolved v2.7.0** |
+| B-2 Lazy-axon promotion memory DoS | B-2 | **Critical** | **✅ resolved v2.7.0** |
 | B-3 Unauthenticated routing-table mutation (LTP poisoning/eclipse) | B-3 | High | open |
-| B-4 Deferred publisher-signature verification | B-4 | High | open |
+| B-4 Deferred publisher-signature verification | B-4 | High | **✅ resolved v2.7.0** |
 | C-2 Envelope freshness / replay | C-2 | High | open |
 | E-1 Targeted address grinding (Sybil placement) | E-1 | Medium | open |
 | (exec summary: DTLS-fingerprint channel binding) | A-1 | Critical | **✅ resolved v2.6.0** |
+
+**Wave 1 shipped (kernel v2.7.0, 2026-05-31):** B-1, B-2, B-4 (above) plus
+**C-1** (canonicalization → total/JSON-valid) and **D-1** (inbound size/count
+caps + adopt-subscribers `maxDirectSubs` enforcement). Both open Criticals are
+now closed. Remaining top items: **B-3** (routing integrity, the largest), then
+**C-2** (envelope freshness), then the bridge/privacy/identity waves.
 
 **What the external pass added beyond confirmation:**
 - A **simulator-vs-reality** section (§4 below) — assurance/realism gaps, not vulnerabilities.
@@ -49,7 +55,7 @@ items in a wave usually touch the same module.
 
 Effort key: **S** ≤ half-day · **M** ~1–2 days · **L** multi-day / architectural.
 
-### Wave 1 — Pub/Sub trust boundary  *(both auditors converge; all in `pubsub/AxonManager.js`)*
+### Wave 1 — Pub/Sub trust boundary  *(both auditors converge; all in `pubsub/AxonManager.js`)* — ✅ SHIPPED v2.7.0 (B-1, B-2, B-4, D-1; + C-1 from Wave 2)
 
 | # | ID | Sev | Fix | Effort | Notes |
 |---|----|-----|-----|--------|-------|
@@ -62,7 +68,7 @@ Effort key: **S** ≤ half-day · **M** ~1–2 days · **L** multi-day / archite
 
 | # | ID | Sev | Fix | Effort | Notes |
 |---|----|-----|-----|--------|-------|
-| 5 | **C-1** | High | Make `canonical()` total + JSON-valid (target RFC 8785): no literal `undefined`, deterministic `NaN/Infinity/-0` handling. | **M** | **Foundational** — signature collisions / cross-impl verify divergence undermine B-4 and C-2. Do before/with Wave 1 #3. |
+| 5 | ~~**C-1**~~ ✅ | High | Make `canonical()` total + JSON-valid (target RFC 8785): no literal `undefined`, deterministic `NaN/Infinity/-0` handling. | **M** | **✅ SHIPPED v2.7.0** — total, matches JSON.stringify value semantics + stable key order; output-preserving for all previously-valid inputs (no flag-day). |
 | 6 | **C-2** | High | Add per-publisher monotonic sequence + strict TTL window (reject `|ts − now| > 300s`) to the signed envelope; enforce at the routing layer. | **M** | Envelope-format change ⇒ mild flag-day (verification side). Closes replay-to-fresh-subscribers. |
 | 7 | **E-4** | Low | Explicit domain-separation tag on envelope/post signing; remove `:`-delimiter ambiguity in CBV construction. | **S** | Cheap hardening; pairs with the envelope work. |
 

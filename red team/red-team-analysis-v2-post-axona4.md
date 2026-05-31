@@ -72,14 +72,14 @@ Severity: Crit / High / Med / Low. "Prior?" = relation to the first analysis.
 |----|---------|-----|-------|-------------|
 | ~~**A‑1**~~ | Mesh CBV not bound to DTLS fingerprint → bridge MITM of mesh — **✅ RESOLVED v2.6.0** | Crit | C3 (deferred) | CRY‑1, BRG‑1/2, MESH‑1 |
 | **A‑2** | Handshake transcript is undirected (no recipient/role id); `expectNodeId` usually null | High | new | CRY‑5 |
-| **B‑1** | Routed `pubsub:subscribe` still allows `subscriberId ≠ fromId` → reflection/amplification (full feed + ≤100-msg replay blast at a victim) | Crit | C4 *residual (direct path only was fixed)* | DOS‑1 |
-| **B‑2** | Lazy-axon promotion has no self-proximity gate → unbounded role allocation for random topicIds (memory DoS) | Crit | C5 | DOS‑2 |
+| **B‑1** ✅v2.7.0 | Routed `pubsub:subscribe` still allows `subscriberId ≠ fromId` → reflection/amplification (full feed + ≤100-msg replay blast at a victim) | Crit | C4 *residual (direct path only was fixed)* | DOS‑1 |
+| **B‑2** ✅v2.7.0 | Lazy-axon promotion has no self-proximity gate → unbounded role allocation for random topicIds (memory DoS) | Crit | C5 | DOS‑2 |
 | **B‑3** | Routing learning handlers (`triadic_introduce`, `hop_cache`, `lateral_spread`, `reinforce`) trust message *content*, discard proven `fromId` → table poisoning / eclipse / unevictable self-reinforce | High | H1 (broader) | RTE‑1/2/3/7 |
-| **B‑4** | `_onPublishDirect` lets any peer inject into any topic; publisher signature only checked at app layer *after* network fan-out | High | C2 (partial) | DOS‑3 |
-| **C‑1** | `canonical()` emits literal `undefined`, maps `NaN/Infinity/-0` lossily, non-JSON output → signature collisions + cross-impl verify divergence | High | **new** | CRY‑2/3 |
+| **B‑4** ✅v2.7.0 | `_onPublishDirect` lets any peer inject into any topic; publisher signature only checked at app layer *after* network fan-out | High | C2 (partial) | DOS‑3 |
+| **C‑1** ✅v2.7.0 | `canonical()` emits literal `undefined`, maps `NaN/Infinity/-0` lossily, non-JSON output → signature collisions + cross-impl verify divergence | High | **new** | CRY‑2/3 |
 | **C‑2** | Signed envelopes have no freshness (no nonce/seq/expiry) → unlimited replay to fresh subscribers / restarted nodes | High | H2 | CRY‑4 |
 | **C‑3** | Metrics reflection: `metricsResp` to attacker-named `requesterId`; ownership gate fails OPEN when replay cache empty; broadcast fans tree-wide | High | M1/M2 (sharper) | DOS‑4 |
-| **D‑1** | No inbound payload/size caps (json, messages[], peerRoots[], subscriberIds[]); `_onAdoptSubscribers` bypasses `maxDirectSubs` | High | M3 | DOS‑5 |
+| **D‑1** ✅v2.7.0 | No inbound payload/size caps (json, messages[], peerRoots[], subscriberIds[]); `_onAdoptSubscribers` bypasses `maxDirectSubs` | High | M3 | DOS‑5 |
 | **D‑2** | Bridge WS: no Origin check, no `maxPayload`, no pending-conn cap → unauth flood / OOM | High | **new** (bridge) | BRG‑3 |
 | **D‑3** | Dedup caches FIFO-evictable by attacker-chosen `publishId` → forced eviction re-enables re-delivery/re-relay; `_seenPublishTtlMs` declared but unused | Med | **new** | DOS‑6 |
 | **D‑4** | Topology disclosure: `local_probe` returns ~entire synaptome to any caller → cheap graph mapping for targeting | Med | H3 | RTE‑4 |

@@ -16,6 +16,45 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.7.0 — 2026-05-31
+
+### Pub/sub trust boundary: a peer can only act for itself, and only where it belongs
+
+A batch of hardening to the publish/subscribe layer so that membership and
+message flow can't be driven by a peer on behalf of others, and so that
+resource use is bounded by what a peer can legitimately request:
+
+- **Subscriptions can only ever be made for the requesting peer.** Across
+  *every* path — including multi-hop routed subscribe/unsubscribe, not just
+  the direct one — a node now enrolls (or removes) only the cryptographically
+  authenticated peer that delivered the request. A peer can no longer name a
+  third party as the subscriber, closing a reflection/amplification vector
+  where one peer could aim a topic's feed (and its catch-up backlog) at a
+  victim.
+- **A node only hosts topics it's actually responsible for.** Becoming a
+  relay point for a topic now requires being among the nodes closest to that
+  topic's address. A flood of messages for arbitrary topics can no longer make
+  uninvolved nodes allocate per-topic state, closing a memory-exhaustion vector
+  that could crash browser peers.
+- **Forged-signature messages are rejected at the entry point.** A signed
+  message whose signature doesn't verify is now dropped where it first enters
+  the relay tree, before it is cached or forwarded — so spoofed-signature spam
+  can't be amplified outward before the edge rejects it. (Anonymous/unsigned
+  messages are unaffected.)
+- **Canonical encoding is now total and standards-aligned.** The byte encoding
+  underlying every signature and content hash always emits valid JSON with a
+  stable key order and matches what the wire produces, eliminating a class of
+  signer/verifier mismatches and signature-collision hazards. No change for any
+  message that verified before.
+- **Inbound payloads are bounded.** Per-message size and per-batch count caps
+  on the network-facing handlers prevent a single inbound message from forcing
+  an unbounded allocation.
+
+All of the above are local enforcement changes — fully interoperable with
+earlier peers (no flag-day).
+
+---
+
 ## Kernel v2.6.0 — 2026-05-30
 
 ### Mesh traffic is now cryptographically bound to its own connection
