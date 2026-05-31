@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.6.2 \quad 2026-05-30\par}
+{\small An Axona Architecture Note \quad v0.7.0 \quad 2026-05-31\par}
 \end{center}
 \vfill
 \null
@@ -588,6 +588,7 @@ A pub/sub message envelope is signed:
 \begin{verbatim}
 {
   msgId:        "<sha256 of canonical(envelope) hex>",
+  seq:          1716638400123,   // per-publisher monotonic (v2.9.0)
   ts:           1716638400000,
   topic:        "us-east/hello-world",
   message:      <application payload>,
@@ -600,6 +601,18 @@ Receivers verify the signature against the signer's pubkey using
 \texttt{crypto.subtle.verify}; the kernel surfaces verification
 result on the delivered envelope so applications can decide whether
 to trust unsigned or unverifiable publishes.
+
+As of kernel v2.9.0 (envelope format \textbf{v2}, finding C-2) the
+signature covers a domain-separated core
+(\texttt{axona:pubsub-envelope:v2}) and includes a per-publisher
+monotonic \texttt{seq}. Two properties follow. \emph{Freshness:} a
+topic's root axons reject a \emph{live} publish whose signed
+\texttt{ts} is outside a $\pm$5-minute window, so a captured envelope
+can't be re-injected as new once it ages out (the legitimate
+replay-to-late-subscribers path is exempt --- it serves cached
+history). \emph{Order:} \texttt{seq} gives each publisher's stream a
+total order, which is what makes ``latest'' and bounded-queue eviction
+(below) deterministic across replicas.
 
 % =====================================================================
 % IX. ROUTING
@@ -946,7 +959,10 @@ on invalid inputs or signing failure.
 \item[\texttt{topic}] string.
 \item[\texttt{handler}] function \texttt{(envelope) => void}\;
 invoked for each delivery. The envelope is
-\texttt{\{ msgId, ts, topic, message, publisher, signerPubkey \}}.
+\texttt{\{ msgId, seq, ts, topic, message, publisher, signerPubkey \}}.
+A retraction (see \texttt{peer.kill}) arrives on the same handler as a
+marker, \texttt{\{ deleted: true, msgId, topic \}} --- branch on
+\texttt{env.deleted} to drop your local copy.
 \item[\texttt{opts.publisher}] \emph{(default: this peer's nodeId)}\;
 same semantics as \texttt{pub} --- must match the publisher's
 \texttt{publisher} value for the subscription to land at the right
@@ -959,15 +975,21 @@ than that timestamp.
 \end{description}
 
 \noindent Returns a Promise resolving to a \texttt{Subscription}
-handle. Call \texttt{sub.unsubscribe()} to stop receiving.
+handle. Call \texttt{sub.stop()} to cancel that handle, or
+\texttt{peer.unsub(topic, opts)} (kernel v2.10.0) to leave the topic by
+name --- stops every local subscription for it and, when the last goes,
+sends the network unsubscribe (self-only by construction).
 
 \smallskip
 \noindent\texttt{await peer.pull(msgId, opts)}\quad
-\emph{fetch a single message by ID from the relay's replay cache}
+\emph{fetch a message from the relay's replay cache --- by ID, or the
+latest}
 
 \begin{description}
 \setlength{\itemsep}{0pt}
-\item[\texttt{msgId}] 64-char hex content hash.
+\item[\texttt{msgId}] 64-char hex content hash, \emph{or}
+\texttt{null}/omitted to fetch the topic's most-recent message
+(highest \texttt{seq}; kernel v2.10.0).
 \item[\texttt{opts.topic}] string. The topic name (required, used to
 locate the relay).
 \item[\texttt{opts.publisher}] 66-char hex publisher ID, or
@@ -975,7 +997,10 @@ locate the relay).
 \item[\texttt{opts.timeoutMs}] \emph{(default} \texttt{1000}\emph{)}.
 \end{description}
 
-\noindent Returns the envelope or \texttt{null} if not found.
+\noindent Returns the envelope or \texttt{null} if not found (which
+includes a message that has \emph{expired} past its hold time). A
+successful pull slides the message's hold forward, bounded by its 48\,h
+ceiling.
 
 \smallskip
 \noindent\texttt{await peer.metrics(topic, opts)}\quad
@@ -990,6 +1015,48 @@ locate the relay).
 
 \noindent Returns \texttt{\{ publishes, subscribers, deliveries,
 pulls, reshares, relayCount \}}.
+
+\subsection*{Message lifecycle (kernel v2.10.0)}
+
+Three lifecycle controls, each \textbf{self-authenticating} --- the
+authority to act is proven by the same keypair that proved
+authorship/ownership, with no registry or central gatekeeper.
+
+\smallskip
+\noindent\texttt{await peer.kill(topic, msgId, opts?)}\quad
+\emph{retract a message you published (creator-only)}
+
+\noindent A topic's root axons accept the kill only if it is signed by
+the \emph{same key that signed the original message}; they drop it from
+their replay caches, record a short-lived tombstone (so a lagging replica
+can't resurrect it), and forward a delete marker to subscribers. It is
+best-effort redaction, \emph{not} a cryptographic un-send --- a
+subscriber that already received the plaintext can keep it --- and an
+anonymous (\texttt{sign:\,false}) message has no provable creator and so
+cannot be killed. Throws \texttt{KillError}.
+
+\smallskip
+\noindent\texttt{await peer.unpub(topic, opts?)}\quad
+\emph{remove a topic's whole queue (owner-only)}
+
+\noindent The \emph{owner} is the identity whose nodeId seeds the topic
+ID; roots verify this self-authenticatingly (the signer's pubkey must
+bind to the owner nodeId \emph{and} that nodeId must derive the topic
+ID). \texttt{opts.destroy} (default \texttt{false}) escalates from
+``clear the messages'' to total removal (messages \emph{and}
+config/ownership state). Public (ownerless) topics cannot be unpublished.
+Throws \texttt{UnpubError}.
+
+\subsection*{Topic limits}
+
+Each topic's replay queue is bounded (kernel v2.10.0): \textbf{max
+messages} (default 100, ceiling 256) with deterministic eviction of the
+lowest-ordered message by signed \texttt{(seq, ts, msgId)} --- a max of 1
+is a retained / latest-value slot; a \textbf{hold time} (default 24\,h,
+hard ceiling 48\,h) after which a message expires and is swept; and, on
+\emph{open} (anyone-may-publish) topics, a \textbf{per-publisher quota}
+(one-quarter of the queue) so a single publisher can't flood out the
+rest. Owner-gated topics are governed by their publish rules instead.
 
 \subsection*{Direct messaging}
 
