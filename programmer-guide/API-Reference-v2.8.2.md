@@ -1,13 +1,13 @@
 # Axona API Reference
 
 Reference for every public symbol exported from `@axona/protocol`
-v2.8.0. Organized by what application developers actually reach for;
+v2.8.2. Organized by what application developers actually reach for;
 deep-customization surfaces are at the end.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v2.8.0.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v2.8.0.md) — mental model + worked
+- [Quick Start](Quick-Start-v2.8.2.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v2.8.2.md) — mental model + worked
   example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects (authenticated handshake, channel binding, pub/sub
@@ -276,10 +276,10 @@ topic, message, signature, signerPubkey })`), so your usable payload is
 string length, so heavily multi-byte (CJK/emoji) content can exceed
 256 KiB on the wire.
 
-⚠️ The cap is currently enforced **at the receiving root axon**, not at
-`peer.pub`: an oversized publish is **silently dropped network-side**
-(logged `publish-oversize-dropped`) — the publisher gets **no error**. So
-if a large message "doesn't arrive," check its size first.
+`peer.pub` **rejects an oversized message up front** (kernel ≥ v2.8.2)
+with `PublishError(PUBLISH_PAYLOAD_TOO_LARGE)` — you get an immediate,
+catchable error rather than a message that silently fails to arrive. The
+root axon also enforces the same cap at ingress as defense-in-depth.
 
 Pub/sub is a *broadcast* path (replicated to K root axons, cached, fanned
 to all subscribers), so it is the wrong place for images/documents even
@@ -298,11 +298,10 @@ const msgId = await peer.pub('news/world', { title: 'hi' }, {
 - `PUBLISH_INVALID_TOPIC` — empty topic name.
 - `PUBLISH_SIGN_FAILED` — signing failed (identity missing privateKey,
   Web Crypto unavailable, etc).
-- `PUBLISH_PAYLOAD_TOO_LARGE` — the message is **not JSON-serializable**
+- `PUBLISH_PAYLOAD_TOO_LARGE` — serialized envelope exceeds the 256 KiB
+  cap (kernel ≥ v2.8.2; see "Maximum message size" above).
+- `PUBLISH_INVALID_MESSAGE` — the message is **not JSON-serializable**
   (circular reference, `BigInt`, etc.), so the envelope can't be encoded.
-  Despite the name, this does **not** fire on size — there is no
-  client-side size check today; oversized publishes are dropped at the
-  receiving root axon instead (see "Maximum message size" above).
 
 #### `peer.sub(topicName, handler, opts?)` → `Promise<Subscription>`
 
@@ -672,7 +671,7 @@ Subclasses:
 |---|---|
 | `IdentityError` | `IDENTITY_INVALID`, `IDENTITY_LOAD_FAILED`, `IDENTITY_KEY_IMPORT_FAILED` |
 | `TransportError` | `TRANSPORT_NOT_STARTED`, `TRANSPORT_TIMEOUT`, `TRANSPORT_NOT_BOUND`, `TRANSPORT_CLOSED` |
-| `PublishError` | `PUBLISH_INVALID_TOPIC`, `PUBLISH_SIGN_FAILED`, `PUBLISH_PAYLOAD_TOO_LARGE` |
+| `PublishError` | `PUBLISH_INVALID_TOPIC`, `PUBLISH_SIGN_FAILED`, `PUBLISH_PAYLOAD_TOO_LARGE`, `PUBLISH_INVALID_MESSAGE` |
 | `SubscribeError` | `SUBSCRIBE_INVALID_TOPIC`, `SUBSCRIBE_HANDLER_MISSING` |
 | `PullError` | `PULL_TIMEOUT`, `PULL_MALFORMED_MSGID` |
 | `MetricsError` | `METRICS_TIMEOUT` |
@@ -1019,7 +1018,7 @@ is informational and corresponds to the npm release tag.
 
 The full, versioned record is the [security
 changelog](../SECURITY-CHANGELOG.md); this is the developer-facing
-summary of what's enforced as of kernel v2.8.0. Everything here is
+summary of what's enforced as of kernel v2.8.2. Everything here is
 **self-authenticating** — no certificate authority, no central trust
 server, no reputation service.
 

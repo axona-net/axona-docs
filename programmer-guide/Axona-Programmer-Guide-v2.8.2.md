@@ -8,9 +8,9 @@ The guide assumes you already know JavaScript + Node + a browser. It does
 not assume any DHT / WebRTC / cryptography background — concepts are
 introduced where they're needed.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v2.8.0)
-- **Browser SDK**: [@axona-net/axona-peer](https://github.com/axona-net/axona-peer) (v3.11.0)
-- **WebSocket bridge**: [@axona-net/axona-bridge](https://github.com/axona-net/axona-bridge) (v2.4.0)
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v2.8.2)
+- **Browser SDK**: [@axona-net/axona-peer](https://github.com/axona-net/axona-peer) (v3.13.0)
+- **WebSocket bridge**: [@axona-net/axona-bridge](https://github.com/axona-net/axona-bridge) (v2.4.1)
 - **Live network**: `wss://bridge.axona.net`
 - **Security model**: see §3.5 below and the [security changelog](../SECURITY-CHANGELOG.md) — the v2 line adds an authenticated-identity handshake, channel binding, a pub/sub trust boundary, and verified routing admission.
 
@@ -105,7 +105,7 @@ only.
 ```
 mkdir my-axona-app && cd my-axona-app
 npm init -y
-npm install @axona/protocol@github:axona-net/axona-protocol#v2.8.0
+npm install @axona/protocol@github:axona-net/axona-protocol#v2.8.2
 ```
 
 You now have `node_modules/@axona/protocol/src/` with the full kernel.
@@ -251,7 +251,7 @@ useful for genuinely public, anonymous topics.
 Axona is **self-authenticating**: every guarantee is enforced by
 cryptography the peers carry themselves — there is no certificate
 authority, central trust server, or reputation service. A node's
-identity *is* its keypair. As of kernel v2.8.0:
+identity *is* its keypair. As of kernel v2.8.2:
 
 - **Identity is provable, not asserted.** A nodeId's bottom 256 bits are
   `SHA-256(pubkey)`, and every connection runs the `axona/4` handshake:
@@ -699,7 +699,7 @@ open" from "channels are open *and* carrying authenticated routing." A
 sustained `true` (across several polls) means the mesh looks connected
 but isn't actually routing; `boundCount`/`meshBound` are the honest
 usable-peer counts. Cheap; safe for a status dashboard. See the
-[API reference §8 health()](API-Reference-v2.8.0.md) for the full shape.
+[API reference §8 health()](API-Reference-v2.8.2.md) for the full shape.
 
 ### 8.4 Logs and errors
 
@@ -1152,16 +1152,15 @@ application layer.
 
 ### 13.6b Message size limit (and the silent-drop trap)
 
-A published message is capped at **256 KiB** (kernel ≥ v2.8.1; 64 KiB
-before), measured on the *serialized envelope*. Two things to know:
+A published message is capped at **256 KiB** (the cap rose from 64 KiB
+in kernel v2.8.1), measured on the *serialized envelope*. Two things to know:
 
-- **There's no client-side size error.** `peer.pub` does not pre-check
-  size — an oversized publish is signed, sent, and then **silently
-  dropped at the first root axon** (logged `publish-oversize-dropped`).
-  The publisher sees no rejection. So a "message that never arrives" is
-  often just over the cap. (The `PUBLISH_PAYLOAD_TOO_LARGE` error,
-  confusingly, fires only on *non-serializable* payloads — circular
-  refs, `BigInt` — not on size.)
+- **`peer.pub` rejects oversize up front** (kernel ≥ v2.8.2): you get
+  `PublishError(PUBLISH_PAYLOAD_TOO_LARGE)` immediately, so catch it and
+  handle large content differently rather than letting a message silently
+  fail. (The root axon also enforces the cap at ingress as
+  defense-in-depth.) A non-serializable message — circular ref, `BigInt` —
+  throws `PUBLISH_INVALID_MESSAGE` instead.
 - **Don't ship blobs over pub/sub even under the cap.** Every publish is
   replicated to K root axons, cached in their replay rings, and fanned to
   *all* subscribers — so a large message multiplies across the whole
@@ -1395,10 +1394,10 @@ UPGRADE_CLOSE_CODE   // 4426
 
 ## Where to go next
 
-- **[Quick Start](Quick-Start-v2.8.0.md)** — if someone you're onboarding has
+- **[Quick Start](Quick-Start-v2.8.2.md)** — if someone you're onboarding has
   five minutes, send them here instead of this 1500-line guide.
 
-- **[API Reference](API-Reference-v2.8.0.md)** — when you're past the
+- **[API Reference](API-Reference-v2.8.2.md)** — when you're past the
   conceptual material and just need the signature for a specific call.
 
 - **Read the source of the reference peer**:
