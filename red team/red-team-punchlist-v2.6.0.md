@@ -25,15 +25,16 @@ about where to spend effort first.
 | B-2 Lazy-axon promotion memory DoS | B-2 | **Critical** | **✅ resolved v2.7.0** |
 | B-3 Unauthenticated routing-table mutation (LTP poisoning/eclipse) | B-3 | High | **✅ resolved v2.8.0** |
 | B-4 Deferred publisher-signature verification | B-4 | High | **✅ resolved v2.7.0** |
-| C-2 Envelope freshness / replay | C-2 | High | open |
+| C-2 Envelope freshness / replay | C-2 | High | **✅ resolved v2.9.0** |
 | E-1 Targeted address grinding (Sybil placement) | E-1 | Medium | open |
 | (exec summary: DTLS-fingerprint channel binding) | A-1 | Critical | **✅ resolved v2.6.0** |
 
 **Wave 1 shipped (kernel v2.7.0, 2026-05-31):** B-1, B-2, B-4 (above) plus
 **C-1** (canonicalization → total/JSON-valid) and **D-1** (inbound size/count
 caps + adopt-subscribers `maxDirectSubs` enforcement). Both open Criticals are
-now closed. Remaining top items: **B-3** (routing integrity, the largest), then
-**C-2** (envelope freshness), then the bridge/privacy/identity waves.
+now closed. **B-3** (routing integrity) shipped v2.8.0; **C-2** (envelope
+freshness) + **E-4** (signature domain separation) shipped v2.9.0. Remaining top
+items: the bridge/privacy/identity waves (D-2, C-3, D-3; F-1/F-2; A-2, E-2, E-1).
 
 **What the external pass added beyond confirmation:**
 - A **simulator-vs-reality** section (§4 below) — assurance/realism gaps, not vulnerabilities.
@@ -64,13 +65,13 @@ Effort key: **S** ≤ half-day · **M** ~1–2 days · **L** multi-day / archite
 | 3 | **B-4** | High | Verify the publish envelope's Ed25519 signature at the **K-closest ingress** (root axons) *before* fan-out/caching — not only at the app edge. | **M** | Depends on **C-1** (canonicalization must be total first, or the verify is bypassable). Stops spam being amplified through the tree. |
 | 4 | **D-1** | High | Inbound size/count caps (json, `messages[]`, `peerRoots[]`, `subscriberIds[]`); close the `_onAdoptSubscribers` bypass of `maxDirectSubs`. | **S–M** | Natural to land with the pub/sub batch; blunts the amplification surface B-1/B-4 exploit. |
 
-### Wave 2 — Signature soundness & freshness  *(`pubsub/envelope.js`, canonical codec)*
+### Wave 2 — Signature soundness & freshness  *(`pubsub/envelope.js`, canonical codec)* — ✅ SHIPPED (C-1 v2.7.0; C-2 + E-4 v2.9.0)
 
 | # | ID | Sev | Fix | Effort | Notes |
 |---|----|-----|-----|--------|-------|
 | 5 | ~~**C-1**~~ ✅ | High | Make `canonical()` total + JSON-valid (target RFC 8785): no literal `undefined`, deterministic `NaN/Infinity/-0` handling. | **M** | **✅ SHIPPED v2.7.0** — total, matches JSON.stringify value semantics + stable key order; output-preserving for all previously-valid inputs (no flag-day). |
-| 6 | **C-2** | High | Add per-publisher monotonic sequence + strict TTL window (reject `|ts − now| > 300s`) to the signed envelope; enforce at the routing layer. | **M** | Envelope-format change ⇒ mild flag-day (verification side). Closes replay-to-fresh-subscribers. |
-| 7 | **E-4** | Low | Explicit domain-separation tag on envelope/post signing; remove `:`-delimiter ambiguity in CBV construction. | **S** | Cheap hardening; pairs with the envelope work. |
+| 6 | ~~**C-2**~~ ✅ | High | Add per-publisher monotonic sequence + strict TTL window (reject `|ts − now| > 300s`) to the signed envelope; enforce at the routing layer. | **M** | **✅ SHIPPED v2.9.0** — `seq`+`ts` folded under the signature (envelope format v2); freshness window + per-publisher seq high-water enforced at live ingress (`_onPublish`/`_onPublishDirect`), replay path exempt. Checked against the *signed* ts, not the unsigned wire `publishTs`. Coordinated flag-day (verification side only). |
+| 7 | ~~**E-4**~~ ✅ | Low | Explicit domain-separation tag on envelope/post signing; remove `:`-delimiter ambiguity in CBV construction. | **S** | **✅ SHIPPED v2.9.0** — envelope signature now covers a domain-tagged core (`ENVELOPE_DOMAIN = 'axona:pubsub-envelope:v2'`); folded into the C-2 flag-day. |
 
 ### Wave 3 — Routing integrity  *(`dht/AxonaPeer.js`, NH-1 learning handlers)* — ✅ B-3 SHIPPED v2.8.0 (verified-only admission + reinforce gate + local_probe cap; D-4 folded in)
 
@@ -110,11 +111,11 @@ Effort key: **S** ≤ half-day · **M** ~1–2 days · **L** multi-day / archite
 
 ## 3. Recommended sequencing (TL;DR)
 
-1. **C-1** (canonicalization) + **B-1** (subscribe origin) — foundational + highest-leverage, cheapest of the criticals.
-2. **B-2** + **B-4** + **D-1** — finish the Pub/Sub trust-boundary batch.
-3. **C-2** + **E-4** — envelope freshness once canonicalization is total.
-4. **B-3** — the routing-integrity keystone (largest single item; eclipse prevention).
-5. **D-2** + **C-3** + **D-3** — bridge/metrics hardening.
+1. ~~**C-1** (canonicalization) + **B-1** (subscribe origin)~~ ✅ v2.7.0 — foundational + highest-leverage, cheapest of the criticals.
+2. ~~**B-2** + **B-4** + **D-1**~~ ✅ v2.7.0 — finish the Pub/Sub trust-boundary batch.
+3. ~~**C-2** + **E-4**~~ ✅ v2.9.0 — envelope freshness once canonicalization is total.
+4. ~~**B-3**~~ ✅ v2.8.0 — the routing-integrity keystone (largest single item; eclipse prevention).
+5. **D-2** + **C-3** + **D-3** — bridge/metrics hardening.  ← **next**
 6. **F-1** + **F-2** — privacy quick wins.
 7. **A-2**, **E-2**, then **E-1** (after the PoW-vs-Vivaldi decision).
 

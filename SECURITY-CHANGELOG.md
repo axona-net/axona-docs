@@ -16,6 +16,45 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.9.0 — 2026-05-31
+
+### A captured message can't be replayed back into the feed (envelope freshness)
+
+Every signed pub/sub message now carries, *under its signature*, a freshness
+window and a per-publisher sequence number — so a message a node legitimately
+sent can't be **captured and re-injected later** as if it were live:
+
+- **Freshness window.** A signed message's timestamp is now covered by the
+  signature, and the topic's hosting nodes reject a live publish whose signed
+  timestamp is outside a bounded window of the present. A recorded message
+  therefore stops being accepted as "new" once it ages out — an attacker can no
+  longer rebroadcast last week's signed message to people who subscribe today.
+  Crucially, the check is on the *signed* timestamp, not the unsigned routing
+  metadata a replayer would control. (This is distinct from the legitimate
+  *replay-to-late-subscribers* feature, where a topic's own hosting node serves
+  its cached history to a peer that just subscribed — that path is unchanged.)
+- **Per-publisher sequence.** Each publisher stamps a monotonically increasing
+  number under the signature, seeded from the wall clock so it keeps climbing
+  across restarts. A hosting node tracks how far each publisher has advanced and
+  rejects a message that tries to rewind well behind that point — i.e. a replay
+  from earlier in the publisher's own stream — while still tolerating benign
+  network reordering of genuinely live messages. This also gives every topic a
+  deterministic ordering, the foundation for "give me the latest" semantics.
+- **Explicit domain separation on signatures.** The data a publisher signs is
+  now tagged with an explicit, versioned context label, so a signature produced
+  for a pub/sub message can never be lifted and presented as a valid signature
+  in a different part of the protocol, and there is no delimiter ambiguity in
+  what was signed.
+
+Together these close the message-replay gap that signing alone didn't cover:
+before, a signature proved *who wrote* a message but not *when* or *in what
+order*, so a valid old message stayed valid forever. This is a coordinated
+upgrade — the freshness and sequence fields are mandatory, so all peers, the
+bridge, and the demo move to v2.9.0 together — but it changes only what nodes
+*verify*, not any stored data.
+
+---
+
 ## Kernel v2.8.0 — 2026-05-31
 
 ### A peer earns its place in the routing table — gossip can't poison it (eclipse prevention)
