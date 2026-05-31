@@ -1,8 +1,8 @@
-# Axona Pub/Sub Lifecycle & Access-Control Design — v0.1
+# Axona Pub/Sub Lifecycle & Access-Control Design — v0.2
 
-**Status:** draft for review · **Target kernel:** v2.10.0+ · **Builds on:** kernel
-v2.9.0 (envelope format v2 — signed per-publisher `seq` + freshness window, findings
-C-2/E-4).
+**Status:** decisions locked (2026-05-31) — ready to implement · **Target kernel:**
+v2.10.0+ · **Builds on:** kernel v2.9.1 (envelope format v2 — signed per-publisher
+`seq` + freshness window, findings C-2/E-4).
 
 This document specifies a set of additions to the Axona pub/sub layer:
 
@@ -122,9 +122,18 @@ An owner-signed, versioned object stored on the topic's root axons:
 ### 1.5 Ownerless (Model 1) topics
 
 Public-mode topics have no owner key, so: no ACL, no `unpub`, no owner-set config.
-They use **protocol-default** queue size and hold time (§5, §6). Per-message `kill` by
-the *message creator* still works (creator = message signer), because that authority
-comes from the message's own signature, not from topic ownership.
+They use the **protocol defaults** — **`maxMessages = 100`, `maxHoldMs = 24 h`**
+(decided) — for queue size and hold time (§5, §6). Per-message `kill` by the *message
+creator* still works (creator = message signer), because that authority comes from the
+message's own signature, not from topic ownership.
+
+**Per-publisher quota (open topics only — decided).** Because anyone may publish to a
+Model 1 topic, a single publisher can flood the bounded queue and evict everyone else's
+messages (§5.3). Open topics therefore enforce a **per-publisher cap on how much of the
+queue one `signerPubkey` may occupy** (proposal: ⌈maxMessages / 4⌉, min 1), so no single
+anonymous publisher can flush the topic. **Owned topics (Models 2 & 3) do NOT get this
+quota** — their publishers are already gated by the owner-signed allow-list, so the owner
+is trusted to manage contention and an internal quota would only get in the way.
 
 ### 1.6 Key distribution for Model 3 (out of kernel scope, sketched)
 
@@ -134,6 +143,12 @@ a companion "key-envelope" topic the owner publishes member-wrapped keys to, or
 out-of-band. **Revocation requires re-keying** (issue a new group key to the remaining
 members) — heavier than bumping an ACL epoch, and the reason Model 3 membership churn is
 costlier than Model 2's. The kernel only ever sees ciphertext in `message`.
+
+> **Decision.** Group-key distribution is **fully application-layer** — the kernel ships
+> no blessed convention. The planned **open-source reference application** built on Axona
+> will implement Model 3 (member-wrapped group keys + re-keying on revocation) and serves
+> as the worked example others can follow; if a genuinely common pattern emerges there, we
+> can revisit promoting it to a kernel-level helper later.
 
 ---
 
@@ -257,9 +272,15 @@ peer.unpub(topic) → Promise<{ ok: boolean }>
 - **Owner-only**, proven by signing an `axona:pubsub-unpub:v1` object with the topic
   owner key (the key that seeds topicId). Mirrors `kill` but at queue scope.
 - **Unavailable on Model 1 (ownerless) topics** — there is no key to prove ownership.
-- **Scope:** drops all cached messages + emits a queue-level tombstone (so lagging
-  replicas don't resurrect). Topic metadata (ACL, config) persists unless an explicit
-  `{ destroy: true }` is passed. Subscriber list is soft state and ages out.
+- **Scope (decided):**
+  - **`peer.unpub(topic)`** — drops all cached messages + emits a queue-level tombstone
+    (so lagging replicas don't resurrect), but **keeps** the topic's owner-signed config
+    and ACL, so the owner can keep publishing into the same topic afterwards.
+  - **`peer.unpub(topic, { destroy: true })`** — **total removal**: messages **and** the
+    owner-signed config/ACL **and** any ownership/role state are dropped, leaving nothing
+    behind. The topicId can always be re-derived later, so the owner can re-create the
+    topic from scratch — but it comes back with default config and an empty ACL, not its
+    prior settings. Subscriber list is soft state and ages out either way.
 - Same distributed-delete + tombstone discipline as §3.4.
 
 ### 4.2 `unsub(topic)` — subscriber removes itself
@@ -297,11 +318,12 @@ fields, every replica evicts the **same** message — no divergence. (Today's
 - Bounding the count is itself a **DoS mitigation** (caps per-topic storage; reinforces
   D-1). Consider also a **total-bytes** cap, since 256 × 256 KiB × K ≈ tens of MiB per
   topic per replica.
-- **Open-topic hazard (must document):** small queues + `pub = anyone` (Model 1) =
-  **eviction flooding** (an attacker publishes `maxMessages` messages and flushes all
-  legitimate history) and, at size 1, **retained-slot defacement**. Both vanish under
-  Models 2/3 (publish is ACL-gated). Guidance: use small queues only with a publish
-  ACL; for open topics consider per-publisher quotas within the topic.
+- **Open-topic hazard → per-publisher quota (decided, Phase A).** Small queues +
+  `pub = anyone` (Model 1) invite **eviction flooding** (one publisher fills `maxMessages`
+  and flushes all legitimate history) and, at size 1, **retained-slot defacement**. Open
+  topics therefore cap how much of the queue one `signerPubkey` may hold (⌈maxMessages/4⌉,
+  min 1; see §1.5). Owned topics (Models 2/3) are gated by the publish ACL and are **not**
+  subject to this quota.
 
 ---
 
@@ -337,9 +359,10 @@ value. Clock skew across replicas yields a small divergence in *soft* expiry onl
 
 ### 6.3 Ownerless topics
 
-Model 1 topics use the protocol defaults for `maxMessages`/`maxHoldMs` (no owner to set
-config). Defaults are fixed by the kernel, not first-publisher-wins (which would be an
-abuse vector).
+Model 1 topics use the protocol defaults — **`maxMessages = 100`, `maxHoldMs = 24 h`**
+(decided) — fixed by the kernel, not first-publisher-wins (which would be an abuse
+vector). The 48 h cap still applies as the absolute ceiling for owner-set values on
+owned topics.
 
 ---
 
@@ -380,10 +403,11 @@ Each signed object carries its **own domain tag** (E-4 discipline): `axona:pubsu
 ## 9. Phasing
 
 1. **Phase A — lifecycle on the existing single-owner model** (no ACL yet):
-   `peer.unsub` (formalize) → `peer.kill` + tombstones → `peer.unpub` → bounded queue
-   (ordered eviction) + absolute-ceiling TTL + `pull`-latest. All of this works on
-   today's owner-keyed + public topics and needs no new trust object beyond the kill/
-   unpub/config signatures.
+   `peer.unsub` (formalize) → `peer.kill` + tombstones → `peer.unpub` (+ `{destroy:true}`
+   total removal) → bounded queue (ordered eviction, default `maxMessages=100`) +
+   **per-publisher quota on open topics** + absolute-ceiling TTL (default/ceiling
+   `maxHoldMs=24 h`, cap 48 h) + `pull`-latest. All of this works on today's owner-keyed +
+   public topics and needs no new trust object beyond the kill/unpub/config signatures.
 2. **Phase B — Model 2** publisher ACL (owner-signed, epoch'd) + ingress membership check.
 3. **Phase C — Model 3** = Model 2 + app-layer group-key encryption (kernel unchanged;
    document the key-distribution pattern + the re-keying-on-revocation cost).
@@ -393,15 +417,24 @@ SECURITY-CHANGELOG (for the authorization-relevant parts) → coordinated deploy
 
 ---
 
-## 10. Open questions for review
+## 10. Resolved decisions (2026-05-31)
 
-1. **Default `maxMessages` / `maxHoldMs`** for ownerless (Model 1) topics — propose
-   100 messages / 24 h. Agree?
-2. **Per-publisher quota within a topic** for open topics — ship in Phase A or defer?
-   (It's the real fix for eviction-flooding; without it, small open topics are abusable.)
-3. **`unpub { destroy: true }`** — should destroying a topic also clear its owner-signed
-   config/ACL, or leave them so the topic can be cleanly re-opened by the owner later?
-4. **Kill tombstone lifetime** — confirm "remaining hold window" is sufficient; a topic
-   with a 48 h hold keeps tombstones up to 48 h. Acceptable storage?
-5. **Group-key transport for Model 3** — companion key-envelope topic vs out-of-band; do
-   we want a kernel-blessed convention or leave it fully app-layer?
+All five review questions are settled; this section is the record.
+
+1. **Default `maxMessages` / `maxHoldMs` for ownerless (Model 1) topics → `100` / `24 h`.**
+   Kernel-fixed; the 48 h cap remains the absolute ceiling for owner-set values on owned
+   topics. (§1.5, §6.3)
+2. **Per-publisher quota → ship in Phase A, OPEN (Model 1) topics ONLY.** Caps how much of
+   the bounded queue one `signerPubkey` may occupy (⌈maxMessages/4⌉, min 1) so an anonymous
+   publisher can't flush the topic. Owned topics (Models 2/3) are exempt — the owner-signed
+   publish ACL already governs who may publish, and an internal quota would only get in the
+   owner's way. (§1.5, §5.3)
+3. **`unpub { destroy: true }` → total removal.** Messages **and** owner-signed config/ACL
+   **and** ownership/role state are dropped. Plain `unpub` (no flag) drops only the message
+   queue and keeps config/ACL so the owner can keep publishing. (§4.1)
+4. **Kill tombstone lifetime → the remaining hold window is sufficient** (≤ 48 h on a
+   max-hold topic). Acceptable storage for now; revisit if it proves heavy in practice. (§3.4)
+5. **Group-key transport for Model 3 → fully application-layer; no kernel convention.** The
+   planned open-source reference application implements it (member-wrapped keys + re-keying
+   on revocation) and stands as the worked example; promote to a kernel helper only if a
+   common pattern clearly emerges. (§1.6)
