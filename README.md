@@ -95,6 +95,12 @@ document's footer / title and produce a fresh versioned PDF in the same commit.
 The previous PDF moves to `history/<section>/` so the canonical file is always
 the most recent version at the top level.
 
+**Security-relevant changes** (in any Axona repo): update
+[`SECURITY-CHANGELOG.md`](SECURITY-CHANGELOG.md) in the same batch — resolved
+items only, keyed to kernel version, described by *what's now protected* (never
+enumerate still-open findings, which live only in the private red-team
+register). The code repos' PR templates carry this same reminder.
+
 ## License
 
 Documents in this repository are released under the same terms as the protocol
