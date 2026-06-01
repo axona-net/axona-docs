@@ -4,7 +4,7 @@ size: 16:9
 theme: default
 paginate: true
 header: ""
-footer: "AXONA · v0.19 · May 2026"
+footer: "AXONA · v0.20 · June 2026"
 style: |
   /* ── Tufte-inspired typography + cream paper ─────────────────── */
   @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Inconsolata:wght@400;500&display=swap');
@@ -164,7 +164,7 @@ style: |
 
 <div class="meta">
 
-May 2026 · v0.19 · pre-seed pitch
+June 2026 · v0.20 · pre-seed pitch
 Source: <a href="https://github.com/axona-net">github.com/axona-net</a> · live: <a href="https://axona.net">axona.net</a> · simulator: <a href="https://axona-net.github.io/dht-sim/">axona-net.github.io/dht-sim</a>
 Contact: <a href="mailto:davidasmith@gmail.com">davidasmith@gmail.com</a>
 
@@ -298,6 +298,10 @@ Publishers see aggregate <code>publishes</code>, <code>subscribers</code>, and <
 - Reference resolution via on-demand <code>pull</code>
 - Per-relay reach metrics
 
+#### Hardened, not hypothetical
+
+Authenticated handshake, DTLS channel binding, replay-proof signed envelopes, and eclipse-resistant routing admission — shipped, with a public <a href="https://github.com/axona-net/axona-docs/blob/main/SECURITY-CHANGELOG.md">security changelog</a>. Self-authenticating throughout: no CA, no central trust server.
+
 #### What's NOT in the protocol
 
 - Encryption scheme — application choice
@@ -306,7 +310,7 @@ Publishers see aggregate <code>publishes</code>, <code>subscribers</code>, and <
 
 #### Live now
 
-<code>@axona/protocol</code> v2.1.0 kernel · <code>axona.net</code> browser peers · <code>bridge.axona.net</code> signaling · <code>dht-sim</code> 50,000-node simulator. All open source, MIT-licensed.
+<code>@axona/protocol</code> v2.10.0 kernel · <code>axona.net</code> browser peers · <code>bridge.axona.net</code> signaling · <code>dht-sim</code> 50,000-node simulator. All open source, MIT-licensed.
 
 </div>
 </div>
@@ -321,7 +325,7 @@ Publishers see aggregate <code>publishes</code>, <code>subscribers</code>, and <
 # Three layers. Two contracts. Same code in the lab and in deployment.
 
 - <span class="head">Application layer.</span>
-  Four pub/sub verbs (<code>pub</code> · <code>sub</code> · <code>pull</code> · <code>metrics</code>), plus direct messaging, mesh introspection, and lifecycle — the <code>AxonaPeer</code> surface in the kernel.
+  Pub/sub (<code>pub</code> · <code>sub</code> · <code>unsub</code> · <code>pull</code> · <code>metrics</code>) plus creator/owner-controlled lifecycle (<code>kill</code> a message · <code>unpub</code> a topic), direct messaging, and mesh introspection — the <code>AxonaPeer</code> surface in the kernel.
 - <span class="head">Protocol layer.</span>
   Where the routing decisions live. Axona's brain-inspired learning rules (vitality, hop caching, axonal trees) sit in this slot. <strong>So does K-DHT. So does G-DHT.</strong> Same slot, swappable protocol — the architectural property that made the 47-design benchmark grid possible.
 - <span class="head">Transport layer.</span>
@@ -338,7 +342,7 @@ Every peer-to-peer connection carries a <em>vitality</em> score that increases w
 
 #### Where the code lives
 
-<code>@axona/protocol</code> v2.1.0 kernel package (<code>AxonaPeer</code>, <code>AxonaDomain</code>, <code>Transport</code>) — npm-published, MIT-licensed, gated by the kernel-regression and pub/sub-cascade smoke suites.
+<code>@axona/protocol</code> v2.10.0 kernel package (<code>AxonaPeer</code>, <code>AxonaDomain</code>, <code>Transport</code>) — npm-published, MIT-licensed, gated by the kernel-regression and pub/sub-cascade smoke suites.
 
 </div>
 </div>
@@ -579,8 +583,8 @@ Every node — human, AI agent, IoT device, sensor, service — that needs dynam
   Adapters for MCP, A2A, OpenAI Agents alongside the SDK. Target: <span class="num">1,000 active nodes</span>.
 - <span class="head">Q4 2026 — Federated bridge mesh.</span>
   No single point of dependency; any operator can run a bridge. Target: <span class="num">10,000 active nodes</span>.
-- <span class="head">Q1 2027 — Hybrid post-quantum identity + adversarial hardening.</span>
-  Ed25519 + ML-DSA; adversarial pass on partition, eclipse, sybil. Target: <span class="num">100,000 active nodes</span>.
+- <span class="head">Q1 2027 — Hybrid post-quantum identity + Byzantine-fault frontier.</span>
+  Ed25519 + ML-DSA. The eclipse / replay / tamper / partition vectors are already hardened (shipped, public changelog); the remaining frontier is Byzantine "black-hole" forwarding faults and Sybil-placement cost, modelled at scale first. Target: <span class="num">100,000 active nodes</span>.
 
 </div>
 <div class="margin">
@@ -596,7 +600,7 @@ Every node — human, AI agent, IoT device, sensor, service — that needs dynam
 #### Known risks
 
 1. <strong>Walled gardens may successfully wall.</strong> Mitigation: target the long tail, not the giants.
-2. <strong>Routing under adversarial conditions untested.</strong> Mitigation: Q1 2027 adversarial pass.
+2. <strong>Byzantine forwarding faults at scale.</strong> Eclipse, replay, and tampering are hardened today; silent "black-hole" relays remain the open frontier. Mitigation: heterogeneous-protocol simulator + forwarding-vitality route-around.
 3. <strong>Network effect may not compound before vendor stacks entrench.</strong> Mitigation: faster cadence than vendor SDK iteration.
 
 #### Contact
