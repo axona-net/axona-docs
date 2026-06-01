@@ -1,0 +1,633 @@
+% =====================================================================
+% Axona Applications
+% David A. Smith, Axona.net
+%
+% Compile with:  pdflatex Axona-Applications.tex   (run twice for refs)
+%            or:  tectonic -X compile Axona-Applications.tex
+% Requires: tufte-latex, booktabs, microtype, xcolor (all standard TeX Live)
+%
+% Typographic style matches the Axona Explainer (tufte-handout).
+% =====================================================================
+
+\documentclass[nobib]{tufte-handout}
+
+\usepackage[utf8]{inputenc}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{fancyhdr}
+\usepackage{etoolbox}
+\usepackage{needspace}
+
+% Prevent section-heading orphans (heading stranded at the bottom of a
+% page).  \needspace reserves vertical room before each heading; if the
+% page lacks it, LaTeX breaks before the heading instead of after.
+\pretocmd{\section}{\needspace{6\baselineskip}}{}{}
+\pretocmd{\subsection}{\needspace{4\baselineskip}}{}{}
+
+\definecolor{rust}{RGB}{185,78,54}
+\definecolor{rustsoft}{RGB}{212,168,150}
+\definecolor{inkmuted}{RGB}{102,102,102}
+
+% Roman numeral sections to match the Tufte-book typography
+\setcounter{secnumdepth}{1}
+\renewcommand{\thesection}{\Roman{section}}
+
+\title{Axona Applications}
+\author[David A. Smith]{David A. Smith \\[0.3em] \emph{\small Axona.net}}
+\date{}
+
+\begin{document}
+
+% fancyhdr-based plain style: bypasses tufte-handout's letterspaced
+% running heads (which break on some page-break points) but keeps
+% visible page numbers at the foot.
+\fancypagestyle{axonaplain}{%
+  \fancyhf{}%
+  \renewcommand{\headrulewidth}{0pt}%
+  \fancyfoot[C]{\thepage}%
+}
+
+% --------------------------------------------------------------------
+% Custom title page
+% --------------------------------------------------------------------
+\thispagestyle{empty}
+\null\vfill
+\begin{center}
+{\fontsize{48}{52}\selectfont \textsc{Axona}\par}
+\vspace{0.4em}
+{\Large\itshape Applications\par}
+\vspace{3.5em}
+{\large\itshape What runs on Axona today, what gets better if it\\
+migrates, and what we are building next.\par}
+\vspace{4em}
+{\large David A.~Smith\par}
+{\itshape\small Axona.net\par}
+\vspace{2em}
+{\small An Axona Applications Note \quad v0.1 \quad 2026-06-01\par}
+\end{center}
+\vfill
+\null
+\newpage
+
+% --------------------------------------------------------------------
+% Epigraph page
+% --------------------------------------------------------------------
+\thispagestyle{empty}
+\null\vfill
+\begin{flushright}
+\itshape The protocol's defaults are the product's features.\par
+\end{flushright}
+\vfill
+\null\newpage
+
+% --------------------------------------------------------------------
+% Body opens with page numbers
+% --------------------------------------------------------------------
+\pagestyle{axonaplain}
+\thispagestyle{axonaplain}
+
+\section*{How to Read This}
+
+\newthought{This document has two parts.}
+
+\textbf{Part~I --- Existing Applications: A Deep Dive} examines the
+dozen applications that depend on a DHT today, and what changes for
+each if its discovery and propagation layer moves to Axona. It is
+adapted from the whitepaper chapter of the same name and refreshed to
+the \emph{current} state of the protocol: Axona is no longer a
+simulator result, it is a live, browser-native network
+(\texttt{@axona/protocol} v2.10.0) with an authenticated handshake,
+signed and freshness-bounded messages, and a full pub/sub
+lifecycle. Where that shipped reality strengthens --- or qualifies ---
+the original projection, the text says so.
+
+\textbf{Part~II --- Future Applications: Axona Powered} covers the
+applications we are building \emph{on} Axona rather than migrating
+\emph{to} it: \texttt{civildefense.io} (the first end-user
+application), \textsc{Syzl} (the adaptive social feed), and a
+deliberately open pipeline for what comes next.
+
+\marginnote{\emph{On the numbers.} Latency figures in Part~I are
+back-of-envelope projections from the 25{,}000-node benchmark in the
+whitepaper, applied to each application's typical workload. They are
+projections, not field measurements of the migrated application, and
+are marked as such throughout. What is \emph{not} a projection is the
+protocol surface itself --- the API verbs, the security properties, the
+lifecycle semantics --- which is live and testable today.}
+
+% =====================================================================
+\section{Existing Applications: A Deep Dive}
+% =====================================================================
+
+\newthought{For each application:} what it does, the DHT layer it uses
+now, that layer's performance profile, where it falls short of user
+expectations, and what changes if it migrates to Axona.\sidenote{%
+Streaming-class applications --- those that become possible only with
+Axona's latency budget but do not exist today --- are the subject of
+Part~II, not this part.}
+
+\subsection{What ``migrate to Axona'' means in 2026}
+
+When the original chapter was written, ``N-DHT / NH-1'' was a
+simulator. The claims below now rest on a deployed substrate, which
+changes their character from \emph{hypothesis} to \emph{engineering
+estimate}:
+
+\begin{itemize}
+\item \textbf{Browser-native and live.} Axona was designed for the
+WebRTC environment from the start. The reference network runs at
+\texttt{axona.net} via the \texttt{axona-peer} browser node and the
+\texttt{axona-bridge} signaling broker.\sidenote{The bridge carries
+WebRTC offer/answer payloads only and then drops out --- it sees no
+application traffic, and any operator can run one. A federated bridge
+mesh is on the roadmap.}
+\item \textbf{Authenticated, not anonymous-by-accident.} Every peer
+link is established through the \texttt{axona/4} authenticated
+handshake, with the mesh channel-binding value bound to the DTLS
+certificate fingerprints --- so a relaying bridge cannot transparently
+intercept ``direct'' peer traffic.
+\item \textbf{Signed and fresh.} Every published message is an
+Ed25519-signed envelope (format v2) over a domain-tagged core carrying
+a per-publisher monotonic sequence number and timestamp, with a
+freshness window enforced at ingress. Replay-to-fresh-subscribers is
+closed.
+\item \textbf{A real lifecycle, not just fan-out.} Beyond
+\texttt{pub}/\texttt{sub}, the kernel now exposes \texttt{unsub},
+\texttt{pull} (by id \emph{or} latest), \texttt{kill} (creator-only
+delete with tombstones), \texttt{unpub} (owner-only topic destroy),
+bounded per-topic queues with deterministic eviction, and a hold-time
+TTL.\sidenote{24-hour default, 48-hour ceiling, sliding on pull.}
+Membership-gated topics are supported via shared-encryption group keys
+at the application layer.
+\end{itemize}
+
+With that substrate in place, the per-application analysis follows.
+
+\subsection{BitTorrent (Mainline DHT)}
+
+\textbf{What it does.} Mainline DHT is BitTorrent's trackerless
+peer-discovery layer: a torrent's \texttt{info\_hash} maps into the
+keyspace, swarm peers register under that key, and new peers query the
+DHT to find the swarm.
+
+\textbf{Current implementation.} Kademlia, 160-bit IDs, $K{=}8$
+buckets, $\alpha{=}3$ parallel queries.\sidenote{The largest production
+DHT in the world by node count --- an estimated 10--20 million nodes at
+peak.}
+
+\textbf{Performance \& shortfall.} Cold-start \texttt{get\_peers}
+latency is typically 5--30~s, dominated by the iterative
+$\alpha$-parallel walk through globally-scattered random-ID peers.
+Modern clients hide this behind a centralized tracker for the first
+discovery round; the DHT is the tracker-resistance \emph{backup}, not
+the primary path --- precisely because the cold-start latency is
+unacceptable for a primary path.
+
+\textbf{What Axona changes.} Mainline lookups translate directly (same
+operation, same data model). Projected lookup latency drops to
+$\sim$250--300~ms at 25K nodes --- a 20--100$\times$ improvement that
+collapses the user-visible delay below the threshold where tracker
+fallback adds value. The qualitative shift: the DHT becomes \emph{the}
+discovery layer, not a fallback.
+
+\subsection{IPFS / Filecoin / libp2p}
+
+\textbf{What it does.} Content-addressable storage: content is
+referenced by a CID, and the libp2p Kad-DHT routes lookups to peers
+that announced they hold it.
+
+\textbf{Current implementation.} libp2p Kad-DHT (Kademlia variant),
+default $K{=}20$, $\alpha{=}3$, tens of thousands of nodes.
+
+\textbf{Performance \& shortfall.} CID lookup averages 1--5~s;
+provider-record retrieval adds 1--3~s; end-to-end first-byte from cold
+cache is 5--15~s --- 25--300$\times$ slower than a centralized HTTP CDN
+(50--200~ms). The IPFS gateway tier exists to paper over this with
+centralized servers. Separately, \texttt{libp2p-pubsub} (gossipsub) for
+IPNS updates carries its own mesh-scaling challenges.
+
+\textbf{What Axona changes.} DHT-layer lookups drop to
+$\sim$250--300~ms (projection), making end-to-end first-byte
+$\sim$500~ms--1~s --- a 10--20$\times$ improvement that turns
+CDN-replacement viability from hypothetical into a real question.
+Axona's axonal pub/sub trees would replace gossipsub for IPNS updates
+with bounded per-relay fan-out cost. The combination makes IPFS
+deployable on browser-class infrastructure for both halves, which it
+currently is not.
+
+\subsection{Ethereum (discv5)}
+
+\textbf{What it does.} discv5 is Ethereum's peer-discovery layer --- how
+a new node finds peers --- using a Kademlia variant with
+verifiable-identity ENRs.
+
+\textbf{Performance \& shortfall.} Cold-start peer acquisition takes
+30~s to several minutes (Kademlia walk plus per-peer ENR verification
+round-trips). For an on-demand join (a fresh validator, a new searcher)
+that is operational friction; mempool gossip via gossipsub adds a
+latency-sensitive scaling dimension the static Kademlia table cannot
+adapt to.
+
+\textbf{What Axona changes.} Discovery latency drops 10--50$\times$ for
+the DHT layer (projection). The locality-aware bootstrap gives new
+nodes regionally-sensible initial peer sets --- which matters more for
+Ethereum than BitTorrent because mempool propagation is
+latency-sensitive. Axona's axonal trees are a natural fit for
+``broadcast a transaction to all interested validators in a region,''
+addressing the gossipsub limitation directly.\sidenote{Axona's
+authenticated handshake maps cleanly onto discv5's identity
+requirements --- the migration does not trade away ENR-style verifiable
+identity.}
+
+\subsection{Bitcoin Block / Transaction Propagation}
+
+\textbf{What it does.} Bitcoin propagates blocks and transactions
+through a peer-to-peer mesh: DNS-seed bootstrap, \texttt{addr}-message
+peer discovery, gossip propagation.
+
+\textbf{Performance \& shortfall.} Full-block propagation averages
+1--3~s (compact blocks reduce the announce to a few hundred ms plus a
+re-request); mempool transaction latency is 50--200~ms. The flooded
+gossip is \emph{not} locality-aware --- a US-east $\to$ Asia transaction
+may route through Europe --- and MEV concentrates around peers with
+privileged low-latency access to miners.
+
+\textbf{What Axona changes.} Locality-aware discovery solves regional
+clustering; nodes find nearby peers by default and transactions
+propagate along short-path edges. Compact-block propagation becomes
+routed pub/sub: every node subscribes to a block-announcement topic,
+the miner publishes, the axonal tree fans out at $\sim$100~ms at 50K
+nodes (projection). The tree is built once and reused rather than
+re-running inventory exchange per peer per round, and peer-to-miner
+latency becomes a property of geography rather than peering
+relationships --- the privileged-peer problem partially dissolves.
+
+\subsection{Tor Onion Services v3}
+
+\textbf{What it does.} Self-authenticating, location-hidden endpoints;
+descriptor lookup is mediated by the HSDir hash ring.
+
+\textbf{Performance \& shortfall.} Rendezvous takes 5--15~s end-to-end,
+dominated by Tor circuit setup; the descriptor lookup itself adds
+1--3~s. HSDir nodes are infrastructure-tier (a centralization
+concession), and descriptor caching is short-lived --- popular services
+see fetch storms.
+
+\textbf{What Axona changes.} The descriptor lookup itself drops to
+$\sim$300~ms (projection), though the Tor circuit still dominates total
+cost. The structural benefit is decentralizing the HSDir tier: Axona's
+hop-caching deposits descriptors at any node along the lookup path,
+widening the descriptor-fetch tier beyond designated relays. The
+directory-authority trust model is unchanged --- Axona widens the cache
+tier, it does not replace Tor's anonymity design.
+
+\subsection{Storj / Sia (Decentralized Storage)}
+
+\textbf{What it does.} Files are sharded, encrypted, and replicated
+across provider nodes; the DHT mediates shard placement and retrieval.
+
+\textbf{Performance \& shortfall.} Storj shard retrieval is 200--800~ms
+for a 4~KB shard (dominated by the connection to a remote provider, not
+the lookup); provider discovery at edge is $\sim$1~s. Placement is
+\emph{region-blind} --- a Berlin user may hold shards in S\~ao Paulo.
+
+\textbf{What Axona changes.} Locality-aware placement: shards land on
+providers in the user's S2 cell with high probability, dropping
+retrieval to the regional budget ($\sim$100--200~ms, projection).
+Repair coordination (replacing a shard when a provider drops) becomes
+an axonal-tree topic with high delivery under churn --- and the new
+lifecycle verbs give it explicit semantics: a provider going offline is
+a \texttt{kill}/tombstone event, not an inference from silence.
+
+\subsection{Tox / Briar (Peer-to-Peer Messengers)}
+
+\textbf{What it does.} Serverless peer-to-peer messengers. Tox uses a
+Kademlia DHT for contact discovery; Briar uses hybrid local + overlay
+routing.
+
+\textbf{Performance \& shortfall.} Tox contact-availability checks take
+2--10~s; NAT makes initial establishment slower. \emph{Group chat is
+expensive} --- every message goes to every member, making large groups
+infeasible --- and ``contact came online'' requires polling because
+there is no real pub/sub.
+
+\textbf{What Axona changes.} Contact discovery drops to $\sim$250~ms
+(projection), comparable to a centralized messenger's offline-status
+check. Group chat becomes a pub/sub topic: bounded per-hop fan-out
+scaling to thousands of members; ``came online'' becomes an automatic
+event. Crucially, the membership and privacy story is now real, not
+aspirational: a private group is a \textbf{shared-encryption topic}
+(the group key is distributed at the app layer; the protocol carries
+opaque ciphertext and gates nothing it shouldn't), and
+\texttt{kill}/\texttt{unsub}/\texttt{unpub} give first-class
+leave/remove/teardown. This is the first peer-to-peer messenger
+architecture that scales to large groups with a centralized service's
+latency profile \emph{and} a credible membership model.
+
+\subsection{YaCy (Decentralized Search)}
+
+\textbf{What it does.} A peer-to-peer search engine --- each peer crawls
+part of the web; a custom DHT mediates shared indexing and query
+distribution.
+
+\textbf{Performance \& shortfall.} Queries take 2--30~s (index lookup
+plus query distribution, both $\sim\!\log N$ on a high
+$\sim$200--500~ms per-peer constant). Against Google's $\sim$200~ms
+median this is unusable interactively --- the UX gap is why YaCy stayed
+a research curiosity.
+
+\textbf{What Axona changes.} DHT-layer query distribution drops to
+$\sim$250~ms (projection); shard-level result caching via hop caching
+makes an interactive YaCy-like engine plausible. Ranked aggregation
+across shards is a separate algorithmic problem, and beating Google
+needs decades of ranking infrastructure --- but the \emph{latency
+floor} stops being the disqualifying factor.
+
+\subsection{Radicle (Decentralized Git Forge)}
+
+\textbf{What it does.} Peer-to-peer git collaboration; repositories
+addressed by peer-ID, a DHT layer for repository discovery, custom
+routing for pull requests.
+
+\textbf{Performance \& shortfall.} Repository discovery is 1--3~s;
+change-set propagation is 5--30~s --- making ``find a project, browse
+it'' feel slow versus GitHub and ``watch this repo'' poll-based rather
+than push-based.
+
+\textbf{What Axona changes.} Repository discovery drops to
+$\sim$300~ms (projection); change-set propagation becomes a
+\texttt{commits-on-this-repo} axonal topic with $\sim$200~ms fan-out,
+making the forge interactive in the GitHub sense, not just
+browsable.\sidenote{The signed-envelope sequence numbers give watchers
+a tamper-evident, gap-detectable commit feed for free.}
+
+\subsection{Handshake / ENS (Decentralized DNS)}
+
+\textbf{What it does.} Decentralized name resolution; ownership
+recorded on-chain, a DHT-like layer caches recent lookups.
+
+\textbf{Performance \& shortfall.} Hot cached lookups are
+$<$100~ms; cold lookups hit the chain and take seconds to minutes, so
+cache hit-rate dominates. The cache tier is operated by infrastructure
+peers (a centralization tradeoff) because random-Kademlia caching does
+not scale.
+
+\textbf{What Axona changes.} Hop caching makes the cache tier
+\emph{implicit}: every routed lookup deposits its result at intermediate
+nodes, popular names accrue shortcuts naturally, and the explicit
+caching infrastructure becomes unnecessary. Cold-cache latency drops
+because the routing itself is faster.
+
+\subsection{WebTorrent / WebRTC P2P}
+
+\textbf{What it does.} BitTorrent for browsers over WebRTC data
+channels, bridged to Mainline DHT for peer discovery (most browsers
+cannot speak Mainline directly).
+
+\textbf{Performance \& shortfall.} Discovery is 5--30~s (Mainline
+latency plus bridge overhead). The \emph{Mainline-DHT bridge is a
+centralization concession driven entirely by the protocol's inability
+to run in browsers} --- the bridge operators are a single point of
+failure and surveillance.
+
+\textbf{What Axona changes.} Axona \emph{is} a browser-native DHT ---
+the cleanest fit in the catalogue. WebTorrent on Axona eliminates the
+\emph{discovery} bridge: peer discovery runs in-browser at the regional
+budget (100--300~ms), and the browser becomes a first-class
+peer-to-peer participant.\sidenote{Axona still uses a lightweight
+\emph{signaling} bridge for WebRTC NAT traversal, but it carries no
+application or discovery traffic and drops out once peers are connected
+--- a categorically smaller role than the Mainline-DHT bridge it
+replaces.} The connection-cap analysis shows this is sustainable on
+browser-class infrastructure.
+
+\subsection{Mastodon-Style Federations (No DHT Today)}
+
+\textbf{What it does.} A federation of independent ActivityPub servers;
+users follow accounts on other servers, and the home server fetches and
+serves federated content.
+
+\textbf{Current implementation.} No DHT. Discovery via WebFinger
+(centralized per-domain handle resolution); cross-server delivery via
+direct HTTP push from the publisher's home server to each subscriber's
+home server.
+
+\textbf{Performance \& shortfall.} Home servers (often small VPS) show
+200--2000~ms under load; popular-post federation can lag by minutes due
+to per-subscriber-server fan-out. The \emph{home-server-as-bottleneck}
+pattern means a viral post on a small instance can take the instance
+down, because every other instance's followers fetch from the
+publisher's home.
+
+\textbf{What Axona changes.} This is the application that becomes
+\emph{architecturally different}. Handle resolution becomes an Axona
+lookup (independent of home-server load). Status delivery becomes an
+axonal-tree topic per follower-graph cluster: a viral post fans out via
+the tree at bounded per-relay cost, never saturating any single home
+server. Home servers keep durable storage and WebFinger origin
+authority, but the fan-out load moves to the DHT layer --- making small
+servers stop being single points of failure for their users' reach.
+
+\subsection{Summary of Improvements}
+
+\begin{table*}[ht]
+\centering
+\small
+\begin{tabular}{@{}p{0.20\linewidth}p{0.36\linewidth}p{0.36\linewidth}@{}}
+\toprule
+\textbf{Application} & \textbf{Current bottleneck} & \textbf{Axona improvement} \\
+\midrule
+BitTorrent (Mainline) & 5--30\,s cold lookup & $\sim$300\,ms; primary path possible \\
+IPFS / Filecoin & 5--15\,s first-byte & $\sim$1\,s; CDN-replacement viable \\
+Ethereum discv5 & Multi-minute join, mempool latency & $\sim$1\,s join, locality-aware mempool \\
+Bitcoin propagation & Region-blind, MEV-prone & Locality-aware, axonal-tree announce \\
+Tor onion services & DHT minor; HSDir centralization & Wider HSDir tier, faster lookups \\
+Storj / Sia & Region-blind shard placement & Locality-aware shards + repair pub/sub \\
+Tox / Briar messengers & Slow group chat, polling status & Pub/sub group chat, push status, real membership \\
+YaCy & 5--30\,s queries & $\sim$300\,ms DHT layer; interactive plausible \\
+Radicle & 5--30\,s changeset propagation & $\sim$200\,ms via axonal pub/sub \\
+Handshake / ENS & Cold-cache slow & Implicit caching via hop caching \\
+WebTorrent & Mainline-DHT discovery bridge & Discovery bridge eliminated; browser-native \\
+Mastodon-style federation & Home-server bottleneck & Decentralized fan-out via axonal trees \\
+\bottomrule
+\end{tabular}
+\caption{Cross-application summary. Latency numbers are projections
+from the 25K-node benchmark; production deployments need the
+friction-realistic simulator extensions to confirm.}
+\label{tab:apps-summary}
+\end{table*}
+
+\newthought{The pattern.} The DHT layer is rarely the \emph{only}
+bottleneck, but it is consistently \emph{a} bottleneck, and moving to
+Axona consistently moves it out of the user-visible critical path. The
+biggest beneficiaries are the interactive applications (messengers,
+search, dev forges) where DHT latency sits in the user's path; the
+least are those where the DHT is already a small fraction of total
+latency (Tor circuits, Storj's remote-provider connection). The
+application that becomes \emph{architecturally different} is the
+federation pattern, because Axona's pub/sub primitive replaces the
+home-server fan-out those patterns suffer under.
+
+\textbf{Honest framing.} We keep the federation claim modest: the
+architecture is \emph{enabled}, not necessarily preferable in every
+dimension. And the latency figures remain projections until measured on
+the friction-realistic substrate. What changed since the original
+chapter is the floor under those projections --- the protocol is no
+longer a simulator artifact but a live, authenticated,
+signed-and-fresh network with a real lifecycle.
+
+% =====================================================================
+\section{Future Applications: Axona Powered}
+% =====================================================================
+
+\newthought{Part~I asked} ``what gets better if an existing app
+migrates?'' Part~II asks the opposite: ``what do we build that
+\emph{only} Axona makes practical?'' These are applications designed
+Axona-native from the first line --- they consume the pub/sub lifecycle,
+the geographic locality, the signed-and-fresh envelopes, and the
+no-central-operator property as load-bearing features, not
+conveniences.
+
+\subsection{civildefense.io --- the flagship}
+
+\textbf{What it is.} A tap-to-report incident map. A user taps a
+location to register a concern; reports propagate over anonymous
+peer-to-peer with a 24-hour expiry, surfacing on a shared regional map
+without any central server holding the data.
+
+\textbf{Why it is Axona-native.} Every primitive the app needs is a
+protocol primitive:
+
+\begin{itemize}
+\item \textbf{Geographic locality is the product.} The S2 cell prefix
+in every nodeId means a report is relevant to, and routes toward, the
+people physically near it --- at zero coordination cost. An incident map
+is, structurally, a geographically-keyed pub/sub feed, which is exactly
+what Axona routes.
+\item \textbf{Expiry is a first-class semantic now, not a side
+effect.} The original brief leaned on implicit expiry through the
+replay-cache LRU. With the v2.10.0 lifecycle, the 24-hour window is the
+\textbf{hold-time TTL} --- an explicit, principled bound, so reports age
+out deterministically rather than whenever the cache happens to evict
+them.
+\item \textbf{Signed, fresh, and tamper-evident.} Reports are
+Ed25519-signed envelopes with per-publisher sequence numbers and a
+freshness window --- so a stale or replayed report cannot be re-injected
+at a fresh subscriber, which matters acutely for an incident feed.
+\item \textbf{Anonymous but authenticated transport.} The
+\texttt{axona/4} handshake plus mesh channel-binding means reports
+travel end-to-end without a central operator and without a relaying
+bridge being able to read or rewrite them.
+\end{itemize}
+
+\textbf{What it still needs from us.} A membership-gated variant
+(e.g.\ a verified-responder channel) wants \textbf{Model~3
+shared-encryption group keys} --- the group key distributed at the
+application layer, the protocol carrying opaque
+ciphertext.\sidenote{\texttt{civildefense.io} is one of the two worked
+references --- alongside the open-source reference app --- driving that
+app-layer group-key design.}
+
+\textbf{Status.} First end-user application; the primitive fit is why
+it came together in weeks rather than quarters.
+
+\subsection{\textsc{Syzl} --- the adaptive social feed}
+
+\textbf{What it is.} A swipe-based decentralized social feed where every
+gesture trains your network: \emph{swipe right} to \textsc{Syzl} a post
+(it reshares to your followers and your connection to the publisher
+strengthens), \emph{swipe left} to \textsc{Fyzl} it (it stops, and the
+connection weakens). Ranking runs transparently on your own device from
+your own swipe history --- there is no algorithm operator and no
+server-side ranking.\sidenote{Full product brief:
+\texttt{SYZL-Brief.md} in this folder.}
+
+\textbf{Why it is Axona-native.}
+
+\begin{itemize}
+\item \textbf{The mechanism mirrors the protocol.} Axona's
+neuromorphic routing strengthens useful connections and prunes the
+rest; \textsc{Syzl} does the same one layer up, with user attention as
+the learning signal. Same algorithm, different layer --- the protocol's
+own story retold for end users.
+\item \textbf{No central operator, no engagement-maximization
+incentive.} No ads, no rage-bait amplification, no shadowbanning;
+ranking runs only on-device.
+\item \textbf{Verifiable reach without surveillance.} Publishers see
+reach (\texttt{publishes} + \texttt{reshare\_count}) via
+\texttt{peer.metrics} without learning \emph{who} reshared --- the
+privacy property Axona was built for, surfaced at the app layer.
+\item \textbf{Connection-sharing as a feature, not a leak.} Because
+subscriptions are first-class protocol objects, ``share my graph'' is a
+native operation; recipients adopt connections selectively, with
+provenance.
+\end{itemize}
+
+\textbf{Lifecycle fit.} \textsc{Syzl} is almost entirely
+application-layer over \texttt{@axona/protocol}: \texttt{pub}/%
+\texttt{sub} for posts, reshares, and connection-list cards;
+\texttt{pull} for referenced bodies; \texttt{metrics} for the reach
+dashboard; \texttt{unsub} for dropping a rotated-out connection
+cleanly. The hill-climb plus simulated-annealing exploration that keeps
+the feed alive is $\sim$200 lines on top of \texttt{lookup}/%
+\texttt{peers}.
+
+\textbf{\textsc{Syzl} Anywhere.} A companion Manifest-V3 browser
+extension that lets a user \textsc{Syzl} any page, selection, or image
+in one click, running the user's Axona peer in a background service
+worker --- which doubles as keeping the network warm while the user
+browses. Roughly six weeks of work, $\sim$70\% code-shared with the PWA
+composer.
+
+\subsection{The Pipeline --- others as we invent them}
+
+This section is deliberately open. Part~I is, in effect, a menu:
+several of those ``what Axona changes'' analyses describe applications
+that are more interesting built \emph{fresh} on Axona than migrated.
+Natural near-term candidates, none yet committed:
+
+\begin{itemize}
+\item \textbf{A browser-native swarm transport.} WebTorrent's
+discovery bridge eliminated --- large-file or live-media distribution
+among browser peers with no Mainline-DHT intermediary.
+\item \textbf{A large-group peer-to-peer messenger.} Tox/Briar's
+group-chat ceiling lifted by pub/sub fan-out plus Model~3
+shared-encryption membership.
+\item \textbf{A federated-feed fan-out layer.} The Mastodon-style
+``viral post on a small instance'' failure removed by moving fan-out to
+axonal trees while home servers keep storage and identity.
+\end{itemize}
+
+As each of these graduates from idea to product, it gets its own brief
+in this folder and a row in Part~II.
+
+\subsection{What the Axona-Powered Applications Share}
+
+Across \texttt{civildefense.io}, \textsc{Syzl}, and the pipeline, the
+same four properties keep recurring as the reason the app is
+\emph{possible}, not merely \emph{cheaper}:
+
+\begin{enumerate}
+\item \textbf{Geographic locality for free} --- the S2 prefix puts
+relevance and routing in the same place at zero coordination cost.
+\item \textbf{Pub/sub with a real lifecycle} ---
+\texttt{pub}/\texttt{sub}/\texttt{unsub}/\texttt{pull}/\texttt{kill}/%
+\texttt{unpub}, bounded queues, and hold-time TTL turn ``fan a message
+out'' into a managed, expiring, revocable feed.
+\item \textbf{Signed, fresh, end-to-end-secure messages} ---
+authenticity, freshness, and MITM-resistance are protocol defaults, so
+the application never has to bolt them on.
+\item \textbf{No central operator} --- ranking, membership, and reach
+live on-device and in the mesh, which removes the
+surveillance-and-incentive failure mode common to their centralized
+counterparts.
+\end{enumerate}
+
+These are the same properties Part~I shows existing applications
+\emph{reaching toward} through bridges, gateways, and caching tiers. The
+forward-looking bet of Part~II is that designing for them from the first
+line produces applications the migration path cannot --- because the
+protocol's defaults are the product's features.
+
+\end{document}
