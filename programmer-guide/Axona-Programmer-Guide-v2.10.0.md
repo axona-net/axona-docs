@@ -757,7 +757,7 @@ open" from "channels are open *and* carrying authenticated routing." A
 sustained `true` (across several polls) means the mesh looks connected
 but isn't actually routing; `boundCount`/`meshBound` are the honest
 usable-peer counts. Cheap; safe for a status dashboard. See the
-[API reference §8 health()](API-Reference-v2.10.0.md) for the full shape.
+[API reference §8 health()](Axona-API-Reference-v2.10.0.md) for the full shape.
 
 ### 8.4 Logs and errors
 
@@ -1480,7 +1480,7 @@ UPGRADE_CLOSE_CODE   // 4426
 - **[Quick Start](Quick-Start-v2.10.0.md)** — if someone you're onboarding has
   five minutes, send them here instead of this 1500-line guide.
 
-- **[API Reference](API-Reference-v2.10.0.md)** — when you're past the
+- **[API Reference](Axona-API-Reference-v2.10.0.md)** — when you're past the
   conceptual material and just need the signature for a specific call.
 
 - **Read the source of the reference peer**:
