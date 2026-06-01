@@ -2,7 +2,7 @@
 
 **What runs on Axona today, what gets better if it migrates, and what we are building next.**
 
-*Version 0.2 · 2026-06-01 · David A. Smith · davidasmith@gmail.com*
+*Version 0.3 · 2026-06-01 · David A. Smith · davidasmith@gmail.com*
 
 ---
 
@@ -439,6 +439,160 @@ geographic locality for free. For the large class of realtime features that do
 not need a durability guarantee — chat, presence, live cursors, notifications,
 feeds — that is a favorable trade, and it is exactly the class Tier 1 vendors
 serve.
+
+## Decentralized Social & Messaging Protocols
+
+A cohort of protocols already run the right *shape* — signed messages fanned out
+through a relay layer — but pay for it with operator-run relays or homeservers
+that are the centralization and availability weak point. For these, Axona is not
+a rewrite: it is a better transport that drops the relay as a single point of
+failure. In each case Axona supplies the **fan-out and discovery layer**, not
+the protocol's own identity or data model — those ride as opaque, app-signed
+payloads.
+
+### Nostr
+
+**What it is.** "Notes and Other Stuff Transmitted by Relays" — clients publish
+secp256k1-signed events to a handful of independently-operated relays and read
+from several at once for coverage. **Where it falls short.** Relay availability
+is fragile, popular relays face moderation and centralization pressure, and a
+client must redundantly POST each event to N relays for reach.
+
+**What Axona changes.** A Nostr event (with its own signature intact) becomes
+the opaque payload of an Axona publish; relays become axonal-tree topics. One
+publish fans out through the mesh instead of N redundant relay uploads, relay
+operators stop being load-bearing, and geographic locality routes events toward
+the people near them. Axona replaces the *relay layer*, not Nostr's npub
+identity.
+
+### Waku / WalletConnect
+
+**What it is.** Waku (libp2p gossipsub, the successor to Ethereum's Whisper)
+carries privacy-preserving messages for the Status/Logos stack; WalletConnect
+relays end-to-end-encrypted session messages between a wallet and a dApp.
+**Where it falls short.** Both still lean on a relay tier the user does not
+control.
+
+**What Axona changes.** Encrypted session and messaging payloads map onto a
+Model 3 shared-encryption topic — the protocol carries opaque ciphertext and the
+relay operator disappears. WalletConnect's "pair wallet and dApp, exchange
+encrypted requests" is a two-party encrypted topic, which is natively what Axona
+does.
+
+### Farcaster
+
+**What it is.** A "sufficiently decentralized" social network: hubs store and
+propagate messages (casts, reactions) and gossip them via libp2p gossipsub,
+while identity and the username registry live on-chain. **Where it falls
+short.** The hub-to-hub gossip layer is the operational weight; running a hub is
+non-trivial.
+
+**What Axona changes.** Axona becomes the hub gossip transport — message
+propagation rides axonal trees with bounded per-relay cost and geographic
+locality — while the on-chain registry stays exactly where it is. The
+decentralization story improves without touching the identity layer.
+
+### Matrix
+
+**What it is.** Federated real-time communication: homeservers federate over the
+server-to-server API, and each room is replicated across the participating
+homeservers. **Where it falls short.** A homeserver is a single point of failure
+and a load/centralization point for all of its users; the long-running P2P
+Matrix experiments exist precisely to remove it.
+
+**What Axona changes.** Axona offers the transport and discovery those P2P
+experiments need: room events become a topic, handle/room discovery becomes a
+lookup, and a user's reachability stops depending on one homeserver's uptime.
+Durable room history stays an app-layer concern (a peer or service that retains
+it), since Axona's hold-time is bounded.
+
+### Bluesky / AT Protocol
+
+**What it is.** Personal Data Servers (PDSes) hold user repos; a central
+**Relay** crawls them and emits a global "firehose" of repo commits that App
+Views index. **Where it falls short.** The Relay is a massive centralized
+aggregation-and-fan-out point — the firehose is, structurally, one enormous
+pub/sub channel run by one party.
+
+**What Axona changes.** The firehose rebroadcast becomes an axonal-tree topic
+(or a set of them, partitioned by region or collection), and PDS discovery
+becomes a DHT lookup. This is the largest lift in this cohort — the AT Protocol
+has a lot of moving parts — but it is also the clearest case of a centralized
+pub/sub firehose that Axona's primitive is shaped to carry.
+
+## Realtime Apps Currently Renting Centralized Infrastructure
+
+The previous cohort already thinks in pub/sub. This one does not — these
+applications buy a realtime layer (a CDN, a WebSocket PaaS, a game backend)
+because building one is hard. Axona's axonal trees plus S2 geographic locality
+are the thing they would otherwise rent.
+
+### Peer-assisted CDN & P2P video
+
+**Today.** Peer5 (now part of Microsoft), Streamroot (Lumen), CDNBye, and THEO's
+P2P module form a WebRTC mesh among viewers to share HLS/DASH segments,
+offloading the origin CDN and cutting bandwidth cost — especially for live
+events where everyone wants the same segment at the same instant.
+
+**What Axona changes.** This is a near-ideal fit: a live stream's segment topic
+fans out through an axonal tree, and the S2 prefix clusters the swarm by region
+so peers pull from neighbors, not across oceans. Axona supplies the mesh
+formation, locality, and fan-out these products hand-build, with signed segments
+and no central coordinator tracking who watched what.
+
+### Collaborative editing & multiplayer
+
+**Today.** CRDT libraries (Yjs, Automerge) need a sync transport plus
+"awareness" (live cursors, presence); teams either run a `y-websocket` server or
+buy a multiplayer backend — Liveblocks, PartyKit, Cloudflare Durable Objects,
+Convex, Ably Spaces.
+
+**What Axona changes.** A document becomes a topic: CRDT update messages publish
+to it, and awareness/presence is native (`peer.peers` + join/leave). Because
+CRDTs converge from any order of opaque updates, Axona's carry-opaque-bytes
+model fits cleanly, and per-publisher sequence numbers give each editor's stream
+a stable order. Durable document persistence remains app-layer (a peer or
+service that retains the doc), since Axona's queue and hold-time are bounded —
+the honest boundary of the fit.
+
+### Live data feeds
+
+**Today.** Sports scores, financial tickers, live blogs, election and flight
+trackers — one publisher, a high-frequency update stream, and a large read-only
+audience — served today by CDN-plus-WebSocket stacks or a Tier 1 pub/sub vendor.
+
+**What Axona changes.** This is the pub/sub sweet spot with nothing working
+against it: the data is inherently ephemeral (the TTL is a feature, not a
+limitation), the audience is read-only (no membership complexity), and fan-out
+to a geo-distributed crowd is exactly what axonal trees do. Of every category in
+this document, live feeds need the least from Axona to work well.
+
+### Partial fits
+
+- **Multiplayer game netcode & matchmaking** (Photon, Colyseus, Nakama,
+  Hathora, Playroom): matchmaking discovery maps onto a DHT lookup, and
+  peer/relay state sync onto the mesh — a good fit for non-authoritative or
+  lockstep designs. Authoritative twitch shooters still want a server tick, and
+  the hardest cases are latency-bound, though the S2 prefix helps regional
+  matchmaking.
+- **Feature-flag / config streaming** (LaunchDarkly streaming, ConfigCat):
+  pushing flag updates to clients is a small, clean pub/sub topic — a tidy fit,
+  modest in scope.
+- **Software & game-patch distribution** (npm/apt/container registries, game
+  patchers): DHT discovery plus swarm delivery is BitTorrent's pattern applied
+  to updates — strong on bandwidth economics, bounded by the need for an
+  authoritative signed manifest (which the app supplies).
+
+### Where Axona does not fit
+
+To keep the catalogue honest, three categories are explicit non-targets.
+**Distributed coordination and config stores** (etcd, ZooKeeper, Consul) require
+strong consensus (a CP system); Axona is not a consensus protocol and should not
+pretend to be. **Durable event-sourcing and data pipelines** are the Tier 3
+streaming case already excluded. And **strong-consistency databases and search
+indices** need guarantees a best-effort fan-out mesh does not provide. Axona is
+a realtime discovery-and-fan-out layer; where the requirement is consensus or
+durable total order, the right answer is a different tool.
 
 ---
 
