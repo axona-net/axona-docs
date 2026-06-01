@@ -64,7 +64,7 @@ migrates, and what we are building next.\par}
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Applications Note \quad v0.3 \quad 2026-06-01\par}
+{\small An Axona Applications Note \quad v0.4 \quad 2026-06-01\par}
 \end{center}
 \vfill
 \null
@@ -91,16 +91,17 @@ migrates, and what we are building next.\par}
 
 \newthought{This document has two parts.}
 
-\textbf{Part~I --- Existing Applications: A Deep Dive} examines the
-dozen applications that depend on a DHT today, and what changes for
-each if its discovery and propagation layer moves to Axona. It is
-adapted from the whitepaper chapter of the same name and refreshed to
-the \emph{current} state of the protocol: Axona is no longer a
-simulator result, it is a live, browser-native network
-(\texttt{@axona/protocol} v2.10.0) with an authenticated handshake,
-signed and freshness-bounded messages, and a full pub/sub
-lifecycle. Where that shipped reality strengthens --- or qualifies ---
-the original projection, the text says so.
+\textbf{Part~I --- Existing Applications: A Deep Dive} surveys the
+applications and services that would benefit from running on the Axona
+protocol. It leads with the highest-impact, lowest-effort case --- the
+managed pub/sub services an application can replace with the protocol's
+own primitive --- then the decentralized protocols and centralized
+realtime services Axona can carry, and finally the established
+applications built on a DHT today. The Axona protocol is a live,
+browser-native network (\texttt{@axona/protocol} v2.10.0) with an
+authenticated handshake, signed and freshness-bounded messages, and a
+full pub/sub lifecycle; each entry maps an application's need onto that
+surface.
 
 \textbf{Part~II --- Future Applications: Axona Powered} covers the
 applications we are building \emph{on} Axona rather than migrating
@@ -109,30 +110,32 @@ application), \textsc{Syzl} (the adaptive social feed), and a
 deliberately open pipeline for what comes next.
 
 \marginnote{\emph{On the numbers.} Latency figures in Part~I are
-back-of-envelope projections from the 25{,}000-node benchmark in the
-whitepaper, applied to each application's typical workload. They are
-projections, not field measurements of the migrated application, and
-are marked as such throughout. What is \emph{not} a projection is the
-protocol surface itself --- the API verbs, the security properties, the
-lifecycle semantics --- which is live and testable today.}
+back-of-envelope projections from the Axona simulator's 25{,}000-node
+benchmark, applied to each application's typical workload --- the
+simulator is the scalable testbed where protocol changes are measured
+before deployment. They are projections, not field measurements of the
+migrated application. What is \emph{not} a projection is the protocol
+surface itself --- the API verbs, the security properties, the lifecycle
+semantics --- which is live and testable today.}
 
 % =====================================================================
 \section{Existing Applications: A Deep Dive}
 % =====================================================================
 
-\newthought{For each application:} what it does, the DHT layer it uses
-now, that layer's performance profile, where it falls short of user
-expectations, and what changes if it migrates to Axona.\sidenote{%
-Streaming-class applications --- those that become possible only with
-Axona's latency budget but do not exist today --- are the subject of
-Part~II, not this part.}
+\newthought{Each entry follows} the same shape: what the application or
+service does, where it falls short today, and what changes on the Axona
+protocol. We lead with the case that is both highest-impact and
+lowest-effort for the developer --- replacing a managed pub/sub service
+--- because it asks nothing of the application but a change of
+transport.\sidenote{%
+Streaming-class applications --- those that become possible only with the
+Axona protocol's latency budget but do not exist today --- are the
+subject of Part~II, not this part.}
 
-\subsection{What ``migrate to Axona'' means in 2026}
+\subsection{What the Axona Protocol Provides}
 
-When the original chapter was written, ``N-DHT / NH-1'' was a
-simulator. The claims below now rest on a deployed substrate, which
-changes their character from \emph{hypothesis} to \emph{engineering
-estimate}:
+The analysis throughout rests on a deployed substrate, not a plan. Four
+properties carry every case:
 
 \begin{itemize}
 \item \textbf{Browser-native and live.} Axona was designed for the
@@ -162,7 +165,257 @@ Membership-gated topics are supported via shared-encryption group keys
 at the application layer.
 \end{itemize}
 
-With that substrate in place, the per-application analysis follows.
+These four properties recur throughout the catalogue as the reason each
+application benefits.
+
+\subsection{Pub/Sub-as-a-Service --- the Managed Realtime Tier}
+
+\newthought{The highest-impact case} asks the least of the developer. A
+class of companies sells \emph{pub/sub itself} as a service --- their
+product is the WebSocket fan-out an application would otherwise build and
+operate, because doing it at scale (connection management, presence,
+history, global points of presence) is hard. The Axona protocol changes
+the economics directly: fan-out becomes a property of the mesh, the
+per-message meter disappears, and so does the operator who could read the
+traffic. An application replaces the service with the protocol's own
+pub/sub primitive --- a change of transport, not of architecture. These
+services sort into four tiers by how cleanly Axona displaces them.
+
+\textbf{Tier 1 --- Realtime client pub/sub (the bullseye).} Vendors:
+Pusher Channels, Ably, PubNub, Firebase Realtime Database, Supabase
+Realtime, Azure Web PubSub / SignalR Service, Stream
+(getstream.io). A client subscribes to a channel, a publisher sends,
+every subscriber receives it in real time --- plus presence, short-term
+history, and reconnect handling. The meter is per-message \emph{and} per
+connection-minute \emph{and} per channel-minute,\sidenote{Ably is
+roughly \$2.50 per million messages plus \$1 per million
+connection-minutes; PubNub starts near \$98/mo for 1{,}000
+monthly-active users. The product is the fan-out infrastructure you
+would otherwise run yourself.} or per monthly-active-user. This is the
+closest match in the entire document, because Axona's pub/sub primitive
+\emph{is} this product --- minus the operator and the meter.
+
+\begin{fullwidth}
+\par\medskip\noindent\small
+\begin{tabular}{@{}p{0.34\textwidth}p{0.58\textwidth}@{}}
+\toprule
+\textbf{Managed-service feature} & \textbf{Axona equivalent} \\
+\midrule
+Channel / topic & \texttt{peer.sub(topic)} over \texttt{deriveTopicId} (public or owned) \\
+Publish & \texttt{peer.pub} --- Ed25519-signed, freshness-bounded envelope \\
+Presence (``who's online'') & \texttt{peer.peers} + \texttt{onPeerJoin}\,/\,\texttt{onPeerLeave} --- native \\
+Message history / ``rewind'' & replay cache + \texttt{peer.pull} (by id \emph{or} latest) + hold-time TTL \\
+Channel teardown / revoke & \texttt{unsub} / \texttt{kill} (creator delete + tombstone) / \texttt{unpub} \\
+Private channels & Model~3 shared-encryption topic (group key at the app layer) \\
+Reach analytics & \texttt{peer.metrics} (publishes / subscribers / reshare\_count) \\
+\bottomrule
+\end{tabular}
+\par\smallskip{\small\itshape Tier-1 realtime pub/sub features and their Axona equivalents.}
+\par\medskip
+\end{fullwidth}
+
+The pitch is economic and architectural at once: peers carry the
+fan-out, so marginal cost per message trends to zero and there is no
+per-connection bill; and because there is no central relay,
+Pusher/Ably/PubNub's structural ability to read every channel's traffic
+simply does not exist --- messages are signed and, where wanted,
+end-to-end encrypted. Geographic locality (the S2 prefix) is a bonus
+none of these vendors offer natively.
+
+\textbf{Tier 2 --- Push notifications (complement, not replace).}
+Vendors: Firebase Cloud Messaging (FCM), Apple Push Notification service
+(APNs), OneSignal, Airship, Pusher Beams. Axona delivers
+``came-online'' and event pushes to \emph{connected} peers natively, but
+it \emph{cannot wake a closed application} --- only the OS push channel
+can originate that, and only the platform vendor controls it. So Axona
+replaces the in-app realtime layer and \emph{pairs with} FCM/APNs for
+the wake-the-device layer; it does not displace them.
+
+\textbf{Tier 3 --- Durable server-side event streaming (NOT a
+replacement).} Vendors: Apache Kafka / Confluent Cloud, Google Cloud
+Pub/Sub, AWS SNS\,+\,SQS / Kinesis / EventBridge, Azure Event Hubs /
+Service Bus, CloudAMQP (RabbitMQ), Solace PubSub+, IBM MQ. These are
+durable commit logs and queues: long retention, partitioning,
+replay-from-offset, exactly-once or strict FIFO delivery, transactions,
+backend consumers. Axona is deliberately \emph{not} this --- its
+retention is a bounded queue ($\le$256 messages) under a 24--48~h
+hold-time TTL, its ordering is per-publisher rather than a global total
+order, and its delivery is high but best-effort under churn, not the
+exactly-once SLA Kafka and Ably market. Positioning Axona as a Kafka
+replacement would be the overclaim that discredits the rest of this
+document; it is a realtime fan-out layer, not an event-sourcing
+backbone.
+
+\textbf{Tier 4 --- MQTT / IoT brokers (partial).} Vendors: HiveMQ Cloud,
+EMQX Cloud, Azure Event Grid (MQTT), AWS IoT Core. Conceptually adjacent
+--- topics, retained messages ($\approx$ Axona's replay-latest), QoS
+tiers --- and Axona's geo-locality is genuinely attractive for regional
+device fleets. But these brokers win on backend data-plane bridging
+(dozens of connectors into Kafka, Kinesis, databases) and
+device-constrained QoS that Axona does not provide. Axona fits
+\emph{peer-to-peer} device coordination, not the industrial-broker role
+with enterprise integrations.
+
+\textbf{The honest gap list.} To genuinely displace Ably/Pusher/PubNub
+rather than merely resemble them, four gaps must be stated plainly:
+\begin{enumerate}
+\item \textbf{No exactly-once / no global ordering SLA} ---
+per-publisher sequence only; high delivery, not guaranteed delivery.
+\item \textbf{Short, bounded history} --- minutes-to-days, not the
+months of stored messages PubNub sells.
+\item \textbf{No managed support / uptime SLA} --- Axona is
+infrastructure you adopt, not a vendor you page at 3~a.m.
+\item \textbf{Presence and fan-out at PaaS scale are unproven} --- the
+claim needs the friction-realistic benchmark before it is
+field-credible.
+\end{enumerate}
+The trade is explicit: you give up the SLA, the durability, and the
+managed support; you get no per-message fee, no operator able to read
+your traffic, and geographic locality for free. For the large class of
+realtime features that do not need a durability guarantee --- chat,
+presence, live cursors, notifications, feeds --- that is a favorable
+trade, and exactly the class Tier~1 vendors serve.
+
+\subsection{Decentralized Social \& Messaging Protocols}
+
+\newthought{A cohort of protocols} already run the right \emph{shape}
+--- signed messages fanned out through a relay layer --- but pay for it
+with operator-run relays or homeservers that are the centralization and
+availability weak point. For these, Axona is not a rewrite: it is a
+better transport that drops the relay as a single point of failure. In
+each case Axona supplies the \emph{fan-out and discovery layer}, not the
+protocol's own identity or data model --- those ride as opaque,
+app-signed payloads.
+
+\textbf{Nostr.} ``Notes and Other Stuff Transmitted by Relays'' ---
+clients publish secp256k1-signed events to a handful of
+independently-operated relays and read from several at once for
+coverage. Relay availability is fragile, popular relays face moderation
+and centralization pressure, and a client must redundantly POST each
+event to N relays for reach. \emph{What Axona changes:} a Nostr event
+(its own signature intact) becomes the opaque payload of an Axona
+publish, and relays become axonal-tree topics. One publish fans out
+through the mesh instead of N redundant uploads, relay operators stop
+being load-bearing, and geographic locality routes events toward the
+people near them. Axona replaces the \emph{relay layer}, not Nostr's
+\texttt{npub} identity.
+
+\textbf{Waku / WalletConnect.} Waku (libp2p gossipsub, successor to
+Ethereum's Whisper) carries privacy-preserving messages for the
+Status/Logos stack; WalletConnect relays end-to-end-encrypted session
+messages between a wallet and a dApp. Both still lean on a relay tier
+the user does not control. \emph{What Axona changes:} encrypted session
+and messaging payloads map onto a Model~3 shared-encryption topic --- the
+protocol carries opaque ciphertext and the relay operator disappears.
+WalletConnect's ``pair wallet and dApp, exchange encrypted requests'' is
+a two-party encrypted topic, which is natively what Axona does.
+
+\textbf{Farcaster.} A ``sufficiently decentralized'' social network:
+hubs store and propagate messages (casts, reactions) and gossip them via
+libp2p gossipsub, while identity and the username registry live
+on-chain. The hub-to-hub gossip layer is the operational weight.
+\emph{What Axona changes:} Axona becomes the hub gossip transport ---
+propagation rides axonal trees with bounded per-relay cost and
+geographic locality --- while the on-chain registry stays exactly where
+it is. The decentralization story improves without touching the identity
+layer.
+
+\textbf{Matrix.} Federated real-time communication: homeservers federate
+over the server-to-server API, and each room is replicated across the
+participating homeservers. A homeserver is a single point of failure and
+a load/centralization point for all of its users; the long-running P2P
+Matrix experiments exist precisely to remove it. \emph{What Axona
+changes:} Axona offers the transport and discovery those experiments
+need --- room events become a topic, handle/room discovery becomes a
+lookup, and a user's reachability stops depending on one homeserver's
+uptime.\sidenote{Durable room history stays an app-layer concern --- a
+peer or service that retains it --- since Axona's hold-time is bounded.}
+
+\textbf{Bluesky / AT Protocol.} Personal Data Servers (PDSes) hold user
+repos; a central \textbf{Relay} crawls them and emits a global
+``firehose'' of repo commits that App Views index. The Relay is a
+massive centralized aggregation-and-fan-out point --- the firehose is,
+structurally, one enormous pub/sub channel run by one party. \emph{What
+Axona changes:} the firehose rebroadcast becomes an axonal-tree topic
+(or a set of them, partitioned by region or collection), and PDS
+discovery becomes a DHT lookup. This is the largest lift in the cohort,
+but also the clearest case of a centralized pub/sub firehose that
+Axona's primitive is shaped to carry.
+
+\subsection{Realtime Apps Currently Renting Centralized Infrastructure}
+
+\newthought{The previous cohort} already thinks in pub/sub. This one
+does not --- these applications buy a realtime layer (a CDN, a WebSocket
+PaaS, a game backend) because building one is hard. Axona's axonal trees
+plus S2 geographic locality are the thing they would otherwise rent.
+
+\textbf{Peer-assisted CDN \& P2P video.} Peer5 (now part of Microsoft),
+Streamroot (Lumen), CDNBye, and THEO's P2P module form a WebRTC mesh
+among viewers to share HLS/DASH segments, offloading the origin CDN and
+cutting bandwidth cost --- especially for live events where everyone
+wants the same segment at the same instant. \emph{What Axona changes:} a
+near-ideal fit --- a live stream's segment topic fans out through an
+axonal tree, and the S2 prefix clusters the swarm by region so peers
+pull from neighbors, not across oceans. Axona supplies the mesh
+formation, locality, and fan-out these products hand-build, with signed
+segments and no central coordinator tracking who watched what.
+
+\textbf{Collaborative editing \& multiplayer.} CRDT libraries (Yjs,
+Automerge) need a sync transport plus ``awareness'' (live cursors,
+presence); teams either run a \texttt{y-websocket} server or buy a
+multiplayer backend --- Liveblocks, PartyKit, Cloudflare Durable
+Objects, Convex, Ably Spaces. \emph{What Axona changes:} a document
+becomes a topic --- CRDT update messages publish to it, and
+awareness/presence is native (\texttt{peer.peers} + join/leave). Because
+CRDTs converge from any order of opaque updates, Axona's
+carry-opaque-bytes model fits cleanly, and per-publisher sequence
+numbers give each editor's stream a stable order.\sidenote{Durable
+document persistence remains app-layer --- a peer or service that retains
+the doc --- since Axona's queue and hold-time are bounded. The honest
+boundary of the fit.}
+
+\textbf{Live data feeds.} Sports scores, financial tickers, live blogs,
+election and flight trackers --- one publisher, a high-frequency update
+stream, and a large read-only audience --- served today by
+CDN-plus-WebSocket stacks or a Tier~1 pub/sub vendor. \emph{What Axona
+changes:} the pub/sub sweet spot with nothing working against it --- the
+data is inherently ephemeral (the TTL is a feature, not a limitation),
+the audience is read-only (no membership complexity), and fan-out to a
+geo-distributed crowd is exactly what axonal trees do. Of every category
+in this document, live feeds need the least from Axona to work well.
+
+\textbf{Partial fits.} \emph{Multiplayer game netcode \& matchmaking}
+(Photon, Colyseus, Nakama, Hathora, Playroom): matchmaking discovery
+maps onto a DHT lookup and peer/relay state sync onto the mesh --- good
+for non-authoritative or lockstep designs, though authoritative twitch
+shooters still want a server tick and the hardest cases are
+latency-bound. \emph{Feature-flag / config streaming} (LaunchDarkly,
+ConfigCat): pushing flag updates to clients is a small, clean pub/sub
+topic. \emph{Software \& game-patch distribution} (npm/apt/container
+registries, game patchers): DHT discovery plus swarm delivery is
+BitTorrent's pattern applied to updates --- strong on bandwidth
+economics, bounded by the need for an authoritative signed manifest the
+app supplies.
+
+\textbf{Where Axona does not fit.} To keep the catalogue honest, three
+categories are explicit non-targets. \emph{Distributed coordination and
+config stores} (etcd, ZooKeeper, Consul) require strong consensus (a CP
+system); Axona is not a consensus protocol and should not pretend to be.
+\emph{Durable event-sourcing and data pipelines} are the Tier~3
+streaming case already excluded. And \emph{strong-consistency databases
+and search indices} need guarantees a best-effort fan-out mesh does not
+provide. Axona is a realtime discovery-and-fan-out layer; where the
+requirement is consensus or durable total order, the right answer is a
+different tool.
+
+\subsection{Applications Built on a DHT Today}
+
+\newthought{The remaining applications} already run a DHT --- for peer
+discovery, content addressing, or descriptor lookup --- and would gain
+from swapping it for the Axona protocol's locality-aware routing and
+pub/sub fan-out. These are higher-effort migrations than the pub/sub
+services above --- they touch an application's existing overlay --- but
+the latency and architecture wins are substantial.
 
 \subsection{BitTorrent (Mainline DHT)}
 
@@ -431,10 +684,9 @@ servers stop being single points of failure for their users' reach.
 
 \subsection{Summary of Improvements}
 
-\begin{table*}[ht]
-\centering
-\small
-\begin{tabular}{@{}p{0.20\linewidth}p{0.36\linewidth}p{0.36\linewidth}@{}}
+\begin{fullwidth}
+\par\medskip\noindent\small
+\begin{tabular}{@{}p{0.22\textwidth}p{0.35\textwidth}p{0.35\textwidth}@{}}
 \toprule
 \textbf{Application} & \textbf{Current bottleneck} & \textbf{Axona improvement} \\
 \midrule
@@ -452,11 +704,9 @@ WebTorrent & Mainline-DHT discovery bridge & Discovery bridge eliminated; browse
 Mastodon-style federation & Home-server bottleneck & Decentralized fan-out via axonal trees \\
 \bottomrule
 \end{tabular}
-\caption{Cross-application summary. Latency numbers are projections
-from the 25K-node benchmark; production deployments need the
-friction-realistic simulator extensions to confirm.}
-\label{tab:apps-summary}
-\end{table*}
+\par\smallskip{\small\itshape Cross-application summary. Latency figures are back-of-envelope projections from the Axona simulator's 25K-node benchmark, to be confirmed on the friction-realistic model.}
+\par\medskip
+\end{fullwidth}
 
 \newthought{The pattern.} The DHT layer is rarely the \emph{only}
 bottleneck, but it is consistently \emph{a} bottleneck, and moving to
@@ -471,252 +721,12 @@ home-server fan-out those patterns suffer under.
 
 \textbf{Honest framing.} We keep the federation claim modest: the
 architecture is \emph{enabled}, not necessarily preferable in every
-dimension. And the latency figures remain projections until measured on
-the friction-realistic substrate. What changed since the original
-chapter is the floor under those projections --- the protocol is no
-longer a simulator artifact but a live, authenticated,
-signed-and-fresh network with a real lifecycle.
+dimension. And the latency figures are simulator projections, to be
+confirmed against the friction-realistic model before they are quoted as
+field results. What is not in question is the protocol surface they run
+on --- authenticated, signed-and-fresh, with a real pub/sub lifecycle,
+live today.
 
-\subsection{Pub/Sub-as-a-Service --- the Managed Realtime Tier}
-
-\newthought{The applications above} are open-source systems that
-\emph{use} a DHT. There is a second class of target that is not an
-application at all but a \emph{business model}: companies whose product
-\emph{is} pub/sub. They exist because operating WebSocket fan-out at
-scale --- connection management, presence, history, global points of
-presence --- is hard, so they run it for you and meter it. Axona changes
-the economics directly: fan-out becomes a property of the mesh, the
-per-message meter disappears, and so does the operator who could read
-the traffic. These services sort into four tiers by how cleanly Axona
-displaces them.
-
-\textbf{Tier 1 --- Realtime client pub/sub (the bullseye).} Vendors:
-Pusher Channels, Ably, PubNub, Firebase Realtime Database, Supabase
-Realtime, Azure Web PubSub / SignalR Service, Stream
-(getstream.io). A client subscribes to a channel, a publisher sends,
-every subscriber receives it in real time --- plus presence, short-term
-history, and reconnect handling. The meter is per-message \emph{and} per
-connection-minute \emph{and} per channel-minute,\sidenote{Ably is
-roughly \$2.50 per million messages plus \$1 per million
-connection-minutes; PubNub starts near \$98/mo for 1{,}000
-monthly-active users. The product is the fan-out infrastructure you
-would otherwise run yourself.} or per monthly-active-user. This is the
-closest match in the entire document, because Axona's pub/sub primitive
-\emph{is} this product --- minus the operator and the meter.
-
-\begin{table*}[ht]
-\centering
-\small
-\begin{tabular}{@{}p{0.34\linewidth}p{0.56\linewidth}@{}}
-\toprule
-\textbf{Managed-service feature} & \textbf{Axona equivalent} \\
-\midrule
-Channel / topic & \texttt{peer.sub(topic)} over \texttt{deriveTopicId} (public or owned) \\
-Publish & \texttt{peer.pub} --- Ed25519-signed, freshness-bounded envelope \\
-Presence (``who's online'') & \texttt{peer.peers} + \texttt{onPeerJoin}\,/\,\texttt{onPeerLeave} --- native \\
-Message history / ``rewind'' & replay cache + \texttt{peer.pull} (by id \emph{or} latest) + hold-time TTL \\
-Channel teardown / revoke & \texttt{unsub} / \texttt{kill} (creator delete + tombstone) / \texttt{unpub} \\
-Private channels & Model~3 shared-encryption topic (group key at the app layer) \\
-Reach analytics & \texttt{peer.metrics} (publishes / subscribers / reshare\_count) \\
-\bottomrule
-\end{tabular}
-\caption{Tier-1 realtime pub/sub features and their Axona equivalents.}
-\label{tab:paas-mapping}
-\end{table*}
-
-The pitch is economic and architectural at once: peers carry the
-fan-out, so marginal cost per message trends to zero and there is no
-per-connection bill; and because there is no central relay,
-Pusher/Ably/PubNub's structural ability to read every channel's traffic
-simply does not exist --- messages are signed and, where wanted,
-end-to-end encrypted. Geographic locality (the S2 prefix) is a bonus
-none of these vendors offer natively.
-
-\textbf{Tier 2 --- Push notifications (complement, not replace).}
-Vendors: Firebase Cloud Messaging (FCM), Apple Push Notification service
-(APNs), OneSignal, Airship, Pusher Beams. Axona delivers
-``came-online'' and event pushes to \emph{connected} peers natively, but
-it \emph{cannot wake a closed application} --- only the OS push channel
-can originate that, and only the platform vendor controls it. So Axona
-replaces the in-app realtime layer and \emph{pairs with} FCM/APNs for
-the wake-the-device layer; it does not displace them.
-
-\textbf{Tier 3 --- Durable server-side event streaming (NOT a
-replacement).} Vendors: Apache Kafka / Confluent Cloud, Google Cloud
-Pub/Sub, AWS SNS\,+\,SQS / Kinesis / EventBridge, Azure Event Hubs /
-Service Bus, CloudAMQP (RabbitMQ), Solace PubSub+, IBM MQ. These are
-durable commit logs and queues: long retention, partitioning,
-replay-from-offset, exactly-once or strict FIFO delivery, transactions,
-backend consumers. Axona is deliberately \emph{not} this --- its
-retention is a bounded queue ($\le$256 messages) under a 24--48~h
-hold-time TTL, its ordering is per-publisher rather than a global total
-order, and its delivery is high but best-effort under churn, not the
-exactly-once SLA Kafka and Ably market. Positioning Axona as a Kafka
-replacement would be the overclaim that discredits the rest of this
-document; it is a realtime fan-out layer, not an event-sourcing
-backbone.
-
-\textbf{Tier 4 --- MQTT / IoT brokers (partial).} Vendors: HiveMQ Cloud,
-EMQX Cloud, Azure Event Grid (MQTT), AWS IoT Core. Conceptually adjacent
---- topics, retained messages ($\approx$ Axona's replay-latest), QoS
-tiers --- and Axona's geo-locality is genuinely attractive for regional
-device fleets. But these brokers win on backend data-plane bridging
-(dozens of connectors into Kafka, Kinesis, databases) and
-device-constrained QoS that Axona does not provide. Axona fits
-\emph{peer-to-peer} device coordination, not the industrial-broker role
-with enterprise integrations.
-
-\textbf{The honest gap list.} To genuinely displace Ably/Pusher/PubNub
-rather than merely resemble them, four gaps must be stated plainly:
-\begin{enumerate}
-\item \textbf{No exactly-once / no global ordering SLA} ---
-per-publisher sequence only; high delivery, not guaranteed delivery.
-\item \textbf{Short, bounded history} --- minutes-to-days, not the
-months of stored messages PubNub sells.
-\item \textbf{No managed support / uptime SLA} --- Axona is
-infrastructure you adopt, not a vendor you page at 3~a.m.
-\item \textbf{Presence and fan-out at PaaS scale are unproven} --- the
-claim needs the friction-realistic benchmark before it is
-field-credible.
-\end{enumerate}
-The trade is explicit: you give up the SLA, the durability, and the
-managed support; you get no per-message fee, no operator able to read
-your traffic, and geographic locality for free. For the large class of
-realtime features that do not need a durability guarantee --- chat,
-presence, live cursors, notifications, feeds --- that is a favorable
-trade, and exactly the class Tier~1 vendors serve.
-
-\subsection{Decentralized Social \& Messaging Protocols}
-
-\newthought{A cohort of protocols} already run the right \emph{shape}
---- signed messages fanned out through a relay layer --- but pay for it
-with operator-run relays or homeservers that are the centralization and
-availability weak point. For these, Axona is not a rewrite: it is a
-better transport that drops the relay as a single point of failure. In
-each case Axona supplies the \emph{fan-out and discovery layer}, not the
-protocol's own identity or data model --- those ride as opaque,
-app-signed payloads.
-
-\textbf{Nostr.} ``Notes and Other Stuff Transmitted by Relays'' ---
-clients publish secp256k1-signed events to a handful of
-independently-operated relays and read from several at once for
-coverage. Relay availability is fragile, popular relays face moderation
-and centralization pressure, and a client must redundantly POST each
-event to N relays for reach. \emph{What Axona changes:} a Nostr event
-(its own signature intact) becomes the opaque payload of an Axona
-publish, and relays become axonal-tree topics. One publish fans out
-through the mesh instead of N redundant uploads, relay operators stop
-being load-bearing, and geographic locality routes events toward the
-people near them. Axona replaces the \emph{relay layer}, not Nostr's
-\texttt{npub} identity.
-
-\textbf{Waku / WalletConnect.} Waku (libp2p gossipsub, successor to
-Ethereum's Whisper) carries privacy-preserving messages for the
-Status/Logos stack; WalletConnect relays end-to-end-encrypted session
-messages between a wallet and a dApp. Both still lean on a relay tier
-the user does not control. \emph{What Axona changes:} encrypted session
-and messaging payloads map onto a Model~3 shared-encryption topic --- the
-protocol carries opaque ciphertext and the relay operator disappears.
-WalletConnect's ``pair wallet and dApp, exchange encrypted requests'' is
-a two-party encrypted topic, which is natively what Axona does.
-
-\textbf{Farcaster.} A ``sufficiently decentralized'' social network:
-hubs store and propagate messages (casts, reactions) and gossip them via
-libp2p gossipsub, while identity and the username registry live
-on-chain. The hub-to-hub gossip layer is the operational weight.
-\emph{What Axona changes:} Axona becomes the hub gossip transport ---
-propagation rides axonal trees with bounded per-relay cost and
-geographic locality --- while the on-chain registry stays exactly where
-it is. The decentralization story improves without touching the identity
-layer.
-
-\textbf{Matrix.} Federated real-time communication: homeservers federate
-over the server-to-server API, and each room is replicated across the
-participating homeservers. A homeserver is a single point of failure and
-a load/centralization point for all of its users; the long-running P2P
-Matrix experiments exist precisely to remove it. \emph{What Axona
-changes:} Axona offers the transport and discovery those experiments
-need --- room events become a topic, handle/room discovery becomes a
-lookup, and a user's reachability stops depending on one homeserver's
-uptime.\sidenote{Durable room history stays an app-layer concern --- a
-peer or service that retains it --- since Axona's hold-time is bounded.}
-
-\textbf{Bluesky / AT Protocol.} Personal Data Servers (PDSes) hold user
-repos; a central \textbf{Relay} crawls them and emits a global
-``firehose'' of repo commits that App Views index. The Relay is a
-massive centralized aggregation-and-fan-out point --- the firehose is,
-structurally, one enormous pub/sub channel run by one party. \emph{What
-Axona changes:} the firehose rebroadcast becomes an axonal-tree topic
-(or a set of them, partitioned by region or collection), and PDS
-discovery becomes a DHT lookup. This is the largest lift in the cohort,
-but also the clearest case of a centralized pub/sub firehose that
-Axona's primitive is shaped to carry.
-
-\subsection{Realtime Apps Currently Renting Centralized Infrastructure}
-
-\newthought{The previous cohort} already thinks in pub/sub. This one
-does not --- these applications buy a realtime layer (a CDN, a WebSocket
-PaaS, a game backend) because building one is hard. Axona's axonal trees
-plus S2 geographic locality are the thing they would otherwise rent.
-
-\textbf{Peer-assisted CDN \& P2P video.} Peer5 (now part of Microsoft),
-Streamroot (Lumen), CDNBye, and THEO's P2P module form a WebRTC mesh
-among viewers to share HLS/DASH segments, offloading the origin CDN and
-cutting bandwidth cost --- especially for live events where everyone
-wants the same segment at the same instant. \emph{What Axona changes:} a
-near-ideal fit --- a live stream's segment topic fans out through an
-axonal tree, and the S2 prefix clusters the swarm by region so peers
-pull from neighbors, not across oceans. Axona supplies the mesh
-formation, locality, and fan-out these products hand-build, with signed
-segments and no central coordinator tracking who watched what.
-
-\textbf{Collaborative editing \& multiplayer.} CRDT libraries (Yjs,
-Automerge) need a sync transport plus ``awareness'' (live cursors,
-presence); teams either run a \texttt{y-websocket} server or buy a
-multiplayer backend --- Liveblocks, PartyKit, Cloudflare Durable
-Objects, Convex, Ably Spaces. \emph{What Axona changes:} a document
-becomes a topic --- CRDT update messages publish to it, and
-awareness/presence is native (\texttt{peer.peers} + join/leave). Because
-CRDTs converge from any order of opaque updates, Axona's
-carry-opaque-bytes model fits cleanly, and per-publisher sequence
-numbers give each editor's stream a stable order.\sidenote{Durable
-document persistence remains app-layer --- a peer or service that retains
-the doc --- since Axona's queue and hold-time are bounded. The honest
-boundary of the fit.}
-
-\textbf{Live data feeds.} Sports scores, financial tickers, live blogs,
-election and flight trackers --- one publisher, a high-frequency update
-stream, and a large read-only audience --- served today by
-CDN-plus-WebSocket stacks or a Tier~1 pub/sub vendor. \emph{What Axona
-changes:} the pub/sub sweet spot with nothing working against it --- the
-data is inherently ephemeral (the TTL is a feature, not a limitation),
-the audience is read-only (no membership complexity), and fan-out to a
-geo-distributed crowd is exactly what axonal trees do. Of every category
-in this document, live feeds need the least from Axona to work well.
-
-\textbf{Partial fits.} \emph{Multiplayer game netcode \& matchmaking}
-(Photon, Colyseus, Nakama, Hathora, Playroom): matchmaking discovery
-maps onto a DHT lookup and peer/relay state sync onto the mesh --- good
-for non-authoritative or lockstep designs, though authoritative twitch
-shooters still want a server tick and the hardest cases are
-latency-bound. \emph{Feature-flag / config streaming} (LaunchDarkly,
-ConfigCat): pushing flag updates to clients is a small, clean pub/sub
-topic. \emph{Software \& game-patch distribution} (npm/apt/container
-registries, game patchers): DHT discovery plus swarm delivery is
-BitTorrent's pattern applied to updates --- strong on bandwidth
-economics, bounded by the need for an authoritative signed manifest the
-app supplies.
-
-\textbf{Where Axona does not fit.} To keep the catalogue honest, three
-categories are explicit non-targets. \emph{Distributed coordination and
-config stores} (etcd, ZooKeeper, Consul) require strong consensus (a CP
-system); Axona is not a consensus protocol and should not pretend to be.
-\emph{Durable event-sourcing and data pipelines} are the Tier~3
-streaming case already excluded. And \emph{strong-consistency databases
-and search indices} need guarantees a best-effort fan-out mesh does not
-provide. Axona is a realtime discovery-and-fan-out layer; where the
-requirement is consensus or durable total order, the right answer is a
-different tool.
 
 % =====================================================================
 \section{Future Applications: Axona Powered}
