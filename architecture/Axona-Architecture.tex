@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.7.1 \quad 2026-06-01\par}
+{\small An Axona Architecture Note \quad v0.7.2 \quad 2026-06-01\par}
 \end{center}
 \vfill
 \null
@@ -650,7 +650,21 @@ delivery when the target isn't directly bound.
 \item[\texttt{reinforce} (ntf).] ``This lookup succeeded; bump
 the weight on the synapse I used.'' Fire-and-forget LTP signal
 back along the path. Only flows when the lookup hit at-or-below
-average latency for the path's region.
+average latency for the path's region. On identity-binding
+transports the handler is a no-op unless the \emph{target} synapse's
+peer is currently bound (the B-3 gate: an unauthenticated
+\texttt{reinforce} must not be able to refresh the eviction-inertia
+of a stale or unverified entry and pin it in the table). Weight is
+independently clamped to $\le 1.0$, so inertia is the only lever the
+gate needs to close.
+\marginnote{\emph{Residual, by design:} the gate keys on the
+\emph{target} synapse being bound, not on the \emph{sender's}
+identity --- so any bound peer can refresh the inertia of any other
+bound peer's synapse. The blast radius is bounded to ``keep an
+already-verified, live peer pinned slightly longer,'' which is
+benign; binding the signal to the sender would add cost for no
+attacker-relevant gain. Revisit only if reinforce ever carries
+weight a sender could bias.}
 \end{description}
 
 Two structural-plasticity messages let the network rewire itself
