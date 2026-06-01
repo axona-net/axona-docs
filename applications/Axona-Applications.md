@@ -2,7 +2,7 @@
 
 **What runs on Axona today, what gets better if it migrates, and what we are building next.**
 
-*Version 0.1 · 2026-06-01 · David A. Smith · davidasmith@gmail.com*
+*Version 0.2 · 2026-06-01 · David A. Smith · davidasmith@gmail.com*
 
 ---
 
@@ -334,6 +334,111 @@ figures remain projections until measured on the friction-realistic substrate.
 What changed since the original chapter is the floor under those projections —
 the protocol is no longer a simulator artifact but a live, authenticated,
 signed-and-fresh network with a real lifecycle.
+
+## Pub/Sub-as-a-Service — the Managed Realtime Tier
+
+The applications above are open-source systems that *use* a DHT. There is a
+second class of target that is not an application at all but a **business
+model**: companies whose product *is* pub/sub. They exist because operating
+WebSocket fan-out at scale — connection management, presence, history,
+global points of presence — is hard, so they run it for you and meter it.
+Axona changes the economics directly: fan-out becomes a property of the mesh,
+the per-message meter disappears, and so does the operator who could read the
+traffic. These services sort into four tiers by how cleanly Axona displaces
+them.
+
+### Tier 1 — Realtime client pub/sub (the bullseye)
+
+**Vendors:** Pusher Channels, Ably, PubNub, Firebase Realtime Database,
+Supabase Realtime, Azure Web PubSub / SignalR Service, Stream (getstream.io).
+
+**What they sell.** A client subscribes to a channel; a publisher sends; every
+subscriber receives it in real time — plus presence, short-term message
+history, and reconnect handling. The meter is per-message **and** per
+connection-minute **and** per channel-minute (Ably is roughly $2.50 / million
+messages + $1 / million connection-minutes), or per monthly-active-user
+(PubNub starts near $98/mo for 1,000 MAU). The product is the fan-out
+infrastructure you would otherwise run yourself.
+
+**What Axona changes.** This is the closest match in the entire document,
+because Axona's pub/sub primitive *is* this product, minus the operator and the
+meter. The feature mapping is near-complete:
+
+| Managed-service feature | Axona equivalent |
+|---|---|
+| Channel / topic | `peer.sub(topic)` over `deriveTopicId` (public or owned) |
+| Publish | `peer.pub` — Ed25519-signed, freshness-bounded envelope |
+| Presence ("who's online") | `peer.peers` + `onPeerJoin` / `onPeerLeave` — native |
+| Message history / "rewind" | replay cache + `peer.pull` (by id *or* latest) + hold-time TTL |
+| Channel teardown / revoke | `unsub` / `kill` (creator delete + tombstone) / `unpub` |
+| Private channels | Model 3 shared-encryption topic (group key at the app layer) |
+| Reach analytics | `peer.metrics` (publishes / subscribers / reshare_count) |
+
+The pitch is economic and architectural at once: peers carry the fan-out, so the
+marginal cost per message trends to zero and there is no per-connection bill;
+and because there is no central relay, Pusher/Ably/PubNub's structural ability
+to read every channel's traffic simply does not exist — messages are signed and,
+where wanted, end-to-end encrypted. Geographic locality (the S2 prefix) is a
+bonus none of these vendors offer natively.
+
+### Tier 2 — Push notifications (complement, not replace)
+
+**Vendors:** Firebase Cloud Messaging (FCM), Apple Push Notification service
+(APNs), OneSignal, Airship, Pusher Beams.
+
+Axona delivers "came-online" and event pushes to *connected* peers natively, but
+it **cannot wake a closed application** — only the OS push channel (APNs/FCM)
+can originate that, and only the platform vendor controls it. So Axona replaces
+the in-app realtime layer and **pairs with** FCM/APNs for the wake-the-device
+layer; it does not displace them.
+
+### Tier 3 — Durable server-side event streaming (NOT a replacement)
+
+**Vendors:** Apache Kafka / Confluent Cloud, Google Cloud Pub/Sub, AWS SNS +
+SQS / Kinesis / EventBridge, Azure Event Hubs / Service Bus, CloudAMQP
+(RabbitMQ), Solace PubSub+, IBM MQ.
+
+These are **durable commit logs and queues**: long retention, partitioning,
+replay-from-offset, exactly-once or strict FIFO delivery, transactions, and
+backend consumers. Axona is deliberately **not** this — its retention is a
+bounded queue (≤256 messages) under a 24–48 h hold-time TTL, its ordering is
+per-publisher rather than a global total order, and its delivery is high but
+best-effort under churn, not the exactly-once SLA Kafka and Ably market.
+Positioning Axona as a Kafka replacement would be the overclaim that
+discredits the rest of this document; it is a realtime fan-out layer, not an
+event-sourcing backbone.
+
+### Tier 4 — MQTT / IoT brokers (partial)
+
+**Vendors:** HiveMQ Cloud, EMQX Cloud, Azure Event Grid (MQTT), AWS IoT Core.
+
+Conceptually adjacent — topics, retained messages (≈ Axona's replay-latest),
+QoS tiers — and Axona's geo-locality is genuinely attractive for regional
+device fleets. But these brokers win on **backend data-plane bridging** (dozens
+of connectors into Kafka, Kinesis, databases) and device-constrained QoS that
+Axona does not provide. Axona fits *peer-to-peer* device coordination, not the
+industrial-broker role with enterprise integrations.
+
+### The honest gap list (what Tier 1 displacement requires)
+
+To genuinely displace Ably/Pusher/PubNub rather than merely resemble them, four
+gaps must be stated plainly:
+
+1. **No exactly-once / no global ordering SLA** — per-publisher sequence only;
+   high delivery, not guaranteed delivery.
+2. **Short, bounded history** — minutes-to-days, not the months of stored
+   messages PubNub sells.
+3. **No managed support / uptime SLA** — Axona is infrastructure you adopt, not
+   a vendor you page at 3 a.m.
+4. **Presence and fan-out at PaaS scale are unproven** — the claim needs the
+   friction-realistic benchmark before it is field-credible.
+
+The trade is explicit: you give up the SLA, the durability, and the managed
+support; you get no per-message fee, no operator able to read your traffic, and
+geographic locality for free. For the large class of realtime features that do
+not need a durability guarantee — chat, presence, live cursors, notifications,
+feeds — that is a favorable trade, and it is exactly the class Tier 1 vendors
+serve.
 
 ---
 
