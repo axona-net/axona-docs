@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.7.0 \quad 2026-05-31\par}
+{\small An Axona Architecture Note \quad v0.7.1 \quad 2026-06-01\par}
 \end{center}
 \vfill
 \null
@@ -1325,6 +1325,31 @@ exchanged in the SDP, no nonce round-trip is needed and the
 handshake adds no extra latency --- security and speed land
 together.} Not yet mission-critical; deferred until adoption
 makes first-connect time the binding constraint.
+
+\item[\textbf{Black-hole detection (forwarding vitality).}] Every
+hardening to date answers \emph{``is this peer who it claims to be,
+and may it do this?''} --- identity, channel binding, ingress
+authorization, verified routing admission. A \emph{black-hole node}
+passes all of them and then silently drops (or, equivalently, fails
+to forward) the traffic it should relay. This is a Byzantine
+behavioural fault, not an identity one. Tampering is already defeated
+(end-to-end signatures + A-1) and replay/reorder by C-2's
+\texttt{seq}+freshness; \emph{omission}, though, is only
+\emph{inferable}, never provable --- you cannot prove a negative, and
+a malicious drop is indistinguishable from a crash or a bad link.
+The direction is a \emph{local} forwarding-vitality signal --- each
+node's own first-party measurement of whether traffic routed through a
+peer reached an acked destination, over the existing K-closest path
+redundancy --- driving route-around, never a gossiped reputation
+verdict (which the no-central-authority constraint forbids).
+Equivocation is the one bad-faith behaviour that \emph{is} provable
+(signed conflicting artifacts) and can land earlier. The gating
+question --- the false-positive rate against honest-but-flaky nodes
+--- must be answered in simulation first; see the black-hole threat
+note and the heterogeneous-protocol simulation plan in
+\texttt{axona-docs}. This is the behavioural complement to verified
+admission: that governs \emph{who is in your routing table}; this
+governs \emph{whether they actually do their job}.
 \end{description}
 
 The job of the architecture is to make these additions land
