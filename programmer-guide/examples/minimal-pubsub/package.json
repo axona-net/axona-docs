@@ -6,6 +6,6 @@
   "description": "Hello-world Axona pub/sub: two peers in one process via SimNetwork.",
   "engines": { "node": ">=20" },
   "dependencies": {
-    "@axona/protocol": "github:axona-net/axona-protocol#v2.10.0"
+    "@axona/protocol": "github:axona-net/axona-protocol#v2.11.0"
   }
 }
