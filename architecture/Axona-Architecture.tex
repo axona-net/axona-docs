@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.7.2 \quad 2026-06-01\par}
+{\small An Axona Architecture Note \quad v0.7.3 \quad 2026-06-01\par}
 \end{center}
 \vfill
 \null
@@ -752,6 +752,65 @@ after subscribing) flushes it and re-issues every live subscription
 against the now-converged set. So a subscription anchored early
 re-anchors as the mesh widens, rather than staying pinned to a stale,
 narrow axon set.
+
+\subsection{Topic Metrics: Scatter-Down, Gather-Direct}
+
+\newthought{\texttt{peer.metrics(topic)}} reports a topic's live state ---
+\texttt{publishes}, \texttt{current\_count} (events retained in the tree
+right now), \texttt{subscribers}, \texttt{deliveries}, \texttt{pulls},
+\texttt{reshares} --- by querying the same axon tree that carries delivery.
+It is a \emph{scatter-down, gather-direct} traversal, not a recursive sum
+back up the tree.
+
+\begin{enumerate}
+\setlength{\itemsep}{0pt}
+\item \textbf{Route to the tree.} \texttt{requestMetrics} issues a routed
+\texttt{pubsub:metricsReq} toward the \texttt{topicId}; a node that doesn't
+host the topic returns \texttt{'forward'}, so the request DHT-routes until it
+reaches a root axon.
+\item \textbf{Scatter down.} On receipt a role replies with its \emph{own}
+local view, then forwards the request as \texttt{pubsub:metricsBroadcast} to
+each of its children, which recurse --- the probe walks the tree along the
+same parent$\rightarrow$child edges that fan messages out. A bounded
+seen-request set (keyed on \texttt{requestId}) makes each relay process a
+given probe once, so redundant edges neither loop nor double-count.
+\item \textbf{Gather direct.} Every responding relay sends its partial result
+\emph{straight back to the original requester} (\texttt{pubsub:metricsResp}),
+not up through its parent. Scattering down but gathering directly keeps the
+root from becoming an aggregation hotspot.
+\item \textbf{Bounded collection.} The requester accumulates responses for a
+fixed window (\texttt{timeoutMs}, default 500\,ms) --- there is no global
+barrier --- then folds them. \texttt{relayCount} (distinct responders) is the
+honest coverage signal; the result is a best-effort snapshot, not a ledger.
+\end{enumerate}
+
+\newthought{Why the fold differs per field.} Each relay holds a local slice:
+its replay cache, its \texttt{children} map, and per-post counters. The tree
+\emph{replicates the message queue} across the $K$ root axons but
+\emph{partitions subscribers} across the tree, so a uniform sum would be
+wrong. The client combines each quantity according to its nature.
+
+\begin{fullwidth}
+\par\medskip\noindent\small
+\begin{tabular}{@{}p{0.20\textwidth}p{0.10\textwidth}p{0.60\textwidth}@{}}
+\toprule
+\textbf{Field} & \textbf{Fold} & \textbf{Why} \\
+\midrule
+\texttt{publishes} & max & distinct posts are replicated across roots; summing would multiply by $K$ \\
+\texttt{current\_count} & max & replicas hold the same retained set; max also tolerates a lagging replica \\
+\texttt{deliveries}, \texttt{pulls}, \texttt{reshares} & sum & partitioned work counters --- each relay tallies only the actions it performed \\
+\texttt{subscribers} & max & membership is partitioned; exact for an unsplit (single-root) topic, a lower bound once the tree splits \\
+\texttt{relayCount} & count & distinct responders --- a coverage indicator \\
+\bottomrule
+\end{tabular}
+\par\smallskip{\small\itshape Replicated set-cardinality folds with \emph{max}; partitioned per-action counters fold with \emph{sum}; partitioned membership folds with \emph{max} (approximate).}
+\par\medskip
+\end{fullwidth}
+
+\marginnote{A self-authenticating ownership gate means a relay answers only
+when the topic's publisher matches the requester, so today the owner alone
+gets non-empty results. \texttt{current\_count} and live \texttt{subscribers}
+were added in kernel v2.11.0.}
 
 % =====================================================================
 % XI. THE APPLICATION API
