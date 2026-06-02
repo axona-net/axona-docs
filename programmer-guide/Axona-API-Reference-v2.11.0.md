@@ -1,13 +1,13 @@
 # Axona API Reference
 
 Reference for every public symbol exported from `@axona/protocol`
-v2.10.0. Organized by what application developers actually reach for;
+v2.11.0. Organized by what application developers actually reach for;
 deep-customization surfaces are at the end.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v2.10.0.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v2.10.0.md) — mental model + worked
+- [Quick Start](Quick-Start-v2.11.0.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v2.11.0.md) — mental model + worked
   example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects (authenticated handshake, channel binding, pub/sub
@@ -418,22 +418,32 @@ returns `null`). Passing a non-null, non-64-hex `msgId` throws
 
 #### `peer.metrics(topicName, opts?)` → `Promise<metricsObj>`
 
-Best-effort delivery + subscriber counts for a topic.
+Best-effort delivery, retention, and subscriber counts for a topic.
 
 ```js
 const m = await peer.metrics('news/world', {
-  publisher: synth,
+  publisher: synth,   // null for a public topic
   timeoutMs: 500,
 });
 // {
-//   publishes:      <distinct messages seen>,
-//   subscribers:    <approx active subscribers>,
-//   reshare_count:  <count>,
+//   publishes:     <distinct messages ever seen>,
+//   current_count: <events live in the tree right now>,   // kernel ≥ v2.11.0
+//   subscribers:   <max direct subscribers at a relay>,   // live, kernel ≥ v2.11.0
+//   deliveries:    <total fan-out deliveries>,
+//   pulls:         <total pull() hits>,
+//   reshares:      <total reshare bumps>,
+//   relayCount:    <distinct relays that replied>,
 // }
 ```
 
-Values are aggregated from whichever axons reply within `timeoutMs`.
-Use for UX ("12 people in this room"), not for billing.
+`current_count` is the number of published events **currently retained**
+(live — non-expired, non-killed) across the topic's tree, so it falls as
+messages are killed or age out under the hold-time TTL; `publishes` is the
+cumulative count of distinct messages ever counted, so it only rises.
+`subscribers` is the max direct-subscriber count reported by any single
+responding relay — exact for an unsplit topic, a lower bound once the tree
+splits into sub-axons. Values are aggregated from whichever axons reply within
+`timeoutMs`. Use for UX ("12 people in this room"), not for billing.
 
 #### `peer.kill(topicName, msgId, opts?)` → `Promise<{ ok }>`
 
@@ -1156,7 +1166,7 @@ is informational and corresponds to the npm release tag.
 
 The full, versioned record is the [security
 changelog](../SECURITY-CHANGELOG.md); this is the developer-facing
-summary of what's enforced as of kernel v2.10.0. Everything here is
+summary of what's enforced as of kernel v2.11.0. Everything here is
 **self-authenticating** — no certificate authority, no central trust
 server, no reputation service.
 

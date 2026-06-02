@@ -8,8 +8,8 @@ The guide assumes you already know JavaScript + Node + a browser. It does
 not assume any DHT / WebRTC / cryptography background — concepts are
 introduced where they're needed.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v2.10.0)
-- **Browser SDK**: [@axona-net/axona-peer](https://github.com/axona-net/axona-peer) (v3.16.0)
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v2.11.0)
+- **Browser SDK**: [@axona-net/axona-peer](https://github.com/axona-net/axona-peer) (v3.19.0)
 - **WebSocket bridge**: [@axona-net/axona-bridge](https://github.com/axona-net/axona-bridge) (v2.6.0)
 - **Live network**: `wss://bridge.axona.net`
 - **Security model**: see §3.5 below and the [security changelog](../SECURITY-CHANGELOG.md) — the v2 line adds an authenticated-identity handshake, channel binding, a pub/sub trust boundary, and verified routing admission.
@@ -105,7 +105,7 @@ only.
 ```
 mkdir my-axona-app && cd my-axona-app
 npm init -y
-npm install @axona/protocol@github:axona-net/axona-protocol#v2.10.0
+npm install @axona/protocol@github:axona-net/axona-protocol#v2.11.0
 ```
 
 You now have `node_modules/@axona/protocol/src/` with the full kernel.
@@ -251,7 +251,7 @@ useful for genuinely public, anonymous topics.
 Axona is **self-authenticating**: every guarantee is enforced by
 cryptography the peers carry themselves — there is no certificate
 authority, central trust server, or reputation service. A node's
-identity *is* its keypair. As of kernel v2.10.0:
+identity *is* its keypair. As of kernel v2.11.0:
 
 - **Identity is provable, not asserted.** A nodeId's bottom 256 bits are
   `SHA-256(pubkey)`, and every connection runs the `axona/4` handshake:
@@ -757,7 +757,7 @@ open" from "channels are open *and* carrying authenticated routing." A
 sustained `true` (across several polls) means the mesh looks connected
 but isn't actually routing; `boundCount`/`meshBound` are the honest
 usable-peer counts. Cheap; safe for a status dashboard. See the
-[API reference §8 health()](Axona-API-Reference-v2.10.0.md) for the full shape.
+[API reference §8 health()](Axona-API-Reference-v2.11.0.md) for the full shape.
 
 ### 8.4 Logs and errors
 
@@ -807,15 +807,18 @@ const m = await peer.metrics('us-east/world-news', {
   timeoutMs: 500,
 });
 // {
-//   publishes:      <count of distinct messages>,
-//   subscribers:    <approximate>,
-//   reshare_count:  <count>,
+//   publishes:     <count of distinct messages ever seen>,
+//   current_count: <events live in the tree right now>,   // kernel ≥ v2.11.0
+//   subscribers:   <max direct subscribers at a relay>,   // live, kernel ≥ v2.11.0
+//   deliveries, pulls, reshares, relayCount,
 // }
 ```
 
 Metrics are best-effort — they're aggregated from whichever axons
-respond within the timeout. Don't use them for billing; do use them
-for "X people are subscribed to this room" UX.
+respond within the timeout. `current_count` is the live retained-event count
+(drops as messages are killed or expire); `publishes` is cumulative (only
+rises). Don't use them for billing; do use them for "X people are subscribed
+to this room" UX.
 
 ---
 
@@ -1469,7 +1472,7 @@ programmatically.
 
 ```js
 WIRE_VERSION         // '1.0'
-KERNEL_VERSION       // '2.10.0'
+KERNEL_VERSION       // '2.11.0'
 UPGRADE_CLOSE_CODE   // 4426
 ```
 
@@ -1477,10 +1480,10 @@ UPGRADE_CLOSE_CODE   // 4426
 
 ## Where to go next
 
-- **[Quick Start](Quick-Start-v2.10.0.md)** — if someone you're onboarding has
+- **[Quick Start](Quick-Start-v2.11.0.md)** — if someone you're onboarding has
   five minutes, send them here instead of this 1500-line guide.
 
-- **[API Reference](Axona-API-Reference-v2.10.0.md)** — when you're past the
+- **[API Reference](Axona-API-Reference-v2.11.0.md)** — when you're past the
   conceptual material and just need the signature for a specific call.
 
 - **Read the source of the reference peer**:
