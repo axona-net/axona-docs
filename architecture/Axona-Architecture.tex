@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.7.3 \quad 2026-06-01\par}
+{\small An Axona Architecture Note \quad v0.7.4 \quad 2026-06-02\par}
 \end{center}
 \vfill
 \null
@@ -217,23 +217,22 @@ running code. The wire format is 66-character lowercase hex --- the
 \textsc{only} representation that ever appears in JSON. The
 conversion happens at exactly two places: when the transport
 serialises an outgoing frame, and when the dispatcher parses an
-incoming one.\sidenote{This rule didn't exist in versions 1.0 through
-1.4. The kernel mixed hex strings and BigInts in different layers
-and the boundaries weren't enforced; pub/sub silently failed because
-\texttt{transport.notify(bigint)} returned without sending against a
-hex-keyed Map. v1.5.0 made BigInt-internal canonical; \texttt{\_normPeerId}
-helpers and \texttt{typeof v === 'bigint'} defensive branches are
-gone.}
+incoming one.
 
 \textbf{Topic identifiers share the address space.} A topic is named
 by the application (a string like \texttt{us-east/hello-world}) and
-optionally anchored at a publisher: \texttt{topicId =
-sha256(publisher~||~topic-name)}. When the publisher is null the
-topic is global (top byte \texttt{00}); when it's a regional
-synthetic publisher (top byte = S2 cell, bottom bits zero), the
-topic inherits the region. That's what makes regional pub/sub route
-naturally: peers in the same region are XOR-closest to topics
-anchored at that region.
+anchored at a publisher: \texttt{topicId =
+sha256(publisher~||~topic-name)}, so its top byte is the publisher's
+S2 cell. A regional synthetic publisher (top byte = S2 cell, bottom
+bits zero) anchors the topic in that region --- which is what makes
+regional pub/sub route naturally: peers in the same region are
+XOR-closest to topics anchored there. A public topic (no publisher)
+is \texttt{00~||~sha256(topic-name)}: the \texttt{00} prefix is simply
+the S2 cell at \texttt{00}, an ordinary cell with no special
+``global'' meaning. Public topics are anchored there by convention, so
+every peer derives the same ID for a given name --- and, like any
+topic, that ID is XOR-closest to the peers whose IDs fall in cell
+\texttt{00}.
 
 The Activation Potential (AP) routing formula, the K-closest
 selector, and the synaptome's stratum buckets all operate on this
@@ -369,10 +368,10 @@ AxonaManager uses internally on every \texttt{pub}/\texttt{sub} to
 find the topic's axons.
 \end{itemize}
 
-\marginnote{The \texttt{AxonaPeer} surface is described in detail in
-the companion document \emph{AxonaPeer Overview} (v0.4.0). This
-section is the architectural placement; the field-by-field
-description lives there.}
+\marginnote{This section is the architectural placement of
+\texttt{AxonaPeer}; the field-by-field surface --- every method, its
+parameters, and its return shape --- is catalogued in the Application
+API section later in this document.}
 
 \texttt{AxonaManager} is a separate object owned by the peer. Its job
 is the pub/sub overlay: when a subscriber sends
@@ -421,16 +420,8 @@ drives the bridge's version gate, runs the hello/hello-ack
 admission, threads TURN credentials from the welcome frame into the
 mesh's ICE config, and resolves once everything is up.
 
-\marginnote{Before v2.1 the factory connected once and stayed dead
-if the socket dropped; each browser app re-implemented reconnect,
-ping/pong, and welcome parsing itself. Folding that into the factory
-is what let \texttt{axona-peer} delete its \textasciitilde850-line
-\texttt{AxonaNode}/\texttt{Browser\-Engine} wrapper and build directly
-on \texttt{webTransport + AxonaPeer}, the same two-object pattern the
-demo uses.}
-
-As of kernel v2.1 the factory also owns the \emph{connection
-lifecycle}, so applications no longer hand-roll it: a 1\,Hz
+The factory also owns the \emph{connection lifecycle}, so an
+application doesn't hand-roll it: a 1\,Hz
 ping/pong heartbeat with stale detection, auto-reconnect with
 exponential backoff on an unexpected socket close (re-running the
 version gate and hello/hello-ack on each re-open), and a small
@@ -677,7 +668,8 @@ synaptome's admission rule (\texttt{\_addByVitality}).
 \marginnote{The performance claim of Axona over Kademlia is roughly
 40\% fewer wall-clock milliseconds per lookup at 25{,}000 nodes,
 mostly from latency-weighted hop selection. The figure is documented
-in the companion paper \emph{Axona: A Learning-Adaptive DHT}.}
+in the companion paper \emph{Axona: A Learning-Adaptive Distributed
+Hash Table and Axonal Publish/Subscribe} (v0.4.01, 2026-05-23).}
 
 % =====================================================================
 % X. PUB/SUB: K-CLOSEST
@@ -1317,13 +1309,14 @@ one bridge can be reached from another. Single-bridge today is a
 deployment simplification, not a protocol constraint.
 
 \item[\textbf{Bridge directory.}] A well-known public topic
-(\texttt{deriveTopicId(\{public:\,true, seed:\,"axona.bridge-directory"\})})
+(\texttt{deriveTopicId(null,\,"axona.bridge-directory")})
 where every bridge republishes itself once per hour: URL, region,
 kernel version, advertised TURN credentials, last-seen
 timestamp.\sidenote{Subscribers keep the newest entry per
-\texttt{signerPubkey} and prune entries older than 24 hours. Pull
-from the global S2 cell (top byte \texttt{0x00}) so every peer
-sees the same directory regardless of geography.} Peers subscribe
+\texttt{signerPubkey} and prune entries older than 24 hours. Being a
+public topic, its ID carries the \texttt{0x00} prefix, so every peer
+derives the same directory ID and sees the same listing regardless of
+geography.} Peers subscribe
 at startup and cache the directory; a peer whose primary bridge
 disappears has a list of alternates to try without out-of-band
 coordination. To prevent spam and DDoS of the channel, the topic
@@ -1430,9 +1423,9 @@ cleanly. The job of the existing layers is to keep working while
 they do.
 
 \vspace{2em}
-\noindent\textit{\footnotesize Companion documents: \emph{NeuronNode
-Overview} (v0.4.0), \emph{AxonaPeer Overview} (v0.4.0), \emph{Axona
-Explainer} (v0.4.25), and the source repositories at
+\noindent\textit{\footnotesize Companion documents: the \emph{Axona
+Programmer Guide} and \emph{Axona API Reference}, the \emph{Axona
+Explainer}, and the source repositories at
 \texttt{github.com/axona-net}.}
 
 % =====================================================================
