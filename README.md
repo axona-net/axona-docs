@@ -20,9 +20,9 @@ This repo uses three terms consistently:
 
 | Term | Meaning |
 |---|---|
-| **Axona** | The protocol described here — addressing, routing, and pub/sub layer, and the name of the deployed network running it. |
+| **Axona** | The protocol — addressing, routing, and pub/sub layer — and the name of the deployed network running it. This is the protocol these documents describe; refer to it by name. |
 | **N-DHT** | *Neuromorphic DHT* — the broader family of learning-adaptive DHT designs to which Axona belongs. |
-| **NH-1** | The current Axona implementation. Numerical results and concrete parameter values quoted in the documents are NH-1 numbers. |
+| **NX-17 / NH-1** | Named neuromorphic engine generations in the **dht-sim** benchmark roster — simulator comparison points along the lineage that informed Axona's design, *not* the deployed protocol. They appear only inside `dht-sim` and its benchmark walkthroughs; everywhere else the protocol is **Axona**. |
 
 ## The five canonical documents
 
