@@ -2,10 +2,11 @@
 
 ## A Complete Specification for Building the Production Axona Bootstrap and Routing System
 
-**Document version:** v0.3.38
-**Companion to:** Axona Whitepaper v0.3.38, Red Team v0.3.38
+**Document version:** v0.4.0
+**Companion to:** Axona Whitepaper v0.3.58, Axona Architecture Note v0.7.5, Axona Programmer Guide v2.14.0
 **Author:** David A. Smith — YZ.social
-**Date:** 2026-04-30
+**Date:** 2026-06-03
+**Kernel as built:** `@axona/protocol` v2.14.0 (wire v1.0)
 **Target deployment:** Mobile (iOS/Android), browser, and server-class peers
 
 ---
@@ -87,7 +88,69 @@ This document assumes the reader is:
 | **13. Deployment Phases**                       | Testnet, staging, limited release, production                |
 | **14. Reference Application**                   | The integration validator                                    |
 | **15. Operational Handoff**                     | What ops needs from engineering                              |
+| **16. Future Directions**                       | Federated bridges, demoting the bridge, capability hardening |
 
+
+---
+
+## Implementation Status (as built — kernel v2.14.0)
+
+This plan was authored in April 2026 as a forward specification. The system
+has since been **built and deployed**; this section reconciles the plan with
+what actually shipped, so the detailed specifications that follow are read in
+the right light. Where a later section names a module or class that differs
+from the shipped name, the mapping below is authoritative.
+
+### What shipped, and where it lives
+
+The seven-layer module taxonomy in §1 (`axona-core`, `axona-transport`,
+`axona-storage`, `axona-crypto`, `axona-bootstrap`, `axona-app`) was realized
+as a **single protocol kernel** plus three consumers — not seven separately
+published packages:
+
+| This plan | As built |
+|---|---|
+| `axona-core` / class `AxonaCore` | **`@axona/protocol`** — `AxonaPeer` (routing + lifecycle), `AxonaManager` (axonal pub/sub), `AxonaDomain` (shared mesh state) |
+| `axona-transport` | kernel `transport/` — `Transport.web()` (bridge-WS + WebRTC-mesh composite), `Transport.node()` (WS), `Transport.sim()` (in-process) |
+| `axona-storage` | kernel `persistence/` — `PersistenceAdapter` with IndexedDB (browser) and file (Node) adapters |
+| `axona-crypto` | kernel `identity/` + `pubsub/envelope` — Ed25519 via Web Crypto, signed envelopes, canonical signing input |
+| `axona-bootstrap` | the **`axona-bridge`** service (signaling broker + embedded universal-hub peer) plus the peer's `join()` path |
+| `axona-app` / class `AxonaApp` | the unified **`AxonaPeer`** API, consumed directly (`pub`/`sub`/`pull`/`metrics`/`unsub`/`kill`/`unpub`/`send`/`notify`/`peers`/`health`) |
+| `axona-demo` | **`axona-peer`** (the axona.net reference app) and the kernel's `examples/minimal-pubsub-browser` demo |
+
+Repositories (the `github.com/YZ-social/dht-sim` pointer in this doc predates
+the split): `axona-net/axona-protocol` (kernel), `axona-net/axona-peer`
+(browser SDK → axona.net), `axona-net/axona-bridge` (signaling broker →
+bridge.axona.net), `axona-net/dht-sim` (simulator + benchmarks);
+documentation in `axona-net/axona-docs`.
+
+### Capabilities realized since v0.3.38
+
+- **264-bit address space.** Identity = `8-bit S2 geo prefix ‖ sha256(Ed25519 pubkey)`; topics share the space (public, publisher-keyed, and synthetic-regional modes).
+- **Authenticated transport (`axona/4`).** Every bind proves the peer's pubkey hashes to its nodeId suffix; WebRTC channels are bound to their DTLS-certificate fingerprint (MITM-resistant). A bidirectional version-gate handshake lets bridges reject sub-floor clients with a clear upgrade signal.
+- **Unified, signed pub/sub.** Ed25519-signed envelopes, verified at K-closest ingress; replication to the K-closest root set; a bounded replay queue (default 100, ceiling 256) with deterministic seq-ordered eviction; hold-time TTL (24 h, 48 h ceiling); a per-publisher quota on open topics; per-publisher monotonic `seq` + a freshness window for anti-replay.
+- **Lifecycle controls, all self-authenticating.** `unsub`; `kill` (creator-only retract + tombstone); `unpub` (owner-only queue removal); `pull` (by `msgId` or latest); `metrics` (swept across the whole K-closest root set; unowned-topic metrics readable by anyone, owner-keyed metrics owner-only).
+- **Soft-state subscriptions.** Re-announced every ~10 s (`refreshIntervalMs`); a root expires a subscriber after 30 s (`maxSubscriptionAgeMs`).
+- **Resilient web transport.** Auto-reconnect with exponential backoff (1→16 s), welcome/RTT observability, app-layer resume on wake.
+- **Graceful bridge shutdown** (kernel ≥ v2.13.0). On `SIGTERM` the bridge announces `peer-leaving`; peers evict it and re-anchor immediately instead of waiting out a refresh tick.
+- **Persistence.** Identity, synaptome, and subscriptions are checkpointed and recovered through the `PersistenceAdapter`.
+
+### Build-sequence status
+
+The phased plan in §11 is largely complete. Phases 0–4 (foundation → core
+protocol → real I/O → bootstrap → hardening) shipped as the v1.0 flag-day
+cutover followed by the v2.x security-hardening waves; the network is **live
+in limited production** (axona.net, bridge.axona.net, demo.axona.net). Active
+work is Phase 7 (scale & refine) plus the items in **Future Directions**
+(§16) — chiefly federated bridges and removing the bridge's residual
+centrality. Security posture is tracked in `SECURITY-CHANGELOG.md` (resolved
+items) and the private red-team punch list (open items).
+
+> The module/interface/wire specifications in §§1–10 are preserved as the
+> original engineering plan. Read them through the mapping above: the shapes
+> are representative, but the canonical, current contracts are the shipped
+> `@axona/protocol` API — see the **Axona Programmer Guide v2.14.0** and the
+> **Axona API Reference**.
 
 ---
 
@@ -2263,6 +2326,61 @@ When the protocol library is production-ready, the engineering team hands off to
 
 ---
 
+## 16. Future Directions
+
+These sit inside the existing seams — the wire format, addressing discipline,
+and K-closest pub/sub semantics are stable. They mirror the **Axona
+Architecture Note (§14, v0.7.5)**; see that document for the detailed
+rationale.
+
+- **Federated bridges.** Multiple bridges across regions, gossiping
+peer-lists so a peer connected to one is reachable from another. Single-bridge
+today is a deployment simplification, not a protocol constraint.
+
+- **Demote the bridge to an ordinary peer.** The routing and pub/sub layers
+already treat a bridge as just another nodeId — no `isBridge` flag, no
+eviction exemption, no routing privilege. Its present dominance is *emergent*:
+every peer dials it first (so it lands in every synaptome) and its `0x89`
+geo-identity sits XOR-close to every `us-east/*` topic, so the ordinary
+K-closest and vitality rules keep selecting it as a root. The only residual
+special status is at the bootstrap layer — peers hold the bridge socket open
+and auto-readmit it on every reconnect, so it never leaves the routing table.
+Once federated bridges exist, and once a peer holds enough healthy mesh peers,
+it should **drop the bridge from routing and root candidacy** (keeping the
+socket for signaling only) and stop auto-readmitting its nodeId — dissolving
+the *correlated* failure mode in which one bridge restart removes a root from
+nearly every topic at once. Validate convergence and churn in `dht-sim`
+before shipping.
+
+- **Bridge directory.** A well-known public topic where each bridge
+republishes itself hourly (URL, region, kernel version, advertised TURN
+credentials, last-seen), gated by an allowed-signer set anchored to genesis
+bridge keys, so a peer whose primary bridge disappears has alternates to try
+without out-of-band coordination.
+
+- **Capability hardening (Endo / SES).** Adopt the Agoric/MetaMask
+object-capability stack (lockdown, Compartments, `codeHash`) to harden the
+host-side surface and make a node's kernel-version claim falsifiable.
+
+- **Behavioral node attestation.** Detect failing or malicious nodes (the
+"broken-but-authentic" failure mode that motivated graceful shutdown) via
+round-trip probes feeding the vitality function, and route around them. No
+browser TEE exists for remote cryptographic attestation, so this is
+*behavioral*, not certificate-based.
+
+- **Latency-coordinate seed (research).** Replace or augment the static S2
+geo-prefix seed with a learned RTT-coordinate embedding (Vivaldi-style); see
+the *Axona vs. Vivaldi* design note.
+
+- **Proof-of-location (research).** Anchor a claimed geo-prefix to measurable
+physical reality (verifiable RTT triangulation or attestation) to resist
+prefix-grinding.
+
+Open security items are tracked in the consolidated red-team punch list;
+resolved items are summarized in `SECURITY-CHANGELOG.md`.
+
+---
+
 ## Summary
 
 This implementation plan describes a complete production Axona system in seven layers: Crypto → Storage → Transport → Bootstrap → Core → App → Application. Each layer has clean interfaces, multiple adapter implementations for different platforms, and is independently testable.
@@ -2288,10 +2406,12 @@ The brain is the algorithm. The body is everything in this document. Together, t
 
 ## References
 
-- Axona Whitepaper v0.3.38 (`Axona-Whitepaper.md`)
-- Red Team Analysis v0.3.38 (`Axona-RedTeam-v0.3.38.md`)
-- Research Deck v0.3.38 (`deck.md`)
-- Source Repository: `github.com/YZ-social/dht-sim`
+- Axona Whitepaper v0.3.58 (`whitepaper/Axona-Whitepaper.md`)
+- Axona Architecture Note v0.7.5 (`architecture/Axona-Architecture.tex`)
+- Axona Programmer Guide v2.14.0 + API Reference (`programmer-guide/`)
+- Red Team Analysis v0.3.38 — historical, retains its original name (`red team/N-DHT-RedTeam-v0.3.38.md`)
+- Research Deck (`presentation/deck.md`)
+- Source: `github.com/axona-net` — `axona-protocol` (kernel), `axona-peer`, `axona-bridge`, `dht-sim`
 
 ---
 
