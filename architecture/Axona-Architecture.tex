@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.7.4 \quad 2026-06-02\par}
+{\small An Axona Architecture Note \quad v0.7.5 \quad 2026-06-03\par}
 \end{center}
 \vfill
 \null
@@ -1307,6 +1307,30 @@ What's coming sits inside the existing seams:
 geographic regions, gossiping peer-lists so a peer connected to
 one bridge can be reached from another. Single-bridge today is a
 deployment simplification, not a protocol constraint.
+
+\item[\textbf{Demote the bridge to an ordinary peer.}] Federated
+bridges remove the single \emph{rendezvous}; this companion change
+removes the single \emph{super-peer}. The routing and pub/sub layers
+already treat a bridge as just another nodeId --- there is no
+\texttt{isBridge} flag, no eviction exemption, no routing
+privilege.\sidenote{The bridge's present dominance is \emph{emergent},
+not granted: every peer dials it first, so it lands in every synaptome
+and carries the highest degree; and its \texttt{0x89} geo-identity sits
+XOR-close to every \texttt{us-east/*} topic. The ordinary K-closest and
+vitality rules then keep selecting it as a root. The topology makes it
+central; the algorithm gives it nothing.} The residual special status
+is purely at the \emph{bootstrap} layer: a peer holds its bridge
+WebSocket open for signaling and \emph{auto-readmits} the bridge to its
+synaptome on every (re)connect, so the bridge never actually leaves the
+routing table. Once a peer holds enough healthy mesh peers it should
+\emph{drop the bridge from routing and root candidacy} --- keeping the
+socket open for signaling only --- and stop auto-readmitting its
+nodeId. With several bridges sharing the load, this also dissolves the
+\emph{correlated} failure mode in which one bridge restart removes a
+root from nearly every topic at once. The goal state: a bridge is a
+signaling endpoint that any operator can stand up, indistinguishable
+from any other peer to the routing fabric. Validate convergence and
+churn behaviour in \texttt{dht-sim} before shipping.
 
 \item[\textbf{Bridge directory.}] A well-known public topic
 (\texttt{deriveTopicId(null,\,"axona.bridge-directory")})
