@@ -1,13 +1,13 @@
 # Axona API Reference
 
 Reference for every public symbol exported from `@axona/protocol`
-v2.11.0. Organized by what application developers actually reach for;
+v2.14.0. Organized by what application developers actually reach for;
 deep-customization surfaces are at the end.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v2.11.0.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v2.11.0.md) — mental model + worked
+- [Quick Start](Quick-Start-v2.14.0.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v2.14.0.md) — mental model + worked
   example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects (authenticated handshake, channel binding, pub/sub
@@ -444,6 +444,21 @@ cumulative count of distinct messages ever counted, so it only rises.
 responding relay — exact for an unsplit topic, a lower bound once the tree
 splits into sub-axons. Values are aggregated from whichever axons reply within
 `timeoutMs`. Use for UX ("12 people in this room"), not for billing.
+
+**Coverage (kernel ≥ v2.14.0).** The request fans out to the topic's whole
+K-closest root set — the same set publishes replicate to — and merges the
+replies (`max` for replicated counters like `current_count`/`subscribers`,
+`sum` for partitioned ones like `deliveries`). Before v2.14.0 it queried only
+the single closest root, so in a churning mesh `current_count` could read `0`
+even while subscribers were receiving a full replay from a sibling root; if you
+saw that, the fix is a kernel bump, not a change to your call.
+
+**Access (kernel ≥ v2.12.0).** Metrics for an **unowned** topic — a public
+topic (`publisher: null`) or a synthetic region-keyed topic (`prefix‖0…0`,
+which no key can own) — are readable by anyone. For an **owner-keyed** topic
+(`publisher` = a real node ID) only that owner gets a response; everyone else's
+request is declined (self-authenticating, no gatekeeper). So `metrics()` on
+someone else's owned topic resolves with zeroed/empty counters, not their data.
 
 #### `peer.kill(topicName, msgId, opts?)` → `Promise<{ ok }>`
 
@@ -1150,7 +1165,7 @@ needed by app code.
 
 ```js
 WIRE_VERSION         // '1.0'        — wire format major.minor
-KERNEL_VERSION       // '2.8.0'      — kernel semver
+KERNEL_VERSION       // '2.14.0'     — kernel semver
 AUTH_PROTO           // 'axona/4'    — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426         — WebSocket close code for version mismatch
 ID_BITS              // 264
@@ -1166,7 +1181,7 @@ is informational and corresponds to the npm release tag.
 
 The full, versioned record is the [security
 changelog](../SECURITY-CHANGELOG.md); this is the developer-facing
-summary of what's enforced as of kernel v2.11.0. Everything here is
+summary of what's enforced as of kernel v2.14.0. Everything here is
 **self-authenticating** — no certificate authority, no central trust
 server, no reputation service.
 
