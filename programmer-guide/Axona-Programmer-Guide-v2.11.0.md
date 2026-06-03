@@ -586,7 +586,50 @@ A topic with no children for `rootGraceMs` (default 60 s) is swept by the
 maintenance loop — so if no one is subscribed for >60 s, replay history can
 be lost before its hold time even elapses.
 
-### 6.5 Publishing flow (what happens under the hood)
+### 6.5 Subscription renewal (soft-state leases)
+
+A subscription is **soft state**, not a permanent registration. You call
+`peer.sub()` **once**; the kernel keeps it alive for you by periodically
+re-announcing it to the topic's current root axons. You never call `sub()`
+again — renewal is automatic and idempotent: a renewal just bumps a
+timestamp on the root, it does not re-deliver cached messages.
+
+Two timers govern the lease (both are `AxonaManager` options, with the
+defaults below):
+
+| Constant | Default | Role |
+|---|---|---|
+| `refreshIntervalMs` | 10 s | How often the kernel re-announces every local subscription to the topic's K-closest roots. |
+| `maxSubscriptionAgeMs` | 30 s | How long a root keeps a subscriber it hasn't heard a renewal from. Past this, the root drops it. |
+
+So in steady state a subscriber renews **every 10 seconds**, and a root
+forgets a subscriber it hasn't heard from in **30 seconds**. The 3x
+headroom is deliberate: a subscriber can miss up to two consecutive
+renewals — a transient mesh hiccup, a dropped frame, a brief disconnect —
+without being evicted, and the next renewal re-establishes the lease.
+
+This cadence is also what lets the system self-heal around churn. Because
+every subscription re-anchors on the ~10 s tick onto the *current* root
+set (the refresh flushes the K-closest cache first), a root — or the
+bridge — leaving is absorbed within a cycle or two: subscribers simply
+re-home onto the surviving roots on their next renewal. A peer that leaves
+*gracefully* announces its departure, so subscribers re-anchor immediately
+rather than waiting for the tick.
+
+**For your application this means: nothing to manage** — you don't renew
+subscriptions yourself. Two implications are worth knowing:
+
+- A subscription does **not** survive on its own if your peer goes silent
+  longer than `maxSubscriptionAgeMs`. When the peer comes back the next
+  refresh re-subscribes automatically, and `since`-replay backfills
+  anything missed that's still within the topic's hold time (§6.4).
+- Renewal is steady background traffic — roughly one re-announce per
+  subscription per `refreshIntervalMs`, to K roots. It's negligible at
+  normal scale, but a topic with very many subscribers is a reason to
+  consider a longer interval (both timers are tunable when you construct
+  the peer's `AxonaManager`).
+
+### 6.6 Publishing flow (what happens under the hood)
 
 1. `peer.pub` builds a signed envelope, JSON-encodes it.
 2. `am.pubsubPublish(topicId, json, meta)` is called on the local
@@ -606,7 +649,7 @@ your own subsequent `peer.sub` sees the message, either subscribe
 first or include yourself in the dht adapter's findKClosest result
 (see [§13](#13-common-pitfalls)).
 
-### 6.6 Message lifecycle: unsubscribe, retract, remove
+### 6.7 Message lifecycle: unsubscribe, retract, remove
 
 Beyond pub/sub, the kernel (≥ v2.10.0) gives you three lifecycle controls,
 all **self-authenticating** — the authority to act is proven by the same
