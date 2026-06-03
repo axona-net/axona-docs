@@ -1,9 +1,9 @@
-# N-DHT Implementation Plan
+# Axona Implementation Plan
 
-## A Complete Specification for Building the Production NH-1 Bootstrap and Routing System
+## A Complete Specification for Building the Production Axona Bootstrap and Routing System
 
 **Document version:** v0.3.38
-**Companion to:** NH-1 Whitepaper v0.3.38, Red Team v0.3.38
+**Companion to:** Axona Whitepaper v0.3.38, Red Team v0.3.38
 **Author:** David A. Smith — YZ.social
 **Date:** 2026-04-30
 **Target deployment:** Mobile (iOS/Android), browser, and server-class peers
@@ -14,7 +14,7 @@
 
 ### Purpose
 
-This document specifies the complete implementation of the N-DHT system as a deployable platform. It is intended for engineers who will build the protocol library, the supporting infrastructure (connection servers, bootstrap servers, monitoring), and the reference application. After reading this document, an engineering team should have unambiguous direction on:
+This document specifies the complete implementation of the Axona system as a deployable platform. It is intended for engineers who will build the protocol library, the supporting infrastructure (connection servers, bootstrap servers, monitoring), and the reference application. After reading this document, an engineering team should have unambiguous direction on:
 
 - What modules need to exist
 - What each module is responsible for
@@ -30,18 +30,18 @@ The goal is a system that **applications can integrate into seamlessly** — dro
 
 This document covers:
 
-- **The protocol library** — `nh1-core`, the routing and pub/sub engine
-- **The transport layer** — `nh1-transport`, abstracting WebRTC, WebSockets, libp2p
-- **The persistence layer** — `nh1-storage`, abstracting platform-specific storage
-- **The bootstrap subsystem** — `nh1-bootstrap`, sponsor flow + hardcoded servers + QR
-- **The cryptographic layer** — `nh1-crypto`, Ed25519, signatures, key management
+- **The protocol library** — `axona-core`, the routing and pub/sub engine
+- **The transport layer** — `axona-transport`, abstracting WebRTC, WebSockets, libp2p
+- **The persistence layer** — `axona-storage`, abstracting platform-specific storage
+- **The bootstrap subsystem** — `axona-bootstrap`, sponsor flow + hardcoded servers + QR
+- **The cryptographic layer** — `axona-crypto`, Ed25519, signatures, key management
 - **The infrastructure** — bootstrap servers, TURN relays, monitoring backends
-- **The reference application** — `nh1-demo`, validating the integration path
+- **The reference application** — `axona-demo`, validating the integration path
 - **The development sequence** — build order, validation gates, deployment milestones
 
 This document does **not** cover:
 
-- The detailed mathematics of the NH-1 routing algorithm (see whitepaper §3-5)
+- The detailed mathematics of the Axona routing algorithm (see whitepaper §3-5)
 - The simulator (`dht-sim`) — that is a research artifact, not a deployment artifact
 - Application-level features built on top (chat UX, social graphs, content discovery)
 - Operational runbooks beyond the build phase (see whitepaper §13 for steady-state ops)
@@ -51,46 +51,43 @@ This document does **not** cover:
 These principles drive every architectural decision below:
 
 1. **The protocol library is platform-agnostic.** Core logic ships as portable code (TypeScript, with bindings) that runs identically on Node.js, browsers, iOS (via WebKit JS bridge or native port), and Android (similar).
-
 2. **Every layer has a clean interface.** Transport, storage, crypto are *abstractions*; the protocol depends on the interface, not the implementation. This is what makes mobile and browser deployments possible from a single core.
-
 3. **Persistence is mandatory, not optional.** Every node persists its synaptome and identity by default. Sessions resume; they do not restart.
-
 4. **Cryptographic verification is non-skippable.** Every peer-to-peer message is signed; every signature is verified. There is no "trust mode" that bypasses signatures.
-
 5. **Failure modes are first-class.** Every operation has explicit timeout, retry, and fallback. The system degrades gracefully.
-
 6. **Observability is built-in, not bolted-on.** Every operation emits structured events; metrics are produced from those events; no separate instrumentation layer is needed.
-
 7. **The integration surface is small.** An application embeds the library by initializing one object and calling 4-5 methods. The library handles everything else.
 
 ### Intended Reader
 
 This document assumes the reader is:
-- Familiar with the NH-1 whitepaper (especially §3-6: foundational mechanics, vitality model, axonal pub/sub)
+
+- Familiar with the Axona whitepaper (especially §3-6: foundational mechanics, vitality model, axonal pub/sub)
 - Familiar with the red team document (especially Issues #1-4: friction items)
 - Comfortable with TypeScript, async/await, cryptographic primitives, and distributed systems concepts
 - Building either the protocol library, the infrastructure, or an application on top of it
 
 ### Document Structure
 
-| Section | Content |
-|---|---|
-| **1. System Architecture Overview** | The 7-layer stack, module responsibilities, dependency graph |
-| **2. The Protocol Library: `nh1-core`** | Routing, pub/sub, learning rules — the brain |
-| **3. The Transport Layer: `nh1-transport`** | WebRTC, WebSocket, libp2p abstractions |
-| **4. The Persistence Layer: `nh1-storage`** | Platform-specific storage adapters |
-| **5. The Cryptographic Layer: `nh1-crypto`** | Keys, signatures, hashes, secure random |
-| **6. The Bootstrap Subsystem: `nh1-bootstrap`** | Sponsor flow, QR codes, fallback servers |
-| **7. The Application API: `nh1-app`** | The integration surface for application developers |
-| **8. Infrastructure Components** | Bootstrap servers, TURN relays, monitoring |
-| **9. Wire Protocol Specification** | Message formats, encoding, signatures |
-| **10. State Persistence Format** | Disk schemas, migration, integrity |
-| **11. Development Sequence** | Build order, validation gates, milestones |
-| **12. Testing Strategy** | Unit, integration, simulation, deployment |
-| **13. Deployment Phases** | Testnet, staging, limited release, production |
-| **14. Reference Application** | The integration validator |
-| **15. Operational Handoff** | What ops needs from engineering |
+
+| Section                                         | Content                                                      |
+| ----------------------------------------------- | ------------------------------------------------------------ |
+| **1. System Architecture Overview**             | The 7-layer stack, module responsibilities, dependency graph |
+| **2. The Protocol Library: `axona-core`**         | Routing, pub/sub, learning rules — the brain                 |
+| **3. The Transport Layer: `axona-transport`**     | WebRTC, WebSocket, libp2p abstractions                       |
+| **4. The Persistence Layer: `axona-storage`**     | Platform-specific storage adapters                           |
+| **5. The Cryptographic Layer: `axona-crypto`**    | Keys, signatures, hashes, secure random                      |
+| **6. The Bootstrap Subsystem: `axona-bootstrap`** | Sponsor flow, QR codes, fallback servers                     |
+| **7. The Application API: `axona-app`**           | The integration surface for application developers           |
+| **8. Infrastructure Components**                | Bootstrap servers, TURN relays, monitoring                   |
+| **9. Wire Protocol Specification**              | Message formats, encoding, signatures                        |
+| **10. State Persistence Format**                | Disk schemas, migration, integrity                           |
+| **11. Development Sequence**                    | Build order, validation gates, milestones                    |
+| **12. Testing Strategy**                        | Unit, integration, simulation, deployment                    |
+| **13. Deployment Phases**                       | Testnet, staging, limited release, production                |
+| **14. Reference Application**                   | The integration validator                                    |
+| **15. Operational Handoff**                     | What ops needs from engineering                              |
+
 
 ---
 
@@ -107,14 +104,14 @@ This document assumes the reader is:
                            │ uses
                            ▼
 ┌───────────────────────────────────────────────────────┐
-│  Layer 6: Application API (`nh1-app`)                 │
+│  Layer 6: Application API (`axona-app`)                 │
 │  Public API surface: connect(), publish(), subscribe()│
 └───────────────────────────────────────────────────────┘
                            ▲
                            │ orchestrates
                            ▼
 ┌───────────────────────────────────────────────────────┐
-│  Layer 5: Protocol Core (`nh1-core`)                  │
+│  Layer 5: Protocol Core (`axona-core`)                  │
 │  Routing, pub/sub, learning, axonal trees             │
 └───────────────────────────────────────────────────────┘
         ▲             ▲             ▲             ▲
@@ -131,34 +128,37 @@ This document assumes the reader is:
 ```
 
 **Layer rules:**
+
 - Higher layers may depend on lower layers
-- Layers do not skip (e.g., `nh1-app` does not directly call `nh1-crypto`; it goes through `nh1-core`)
+- Layers do not skip (e.g., `axona-app` does not directly call `axona-crypto`; it goes through `axona-core`)
 - Within a layer, modules are siblings — they may be aware of each other but should not have hard dependencies
 - The transport, storage, and crypto layers are *interfaces with adapter implementations*. The protocol depends only on the interfaces.
 
 ### 1.2 Module Inventory
 
-| Module | Layer | Lines (est.) | Owns |
-|---|---|---:|---|
-| `nh1-crypto` | 1 | 800 | Ed25519 keypairs, signatures, Blake3, HMAC, secure RNG |
-| `nh1-storage` | 2 | 1200 | Platform-specific disk + keychain adapters |
-| `nh1-transport` | 3 | 2500 | WebRTC, WebSocket, libp2p adapters |
-| `nh1-bootstrap` | 4 | 1500 | Sponsor flow, QR generation/parsing, hardcoded fallback |
-| `nh1-core` | 5 | 4000 | Synaptome, AP routing, axonal tree, vitality, learning |
-| `nh1-app` | 6 | 800 | Public API, lifecycle hooks, observability events |
-| `nh1-demo` | 7 | 2000 | Reference chat application validating integration |
-| **Total** | | **~12,800** | |
 
-For comparison, the simulator's NH-1 is ~270 lines. The 4000-line estimate for `nh1-core` reflects the production reality: error handling, observability, persistence integration, telemetry, edge cases that the simulator does not face.
+| Module          | Layer | Lines (est.) | Owns                                                    |
+| --------------- | ----- | ------------ | ------------------------------------------------------- |
+| `axona-crypto`    | 1     | 800          | Ed25519 keypairs, signatures, Blake3, HMAC, secure RNG  |
+| `axona-storage`   | 2     | 1200         | Platform-specific disk + keychain adapters              |
+| `axona-transport` | 3     | 2500         | WebRTC, WebSocket, libp2p adapters                      |
+| `axona-bootstrap` | 4     | 1500         | Sponsor flow, QR generation/parsing, hardcoded fallback |
+| `axona-core`      | 5     | 4000         | Synaptome, AP routing, axonal tree, vitality, learning  |
+| `axona-app`       | 6     | 800          | Public API, lifecycle hooks, observability events       |
+| `axona-demo`      | 7     | 2000         | Reference chat application validating integration       |
+| **Total**       |       | **~12,800**  |                                                         |
+
+
+For comparison, the simulator's Axona is ~270 lines. The 4000-line estimate for `axona-core` reflects the production reality: error handling, observability, persistence integration, telemetry, edge cases that the simulator does not face.
 
 ### 1.3 The Integration Surface
 
-An application using NH-1 sees this much code:
+An application using Axona sees this much code:
 
 ```typescript
-import { NH1App } from '@yz-social/nh1-app';
+import { AxonaApp } from '@yz-social/axona-app';
 
-const app = new NH1App({
+const app = new AxonaApp({
   identity: 'auto',              // Generate or load from disk
   bootstrap: 'auto',             // Use stored sponsor or fallback to hardcoded
   storage: 'platform-default',   // Use platform-appropriate storage
@@ -188,11 +188,11 @@ This is the design target. If an application developer has to think about synaps
 
 ---
 
-## 2. The Protocol Library: `nh1-core`
+## 2. The Protocol Library: `axona-core`
 
 ### 2.1 Responsibilities
 
-`nh1-core` owns the routing logic. It is the implementation of the NH-1 protocol from the whitepaper, adapted for production constraints:
+`axona-core` owns the routing logic. It is the implementation of the Axona protocol from the whitepaper, adapted for production constraints:
 
 - The synaptome data structure
 - AP routing with two-hop lookahead and iterative fallback
@@ -203,18 +203,19 @@ This is the design target. If an application developer has to think about synaps
 - Replay cache for pub/sub history
 
 It does **not** own:
-- Network I/O (delegated to `nh1-transport`)
-- Disk I/O (delegated to `nh1-storage`)
-- Cryptographic operations (delegated to `nh1-crypto`)
-- Bootstrap orchestration (delegated to `nh1-bootstrap`)
+
+- Network I/O (delegated to `axona-transport`)
+- Disk I/O (delegated to `axona-storage`)
+- Cryptographic operations (delegated to `axona-crypto`)
+- Bootstrap orchestration (delegated to `axona-bootstrap`)
 
 ### 2.2 Public Interface
 
 ```typescript
 // Main core class — everything else lives inside
-class NH1Core {
+class AxonaCore {
   // Initialization
-  constructor(opts: NH1CoreOptions);
+  constructor(opts: AxonaCoreOptions);
   
   // Lifecycle
   async start(): Promise<void>;
@@ -234,11 +235,11 @@ class NH1Core {
   getSynaptomeStats(): SynaptomeStats;
   
   // Inspection (for tests and observability)
-  on(event: NH1CoreEvent, handler: (data: any) => void): void;
-  off(event: NH1CoreEvent, handler: (data: any) => void): void;
+  on(event: AxonaCoreEvent, handler: (data: any) => void): void;
+  off(event: AxonaCoreEvent, handler: (data: any) => void): void;
 }
 
-interface NH1CoreOptions {
+interface AxonaCoreOptions {
   myNodeId: NodeId;
   myPublicKey: PublicKey;
   myPrivateKey: PrivateKey;          // Used for signing only
@@ -248,7 +249,7 @@ interface NH1CoreOptions {
   storage: IStorage;                  // Injected
   crypto: ICrypto;                    // Injected
   
-  parameters: NH1Parameters;          // 12 protocol parameters
+  parameters: AxonaParameters;          // 12 protocol parameters
   highwayMode: boolean;               // True if server-class capacity
 }
 ```
@@ -256,9 +257,9 @@ interface NH1CoreOptions {
 ### 2.3 Internal Module Structure
 
 ```
-nh1-core/
+axona-core/
 ├── src/
-│   ├── index.ts                    // NH1Core class
+│   ├── index.ts                    // AxonaCore class
 │   ├── synaptome/
 │   │   ├── Synapse.ts              // Synapse data structure
 │   │   ├── Synaptome.ts            // Bounded collection of synapses
@@ -368,7 +369,7 @@ enum SynapseSource {
 The **vitality** function and admission gate:
 
 ```typescript
-function vitality(s: Synapse, now: number, params: NH1Parameters): number {
+function vitality(s: Synapse, now: number, params: AxonaParameters): number {
   // Decay-based recency
   const timeSinceUse = now - s.lastSuccessfulUse;
   const recency = Math.exp(-timeSinceUse / params.RECENCY_HALF_LIFE);
@@ -424,7 +425,7 @@ function _addByVitality(synaptome: Synaptome, newSyn: Synapse, now: number): boo
 
 ### 2.5 Implementation Notes
 
-**Concurrency model:** All `nh1-core` operations are async. The library uses a single logical event loop per `NH1Core` instance. State mutations are serialized through an internal command queue to prevent race conditions on synaptome updates.
+**Concurrency model:** All `axona-core` operations are async. The library uses a single logical event loop per `AxonaCore` instance. State mutations are serialized through an internal command queue to prevent race conditions on synaptome updates.
 
 **Memory model:** A single synaptome at 50 synapses occupies ~25 KB (each synapse ~500 bytes after overhead). Replay caches per topic at 100 messages × 1 KB = 100 KB per topic. A typical app subscribed to 5 topics: ~525 KB total state. Acceptable for mobile.
 
@@ -434,13 +435,14 @@ function _addByVitality(synaptome: Synaptome, newSyn: Synapse, now: number): boo
 
 ---
 
-## 3. The Transport Layer: `nh1-transport`
+## 3. The Transport Layer: `axona-transport`
 
 ### 3.1 Responsibilities
 
-`nh1-transport` abstracts away the differences between transport protocols. The protocol core doesn't care whether it's talking via WebRTC, WebSocket, or libp2p — it sees the same interface.
+`axona-transport` abstracts away the differences between transport protocols. The protocol core doesn't care whether it's talking via WebRTC, WebSocket, or libp2p — it sees the same interface.
 
 The transport layer is responsible for:
+
 - Establishing connections to peers
 - Sending and receiving messages
 - Detecting connection failures
@@ -624,7 +626,7 @@ class LibP2PTransport implements ITransport {
     const multiaddr = peer.addresses.find(a => a.protocol.startsWith('libp2p'))?.endpoint;
     const stream = await this.node.dialProtocol(
       multiaddrFromString(multiaddr!),
-      '/nh1/1.0.0'
+      '/axona/1.0.0'
     );
     return new Connection(peer.peerId, stream);
   }
@@ -660,6 +662,7 @@ The transport tracks each connection through a clear state machine:
 ```
 
 **State transitions:**
+
 - `NEW`: Just created, no work begun
 - `GATHERING`: ICE candidates being collected (WebRTC) or DNS resolution
 - `CONNECTING`: Actively establishing transport
@@ -673,7 +676,7 @@ The transport tracks each connection through a clear state machine:
 
 **RPC timeout handling (Issue #2):** Every send is wrapped with an explicit timeout. If no response within `RPC_TIMEOUT_MS = 3000`, the connection is marked SUSPECTED and the synapse's suspicion count increases.
 
-**RTT measurement:** Each ping/pong exchange records the round-trip time. The transport reports the raw RTT; `nh1-core` integrates it into the synapse's `latencyEMA` via exponential moving average.
+**RTT measurement:** Each ping/pong exchange records the round-trip time. The transport reports the raw RTT; `axona-core` integrates it into the synapse's `latencyEMA` via exponential moving average.
 
 **Connection multiplexing:** A single transport connection (e.g., one WebRTC peer connection) carries all messages between two nodes — lookups, publishes, probes, axonal tree messages. The transport doesn't know what these messages mean; it just delivers bytes.
 
@@ -681,11 +684,11 @@ The transport tracks each connection through a clear state machine:
 
 ---
 
-## 4. The Persistence Layer: `nh1-storage`
+## 4. The Persistence Layer: `axona-storage`
 
 ### 4.1 Responsibilities
 
-`nh1-storage` abstracts platform-specific storage. On iOS, it uses Core Data + Keychain. On Android, EncryptedSharedPreferences + KeyStore. On browsers, IndexedDB + Web Crypto API. On Node.js, filesystem + OS keychain.
+`axona-storage` abstracts platform-specific storage. On iOS, it uses Core Data + Keychain. On Android, EncryptedSharedPreferences + KeyStore. On browsers, IndexedDB + Web Crypto API. On Node.js, filesystem + OS keychain.
 
 The protocol core writes structured data; the storage layer makes it durable and recoverable.
 
@@ -815,7 +818,7 @@ class BrowserStorage implements IStorage {
   private db: IDBDatabase | null = null;
   
   async open(): Promise<void> {
-    this.db = await openIndexedDB('nh1-storage', 1, (db) => {
+    this.db = await openIndexedDB('axona-storage', 1, (db) => {
       db.createObjectStore('synaptome', { keyPath: 'id' });
       db.createObjectStore('identity', { keyPath: 'id' });
       db.createObjectStore('replayCaches', { keyPath: 'topicId' });
@@ -891,11 +894,11 @@ class FilesystemStorage implements IStorage {
 
 ---
 
-## 5. The Cryptographic Layer: `nh1-crypto`
+## 5. The Cryptographic Layer: `axona-crypto`
 
 ### 5.1 Responsibilities
 
-`nh1-crypto` provides cryptographic primitives. Every signature, hash, and random number used by the protocol comes through this layer.
+`axona-crypto` provides cryptographic primitives. Every signature, hash, and random number used by the protocol comes through this layer.
 
 The reasons to abstract: different platforms have different best-available implementations (libsodium on iOS, Web Crypto on browsers, libsodium-wasm in Node.js). The protocol depends on the interface, not the implementation.
 
@@ -968,22 +971,23 @@ class IOSCryptoAdapter implements ICrypto {
 - Blake3 hashing: ~5 microseconds for typical message sizes
 - Key generation: ~1 ms
 
-For a typical NH-1 deployment, signing happens on every outbound message and verification on every inbound message. At 100 lookups/min, that's ~200 cryptographic operations per minute = trivial CPU cost.
+For a typical Axona deployment, signing happens on every outbound message and verification on every inbound message. At 100 lookups/min, that's ~200 cryptographic operations per minute = trivial CPU cost.
 
 ---
 
-## 6. The Bootstrap Subsystem: `nh1-bootstrap`
+## 6. The Bootstrap Subsystem: `axona-bootstrap`
 
 ### 6.1 Responsibilities
 
-`nh1-bootstrap` orchestrates the join process. It owns:
+`axona-bootstrap` orchestrates the join process. It owns:
+
 - QR code generation and parsing
 - Sponsor flow (peer-to-peer bootstrap)
 - Hardcoded bootstrap server fallback
 - Token validation and consumption
 - Synaptome snapshot exchange
 
-It does **not** own the synaptome itself; it produces a populated synaptome that `nh1-core` then takes over.
+It does **not** own the synaptome itself; it produces a populated synaptome that `axona-core` then takes over.
 
 ### 6.2 The Bootstrap Interface
 
@@ -1016,7 +1020,7 @@ interface IBootstrap {
 QR codes contain a URL with these fields:
 
 ```
-nh1://join?
+axona://join?
   sponsor=<base58-encoded NodeId>
   pubkey=<base58-encoded public key>
   s2cell=<hex S2 cell ID>
@@ -1031,7 +1035,7 @@ nh1://join?
 
 The signature is over `sponsor || pubkey || s2cell || conninfo || token || expires || use_count`.
 
-The `nh1://` URI scheme is registered by the app for deep-linking, allowing scan → app handoff.
+The `axona://` URI scheme is registered by the app for deep-linking, allowing scan → app handoff.
 
 ### 6.4 The Sponsor Flow Wire Protocol
 
@@ -1111,12 +1115,12 @@ Step 7: Import into local synaptome
   - Set createdAt = now
   - lastSuccessfulUse = 0 (will be set on first probe)
 
-Step 8: Spawn liveness probe (in nh1-transport)
+Step 8: Spawn liveness probe (in axona-transport)
   - Probe all synapses in parallel with 3-second timeout
   - Mark dead ones for fast eviction
 
-Step 9: Notify nh1-core that synaptome is ready
-  - nh1-core takes over; bootstrap is complete
+Step 9: Notify axona-core that synaptome is ready
+  - axona-core takes over; bootstrap is complete
 ```
 
 ### 6.5 The Hardcoded Fallback
@@ -1226,18 +1230,18 @@ The persisted bootstrap is the fastest path to functional. It's tried first; if 
 
 ---
 
-## 7. The Application API: `nh1-app`
+## 7. The Application API: `axona-app`
 
 ### 7.1 Responsibilities
 
-`nh1-app` is the public-facing surface for application developers. It hides the protocol internals and exposes a clean lifecycle.
+`axona-app` is the public-facing surface for application developers. It hides the protocol internals and exposes a clean lifecycle.
 
 ### 7.2 The App API
 
 ```typescript
-class NH1App extends EventEmitter {
+class AxonaApp extends EventEmitter {
   // Construction
-  constructor(opts: NH1AppOptions);
+  constructor(opts: AxonaAppOptions);
   
   // Lifecycle
   async connect(): Promise<void>;
@@ -1265,7 +1269,7 @@ class NH1App extends EventEmitter {
   on(event: 'connected' | 'disconnected' | 'lookup' | 'publish' | 'subscribe' | 'error', handler: any): void;
 }
 
-interface NH1AppOptions {
+interface AxonaAppOptions {
   // Identity
   identity?: 'auto' | { publicKey: string; privateKey: string };
   s2Cell?: string;                     // Optional override; auto-detected otherwise
@@ -1283,7 +1287,7 @@ interface NH1AppOptions {
   observability?: 'silent' | 'console' | { metricsEndpoint: string };
   
   // Advanced
-  parameters?: Partial<NH1Parameters>;
+  parameters?: Partial<AxonaParameters>;
   highwayMode?: 'auto' | true | false;
 }
 ```
@@ -1293,9 +1297,9 @@ interface NH1AppOptions {
 #### 7.3.1 Minimal Browser App
 
 ```typescript
-import { NH1App } from '@yz-social/nh1-app/browser';
+import { AxonaApp } from '@yz-social/axona-app/browser';
 
-const app = new NH1App({});
+const app = new AxonaApp({});
 await app.connect();
 
 await app.publish('hello', { text: 'world' });
@@ -1307,9 +1311,9 @@ app.subscribe('hello', (msg) => console.log(msg));
 ```swift
 let webView = WKWebView()
 webView.loadHTMLString("""
-<script src="nh1-bundle.js"></script>
+<script src="axona-bundle.js"></script>
 <script>
-  const app = new NH1App({
+  const app = new AxonaApp({
     transport: 'webrtc',
     storage: { adapter: nativeStorage }
   });
@@ -1321,9 +1325,9 @@ webView.loadHTMLString("""
 #### 7.3.3 Node.js Server
 
 ```typescript
-import { NH1App } from '@yz-social/nh1-app/node';
+import { AxonaApp } from '@yz-social/axona-app/node';
 
-const app = new NH1App({
+const app = new AxonaApp({
   highwayMode: true,                   // Server-class capacity
   storage: 'platform-default',         // Filesystem
   parameters: {
@@ -1375,7 +1379,7 @@ app.on('error', (error) => {
 
 ### 8.1 Bootstrap Servers
 
-The hardcoded bootstrap servers are dedicated NH-1 nodes that run on operator infrastructure. They are deployed as containers.
+The hardcoded bootstrap servers are dedicated Axona nodes that run on operator infrastructure. They are deployed as containers.
 
 **Specifications:**
 
@@ -1389,7 +1393,7 @@ The hardcoded bootstrap servers are dedicated NH-1 nodes that run on operator in
 ```dockerfile
 FROM node:20-alpine
 WORKDIR /app
-COPY nh1-bootstrap-server/ .
+COPY axona-bootstrap-server/ .
 RUN npm install --production
 CMD ["node", "server.js"]
 ```
@@ -1398,20 +1402,20 @@ CMD ["node", "server.js"]
 version: '3.8'
 services:
   bootstrap:
-    image: yz-social/nh1-bootstrap:latest
+    image: yz-social/axona-bootstrap:latest
     ports:
       - "8080:8080/tcp"
       - "8443:8443/tcp"
     volumes:
       - bootstrap-data:/data
     environment:
-      - NH1_NODE_ID=z5he6z4y...
-      - NH1_PRIVATE_KEY=<keychain reference>
-      - NH1_PUBLIC_KEY=<from binary>
-      - NH1_S2_CELL=0x1a4c
-      - NH1_HIGHWAY_MODE=true
-      - NH1_LISTEN_TCP=0.0.0.0:8080
-      - NH1_LISTEN_WSS=0.0.0.0:8443
+      - Axona_NODE_ID=z5he6z4y...
+      - Axona_PRIVATE_KEY=<keychain reference>
+      - Axona_PUBLIC_KEY=<from binary>
+      - Axona_S2_CELL=0x1a4c
+      - Axona_HIGHWAY_MODE=true
+      - Axona_LISTEN_TCP=0.0.0.0:8080
+      - Axona_LISTEN_WSS=0.0.0.0:8443
 
 volumes:
   bootstrap-data:
@@ -1482,10 +1486,10 @@ The library emits structured events; the application's monitoring stack consumes
 }
 
 // Aggregated as metrics
-nh1_lookups_total{outcome="success",region="us-east"} 1234
-nh1_lookups_total{outcome="failure",region="us-east"} 12
-nh1_lookup_latency_p95{region="us-east"} 245.3
-nh1_synaptome_size_avg{region="us-east"} 47.2
+axona_lookups_total{outcome="success",region="us-east"} 1234
+axona_lookups_total{outcome="failure",region="us-east"} 12
+axona_lookup_latency_p95{region="us-east"} 245.3
+axona_synaptome_size_avg{region="us-east"} 47.2
 ```
 
 ### 8.4 Update Distribution
@@ -1497,7 +1501,7 @@ When the app has updates (new bootstrap server addresses, parameter tunings, sec
 ```typescript
 async function checkForUpdates() {
   try {
-    const manifest = await fetch('https://updates.yz.social/nh1/manifest.json');
+    const manifest = await fetch('https://updates.yz.social/axona/manifest.json');
     const data = await manifest.json();
     
     // Verify manifest is signed by trusted key
@@ -1707,6 +1711,7 @@ function verifyMessage(publicKey: Bytes, message: Object, signature: Signature):
 ```
 
 Signatures are verified at three points:
+
 1. **At the receiver's transport layer** — does this message claim to be from someone I have a public key for?
 2. **At the routing layer** — for `LOOKUP_REQUEST`, is the requesterPath consistent?
 3. **At the application layer** — for `AXONAL_PUBLISH`, does the publisher signature match?
@@ -1734,7 +1739,7 @@ Error codes are documented in the protocol spec; clients log them for diagnostic
 ### 10.1 The Persistence Layout
 
 ```
-nh1-storage/
+axona-storage/
 ├── identity.bin          # IdentityRecord (encrypted at rest)
 ├── synaptome.bin         # SerializedSynaptome
 ├── subscriptions.bin     # Active subscriptions
@@ -1753,16 +1758,19 @@ Each file is independently checksummed. If any are corrupt, the system falls bac
 ### 10.2 Save Strategy
 
 **On graceful shutdown:**
+
 - All state saved to disk
 - Connections closed gracefully
 - Last-known-good stats recorded
 
 **On unexpected termination:**
+
 - Periodic checkpoints (every 60 seconds during active use)
 - Synaptome saved when significant changes occur (10+ new synapses, 5+ evictions)
 - Replay caches saved every 30 seconds during pub/sub activity
 
 **On app launch:**
+
 - Verify integrity of all files
 - Compute time elapsed since last save
 - Apply recency decay to all synapses
@@ -1813,7 +1821,8 @@ This is the recommended build order. Each phase has explicit gates that must be 
 **Goal:** Get the foundation right before building protocol logic.
 
 **Tasks:**
-- Set up TypeScript monorepo with `nh1-crypto`, `nh1-storage`, `nh1-transport`, `nh1-core`, `nh1-bootstrap`, `nh1-app`
+
+- Set up TypeScript monorepo with `axona-crypto`, `axona-storage`, `axona-transport`, `axona-core`, `axona-bootstrap`, `axona-app`
 - Define interfaces for ICrypto, IStorage, ITransport
 - Implement WebCrypto-based crypto adapter
 - Implement IndexedDB storage adapter (browser)
@@ -1823,6 +1832,7 @@ This is the recommended build order. Each phase has explicit gates that must be 
 - Set up CI/CD pipeline
 
 **Validation gates:**
+
 - All adapters have ≥80% test coverage
 - Cross-platform tests pass on macOS, Linux, Windows
 - Browser tests pass in Chrome, Firefox, Safari
@@ -1832,9 +1842,10 @@ This is the recommended build order. Each phase has explicit gates that must be 
 
 ### 11.2 Phase 1 — Core Protocol (Weeks 4-7)
 
-**Goal:** Implement the NH-1 protocol, isolated from production concerns.
+**Goal:** Implement the Axona protocol, isolated from production concerns.
 
 **Tasks:**
+
 - Implement Synapse and Synaptome data structures with all fields
 - Implement vitality function and `_addByVitality`
 - Implement AP routing
@@ -1847,17 +1858,19 @@ This is the recommended build order. Each phase has explicit gates that must be 
 - Build a fake storage for unit testing
 
 **Validation gates:**
-- Unit tests cover all 12 NH-1 rules with their behavioral contracts
-- Integration test: spawn 100 instances on a single machine using fake transport, verify routing succeeds
-- Behavioral parity test: a small simulated network on the protocol library matches NH-1 simulator output to within 5%
 
-**Outcome:** A correct NH-1 implementation that can be hooked up to real I/O.
+- Unit tests cover all 12 Axona rules with their behavioral contracts
+- Integration test: spawn 100 instances on a single machine using fake transport, verify routing succeeds
+- Behavioral parity test: a small simulated network on the protocol library matches Axona simulator output to within 5%
+
+**Outcome:** A correct Axona implementation that can be hooked up to real I/O.
 
 ### 11.3 Phase 2 — Real I/O (Weeks 8-11)
 
 **Goal:** Hook the protocol up to actual network and storage.
 
 **Tasks:**
+
 - Implement WebRTC transport adapter with full ICE/STUN/TURN
 - Implement libp2p transport adapter
 - Implement iOS native crypto and storage bridge
@@ -1868,6 +1881,7 @@ This is the recommended build order. Each phase has explicit gates that must be 
 - Run on real testnet (5-10 nodes on different machines)
 
 **Validation gates:**
+
 - 5-node real testnet sustains 99%+ lookup success over 1 hour
 - WebRTC connection setup succeeds in < 5 seconds for typical NAT environments
 - Synaptome state persists across restarts; no re-bootstrap needed
@@ -1880,6 +1894,7 @@ This is the recommended build order. Each phase has explicit gates that must be 
 **Goal:** Polish the join experience, including QR codes, sponsor flow, and hardcoded fallback.
 
 **Tasks:**
+
 - Implement QR code generation and parsing
 - Implement sponsor flow and bootstrap request/response messages
 - Implement hardcoded bootstrap server fallback
@@ -1890,6 +1905,7 @@ This is the recommended build order. Each phase has explicit gates that must be 
 - Implement TURN integration for WebRTC
 
 **Validation gates:**
+
 - QR-based bootstrap completes in < 7 seconds end-to-end on real mobile devices
 - Hardcoded bootstrap completes in < 7 seconds end-to-end
 - Persisted bootstrap completes in < 1 second on rejoin
@@ -1903,6 +1919,7 @@ This is the recommended build order. Each phase has explicit gates that must be 
 **Goal:** Address red-team Tier 1 issues for production readiness.
 
 **Tasks:**
+
 - Implement bandwidth saturation handling and load-aware AP scoring (Issue #3)
 - Implement replay cache integrity (HMAC, signature verification)
 - Implement reputation tracking and decay
@@ -1913,6 +1930,7 @@ This is the recommended build order. Each phase has explicit gates that must be 
 - Build alerting rules per the operational handoff
 
 **Validation gates:**
+
 - Synthetic Zipf workload (α=1.0): no relay saturates beyond 80% load
 - Synthetic Sybil attack (10% nodes in one cell): lookup success > 90% in that cell
 - Real WebRTC measurements: latency within 30% of simulator predictions
@@ -1925,6 +1943,7 @@ This is the recommended build order. Each phase has explicit gates that must be 
 **Goal:** Validate at scale on dedicated infrastructure.
 
 **Tasks:**
+
 - Deploy 100-node testnet on dedicated VMs
 - Deploy 1,000-node testnet
 - Deploy 5,000-node staging environment
@@ -1934,6 +1953,7 @@ This is the recommended build order. Each phase has explicit gates that must be 
 - Train operations team on diagnosis playbooks
 
 **Validation gates:**
+
 - 1K-node testnet: 99% lookup success, p95 latency < 500ms
 - 5K-node staging: 99% lookup success, p95 latency < 800ms
 - Pub/sub baseline delivery: 100% under no churn
@@ -1947,7 +1967,8 @@ This is the recommended build order. Each phase has explicit gates that must be 
 **Goal:** Ship to early adopters with active monitoring.
 
 **Tasks:**
-- Deploy reference application (`nh1-demo`) — chat or social-style
+
+- Deploy reference application (`axona-demo`) — chat or social-style
 - Open to ~500 invited users
 - Monitor all Tier 1, 2, 3 metrics continuously
 - Establish incident response playbook
@@ -1955,6 +1976,7 @@ This is the recommended build order. Each phase has explicit gates that must be 
 - Iterate on bugs found in production
 
 **Validation gates:**
+
 - 24-hour soak: all critical metrics within target
 - 1-week run: any issue addressed within 48 hours
 - User-reported friction: collected and triaged
@@ -2094,7 +2116,7 @@ describe('Real WebRTC Bootstrap', () => {
       address: 'public-test-server.example.com:8080'
     });
     
-    const joiner = new NH1App({
+    const joiner = new AxonaApp({
       bootstrap: { servers: [sponsor.endpoint] },
     });
     
@@ -2113,38 +2135,40 @@ describe('Real WebRTC Bootstrap', () => {
 
 The deployment timeline maps to the development phases above:
 
-| Week | Phase | Milestone | Deployment Target |
-|---|---|---|---|
-| 0-3 | 0 | Foundation built | Internal dev |
-| 4-7 | 1 | Protocol library complete | Internal dev |
-| 8-11 | 2 | Real I/O integration | Engineering testnet (5 nodes) |
-| 12-15 | 3 | Bootstrap system complete | Engineering testnet (50 nodes) |
-| 16-19 | 4 | Hardening complete | Open testnet (100 nodes) |
-| 20-23 | 5 | Scale validation | Staging (5K nodes) |
-| 24-25 | 6 | Limited release | Production (500 users) |
-| 26+ | 7 | Scaled release | Production (5K+ users) |
+
+| Week  | Phase | Milestone                 | Deployment Target              |
+| ----- | ----- | ------------------------- | ------------------------------ |
+| 0-3   | 0     | Foundation built          | Internal dev                   |
+| 4-7   | 1     | Protocol library complete | Internal dev                   |
+| 8-11  | 2     | Real I/O integration      | Engineering testnet (5 nodes)  |
+| 12-15 | 3     | Bootstrap system complete | Engineering testnet (50 nodes) |
+| 16-19 | 4     | Hardening complete        | Open testnet (100 nodes)       |
+| 20-23 | 5     | Scale validation          | Staging (5K nodes)             |
+| 24-25 | 6     | Limited release           | Production (500 users)         |
+| 26+   | 7     | Scaled release            | Production (5K+ users)         |
+
 
 Total: 26 weeks (~6 months) from kickoff to limited production release.
 
 ---
 
-## 14. Reference Application: `nh1-demo`
+## 14. Reference Application: `axona-demo`
 
 To validate that the API is genuinely simple and integrable, we ship a reference application.
 
 **Choice:** A decentralized chat application — minimum viable to exercise pub/sub, lookup, and persistence.
 
 ```typescript
-// nh1-demo/src/app.ts
+// axona-demo/src/app.ts
 
-import { NH1App } from '@yz-social/nh1-app';
+import { AxonaApp } from '@yz-social/axona-app';
 
 class ChatApp {
-  private app: NH1App;
+  private app: AxonaApp;
   private myUsername: string;
   
   async start() {
-    this.app = new NH1App({
+    this.app = new AxonaApp({
       observability: 'console',
     });
     
@@ -2191,6 +2215,7 @@ class ChatApp {
 ```
 
 **This application validates:**
+
 - The simple 6-method API works
 - Lookup works
 - Pub/sub publish/subscribe works
@@ -2211,7 +2236,7 @@ When the protocol library is production-ready, the engineering team hands off to
 - This implementation plan (you are reading it)
 - The whitepaper (architectural reference)
 - The red team document (failure mode catalog)
-- API documentation for `nh1-app` (TypeDoc-generated)
+- API documentation for `axona-app` (TypeDoc-generated)
 - Internal architecture documentation
 - Runbooks for each operational scenario
 
@@ -2226,7 +2251,7 @@ When the protocol library is production-ready, the engineering team hands off to
 
 - Bootstrap server deployment automation (Terraform or equivalent)
 - TURN server deployment automation
-- Synaptome inspection CLI (`nh1-cli synaptome inspect <node>`)
+- Synaptome inspection CLI (`axona-cli synaptome inspect <node>`)
 - Performance profiling tools
 
 ### 15.4 Knowledge Transfer
@@ -2240,15 +2265,16 @@ When the protocol library is production-ready, the engineering team hands off to
 
 ## Summary
 
-This implementation plan describes a complete production NH-1 system in seven layers: Crypto → Storage → Transport → Bootstrap → Core → App → Application. Each layer has clean interfaces, multiple adapter implementations for different platforms, and is independently testable.
+This implementation plan describes a complete production Axona system in seven layers: Crypto → Storage → Transport → Bootstrap → Core → App → Application. Each layer has clean interfaces, multiple adapter implementations for different platforms, and is independently testable.
 
-**The development sequence** is 26 weeks across 8 phases. Each phase has explicit validation gates that must be passed before moving forward. The reference application (`nh1-demo`) validates the integration surface throughout development.
+**The development sequence** is 26 weeks across 8 phases. Each phase has explicit validation gates that must be passed before moving forward. The reference application (`axona-demo`) validates the integration surface throughout development.
 
 **The infrastructure** consists of 3 hardcoded bootstrap servers, regional TURN relays, and observability backends. All are off-the-shelf or trivially custom.
 
 **The integration surface** is intentionally minimal: 6 methods on a single class. Application developers don't need to understand the protocol internals; they just call `connect()`, `publish()`, `subscribe()`, `lookup()`, and `disconnect()`.
 
 The result, when complete, is a system where:
+
 - A new user can install the app, scan a QR code, and be functional in 7 seconds
 - A returning user can resume in 1 second
 - Pub/sub messages reliably reach all subscribers, even under churn
@@ -2256,14 +2282,14 @@ The result, when complete, is a system where:
 - The protocol learns and adapts as it runs
 - Operations can diagnose and respond to issues with documented playbooks
 
-The brain is the algorithm. The body is everything in this document. Together, they ship the N-DHT.
+The brain is the algorithm. The body is everything in this document. Together, they ship Axona.
 
 ---
 
 ## References
 
-- NH-1 Whitepaper v0.3.38 (`NH1-Whitepaper.md`)
-- Red Team Analysis v0.3.38 (`NH1-RedTeam-v0.3.38.md`)
+- Axona Whitepaper v0.3.38 (`Axona-Whitepaper.md`)
+- Red Team Analysis v0.3.38 (`Axona-RedTeam-v0.3.38.md`)
 - Research Deck v0.3.38 (`deck.md`)
 - Source Repository: `github.com/YZ-social/dht-sim`
 
@@ -2272,7 +2298,9 @@ The brain is the algorithm. The body is everything in this document. Together, t
 *End of implementation plan. Total length ≈ 90 pages typeset.*
 
 *Suggested next steps for the engineering team:*
+
 1. *Review and align on architectural decisions in §1-7*
 2. *Establish team structure and assign module ownership*
 3. *Begin Phase 0: Foundation (week 1-3) work*
 4. *Schedule Phase 1 design review at end of week 3*
+
