@@ -364,6 +364,34 @@ Model 1 topics use the protocol defaults — **`maxMessages = 100`, `maxHoldMs =
 vector). The 48 h cap still applies as the absolute ceiling for owner-set values on
 owned topics.
 
+### 6.4 `touch` — creator-only keep-alive (implemented, kernel v2.15.0)
+
+The complement of the sliding-on-`pull` hold (§2.3): an explicit, creator-only
+keep-alive that resets a message's release time **without requiring a read**.
+
+```
+peer.touch(topic, msgId, opts?) → Promise<{ ok: true }>
+```
+
+- **Authority — creator-only, self-authenticating.** A `touch` is a signed
+  object (`axona:pubsub-touch:v1`) routed to the topic's K-closest roots
+  (`pubsub:touch` / `touch-k`, mirroring `kill`). A root applies it only if the
+  touch's `signerPubkey` matches the signer of the cached message — so only the
+  author can keep their own message alive. Unsigned messages can't be touched.
+- **Effect on a holding root.** Resets `expiresAt = min(now + holdTime,
+  created_at + maxHoldTime)` — extending life but **bounded by the same
+  absolute 48 h ceiling** a `pull` respects (§2.3), so a `touch` can no more pin
+  a message forever than a pull can. It then moves the entry to the **head of
+  the queue** and stamps a `touchedTs` recency that dominates the bounded-queue
+  eviction order (§5), so a touched message is evicted **last**.
+- **Replica consistency.** The signed `touch.ts` is identical at every root that
+  applies the same touch, so the eviction-order bump is convergent across
+  replicas (unlike a pull's local-only slide). A root that misses a touch simply
+  re-converges on the next one.
+- **Abuse bound.** Creator-only authority plus the per-publisher open-topic
+  quota (§5) mean a flooder can't use `touch` to pin more than its share, and
+  the 48 h ceiling bounds total lifetime regardless.
+
 ---
 
 ## 7. New wire messages (summary)
@@ -372,13 +400,14 @@ owned topics.
 |---|---|---|---|
 | `pubsub:pullReq` (extended) | routed | open (Model 1/2) / ciphertext (3) | msgId optional → latest |
 | `pubsub:kill` | routed → root | message-signer sig | tombstone + subscriber purge |
+| `pubsub:touch` / `touch-k` | routed / direct → roots | message-signer sig | reset hold (≤ ceiling) + head-of-queue keep-alive |
 | `pubsub:unpub` | routed → root | owner sig | queue drop + tombstone |
 | `pubsub:acl` | replicated | owner sig, epoch'd | publisher allow-list (Models 2/3) |
 | `pubsub:config` | replicated | owner sig, epoch'd | maxMessages / maxHoldMs / accessModel |
 | `pubsub:unsubscribe(-k)` (exists) | routed/direct | self (B-1) | formalize `peer.unsub` over it |
 
 Each signed object carries its **own domain tag** (E-4 discipline): `axona:pubsub-kill:v1`,
-`…-unpub:v1`, `…-acl:v1`, `…-config:v1` — so no signature is reusable across object types.
+`…-touch:v1`, `…-unpub:v1`, `…-acl:v1`, `…-config:v1` — so no signature is reusable across object types.
 
 ---
 

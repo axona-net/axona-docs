@@ -16,6 +16,37 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.15.0 — 2026-06-03
+
+### Retraction now reliably removes a message everywhere
+
+The creator-only retraction (`kill`, kernel v2.10.0) is strengthened so that
+retracting a message **reliably removes it across the topic's relays and keeps
+it removed**:
+
+- **No surviving copies.** A relay that acquired a message through the replay
+  path (the history a node receives when it subscribes) now retains the content
+  hash that retraction matches on. Previously such a copy wasn't matchable, so
+  it could linger on that relay and be re-served to later subscribers after the
+  author had retracted the message. A retraction now reaches those copies too.
+- **No resurrection.** The replay path now honors the retraction tombstone, so
+  a lagging relay replaying its older history can no longer re-introduce a
+  message the author already retracted.
+
+This keeps the original guarantee honest: retraction remains **best-effort
+redaction, not a cryptographic un-send** (a reader who already received a
+message can keep it, and anonymous/unsigned messages have no provable creator
+and so can't be retracted) — but within the network a retracted message is now
+consistently dropped rather than able to reappear. Self-authenticating as
+before: the authority to retract is the same keypair that signed the message,
+with no registry or central gatekeeper.
+
+> Also in this kernel (not a security change): a creator-only **keep-alive**
+> (`touch`) lets a message's author reset its hold-time expiry — bounded by the
+> same absolute ceiling a read already respects — without re-publishing.
+
+---
+
 ## Kernel v2.10.0 — 2026-05-31
 
 ### Message lifecycle you control — retract, remove, and bounded retention
@@ -309,4 +340,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-05-31.*
+*Last updated: 2026-06-03.*
