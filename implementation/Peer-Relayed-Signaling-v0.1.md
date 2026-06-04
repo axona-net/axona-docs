@@ -191,7 +191,10 @@ the kernel.
 4. **Wire it into `transport/web`**: `MeshManager.sendSignal` routes when a path
    exists, else bridge.
 5. **Tests**: sim + headless multi-peer (real WebRTC) — A connects to C through
-   B with the bridge socket closed.
+   B with the bridge socket closed. ✅ **Done** — `sim-peer-relay.mjs` (§8a),
+   `sim-peer-relay-kernel.mjs` (§8b), and `mesh_relay_webrtc.mjs`
+   (`npm run test:mesh-relay`, §8c) all green; the WebRTC harness is the
+   standing regression test for the kernel work.
 6. **Ship** capability-flagged; **then** make peer-relay the default and let the
    bridge be a pure bootstrap/rendezvous (Architecture §Future Directions:
    "demote the bridge to an ordinary peer").
@@ -317,6 +320,47 @@ node, not on the single-path `routeMessage` forwarder; keep peer-first /
 bridge-fallback. Remaining sim gap before ship: the headless real-WebRTC
 harness (offer/answer/ICE/DTLS over a relayed path with the bridge socket
 closed) — the one layer neither the proxy nor this pass models.
+
+## 8c. Validation results — real-WebRTC harness (2026-06-04)
+
+Ran `axona-protocol/test/integration/mesh_relay_webrtc.mjs`
+(`npm run test:mesh-relay`) — the layer §8a/§8b explicitly deferred: the
+**actual WebRTC offer/answer/ICE/DTLS negotiation**, carried over a peer relay
+instead of the bridge. Three real `RTCPeerConnection` peers (the
+`node-datachannel` polyfill), each a real `MeshManager` + `MeshAuth` (the
+shipping mesh + axona/4 code), keyed by stable nodeId.
+
+Scenario: **A↔B** and **B↔C** bootstrap as real, authenticated channels
+(models "met through the bridge at join"); then the **bridge is closed** (the
+direct signaling fabric is disabled, with a guard that fails the test if any
+direct delivery is attempted afterward); then **A forms a new direct channel
+to C** with every offer / answer / ICE candidate relayed **A→B→C and C→B→A over
+the real A↔B and B↔C data channels** — B forwarding opaque payloads exactly as
+the kernel `mesh:signal` step will.
+
+**Result: 17/17 checks pass, stable across repeated runs.** In particular:
+
+- the **A↔C real `RTCDataChannel` opens in both directions** with the bridge
+  closed, formed entirely via the peer relay;
+- the relay was actually exercised (B forwarded signaling frames) and **no
+  direct-signaling delivery occurred after the bridge closed** (guard = 0);
+- **DTLS fingerprints are present for A↔C on both ends and cross-match**
+  (A.local == C.remote, C.local == A.remote);
+- **axona/4 binds A↔C end-to-end** — confirming the §5 safety claim on a real
+  relay-formed channel: *the connection is authenticated regardless of who
+  relayed the SDP* (A-1's fingerprint binding holds; a relay that rewrote the
+  SDP would produce divergent fingerprints and fail the mutual signature);
+- the resulting A↔C channel is **direct**: an app message A→C arrives at C
+  **without B forwarding it** (B is out of the data path once the channel exists).
+
+**What this closes.** The three validation layers now agree: topology (§8a,
+greedy-XOR proxy), real routing (§8b, kernel `route_msg`/`lookup`), and real
+WebRTC (this, §8c). The mechanism forms an authenticated direct channel
+bridgelessly through a peer. The remaining work is purely the **kernel
+implementation** (§9.3–9.4): productize the relay forwarder + the `sendSignal`
+sink (over the iterative `lookup` path per §8b finding 6), behind the
+`mesh-relay` capability flag. The harness is the regression test that
+implementation must keep green.
 
 ## 10. Relationship to the other Future Directions
 
