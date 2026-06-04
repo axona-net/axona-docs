@@ -1,13 +1,13 @@
 # Axona API Reference
 
 Reference for every public symbol exported from `@axona/protocol`
-v2.14.0. Organized by what application developers actually reach for;
+v2.15.0. Organized by what application developers actually reach for;
 deep-customization surfaces are at the end.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v2.14.0.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v2.14.0.md) — mental model + worked
+- [Quick Start](Quick-Start-v2.15.0.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v2.15.0.md) — mental model + worked
   example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects (authenticated handshake, channel binding, pub/sub
@@ -487,6 +487,37 @@ await peer.kill('news/world', msgId, { publisher: synth });
 
 **Throws** `KillError`: `KILL_INVALID_TOPIC`, `KILL_INVALID_MSGID`,
 `KILL_SIGN_FAILED` (no identity — kills must be signed).
+
+#### `peer.touch(topicName, msgId, opts?)` → `Promise<{ ok }>`
+
+Keep a message alive (kernel ≥ v2.15.0) — the creator-only counterpart to
+`kill`. Signed by the **same key that signed the message** and routed to the
+topic's K-closest roots; each root that holds the message **resets its
+hold-time expiry to `now + hold`** (bounded by the message's absolute 48 h
+ceiling — exactly the bound a `pull` respects), moves it to the **head of the
+queue**, and makes it the **last entry evicted**. Use it to keep a still-relevant
+message (a pinned status, a current value) past its default hold **without
+re-publishing** it.
+
+| Arg | Notes |
+|---|---|
+| `topicName` | The topic you published to. |
+| `msgId` | **Required** 64-char hex (the value `pub` returned). |
+| `opts.publisher` | Must match what you passed to `pub`. |
+
+```js
+const msgId = await peer.pub('status/ops', { state: 'green' }, { publisher: synth });
+// …23 h later, before it ages out, refresh it without re-publishing:
+await peer.touch('status/ops', msgId, { publisher: synth });
+```
+
+> Touch can **extend** a message's life but never **un-bound** it: the absolute
+> 48 h ceiling from first publish still applies, so a touch (like a pull) can't
+> pin a message forever. An anonymous (`sign: false`) message has no provable
+> creator and so **cannot** be touched.
+
+**Throws** `TouchError`: `TOUCH_INVALID_TOPIC`, `TOUCH_INVALID_MSGID`,
+`TOUCH_SIGN_FAILED` (no identity — touches must be signed).
 
 #### `peer.unpub(topicName, opts?)` → `Promise<{ ok }>`
 
@@ -1165,7 +1196,7 @@ needed by app code.
 
 ```js
 WIRE_VERSION         // '1.0'        — wire format major.minor
-KERNEL_VERSION       // '2.14.0'     — kernel semver
+KERNEL_VERSION       // '2.15.0'     — kernel semver
 AUTH_PROTO           // 'axona/4'    — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426         — WebSocket close code for version mismatch
 ID_BITS              // 264
@@ -1181,7 +1212,7 @@ is informational and corresponds to the npm release tag.
 
 The full, versioned record is the [security
 changelog](../SECURITY-CHANGELOG.md); this is the developer-facing
-summary of what's enforced as of kernel v2.14.0. Everything here is
+summary of what's enforced as of kernel v2.15.0. Everything here is
 **self-authenticating** — no certificate authority, no central trust
 server, no reputation service.
 

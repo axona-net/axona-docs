@@ -8,8 +8,8 @@ The guide assumes you already know JavaScript + Node + a browser. It does
 not assume any DHT / WebRTC / cryptography background — concepts are
 introduced where they're needed.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v2.14.0)
-- **Browser SDK**: [@axona-net/axona-peer](https://github.com/axona-net/axona-peer) (v3.22.0)
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v2.15.0)
+- **Browser SDK**: [@axona-net/axona-peer](https://github.com/axona-net/axona-peer) (v3.23.0)
 - **WebSocket bridge**: [@axona-net/axona-bridge](https://github.com/axona-net/axona-bridge) (v2.6.0)
 - **Live network**: `wss://bridge.axona.net`
 - **Security model**: see §3.5 below and the [security changelog](../SECURITY-CHANGELOG.md) — the v2 line adds an authenticated-identity handshake, channel binding, a pub/sub trust boundary, and verified routing admission.
@@ -105,7 +105,7 @@ only.
 ```
 mkdir my-axona-app && cd my-axona-app
 npm init -y
-npm install @axona/protocol@github:axona-net/axona-protocol#v2.14.0
+npm install @axona/protocol@github:axona-net/axona-protocol#v2.15.0
 ```
 
 You now have `node_modules/@axona/protocol/src/` with the full kernel.
@@ -251,7 +251,7 @@ useful for genuinely public, anonymous topics.
 Axona is **self-authenticating**: every guarantee is enforced by
 cryptography the peers carry themselves — there is no certificate
 authority, central trust server, or reputation service. A node's
-identity *is* its keypair. As of kernel v2.14.0:
+identity *is* its keypair. As of kernel v2.15.0:
 
 - **Identity is provable, not asserted.** A nodeId's bottom 256 bits are
   `SHA-256(pubkey)`, and every connection runs the `axona/4` handshake:
@@ -649,11 +649,11 @@ your own subsequent `peer.sub` sees the message, either subscribe
 first or include yourself in the dht adapter's findKClosest result
 (see [§13](#13-common-pitfalls)).
 
-### 6.7 Message lifecycle: unsubscribe, retract, remove
+### 6.7 Message lifecycle: unsubscribe, retract, keep-alive, remove
 
-Beyond pub/sub, the kernel (≥ v2.10.0) gives you three lifecycle controls,
-all **self-authenticating** — the authority to act is proven by the same
-keypair that proved authorship/ownership, with no central gatekeeper:
+Beyond pub/sub, the kernel gives you four lifecycle controls, all
+**self-authenticating** — the authority to act is proven by the same keypair
+that proved authorship/ownership, with no central gatekeeper:
 
 ```js
 // Leave a topic (counterpart to sub; stops all your local subs for it).
@@ -663,10 +663,20 @@ await peer.unsub('rooms/london', { publisher: synth });
 // accepts it only if signed by the same key that signed the original.
 await peer.kill('rooms/london', msgId, { publisher: synth });
 
+// Keep a message YOU published alive past its default hold (kernel ≥ v2.15.0).
+// Creator-only; resets the hold (bounded by the 48 h ceiling) and moves the
+// message to the head of the queue so it's evicted last. No re-publish needed.
+await peer.touch('rooms/london', msgId, { publisher: synth });
+
 // Remove a topic's whole queue. OWNER-only (the identity whose nodeId
 // seeds the topic id). `{ destroy: true }` removes the topic entirely.
 await peer.unpub('rooms/london', { destroy: true });
 ```
+
+`touch` is the keep-alive counterpart to `pull`'s read-slide (§6.4): an
+explicit refresh that doesn't require reading the message. Like a pull it can
+extend a message's life but never past the absolute 48 h ceiling from first
+publish — so it can't pin a message forever.
 
 Subscribers see a retraction as a **delete marker** on their existing
 handler, so branch on it:
@@ -800,7 +810,7 @@ open" from "channels are open *and* carrying authenticated routing." A
 sustained `true` (across several polls) means the mesh looks connected
 but isn't actually routing; `boundCount`/`meshBound` are the honest
 usable-peer counts. Cheap; safe for a status dashboard. See the
-[API reference §8 health()](Axona-API-Reference-v2.14.0.md) for the full shape.
+[API reference §8 health()](Axona-API-Reference-v2.15.0.md) for the full shape.
 
 ### 8.4 Logs and errors
 
@@ -1408,6 +1418,9 @@ peer.pull(msgId | null, { topic, publisher, timeoutMs })
 peer.kill(name, msgId, { publisher? })
   → Promise<{ ok }>                                // creator-only retract (v2.10.0)
 
+peer.touch(name, msgId, { publisher? })
+  → Promise<{ ok }>                                // creator-only keep-alive (v2.15.0)
+
 peer.unpub(name, { destroy?, publisher? })
   → Promise<{ ok }>                                // owner-only queue removal (v2.10.0)
 
@@ -1528,7 +1541,7 @@ programmatically.
 
 ```js
 WIRE_VERSION         // '1.0'
-KERNEL_VERSION       // '2.14.0'
+KERNEL_VERSION       // '2.15.0'
 UPGRADE_CLOSE_CODE   // 4426
 ```
 
@@ -1536,10 +1549,10 @@ UPGRADE_CLOSE_CODE   // 4426
 
 ## Where to go next
 
-- **[Quick Start](Quick-Start-v2.14.0.md)** — if someone you're onboarding has
+- **[Quick Start](Quick-Start-v2.15.0.md)** — if someone you're onboarding has
   five minutes, send them here instead of this 1500-line guide.
 
-- **[API Reference](Axona-API-Reference-v2.14.0.md)** — when you're past the
+- **[API Reference](Axona-API-Reference-v2.15.0.md)** — when you're past the
   conceptual material and just need the signature for a specific call.
 
 - **Read the source of the reference peer**:
