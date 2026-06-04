@@ -184,7 +184,10 @@ the kernel.
 1. **(this) Design note.**
 2. **dht-sim model** of relayed signaling + the validation above.
 3. **Kernel**: `mesh:signal` routed handler + the new `sendSignal` sink with
-   peer-first/bridge-fallback, behind a `mesh-relay` capability flag.
+   peer-first/bridge-fallback, behind a `mesh-relay` capability flag. Per §8b
+   finding 6, base the sink on the **iterative `lookup()` routing path**
+   (alpha-parallel, dead-peer-aware), not a single-path `routeMessage` pass —
+   the single path is churn-fragile at scale; the iterative search is not.
 4. **Wire it into `transport/web`**: `MeshManager.sendSignal` routes when a path
    exists, else bridge.
 5. **Tests**: sim + headless multi-peer (real WebRTC) — A connects to C through
@@ -245,6 +248,75 @@ finding 4 as an explicit requirement (stratified synaptome + bridge fallback).
 Next sim refinement: re-run over the **real kernel** routing (AP-best, vitality)
 rather than the greedy-XOR proxy, and add the WebRTC-negotiation layer in the
 headless real-WebRTC harness.
+
+## 8b. Validation results — real-kernel pass (2026-06-04)
+
+Ran `dht-sim/scripts/sim-peer-relay-kernel.mjs` — the refinement §8a called
+for. This **drops the greedy-XOR proxy** and builds N real `@axona/protocol`
+`AxonaPeer`s over the kernel's own `SimNetwork` + `simTransport`
+(`TransportAxonaEngine`), bootstraps their synaptomes with the **production XOR
+k-bucket fill** (`buildXorRoutingTable`, capped at the real `MAX_SYNAPTOME`
+ceiling — avg synaptome ≈ 28–34), and forms the new edge by routing a
+`mesh:signal` over the kernel's **actual `route_msg` forwarder** — greedy
+next-hop + 2-hop terminal lookahead (`_findCloserInTwoHops`), the exact code a
+deployed peer runs. A node *consumes* the signal iff it is the routed target;
+every intermediary forwards. K = 20; seeds 1–3; geo-correlated nodeIds. (Still
+topology/reachability — real WebRTC stays in the headless harness.)
+
+**Steady state — `mesh:signal` delivered over real `route_msg`:**
+
+| N | delivered | mean / p95 hops | `lookup()` found (cross-check) | connectivity |
+|---|---|---|---|---|
+| 200    | 100.0 % | 3.1 / 5  | 100 % | 100 % |
+| 500    | 99.8 %  | 3.9 / 7  | 100 % | 100 % |
+| 1 000  | 99.8 %  | 4.6 / 8  | 100 % | 100 % |
+| 3 000  | 99.7 %  | 5.7 / 9  | 100 % | 100 % |
+| 10 000 | 99.7 %  | 6.7 / 11 | 100 % | 100 % |
+
+**Churn — kill R % at once + `postChurnHeal`, then re-measure (seed 1; the
+route_msg-vs-lookup gap is stable across seeds 1–3):**
+
+| N | 10 % dead (route_msg / lookup) | 25 % dead | 50 % dead |
+|---|---|---|---|
+| 200    | 99.1 % / 100 % | 99.7 % / 100 % | 97.8 % / 100 % |
+| 1 000  | 97.1 % / 100 % | 94.2 % / 100 % | **80.4 %** / 100 % |
+| 3 000  | 93.0 % / 100 % | 84.6 % / 100 % | **65.1 %** / 100 % |
+| 10 000 | 90.7 % / 100 % | 79.4 % / 100 % | **56.2 %** / 100 % |
+
+**Findings**
+
+5. **The proxy's steady-state GREEN holds on the real router.** Bridgeless
+   `mesh:signal` delivery over the shipping `route_msg` is 99.7–100 % across
+   200–10 000 peers, 100 % connectivity, at a clean **O(log N)** hop premium
+   (mean 3.1 → 6.7, p95 5 → 11 as N grows 200 → 10 k). The proxy was, if
+   anything, slightly conservative. The mechanism in §3.1 works as designed in
+   steady state.
+
+6. **New constraint the proxy could not surface: don't ride single-path
+   `route_msg` under heavy churn.** The kernel's `route_msg` is a *single*
+   greedy path + 2-hop lookahead. Under churn it dead-ends at local minima, and
+   the failure **worsens with scale** — at 50 % of relays dead it falls to
+   80 % (1 k), 65 % (3 k), 56 % (10 k). The proxy's idealized greedy missed this
+   because its static graph never made the forwarder commit to a doomed single
+   path. Meanwhile `peer.lookup()` — the **alpha-parallel, dead-peer-aware
+   iterative search** the kernel already ships — holds **100 % at every size
+   and every churn level**. So the fix is free: **`sendSignal` should deliver
+   the `mesh:signal` over the iterative lookup machinery (alpha branches +
+   re-route on dead next hop), not a single `routeMessage` pass** — with the
+   §6 retry/re-route discipline and the bridge fallback as the final backstop.
+   This refines design decision §7.2 (relay selection) and §3.2 (the sink): the
+   sink's "can I route to peer?" test should be an iterative lookup, and a
+   failed lookup (not just an absent greedy hop) is what triggers bridge
+   fallback.
+
+**Verdict: still GREEN**, now on the *real* router rather than a proxy — with
+finding 6 promoted to a hard implementation requirement alongside finding 4.
+Recommended kernel shape: base `sendSignal` on the `lookup()` routing path
+(iterative, alpha-parallel) carrying the signaling payload to the terminal
+node, not on the single-path `routeMessage` forwarder; keep peer-first /
+bridge-fallback. Remaining sim gap before ship: the headless real-WebRTC
+harness (offer/answer/ICE/DTLS over a relayed path with the bridge socket
+closed) — the one layer neither the proxy nor this pass models.
 
 ## 10. Relationship to the other Future Directions
 
