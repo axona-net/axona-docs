@@ -52,11 +52,11 @@ sized by how deep you want to go:
 
 | Doc | Read when | Length |
 |---|---|---|
-| **[Quick Start](programmer-guide/Quick-Start-v2.15.0.md)** · [PDF](programmer-guide/Quick-Start-v2.15.0.pdf) | You want a working pub/sub roundtrip in 5 minutes. Copy three commands + one file, run, done. | ~150 lines |
-| **[Axona API Reference](programmer-guide/Axona-API-Reference-v2.15.0.md)** · [PDF](programmer-guide/Axona-API-Reference-v2.15.0.pdf) | You're building and need to look up a specific call: signature, params, returns, errors, example for every public export. | ~700 lines |
-| **[Programmer Guide](programmer-guide/Axona-Programmer-Guide-v2.15.0.md)** · [PDF](programmer-guide/Axona-Programmer-Guide-v2.15.0.pdf) | You're starting a new application against Axona. Mental model, identity, topic addressing, pub/sub semantics, the bridge, a worked chat-app example, common pitfalls, production checklist. | ~1500 lines |
+| **[Quick Start](programmer-guide/Quick-Start-v2.16.0.md)** · [PDF](programmer-guide/Quick-Start-v2.16.0.pdf) | You want a working pub/sub roundtrip in 5 minutes. Copy three commands + one file, run, done. | ~150 lines |
+| **[Axona API Reference](programmer-guide/Axona-API-Reference-v2.16.0.md)** · [PDF](programmer-guide/Axona-API-Reference-v2.16.0.pdf) | You're building and need to look up a specific call: signature, params, returns, errors, example for every public export. | ~700 lines |
+| **[Programmer Guide](programmer-guide/Axona-Programmer-Guide-v2.16.0.md)** · [PDF](programmer-guide/Axona-Programmer-Guide-v2.16.0.pdf) | You're starting a new application against Axona. Mental model, identity, topic addressing, pub/sub semantics, the bridge, a worked chat-app example, common pitfalls, production checklist. | ~1500 lines |
 
-All three track `@axona/protocol` v2.15.0 (the version is in each
+All three track `@axona/protocol` v2.16.0 (the version is in each
 filename); the Quick Start's example runs verbatim from a fresh
 `npm init`.
 

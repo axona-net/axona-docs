@@ -16,6 +16,29 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.16.0 — 2026-06-03
+
+### Keep-alive (`touch`) authority follows topic ownership
+
+The keep-alive that lets a message's hold-time be refreshed (`touch`) is gated
+by **topic ownership**, matching the access model already used for `unpub` and
+owned-topic metrics — not message authorship:
+
+- **Open topics** (ownerless — a public topic, or a synthetic region-keyed
+  anchor `prefix‖0^256`): **anyone** may keep a message alive. These topics
+  have no owner, so the keep-alive is a shared, public capability — appropriate
+  for community feeds and regional rooms.
+- **Owned topics** (anchored at a real identity): **only the owner** may. The
+  touch must be signed by the key whose `sha256(pubkey)` is the owner nodeId's
+  256-bit suffix (the same pubkey↔nodeId bind `unpub` enforces; no registry, no
+  gatekeeper).
+
+In every case a `touch` can only **extend** a message's life up to its absolute
+48 h ceiling — never beyond it — so neither an owner nor an open-topic
+participant can pin a message indefinitely.
+
+---
+
 ## Kernel v2.15.0 — 2026-06-03
 
 ### Retraction now reliably removes a message everywhere
@@ -41,9 +64,10 @@ consistently dropped rather than able to reappear. Self-authenticating as
 before: the authority to retract is the same keypair that signed the message,
 with no registry or central gatekeeper.
 
-> Also in this kernel (not a security change): a creator-only **keep-alive**
-> (`touch`) lets a message's author reset its hold-time expiry — bounded by the
-> same absolute ceiling a read already respects — without re-publishing.
+> Also in this kernel: a **keep-alive** (`touch`) lets a message's hold-time
+> expiry be reset — bounded by the same absolute ceiling a read already
+> respects — without re-publishing. Its authorization model is refined in
+> v2.16.0 (above).
 
 ---
 

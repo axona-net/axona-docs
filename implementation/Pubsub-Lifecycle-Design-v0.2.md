@@ -364,20 +364,25 @@ Model 1 topics use the protocol defaults — **`maxMessages = 100`, `maxHoldMs =
 vector). The 48 h cap still applies as the absolute ceiling for owner-set values on
 owned topics.
 
-### 6.4 `touch` — creator-only keep-alive (implemented, kernel v2.15.0)
+### 6.4 `touch` — keep-alive, gated by topic ownership (implemented; ownership gate kernel v2.16.0)
 
-The complement of the sliding-on-`pull` hold (§2.3): an explicit, creator-only
-keep-alive that resets a message's release time **without requiring a read**.
+The complement of the sliding-on-`pull` hold (§2.3): an explicit keep-alive
+that resets a message's release time **without requiring a read**.
 
 ```
 peer.touch(topic, msgId, opts?) → Promise<{ ok: true }>
 ```
 
-- **Authority — creator-only, self-authenticating.** A `touch` is a signed
-  object (`axona:pubsub-touch:v1`) routed to the topic's K-closest roots
-  (`pubsub:touch` / `touch-k`, mirroring `kill`). A root applies it only if the
-  touch's `signerPubkey` matches the signer of the cached message — so only the
-  author can keep their own message alive. Unsigned messages can't be touched.
+- **Authority — by topic ownership, self-authenticating** (mirrors the
+  metrics/`unpub` access model, *not* `kill`'s creator-only one). A `touch` is
+  a signed object (`axona:pubsub-touch:v1`) routed to the topic's K-closest
+  roots (`pubsub:touch` / `touch-k`). A root decides owned/unowned from the
+  message's anchor and authorizes accordingly:
+    - **open topic** (ownerless — public, or a synthetic regional anchor
+      `prefix‖0^256`): **anyone** may touch (any valid, fresh, signed touch);
+    - **owned topic** (anchored at a real identity): only the **owner** —
+      `sha256(touch.signerPubkey) === anchor[8:]` (the same pubkey↔nodeId bind
+      `unpub` uses; only the 256-bit suffix is checked).
 - **Effect on a holding root.** Resets `expiresAt = min(now + holdTime,
   created_at + maxHoldTime)` — extending life but **bounded by the same
   absolute 48 h ceiling** a `pull` respects (§2.3), so a `touch` can no more pin
