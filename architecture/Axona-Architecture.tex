@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.7.5 \quad 2026-06-03\par}
+{\small An Axona Architecture Note \quad v0.7.6 \quad 2026-06-03\par}
 \end{center}
 \vfill
 \null
@@ -528,11 +528,76 @@ silently dropped. Because the bridge sits in nearly every peer's
 K-closest set, that failure mode is a near-invisible delivery hole;
 the eager build is what keeps it an honest relay axon.}
 
-The bridge's embedded peer has a fixed identity (cf3138... in
-production, anchored at London). Its \texttt{health} surface
+The bridge's embedded peer has a fixed, disk-persisted identity
+(\texttt{895bf0...} in production, anchored in us-east --- the
+\texttt{0x89} S2 cell, which is why it sits XOR-close to
+\texttt{us-east/*} topics and is so often a K-closest root). Its
+\texttt{health} surface
 exposes the kernel version it's running and the synaptome it has
 built up, available at \texttt{/healthz} JSON. Operators check that
 endpoint to confirm a deploy.
+
+\subsection{How a New Node Joins}
+
+\newthought{Joining is a mutual, authenticated bind.} A fresh node has
+no peers; it reaches the mesh through a bridge and then fans out to
+direct WebRTC links. Crucially, synaptome membership is established the
+\emph{same} way on every link --- bridge or mesh --- so ``joining'' is
+just the first instance of the generic admit path, not a special case.
+
+\begin{enumerate}
+\setlength{\itemsep}{0pt}
+\item \textbf{Connect + version gate.} The node opens a WebSocket to a
+bridge and exchanges \texttt{client-hello}/\texttt{server-hello}. A
+sub-minimum peer is closed with 4426 before it can do anything else.
+
+\item \textbf{Welcome.} The bridge replies with \texttt{welcome},
+carrying the connection id and a fresh \texttt{serverNonce}; both sides
+now hold the per-connection channel-binding value (CBV) the next step
+signs over.
+
+\item \textbf{Authenticated handshake (\texttt{axona/4}).} Each side
+sends a \texttt{hello} (the responder a \texttt{hello-ack}) carrying its
+Ed25519 public key and a signature over the link's CBV, and verifies
+the other: the presented pubkey must hash to the 256-bit suffix of the
+nodeId it claims, and the signature must check out. A peer that cannot
+prove its id --- or one being MITM'd, since the CBV binds the proof to
+\emph{this} channel --- fails here and is closed.
+
+\item \textbf{Mutual bind + admit.} On success both ends record the
+binding and admit the other into their synaptome \emph{as an ordinary}
+\texttt{Synapse}: the joining node calls
+\texttt{bindPeer(bridgeId, 'bridge')}, whose \texttt{onPeerBound} hook
+seeds the bridge into its synaptome (\texttt{addedBy: bootstrap}); the
+bridge's embedded peer runs \texttt{\_completeHandshake}, binds the new
+node to that connection, and admits it via \texttt{\_addByVitality}
+(\texttt{addedBy: handshake}). No bridge-specific code runs in either
+step --- the bridge is simply the first guaranteed-reachable peer the
+node binds.
+
+\item \textbf{Fan out to the mesh.} The bridge broadcasts
+\texttt{peer-joined} and hands the new node a \texttt{peer-list}. The
+node negotiates WebRTC data channels to those peers (SDP relayed via
+the bridge), and each channel runs the \emph{same} \texttt{axona/4}
+hello --- now additionally bound to the peer's DTLS-certificate
+fingerprint --- firing the same \texttt{onPeerBound} admit. The
+synaptome fills with direct mesh peers; the bridge stops being the only
+neighbour.
+
+\item \textbf{Converge.} Optionally \texttt{peer.join(sponsor)} seeds a
+specific first neighbour; thereafter vitality (weight\,$\times$\,recency)
+and the 10\,s \texttt{refreshTick} grow and prune the synaptome and
+re-anchor subscriptions onto the converged K-closest set. The node is
+now a full participant.
+\end{enumerate}
+
+\marginnote{The admit is symmetric and identity-bound in both
+directions --- each side admits the other's \emph{authenticated}
+nodeId, so a peer can only ever be admitted under an id it proved it
+owns. Because every node runs step~4 against the bridge first, the
+bridge lands in every synaptome: its centrality is \emph{emergent} from
+this bootstrap, not granted by any special rule (see \S\,Future
+Directions, ``demote the bridge to an ordinary peer'').}
 
 % =====================================================================
 % VIII. THE WIRE PROTOCOL
