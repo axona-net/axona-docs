@@ -16,6 +16,39 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.17.0 — 2026-06-04
+
+### Bridgeless connection (peer-relayed signaling) stays authenticated end-to-end
+
+A new, **capability-flagged** path lets two peers negotiate a fresh direct
+WebRTC channel by relaying the WebRTC signaling (SDP offer/answer + ICE)
+*through an existing peer* — a routed `mesh:signal` carried over the mesh —
+instead of through the signaling bridge. This removes the bridge as a
+single point of dependency for forming new connections. The security property
+that makes it safe:
+
+- **A relay can carry the signaling but cannot impersonate either endpoint or
+  read the resulting channel.** The channel the signaling bootstraps is still
+  authenticated end-to-end by the `axona/4` handshake (each side proves its
+  pubkey hashes to its nodeId suffix) **and** bound to the actual DTLS
+  certificate fingerprints (finding A-1). A relaying peer that rewrote the SDP
+  to insert its own certificate would produce divergent fingerprints, so the
+  mutual signature fails and no channel binds. The relay therefore sees the same
+  metadata the bridge already sees (who is connecting to whom) and **nothing
+  more** — it can drop or delay a negotiation, never man-in-the-middle it.
+- **No new signed-object type, no weaker check.** The signaling payload is
+  opaque to relays and needs no signature of its own precisely because the
+  connection it bootstraps authenticates itself; a forged or tampered
+  `mesh:signal` can at worst fail to produce a valid channel, never produce an
+  unauthenticated one. Inbound `mesh:signal` reuses the existing size/rate caps.
+- **Off by default.** The path ships behind a `meshRelay` capability flag; with
+  it disabled the connection behaviour is byte-for-byte the bridge-only path.
+  Validated across three layers before shipping — topology, real kernel routing,
+  and a headless real-WebRTC harness (A↔C formed through B with the bridge
+  closed; fingerprints cross-match; `axona/4` binds end-to-end).
+
+---
+
 ## Kernel v2.16.0 — 2026-06-03
 
 ### Keep-alive (`touch`) authority follows topic ownership
@@ -364,4 +397,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-03.*
+*Last updated: 2026-06-04.*

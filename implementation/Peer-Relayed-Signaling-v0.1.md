@@ -188,8 +188,19 @@ the kernel.
    finding 6, base the sink on the **iterative `lookup()` routing path**
    (alpha-parallel, dead-peer-aware), not a single-path `routeMessage` pass —
    the single path is churn-fragile at scale; the iterative search is not.
+   ✅ **Done (kernel v2.17.0)** — `AxonaPeer` registers a `mesh:signal` routed
+   handler (terminal → `transport.deliverMeshSignal` → `MeshManager.onSignal`)
+   and an outbound relay sink whose reachability is gated on the cached
+   iterative `lookup()` (finding 6) before a `route_msg` carry + retry.
+   Unit-covered by `test/smoke_mesh_signal.js`.
 4. **Wire it into `transport/web`**: `MeshManager.sendSignal` routes when a path
-   exists, else bridge.
+   exists, else bridge. ✅ **Done (kernel v2.17.0)** — `webTransport({ meshRelay })`
+   (default **off**): the `sendSignal` sink prefers the registered relay when the
+   destination is a nodeId (hex meshId) and falls back to the bridge otherwise;
+   `setSignalRelay` / `deliverMeshSignal` / `connectViaRelay` expose the seam;
+   `mesh-relay` is advertised in `client-hello`. Unit-covered by
+   `test/smoke_mesh_relay_glue.js`; behaviour is byte-for-byte the bridge-only
+   path when the flag is off.
 5. **Tests**: sim + headless multi-peer (real WebRTC) — A connects to C through
    B with the bridge socket closed. ✅ **Done** — `sim-peer-relay.mjs` (§8a),
    `sim-peer-relay-kernel.mjs` (§8b), and `mesh_relay_webrtc.mjs`
