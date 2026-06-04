@@ -32,3 +32,14 @@ references/
 
 # Render caches
 *.pdf.tmp
+
+# Logo / branding drafts — kept locally, not tracked (added accidentally in b01139c)
+images/Axona Ant.png
+images/Axona logo.png
+images/axona_logo_ant.png
+images/axona_logo_ant_abstract.png
+images/axona_logo_ant_crest.png
+images/axona_logo_ant_hill.png
+images/axona_logo_ant_steep.png
+images/axona_logo_complex.png
+images/axona_logo_minimal.png
