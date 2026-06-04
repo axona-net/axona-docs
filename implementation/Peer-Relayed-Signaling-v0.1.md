@@ -193,6 +193,59 @@ the kernel.
    bridge be a pure bootstrap/rendezvous (Architecture §Future Directions:
    "demote the bridge to an ordinary peer").
 
+## 8a. Validation results — first dht-sim run (2026-06-03)
+
+Ran `dht-sim/scripts/sim-peer-relay.mjs` — a topology model: a stratified
+channel graph (synaptome) bootstrapped via the bridge, then greedy-XOR
+relay-routing of signaling over established channels, with the bridge
+toggleable. K = 20; seeds 1–3; **reachability/topology only, not WebRTC**.
+
+| N | edge success, bridge ON | edge success, bridge OFF (peer-relay) | OFF hops mean / p95 | connectivity OFF | edge success @ 50 % relays dead |
+|---|---|---|---|---|---|
+| 1 000  | 97.6 % | **97.6 %** | 3.9 / 6 | **100 %** | 94.8 % |
+| 3 000  | 99.2 % | **99.2 %** | 4.6 / 7 | **100 %** | 93.3 % |
+| 10 000 | 99.8 % | **99.8 %** | 5.4 / 8 | **100 %** | ~95 % |
+
+Bootstrap boundary (bridge OFF, reachability vs. # peer channels a fresh node
+holds): **0 → 0 %**, 1 → ~50 %, 2 → ~74 %, 3 → ~80 %, 5 → ~90 %. Stable across
+seeds. (50 k skipped — the script's bootstrap is O(N²); the 1 k–10 k trend is
+stable and the hop premium is clean O(log N).)
+
+**Findings**
+
+1. **Peer-relay matches the bridge baseline.** With a realistic synaptome,
+   bridge-OFF new-edge formation equals bridge-ON (≈ 98–99.8 %), at a small,
+   *logarithmic* hop premium (p95 6 → 7 → 8 as N grows 1 k → 3 k → 10 k) versus
+   the bridge's 1-hop relay. The bridge is **not** required to form new edges
+   once a node is meshed.
+2. **Connected and churn-robust.** The channel graph is 100 % connected with the
+   bridge off, and stays 100 % connected with ~95 % edge-success even when
+   **50 % of relays are killed** — graceful degradation, no fragmentation.
+3. **Bootstrap boundary confirmed.** A node with **0** peer channels can't
+   relay (it needs the bridge/a rendezvous for its *first* edge); by ~3–5 mesh
+   peers it reaches 80–90 % of the network — it crosses to bridge-independent
+   almost immediately. This is exactly the "≥ 1 peer ⇒ bridge-independent"
+   claim, now with a curve.
+4. **Critical precondition (the surprise the sim caught).** Peer-relay only
+   works if the synaptome is **stratified** (multi-scale — a contact at every
+   XOR-distance bucket, the Axona `stratum` / Kademlia k-bucket structure). An
+   earlier model with a *K-closest-only* overlay fragmented to **< 5 %**
+   connectivity and **~1 %** reachability with the bridge off: nearest-neighbour
+   links alone give greedy routing no long-range jumps, so it dies at local
+   minima. Axona's stratum-based synaptome provides the multi-scale links — but
+   the implementation must (a) route relays over the **full** stratified
+   synaptome (AP/stratum routing already does), and (b) ensure far strata are
+   **populated** (lookups / triadic introductions); a node whose far buckets are
+   empty regresses toward the fragmented case. This is the acceptance criterion
+   to enforce, plus the bridge-fallback guard for when relay routing can't
+   progress.
+
+**Verdict: GREEN** to proceed to the kernel `mesh:signal` implementation, with
+finding 4 as an explicit requirement (stratified synaptome + bridge fallback).
+Next sim refinement: re-run over the **real kernel** routing (AP-best, vitality)
+rather than the greedy-XOR proxy, and add the WebRTC-negotiation layer in the
+headless real-WebRTC harness.
+
 ## 10. Relationship to the other Future Directions
 
 - **Federated bridges** removes the single *rendezvous* (where a cold node makes
