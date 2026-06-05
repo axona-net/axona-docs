@@ -208,7 +208,10 @@ the kernel.
    standing regression test for the kernel work.
 6. **Ship** capability-flagged; **then** make peer-relay the default and let the
    bridge be a pure bootstrap/rendezvous (Architecture §Future Directions:
-   "demote the bridge to an ordinary peer").
+   "demote the bridge to an ordinary peer"). ✅ **Done (kernel v2.20.0, §8e)** —
+   `meshRelay` defaults on, peer discovery autonomously forms bridgeless edges,
+   verified end-to-end with the bridge process killed. The bridge is now only
+   the cold-start rendezvous for a node's first edge.
 
 ## 8a. Validation results — first dht-sim run (2026-06-03)
 
@@ -414,14 +417,55 @@ both would have shipped a relay that silently fails in the field:
 routing sim all green after the fixes; route_msg delivery in the sim ticked to
 100%.
 
-**Verdict.** The bridgeless-connection MECHANISM is now verified functional
-end-to-end over the real productized path with the bridge dead — a genuine fix,
-not a green-on-paper one. Two activation gaps remain before a deployment can
-claim it does not depend on the bridge: (a) `meshRelay` ships **default-off**;
-(b) there is **no autonomous trigger** — `connectViaRelay` is an explicit call,
-so a peer must be told to use it (wiring it into discovery / a peer-first
-`sendSignal` default is the §9.6 "make it the default" step). Until (a)+(b)
-land and ship, the capability is proven but **dormant**.
+**Verdict (at §8d, kernel v2.19.0).** The bridgeless-connection MECHANISM is
+verified functional end-to-end over the real productized path with the bridge
+dead — a genuine fix. Two activation gaps remained: (a) `meshRelay` shipped
+**default-off**; (b) there was **no autonomous trigger** (`connectViaRelay` was
+an explicit call). Both are **closed in v2.20.0** — see §8e.
+
+## 8e. AUTONOMOUS verification — default flag, discovery-triggered (2026-06-05, kernel v2.20.0)
+
+§8d proved the mechanism when `connectViaRelay` is called explicitly. v2.20.0
+makes it the **default** and **self-driving**, and §8e proves a deployment forms
+bridgeless connections with no application involvement:
+
+- `meshRelay` now defaults ON (bridge bootstrap path unchanged — it signals by
+  connId, never a hex nodeId, so the relay sink never intercepts it).
+- `AxonaPeer._considerCandidate` (the peer-discovery → connect path) falls back
+  to `connectViaRelay` when `openConnection` finds no bridge binding for a
+  discovered nodeId. So a meshed node forms a new direct edge to a peer it
+  learned about via `triadic_introduce` / gossip — bridge-free.
+
+Harness `axona-protocol/test/integration/mesh_relay_auto_e2e.mjs`
+(`npm run test:mesh-relay-auto-e2e`): peers built with the **default** flag
+(no `meshRelay` passed); bootstrap a mesh via a real bridge; **kill the bridge**;
+sever A↔C so A holds C's id but no channel; **B introduces C to A via a real
+`triadic_introduce`** (no `connectViaRelay` call in the test). Result, **9/9
+stable**: with the bridge **process dead**, A autonomously formed an
+authenticated direct `RTCDataChannel` to C **and re-admitted C to its routing
+table** (synaptome), purely from the discovery event.
+
+**Two more real bugs caught and fixed here** (both churn-class, beyond the
+relay):
+
+1. **`connectViaRelay` was not idempotent.** Discovery fires repeatedly, and each
+   call re-ran `_initiateTo`, overwriting the in-flight `RTCPeerConnection` and
+   restarting ICE so it never completed. Now guarded by `mesh.hasPeer` (no-op
+   while a negotiation to that peer is in progress).
+2. **A reconnecting peer was never re-admitted to the routing table (decisive,
+   affects all churn).** `composite.onPeerBound` deduped its fan-out with a
+   *permanent* `seen` set, so the "peer bound" notification fired only **once per
+   peer for the lifetime of the subscription**. A peer that dropped and rejoined
+   stayed bound-but-unrouted. Fixed by **re-arming the dedup on peer-death** (+
+   clearing the peer from `_deadPeers` on rebind), so a returning peer re-fires
+   `onPeerBound` and is re-seeded into the synaptome.
+
+**Final verdict: bridgeless connection is functional, autonomous, default-on,
+and verified end-to-end with the bridge process dead.** The bridge is now only a
+cold-start rendezvous for a node's first edge; once a node holds ≥1 mesh peer it
+forms further connections without it. Remaining (non-blocking) future work:
+re-run over a large non-full-mesh topology to exercise multi-hop relay paths at
+scale, and the privacy-minimising relay-selection option (§7.2).
 
 ## 10. Relationship to the other Future Directions
 

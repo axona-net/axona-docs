@@ -16,6 +16,38 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.20.0 — 2026-06-05
+
+### Bridgeless connection is now the default and self-driving; a dropped peer rejoins routing
+
+The network no longer depends on the signaling bridge to form new direct
+connections in steady state — and it now does so on its own:
+
+- **On by default.** Peer-relayed signaling (`meshRelay`) is enabled by default.
+  The bridge bootstrap path is byte-for-byte unchanged (it signals by ephemeral
+  connection id, never a node id, so the relay never intercepts it); the bridge
+  remains only the cold-start rendezvous for a node's very first edge.
+- **Autonomous.** When a node learns of a peer it has no channel to (peer-driven
+  discovery), it forms the new direct WebRTC edge by relaying the signaling
+  through the existing mesh — no bridge involved. The resulting channel is still
+  authenticated end-to-end (`axona/4` + DTLS-fingerprint binding), so a relaying
+  peer can carry the signaling but cannot impersonate an endpoint or read the
+  channel.
+- **A peer that drops and reconnects rejoins the routing table.** A fan-out
+  dedup made the "peer bound" notification fire only once per peer for the
+  lifetime of a subscription, so a peer that left and came back (churn, or a
+  bridgeless reconnect) could end up connected-but-unrouted — silently absent
+  from the routing table. The notification is now re-armed when a peer departs,
+  so a returning peer is re-admitted and is reachable again.
+
+Verified end-to-end over real WebRTC with the **bridge process killed**: a node
+autonomously forms an authenticated direct channel to a peer introduced purely
+peer-to-peer, and re-admits it to its routing table — with no bridge in
+existence. Removing the bridge as a hard dependency for new connections
+eliminates a single point of dependency in the network's liveness.
+
+---
+
 ## Kernel v2.19.0 — 2026-06-05
 
 ### Routing tables drop a dead peer immediately; bridgeless connect verified end-to-end
