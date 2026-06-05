@@ -229,14 +229,15 @@ The kill is accepted **iff** its `signerPubkey` equals the `signerPubkey` of the
 identified by `msgId`. This requires the **msgId to be bound to the publisher** so a kill
 can't target someone else's message.
 
-> **Prerequisite to confirm.** Today `msgId = sha256(canonical({signature, seq, ts,
-> topic, message}))`. The `signature` is over publisher-controlled content, so the msgId
-> is effectively publisher-bound *given the signature is present*. The root axon still
-> holds the original envelope in its replay cache, so it can check `kill.signerPubkey ===
-> cachedEnvelope.signerPubkey` directly. **No msgId format change is required** — the
-> check is "does the killer's key match the stored message's signer key." Confirm during
-> implementation that the cached envelope is retained long enough (it is, within the hold
-> window) for this check.
+> **Resolved (kernel v2.18.0).** `msgId = sha256(canonical({publisher, message}))`, where
+> `publisher` is the signer's pubkey (null when unsigned). The msgId is now **directly
+> publisher-bound** — a kill/touch can't target someone else's message because a different
+> publisher hashing the same content yields a different id. The id is also time- and
+> sequence-independent (a stable content address of the author+payload); a publisher that
+> needs two otherwise-identical messages to differ adds a nonce to `message`. Belt-and-
+> suspenders, the root axon still holds the original envelope in its replay cache, so it
+> also checks `kill.signerPubkey === cachedEnvelope.signerPubkey` directly within the hold
+> window.
 
 ### 3.4 Propagation & the tombstone
 
