@@ -1,0 +1,30 @@
+# DHT Benchmark — 25,000 nodes · 500 lookups/cell
+# DHT Benchmark — 25,000 nodes · Omniscient Init
+Protocol,slice hops,slice ms,slice success%
+Kademlia,,,0.0%
+G-DHT,,,0.0%
+NH-1,9.800,545.40,100.0%
+Axona,9.200,556.06,100.0%
+
+# Run Parameters
+Parameter,Value
+Timestamp,2026-06-05T23:02:04.352Z
+Bidirectional,yes
+Nodes,25000
+Protocol,kademlia
+K (bucket size),20
+Alpha (parallel queries),3
+ID bits,64
+Node delay (ms),10
+Web limit,yes
+Max connections,100
+Highway %,0
+G-DHT Bits,8
+Lookups per cell,500
+Warmup sessions (neuromorphic),4
+Effective warmup lookups,5000
+δ median (one-way ms),69.02
+δ mean (one-way ms),70.02
+δ p95 (one-way ms),124.18
+3δ floor — median (ms),207.05
+3δ floor — mean (ms),210.07
