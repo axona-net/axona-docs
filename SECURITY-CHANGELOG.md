@@ -16,6 +16,35 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.21.0 — 2026-06-05
+
+### A dropped direct channel always heals — no peer can wedge unreachable
+
+A peer whose direct `RTCPeerConnection` reached the terminal `closed` state out
+from under it (the far side closing, or an abrupt network drop) was left
+recorded as a known peer with no live channel. Because the peer was still
+"known," the self-healing reconnect path treated it as already-in-progress and
+**never re-established the connection** — so a peer that dropped this particular
+way could become permanently unreachable directly, falling back to multi-hop
+relaying through others indefinitely.
+
+Now a channel that closes out from under us is fully released, so the node
+**re-forms the direct connection on its own** (bridge-free, via a freshly
+relayed handshake through the existing mesh) the next time it sees that peer.
+This closes a liveness gap that would otherwise surface only once a deployed
+network experienced real churn at scale. The complementary `failed`-state
+recovery path is unchanged. Guarded by a dedicated regression test.
+
+This shipped alongside the at-scale verification that the network forms direct,
+authenticated peer-to-peer connections **without the signaling bridge** — over
+genuinely multi-hop relayed signalling (origin and target sharing no common
+neighbour, so a single relay is impossible), with the bridge process killed, and
+with the routing substrate that carries the signalling measured at 10,000 nodes
+(99.5% delivery, 100% reachability). The bridge remains only the optional
+cold-start rendezvous for a node's very first edge.
+
+---
+
 ## Kernel v2.20.0 — 2026-06-05
 
 ### Bridgeless connection is now the default and self-driving; a dropped peer rejoins routing
