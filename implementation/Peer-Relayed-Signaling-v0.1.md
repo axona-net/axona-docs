@@ -523,6 +523,63 @@ over genuinely multi-hop relayed signalling, bridge process dead) with **no
 dependence on the bridge** — at deployment scale and over the multi-hop paths a
 real sparse network actually uses.
 
+## 8g. Pre-deployment stability review (2026-06-05, kernel v2.22.0)
+
+Because every prior verification pass had surfaced at least one real bug, a
+deliberately adversarial pre-deploy review was run: full regression-stability
+loops (kernel suite + all four relay harnesses, ×3 — all green and
+non-flaky) plus three independent code audits (mesh reconnect state machine;
+relay routing path; cross-repo deploy readiness). It found one **blocker** and a
+catalogue of lower-severity items. The point of recording the full triage here is
+that the remaining items are now **known and assessed**, not undiscovered.
+
+**BLOCKER (fixed, v2.22.0) — never-opened negotiation wedge.** The symmetric twin
+of the v2.21.0 `closed` wedge, reached via `failed`. A PeerConnection that fails
+ICE does not autonomously reach `closed`, and the ping/stale/send-fail eviction
+timers run only on already-open channels — so a peer stuck in
+`new`/`signaling`/`failed` that never opens (a **responder** especially, which
+`_scheduleRetry` gives no retry) sits in `_peers` forever, keeping `hasPeer` true
+and no-op'ing `connectViaRelay` permanently. The loopback harnesses can't catch
+it (their ICE never fails). Fixed with a per-peer **negotiation watchdog**
+(absolute 30s deadline, preserved across retries) that retires a never-opened
+peer so discovery can re-drive, and that bounds the previously-unbounded 5s
+offerer retry loop. Guarded by `smoke_mesh_negotiation_watchdog.js` (14).
+
+**Assessed as NOT blockers (with reasons):**
+
+- *Relay sink claims ownership before reachability is confirmed → on relay
+  failure the frame is dropped with no bridge fallback.* Architecturally moot: the
+  bridge signals only by **ephemeral connId**, never by hex nodeId, so it cannot
+  deliver a relay-addressed (hex-nodeId) signal regardless — there is no better
+  fallback. The negotiation's own retry plus the v2.22.0 watchdog bound and
+  re-drive any stuck attempt.
+- *Security of the relay path.* Confirmed safe: a malicious intermediary cannot
+  MITM (the channel binds to the real DTLS fingerprints via the signed axona/4
+  CBV — a substituted fingerprint fails mutual verify), cannot forge an
+  authenticated channel, cannot blackhole an introduction (only the true target
+  consumes; every other hop forwards), and routing is loop-bounded by `MAX_HOPS`.
+  A relay can only drop (fail-closed), which retry/​watchdog handle.
+
+**Known follow-ups (non-blocking, tracked):**
+
+- *`mesh:signal` ingress lacks the design §4/§5 size/rate cap.* A forged offer
+  cannot impersonate (MITM-safe) — the cost is wasted PCs/DTLS, now each bounded
+  to ≤30s by the watchdog — but a per-source rate/size cap and a one-in-flight-
+  per-(from,to) guard should still land as DoS hardening before the mesh:signal
+  surface is widely exposed.
+- *Two slow monotonic leaks on a long-lived relay peer:* the relay-reachability
+  cache and the dead-peer set grow one entry per distinct target / departed peer
+  with no prune. Negligible for browser peers (restart clears them); worth a
+  TTL/sweep for always-on embedded peers.
+
+**Deploy-execution blockers (separate from kernel correctness, user-gated):** the
+msgId change (v2.18.0) is a hard wire split — old and new peers disagree on
+message identity — so the rollout must be a coordinated flag-day; the bridge's
+installed kernel currently lags even its own pin (a `git pull` alone won't update
+it — the deploy must run `npm ci`); and the bridge version-gate floor admits the
+incompatible kernel range and should be raised so stragglers are cleanly rejected
+rather than silently joining a split pub/sub.
+
 ## 10. Relationship to the other Future Directions
 
 - **Federated bridges** removes the single *rendezvous* (where a cold node makes

@@ -16,6 +16,32 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.22.0 — 2026-06-05
+
+### A connection that never finishes negotiating can no longer strand a peer
+
+A direct connection that fails to establish — ICE never completes across a hard
+NAT, no TURN path, the far side goes away mid-handshake — used to leave the
+half-formed peer recorded indefinitely with no live channel and nothing to clean
+it up (the health checks that retire dead links only run on connections that
+actually opened). As with the v2.21.0 case, a peer left in that state was treated
+as "already connecting," so the node would never try again — it could stay
+unable to reach that peer directly until a restart.
+
+Now every connection attempt is given a bounded window to succeed; if it hasn't
+opened in time it is fully retired, so the node cleanly tries again later
+(bridge-free) the next time it encounters that peer. This also caps a
+previously-unbounded reconnect retry loop. The result: no peer can get
+permanently stuck "half-connected," which is the failure mode that only appears
+once a network is large enough to have peers behind difficult NATs.
+
+This was found by a dedicated pre-deployment stability review specifically
+looking for more failure modes of this class (a deliberately adversarial pass,
+since each prior review had surfaced one). It is the same liveness-hardening
+family as v2.21.0 and is covered by a new regression test.
+
+---
+
 ## Kernel v2.21.0 — 2026-06-05
 
 ### A dropped direct channel always heals — no peer can wedge unreachable
