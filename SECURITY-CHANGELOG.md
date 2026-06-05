@@ -16,6 +16,37 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.23.0 — 2026-06-05
+
+### Published message IDs are now verified content addresses; relay setup is rate-bounded; a failed handshake can't strand a peer
+
+A pre-deployment hardening pass (an adversarial whole-system review, deliberately
+broadened beyond the connection layer) produced three protections:
+
+- **Message-ID integrity.** A published message's identifier — the key used to
+  fetch it (`pull`) and to retract it (`kill`) — is now verified to be the true
+  hash of the message's content at the point a node accepts it. A message whose
+  advertised ID does not match its content is rejected, so a published ID
+  reliably resolves to exactly the content it names and cannot be made
+  unretractable or used to shadow another message's ID. Honest publishers are
+  unaffected (their ID already is the content hash).
+
+- **Connection-setup backpressure.** A node now caps how many direct connections
+  it will be negotiating at once, so a peer that floods it with introductions to
+  many fabricated identities cannot drive unbounded connection-setup work. The
+  cap frees itself as negotiations complete or time out, and normal nodes operate
+  far below it.
+
+- **Handshake liveness.** A direct-channel authentication that fails partway
+  (an identity mismatch, or a transient error while admitting the peer) is now
+  always cleanly retryable, so a peer can never be left permanently
+  authenticated-but-unusable by a one-off failure.
+
+All three are covered by new regression tests, including a deterministic test for
+the handshake-liveness case. None changes the wire format.
+
+---
+
 ## Kernel v2.22.0 — 2026-06-05
 
 ### A connection that never finishes negotiating can no longer strand a peer

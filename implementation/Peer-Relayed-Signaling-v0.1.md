@@ -560,17 +560,29 @@ offerer retry loop. Guarded by `smoke_mesh_negotiation_watchdog.js` (14).
   consumes; every other hop forwards), and routing is loop-bounded by `MAX_HOPS`.
   A relay can only drop (fail-closed), which retry/​watchdog handle.
 
-**Known follow-ups (non-blocking, tracked):**
+**Hardening wave — shipped in v2.23.0 (one careful fix at a time, each tested):**
 
-- *`mesh:signal` ingress lacks the design §4/§5 size/rate cap.* A forged offer
-  cannot impersonate (MITM-safe) — the cost is wasted PCs/DTLS, now each bounded
-  to ≤30s by the watchdog — but a per-source rate/size cap and a one-in-flight-
-  per-(from,to) guard should still land as DoS hardening before the mesh:signal
-  surface is widely exposed.
-- *Two slow monotonic leaks on a long-lived relay peer:* the relay-reachability
-  cache and the dead-peer set grow one entry per distinct target / departed peer
-  with no prune. Negligible for browser peers (restart clears them); worth a
-  TTL/sweep for always-on embedded peers.
+- *Pub/sub `postHash` ↔ verified msgId reconciliation* (content-address integrity;
+  closes pull/kill poisoning + un-killable messages). SECURITY-CHANGELOG v2.23.0.
+- *`connectViaRelay` backpressure* — concurrent relay negotiations capped on the
+  mesh's never-opened count (self-healing via the v2.22.0 watchdog), bounding the
+  gossip-introduction-flood amplification.
+- *mesh-auth `verifying` cleared on every non-success exit* — a failed handshake
+  can no longer wedge a channel authenticated-but-unbound (deterministic test).
+
+A methodology note from this wave: the 3-peer `mesh_relay_e2e` harness is
+intermittently flaky (~bootstrap convergence) ONLY when harnesses run
+back-to-back under node-datachannel resource pressure — it is 10/10 clean in
+isolation. A provably-inert change reproduced the same failure pattern, so
+regressions in it must be judged by isolated high-N A/B (or, better,
+deterministic unit tests), not single back-to-back runs.
+
+**Known follow-ups still open (non-blocking, tracked in the red-team register
+addendum, SP-6…SP-12):** a per-source rate + size cap on INBOUND `mesh:signal`
+(SP-6); two slow monotonic leaks on a long-lived relay peer — `_relayReach` and
+`_deadPeers` (SP-7/8); the anonymous-publish quota bypass (SP-10); kill removing
+only the first duplicate-content copy (SP-11); and the latent (currently
+unreachable) glare-dedup null-key tiebreak (SP-12).
 
 **Deploy-execution blockers (separate from kernel correctness, user-gated):** the
 msgId change (v2.18.0) is a hard wire split — old and new peers disagree on

@@ -156,3 +156,48 @@ Two mitigations make this a reasonable trade rather than a reckless one:
 The public `SECURITY-CHANGELOG.md` remains **resolved-items-only** regardless —
 this register is where open work is tracked; the changelog is where shipped
 guarantees are advertised.
+
+---
+
+## Addendum — pre-deployment stability/audit pass (2026-06-05, kernel v2.21.0 → v2.23.0)
+
+Adversarial whole-system review run before the relay/msgId flag-day. Regression
+stability loops (all relay harnesses, ×3, green) + multiple independent code
+audits (mesh reconnect state machine; relay routing path; pub/sub + envelope;
+binding/auth/dedup; bootstrap/join/leave/churn; cross-repo deploy readiness).
+
+### Fixed in this pass
+
+| ID | Severity | Area | Status |
+|---|---|---|---|
+| SP-1 `closed`-channel never released → reconnect wedge | High (liveness) | mesh transport | ✅ v2.21.0 |
+| SP-2 never-opened (`failed`/responder) negotiation wedge | High (liveness) | mesh transport | ✅ v2.22.0 (negotiation watchdog) |
+| SP-3 `postHash` not reconciled with verified msgId (pull/kill poisoning, un-killable msgs) | High (integrity) | pub/sub ingress | ✅ v2.23.0 |
+| SP-4 `connectViaRelay` unbounded (gossip-introduction flood → unbounded WebRTC setup) | Should-fix (DoS) | relay / transport | ✅ v2.23.0 (pendingNegotiations cap = 64) |
+| SP-5 mesh-auth `verifying` not cleared on id-mismatch / bind-throw → bind wedge | Medium (liveness) | mesh-auth | ✅ v2.23.0 (try/finally; deterministic test) |
+
+### Open — tracked for a hardening wave (NOT blocking the bridgeless/relay capability)
+
+| ID | Severity | Area | Note |
+|---|---|---|---|
+| SP-6 `mesh:signal` INBOUND lacks per-source rate + size cap | Should-fix (DoS) | AxonaPeer `mesh:signal` terminal handler → mesh.onSignal | Forged offers spin up responder PCs (each bounded to ≤30 s by the watchdog, MITM-safe). Recommended: cap new responder creation in `mesh.onSignal` on `pendingNegotiations()` (same self-healing primitive as SP-4) + a payload size ceiling + one-in-flight-per-(from,to). Deferred to avoid perturbing the bridge bootstrap path without dedicated tests. |
+| SP-7 `_relayReach` cache grows unbounded | Nit (leak) | AxonaPeer | One entry per distinct relay target, never pruned. TTL/LRU sweep. |
+| SP-8 `_deadPeers` grows unbounded | Nit (leak) | AxonaPeer | One bigint per ever-departed peer; never aged out. |
+| SP-9 `leave()` drain clamps `timeoutMs` to 50 ms | Nit (API) | AxonaPeer | Documented timeout silently ignored; cosmetic (no per-publish ack to await). |
+| SP-10 anonymous publishes bypass the per-publisher quota | Should-fix (anti-flood) | pub/sub bounded queue | Pre-existing (predates msgId work). Open-topic flood evicts signed victims. Key quota on `signerPubkey ?? 'anon'`. |
+| SP-11 one `kill` removes only the first duplicate-content cache copy | Should-fix | pub/sub kill | Identical-content publishes share a content msgId but cache as separate entries; `kill` should filter-remove all matching `postHash`, not `findIndex` the first. |
+| SP-12 glare dedup null-key tiebreak is asymmetric | Latent (not reachable) | webrtc bindPeer | Unreachable today (the only `WebRTCTransport.bindPeer` caller always passes a channelKey). Defensive: defer dedup until both channelKeys present. |
+
+### Cleared by audit (no action)
+
+- Relay path is MITM-safe (DTLS-fingerprint CBV), forge-safe, blackhole-safe, loop-bounded (`MAX_HOPS`).
+- msgId crypto: no signed cross-publisher collision; no precomputed-tombstone censorship; freshness (C-2) intact without msgId.
+- axona/4 auth: no bypass, replay-resistant, pubkey→nodeId bound.
+- In-degree cap (`addIncomingSynapse`) reverse-edge eclipse: not reachable (the method has no production caller).
+- Reconnect re-auth: clean, no double peer-list / double-bind.
+
+### Deploy-execution blockers (separate from kernel correctness; user-gated)
+
+- **msgId v2.18.0 is a hard wire split** — old/new peers disagree on message identity → coordinated flag-day required.
+- **Bridge installed kernel lags its own pin** — `git pull` alone won't update it; the deploy must run `npm ci`.
+- **Bridge version-gate floor (`MIN_KERNEL_VERSION`) too low** — admits the incompatible pre-2.18.0 range; raise it so stragglers are cleanly rejected rather than joining a split pub/sub.
