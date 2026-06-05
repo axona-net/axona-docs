@@ -16,6 +16,41 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.19.0 — 2026-06-05
+
+### Routing tables drop a dead peer immediately; bridgeless connect verified end-to-end
+
+Two routing-integrity fixes, surfaced by an end-to-end verification of
+bridgeless connection (a node forming a new authenticated direct channel to a
+peer with the signaling bridge **process killed**):
+
+- **A dead peer is evicted from the routing table the moment its channel
+  dies.** Previously a peer was only ever *admitted*; a dropped peer — most
+  importantly the bridge after it goes down — lingered in every node's
+  synaptome until lazy cleanup, and greedy routing could keep selecting that
+  dead, address-space-near peer as a next hop. Routing now evicts on the
+  transport's authenticated peer-death signal, so the table reflects only live,
+  bound channels. This both makes **bridgeless peer-relayed connection work
+  when it matters most** (right after the central bridge drops) and shortens
+  the window in which a departed or non-responsive peer can sit in a routing
+  path.
+
+- **Routed forwarding only ever hands a message to a directly-connected
+  neighbour.** A fallback path could forward toward a peer two hops away as if
+  it were adjacent; it now forwards to the verified first hop. This keeps
+  multi-hop delivery (including relayed WebRTC signaling) from dead-ending one
+  hop short.
+
+The security properties of a relayed connection are unchanged and were
+re-confirmed end-to-end over real WebRTC with the bridge dead: the channel is
+authenticated by `axona/4` + DTLS-fingerprint binding regardless of who relayed
+the SDP, so a relaying peer can carry the signaling but cannot impersonate an
+endpoint or read the resulting channel. Removing the bridge as a hard
+dependency for new connections eliminates a single point of dependency in the
+network's liveness.
+
+---
+
 ## Kernel v2.17.0 — 2026-06-04
 
 ### Bridgeless connection (peer-relayed signaling) stays authenticated end-to-end
@@ -397,4 +432,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-04.*
+*Last updated: 2026-06-05.*

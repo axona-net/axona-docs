@@ -366,12 +366,62 @@ the kernel `mesh:signal` step will.
 
 **What this closes.** The three validation layers now agree: topology (§8a,
 greedy-XOR proxy), real routing (§8b, kernel `route_msg`/`lookup`), and real
-WebRTC (this, §8c). The mechanism forms an authenticated direct channel
-bridgelessly through a peer. The remaining work is purely the **kernel
-implementation** (§9.3–9.4): productize the relay forwarder + the `sendSignal`
-sink (over the iterative `lookup` path per §8b finding 6), behind the
-`mesh-relay` capability flag. The harness is the regression test that
-implementation must keep green.
+WebRTC (this, §8c). NOTE: §8c hand-wires the relay; the *productized* kernel
+path is verified separately in §8d.
+
+## 8d. END-TO-END verification of the productized path — bridge killed (2026-06-05, kernel v2.19.0)
+
+§8a–§8c validated the *mechanism* in pieces. This validates the **shipping code
+path composed end-to-end**, and it is the gate for the project-killer question
+("can two nodes connect directly without the bridge?").
+
+Harness `axona-protocol/test/integration/mesh_relay_e2e.mjs`
+(`npm run test:mesh-relay-e2e`): a **real `axona-bridge`** + three real
+`webTransport({ meshRelay:true })` peers over real WebRTC. (1) bootstrap an
+authenticated mesh via the bridge; (2) **`SIGKILL` the bridge** and wait until
+every peer's bridge socket is closed; (3) sever the A↔C channel and drop the
+stale synapse so A holds C's nodeId but has no channel/synapse to it (the
+discovered-but-unconnected production state, §3.3); (4) `A.connectViaRelay(C)`.
+With the bridge **process dead**, A formed a NEW authenticated direct
+`RTCDataChannel` to C — offer/answer/ICE relayed A→B→C over the live mesh —
+axona/4 bound end-to-end, live RTT flowing over the direct channel. **14/14,
+stable across repeated runs.** Because the bridge was dead and A↔C had no prior
+channel, the SDP/ICE could only have crossed via the peer relay.
+
+**This verification caught two real bugs that the piecewise tests did not** —
+both would have shipped a relay that silently fails in the field:
+
+1. **`routeMessage` 2-hop fallback forwarded to a non-adjacent peer.**
+   `_findCloserInTwoHops` returned the *2-hops-away* node; the forwarder then
+   did `transport.send(thatNode, …)` to a peer it had no channel to → the send
+   threw and routing died one hop short. Fixed to return the **first-hop
+   synapse** (the adjacent peer that just answered the probe — proven live).
+
+2. **No dead-synapse eviction (the decisive one).** AxonaPeer subscribed to
+   `onPeerBound` (admission) but never to peer-death, so a dead synapse —
+   crucially the **bridge** after it drops — lingered in every peer's table.
+   Greedy `lookup`/`route_msg` then picked that dead, XOR-near synapse toward
+   many targets, the hop failed, and the relay's *return path* (answer/ICE)
+   never made it back. This is acute precisely when peer-relay matters most:
+   right after the central bridge dies. Fixed by subscribing to
+   `transport.onPeerDied` and **evicting the synapse immediately** (kernel
+   v2.19.0) — plus a defense-in-depth skip of unconnected synapses in the
+   greedy next-hop selection. Eager eviction also improves churn routing for
+   all deployments, not just the relay.
+
+**Regression:** full kernel suite (44 files), both prior WebRTC harnesses
+(`test:mesh`, `test:mesh-relay`), dht-sim engine smokes, and the real-kernel
+routing sim all green after the fixes; route_msg delivery in the sim ticked to
+100%.
+
+**Verdict.** The bridgeless-connection MECHANISM is now verified functional
+end-to-end over the real productized path with the bridge dead — a genuine fix,
+not a green-on-paper one. Two activation gaps remain before a deployment can
+claim it does not depend on the bridge: (a) `meshRelay` ships **default-off**;
+(b) there is **no autonomous trigger** — `connectViaRelay` is an explicit call,
+so a peer must be told to use it (wiring it into discovery / a peer-first
+`sendSignal` default is the §9.6 "make it the default" step). Until (a)+(b)
+land and ship, the capability is proven but **dormant**.
 
 ## 10. Relationship to the other Future Directions
 
