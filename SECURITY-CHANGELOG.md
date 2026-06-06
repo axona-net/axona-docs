@@ -16,6 +16,44 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.28.0 — 2026-06-06
+
+### A node authenticates only within its own network; an active publisher's replay protection no longer weakens under load; dropped-message logging is now observable
+
+- **Network isolation by construction.** A node forms an authenticated channel
+  only with peers that share its network's protocol epoch. The epoch is folded
+  into the value each side signs at connect time, so a peer running a
+  separately-deployed, incompatible build of the protocol cannot complete the
+  mutual handshake with a current node — at the mesh layer or at the bridge.
+  Two networks on different epochs are therefore cryptographically separate:
+  no peer in one can be talked, relayed, or cached into an authenticated
+  relationship with a peer in the other. The wire-format major is also carried
+  in the connection request so the signaling bridge can decline an incompatible
+  peer cleanly, with an explicit "please upgrade," instead of admitting it to
+  fail silently later.
+
+- **Replay protection holds under load.** Each node tracks a per-publisher
+  freshness watermark that rejects a captured message replayed from earlier in
+  that publisher's stream. The bounded store that holds those watermarks now
+  keeps the *most recently active* publishers, so a continuously-active
+  publisher's watermark is retained even while the node is tracking many
+  publishers — closing a window where an attacker could have forced an active
+  publisher's record out of the cache and then replayed an old message of
+  theirs.
+
+- **Silent security drops are now observable.** When a node rejects a hostile or
+  malformed message (a bad signature, a stale or oversized publish, an
+  unauthorized retraction), that decision is now surfaced through the
+  application's logging hook instead of being discarded, so an operator can see
+  what a node is refusing and why.
+
+All three are covered by new regression tests, including a test that a
+cross-epoch handshake is refused even when the epoch tag is forged to match (the
+signature still fails), and a test that an active publisher survives a flood of
+others without losing its replay protection.
+
+---
+
 ## Kernel v2.23.0 — 2026-06-05
 
 ### Published message IDs are now verified content addresses; relay setup is rate-bounded; a failed handshake can't strand a peer
@@ -550,4 +588,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-05.*
+*Last updated: 2026-06-06.*
