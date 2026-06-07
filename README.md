@@ -3,14 +3,20 @@
 Documentation for the **Axona** peer-to-peer protocol: papers, whitepapers,
 explainers, decks, architecture references, implementation plans, and red-team
 analyses. The protocol itself lives in
-[axona-net/axona-peer](https://github.com/axona-net/axona-peer) (browser SDK),
+[axona-net/axona-protocol](https://github.com/axona-net/axona-protocol) (the
+`@axona/protocol` kernel),
+[axona-net/axona-peer](https://github.com/axona-net/axona-peer) (reference
+browser peer),
 [axona-net/axona-bridge](https://github.com/axona-net/axona-bridge) (signaling
-broker), and [axona-net/dht-sim](https://github.com/axona-net/dht-sim) (reference
-simulator).
+broker + TURN),
+[axona-net/axona-relay](https://github.com/axona-net/axona-relay) (headless Node
+supernode), and [axona-net/dht-sim](https://github.com/axona-net/dht-sim)
+(reference simulator).
 
 **Try it live:**
 
-- **<https://axona.net>** — the reference application (browser peer, pub/sub UI; talks to the deployed network).
+- **<https://axona.net>** — the reference application (browser peer, pub/sub UI; talks to the deployed network). *Production runs the `axona/4` / kernel-2.16 line.*
+- **<https://testnet.axona.net>** — the SF testnet peer (the `axona/5` / kernel-2.31 line); **<https://demo-testnet.axona.net>** is the minimal kernel demo on the same testnet.
 - **<https://axona-net.github.io/dht-sim/>** — the in-browser DHT simulator (drive 1K–50K peers locally; visualise routing, benchmark all five protocols).
 - **<https://bridge.axona.net>** — the signaling broker that bootstraps the live network.
 
