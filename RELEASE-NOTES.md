@@ -7,6 +7,34 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v2.29.0 — pub/sub replay backlog fix (2026-06-06)
+
+Compatible minor on the 2.x epoch (`WIRE_VERSION`/`AUTH_PROTO` unchanged), so
+2.29.0 interoperates with 2.28.0 and clears the bridge's `MIN_KERNEL 2.28.0`
+floor. Surfaced on the SF testnet: two subscribers to the same topic got
+*different* backlog on `since:'all'` — one received every prior publish, another
+received none.
+
+- **Root cause.** A node that is a K-closest **root axon** for a topic marks each
+  publishId in the network-level `_seenPublishes` set when it relays the publish
+  — *without* delivering to its own app (its app had not subscribed yet). When
+  that app later subscribed, the backlog arriving as a `pubsub:replay-batch` was
+  skipped by the same `_seenPublishes` gate, so the late subscriber saw nothing.
+  Subscribers that were *not* roots for the topic had an empty `_seenPublishes`
+  and got the full backlog — hence the non-determinism (per topic / K-closest
+  membership).
+- **Fix.** App delivery is now gated **only** by `_appDelivered` (exactly-once),
+  never by `_seenPublishes`. `_onReplayBatch` always attempts app delivery and
+  only re-caches / re-records on the first router-sight of a publishId. Matches
+  the long-documented separation of the two sets and the self-replay path.
+- **Regression test.** `smoke_pubsub_replay.js` gains a remote-replay-after-relay-
+  as-root case (red before / green after); duplicate-batch idempotency preserved.
+- **Versions.** kernel `2.28.0 → 2.29.0`; testnet/axona.net peer `3.25.0 → 3.26.0`;
+  demo `1.15.0 → 1.16.0`. Bridge unchanged (its embedded peer does not subscribe
+  to app topics).
+
+---
+
 ## Pending production cutover — kernel 2.16.0 → 2.28.0 (2026-06)
 
 The next deployment is a **flag-day**: the new build is hard-incompatible with the
