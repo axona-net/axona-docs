@@ -68,7 +68,7 @@ Notes on delivery semantics:
   *no* backlog is fixed.
 - The topic ID is derived identically in both apps from a synthetic
   region-anchored publisher, so `us-east/hello-world` resolves to the same topic
-  in the Peer and the Demo (anchor `0x89` = Virginia).
+  in the Peer and the Demo (region code `0x89` = Virginia).
 
 ---
 
