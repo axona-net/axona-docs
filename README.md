@@ -36,6 +36,7 @@ This repo uses three terms consistently:
 
 ## Supplementary material
 
+- **[`BUILDING.md`](BUILDING.md)** — the standard build process for every typeset doc (LaTeX source → tectonic → versioned PDF, archive the prior to history/). Read this before bumping any document.
 - **[`TESTNET.md`](TESTNET.md)** — the SF testnet quick-reference: live URLs (`testnet.axona.net` peer + `demo-testnet.axona.net` demo), the prod-vs-testnet version matrix, how to run the apps against the testnet bridge, and the security/bug fixes carried since production 2.16.0.
 - **[`RELEASE-NOTES.md`](RELEASE-NOTES.md)** — changes shipped in the kernel and the apps, newest-first and keyed to kernel version.
 - **[`SECURITY-CHANGELOG.md`](SECURITY-CHANGELOG.md)** — public, shareable record of resolved security-relevant changes to the protocol kernel and apps (authenticated handshake, channel binding, hardening batches).
