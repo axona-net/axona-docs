@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.7.7 \quad 2026-06-07\par}
+{\small An Axona Architecture Note \quad v0.7.8 \quad 2026-06-08\par}
 \end{center}
 \vfill
 \null
@@ -1535,6 +1535,40 @@ note and the heterogeneous-protocol simulation plan in
 \texttt{axona-docs}. This is the behavioural complement to verified
 admission: that governs \emph{who is in your routing table}; this
 governs \emph{whether they actually do their job}.
+
+\item[\textbf{Decoupled publish identity.}] Today one Ed25519 key
+serves four roles --- transport auth, routing identity, subscribe
+origin, and \emph{authorship} (the signature on every published
+envelope). A publication therefore carries the publisher's transport
+identity, with its persistent nodeId, region prefix, and
+channel-bound mesh presence. The direction is to let a peer sign
+publishes with a \emph{separate} publish key, so authorship becomes a
+free-standing pseudonym independent of the node it was published
+from.\sidenote{This is the Nostr \texttt{npub} model: a portable
+author identity that can publish from several devices (different
+transport keys, same publish key), and that survives node churn.} The
+envelope format already supports it --- the signature verifies against
+the envelope's \texttt{signerPubkey} field and the \texttt{msgId}
+folds in that same key as the author, so neither verification (B-4)
+nor the wire changes; the only coupling is that \texttt{peer.pub}
+defaults the signer to the node key. \emph{This is the rare change
+that is additive but effectively permanent}: it needs no flag-day to
+introduce (old and new envelopes verify identically), yet once content
+carries publish-key authorship it cannot be cleanly retracted --- so
+it can be added at any time, on its own schedule. Three things must be
+designed alongside it, none in the wire format: \textbf{(1)} it
+anonymizes the \emph{author field}, not the \emph{act} --- a first-hop
+axon can still time-correlate origination, and a node-anchored
+\texttt{topic\_id} re-leaks the publisher, so anonymized publishes must
+target region-synthetic or publish-key-anchored topics;
+\textbf{(2)} anti-abuse must rebind --- a free, infinite supply of
+publish keys defeats per-publisher quota, so rate-limiting attaches to
+the transport node or the publish key carries proof-of-work (it meets
+the open E-1 / quota threads here); and \textbf{(3)} the per-publisher
+\texttt{seq} (C-2) is per-\emph{signer}, so the same publish key used
+from two devices needs coordinated sequencing. Authorship trust then
+becomes a key-distribution question (which \texttt{pub\_pk} is whom),
+exactly as for any pseudonymous-identity system.
 \end{description}
 
 The job of the architecture is to make these additions land
