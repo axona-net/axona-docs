@@ -1,13 +1,13 @@
 # Axona API Reference
 
 Reference for every public symbol exported from `@axona/protocol`
-v2.16.0. Organized by what application developers actually reach for;
+v2.32.0. Organized by what application developers actually reach for;
 deep-customization surfaces are at the end.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v2.31.0.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v2.31.0.md) — mental model + worked
+- [Quick Start](Quick-Start-v2.32.0.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v2.32.0.md) — mental model + worked
   example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects (authenticated handshake, channel binding, pub/sub
@@ -1195,23 +1195,26 @@ roundTripLatency(lat1, lng1, lat2, lng2) // → ms — rough fiber estimate
 randomU32()                              // → 0..2**32 - 1
 ```
 
-**Region names.** Each of the 192 region codes carries **two** human-readable
-names — one per S2 sub-cell ("half") — and both resolve to the same code, so a
-user sees the label nearest their actual location while the address stays
-stable. Homogeneous cells (a single country, open ocean) share one name.
+**Region names.** Each of the 192 region codes carries exactly **one**
+human-readable name, so a region always presents the same label (no
+location-dependent flip-flop). Where a cell straddles an ocean and a landmass
+the land name wins; a multi-country cell takes its dominant city; homogeneous
+cells (a single country, open ocean) keep their name. A name is usually unique
+to one code, but an area larger than one cell may span adjacent codes (e.g.
+`centrlam`) — `regionCode` then returns the canonical (lowest) code.
 
 ```js
-regionNames(code)            // → [nameHalf0, nameHalf1]   e.g. regionNames(0x89) → ['bahamas','useast']
-regionName(code, lat?, lng?) // → string — half-aware when lat/lng given (else half0)
-regionCode(name)             // → integer code | null  (inverse of the above)
-resolveRegion(nameOrCode)    // → integer code | null  — accepts a name OR a numeric/hex code, normalizes to the code
-regionNameForLatLng(lat,lng) // → string — region name for a coordinate
-REGION_NAMES                 // → frozen [half0, half1][] indexed by code [0,192)
+regionName(code)             // → string | null            e.g. regionName(0x89) → 'useast'
+regionCode(name)             // → integer code | null       (inverse; canonical code for a multi-cell name)
+resolveRegion(nameOrCode)    // → integer code | null       accepts a name OR a numeric/hex code, normalizes to the code
+regionNameForLatLng(lat,lng) // → string                    region name for a coordinate
+REGION_NAMES                 // → frozen string[] indexed by code [0,192)
+regionNames(code)            // → [name] | null             deprecated one-element back-compat shim
 ```
 
 Names match `/^[a-z0-9_]{1,8}$/`; open-ocean cells are `<ocean3>_<hex>`
 (`pac_68`, `atl_0a`, …). The interactive `examples/s2-region-visualizer/`
-renders all 192 with both names + the code.
+renders all 192 — one name + the code each.
 
 Sub-path import for the remaining geo helpers (`@axona/protocol/utils/geo.js`):
 `getRegion`, `getContinent`, several XOR routing-table builders. Rarely
@@ -1223,7 +1226,7 @@ needed by app code.
 
 ```js
 WIRE_VERSION         // '2.0'        — wire format major.minor
-KERNEL_VERSION       // '2.31.0'     — kernel semver
+KERNEL_VERSION       // '2.32.0'     — kernel semver
 AUTH_PROTO           // 'axona/5'    — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426         — WebSocket close code for version mismatch
 ID_BITS              // 264

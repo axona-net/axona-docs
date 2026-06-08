@@ -16,7 +16,7 @@ supernode), and [axona-net/dht-sim](https://github.com/axona-net/dht-sim)
 **Try it live:**
 
 - **<https://axona.net>** — the reference application (browser peer, pub/sub UI; talks to the deployed network). *Production runs the `axona/4` / kernel-2.16 line.*
-- **<https://testnet.axona.net>** — the SF testnet peer (the `axona/5` / kernel-2.31 line); **<https://demo-testnet.axona.net>** is the minimal kernel demo on the same testnet.
+- **<https://testnet.axona.net>** — the SF testnet peer (the `axona/5` / kernel-2.32 line); **<https://demo-testnet.axona.net>** is the minimal kernel demo on the same testnet.
 - **<https://axona-net.github.io/dht-sim/>** — the in-browser DHT simulator (drive 1K–50K peers locally; visualise routing, benchmark all five protocols).
 - **<https://bridge.axona.net>** — the signaling broker that bootstraps the live network.
 
@@ -36,7 +36,7 @@ This repo uses three terms consistently:
 |---|---|---|
 | **Paper** | Conference-format research write-up; IEEEtran two-column LaTeX.  Focused 3-protocol comparison (\KDHT / \GDHT / \axona). | [`paper/Axona-Paper.tex`](paper/Axona-Paper.tex) · [PDF](paper/Axona%20Paper%20v0.5.0.pdf) |
 | **Whitepaper** | Complete technical reference. Synthesis edition. | [`whitepaper/Axona-Whitepaper.md`](whitepaper/Axona-Whitepaper.md) · [PDF](whitepaper/Axona%20Whitepaper%20v0.3.58.pdf) |
-| **Explainer** | Popular-audience introduction. Less math, more story. Three-protocol focus (\KDHT / \GDHT / \axona). | [`explainer/Axona-Explainer.md`](explainer/Axona-Explainer.md) · [PDF](explainer/Axona%20Explainer%20v0.4.28.pdf) |
+| **Explainer** | Popular-audience introduction. Less math, more story. Three-protocol focus (\KDHT / \GDHT / \axona). | [`explainer/Axona-Explainer.md`](explainer/Axona-Explainer.md) · [PDF](explainer/Axona%20Explainer%20v0.4.29.pdf) |
 | **Presentation** | Research deck — full benchmark walkthrough at 25K nodes. Marp. | [`presentation/deck.md`](presentation/deck.md) · [PDF](presentation/Axona%20Presentation%20v0.3.55.pdf) |
 | **Pitch** | Tufte-style two-column pitch.  Three-protocol focus (\KDHT / \GDHT / \axona) with the v0.93.0 / May 2026 benchmark numbers. | [`pitch/axona-pitch.md`](pitch/axona-pitch.md) · [PDF](pitch/Axona%20Pitch%20v0.21.pdf) |
 
@@ -47,7 +47,7 @@ This repo uses three terms consistently:
 - **[`RELEASE-NOTES.md`](RELEASE-NOTES.md)** — changes shipped in the kernel and the apps, newest-first and keyed to kernel version.
 - **[`SECURITY-CHANGELOG.md`](SECURITY-CHANGELOG.md)** — public, shareable record of resolved security-relevant changes to the protocol kernel and apps (authenticated handshake, channel binding, hardening batches).
 - **[`applications/`](applications/)** — the [**Axona Applications**](applications/Axona-Applications.md) document ([PDF](applications/Axona%20Applications%20v0.5.pdf)) — leads with the managed pub/sub-as-a-service tier (Pusher/Ably/PubNub and where Axona does — and doesn't — displace them), then decentralized social/messaging protocols (Nostr, Matrix, Farcaster, Bluesky, Waku/WalletConnect) and realtime apps renting centralized infra (peer-assisted CDN, collaborative editing, live feeds), then the established applications built on a DHT today; plus the Axona-powered apps we're building (civildefense.io, SYZL) — and the per-product briefs (SYZL — adaptive social feed).
-- **[`architecture/`](architecture/)** — the full-stack architecture note: kernel · protocol · transport · bridge, the wire protocol, the complete application API, and the demo-app source. [PDF](architecture/Axona%20Architecture%20v0.7.8.pdf) · [`.tex`](architecture/Axona-Architecture.tex). Also the [Axona vs. Vivaldi](architecture/Axona-vs-Vivaldi-v0.1.md) design note (measured-RTT keyspace router vs. predictive latency-coordinate embedding; bears on the E-1 PoW-vs-Vivaldi decision).
+- **[`architecture/`](architecture/)** — the full-stack architecture note: kernel · protocol · transport · bridge, the wire protocol, the complete application API, and the demo-app source. [PDF](architecture/Axona%20Architecture%20v0.7.9.pdf) · [`.tex`](architecture/Axona-Architecture.tex). Also the [Axona vs. Vivaldi](architecture/Axona-vs-Vivaldi-v0.1.md) design note (measured-RTT keyspace router vs. predictive latency-coordinate embedding; bears on the E-1 PoW-vs-Vivaldi decision).
 - **[`implementation/`](implementation/)** — integration plans, wire-protocol spec, per-node refactor plan, NX-17 → NH-1 punchlist, the [pub/sub lifecycle & access-control design](implementation/Pubsub-Lifecycle-Design-v0.2.md) (pull/kill/unpub/unsub, bounded queues, hold time, the three access models), the [heterogeneous-protocol simulation plan](implementation/Heterogeneous-Protocol-Sim-v0.1.md) (run mixed protocol versions / adversaries in one sim session), and the [bridgeless connection / peer-relayed signaling design](implementation/Peer-Relayed-Signaling-v0.1.md) (form a new direct WebRTC link *through an existing peer* instead of the bridge — removing the signaling SPOF).
 - **[`red team/`](red%20team/)** — independent red-team analyses including the protocol-layer god's-eye audit, the v0.3.38 13-issue priority list, the post-`axona/4` v2 sweep, an external v2.6.0 assessment, the **consolidated, prioritized [punch list](red%20team/red-team-punchlist-v2.6.0.md)** that merges them, and the [black-hole node threat & detection note](red%20team/black-hole-nodes-v0.1.md) (Byzantine omission — provable vs inferable, forwarding-vitality design).
 - **[`dead-ends/`](dead-ends/)** — preserved failures kept as cautionary examples (NX-16's masked-distance experiment; relevant smoke tests).
@@ -61,11 +61,11 @@ sized by how deep you want to go:
 
 | Doc | Read when | Length |
 |---|---|---|
-| **[Quick Start](programmer-guide/Quick-Start-v2.31.0.md)** · [PDF](programmer-guide/Quick-Start-v2.31.0.pdf) | You want a working pub/sub roundtrip in 5 minutes. Copy three commands + one file, run, done. | ~150 lines |
-| **[Axona API Reference](programmer-guide/Axona-API-Reference-v2.31.0.md)** · [PDF](programmer-guide/Axona-API-Reference-v2.31.0.pdf) | You're building and need to look up a specific call: signature, params, returns, errors, example for every public export. | ~700 lines |
-| **[Programmer Guide](programmer-guide/Axona-Programmer-Guide-v2.31.0.md)** · [PDF](programmer-guide/Axona-Programmer-Guide-v2.31.0.pdf) | You're starting a new application against Axona. Mental model, identity, topic addressing, pub/sub semantics, the bridge, a worked chat-app example, common pitfalls, production checklist. | ~1500 lines |
+| **[Quick Start](programmer-guide/Quick-Start-v2.32.0.md)** · [PDF](programmer-guide/Quick-Start-v2.32.0.pdf) | You want a working pub/sub roundtrip in 5 minutes. Copy three commands + one file, run, done. | ~150 lines |
+| **[Axona API Reference](programmer-guide/Axona-API-Reference-v2.32.0.md)** · [PDF](programmer-guide/Axona-API-Reference-v2.32.0.pdf) | You're building and need to look up a specific call: signature, params, returns, errors, example for every public export. | ~700 lines |
+| **[Programmer Guide](programmer-guide/Axona-Programmer-Guide-v2.32.0.md)** · [PDF](programmer-guide/Axona-Programmer-Guide-v2.32.0.pdf) | You're starting a new application against Axona. Mental model, identity, topic addressing, pub/sub semantics, the bridge, a worked chat-app example, common pitfalls, production checklist. | ~1500 lines |
 
-All three track `@axona/protocol` v2.31.0 (the version is in each
+All three track `@axona/protocol` v2.32.0 (the version is in each
 filename); the Quick Start's example runs verbatim from a fresh
 `npm init`.
 

@@ -2,18 +2,18 @@
 
 The single reference every document + README is reconciled against in this
 refresh. Facts here are verified against the code on the `testnet` line
-(kernel **v2.31.0**). Keep docs consistent with this; update this first if the
+(kernel **v2.32.0**). Keep docs consistent with this; update this first if the
 system changes.
 
 ## Versions (testnet line)
 
 | Component | Version | Notes |
 |---|---|---|
-| `@axona/protocol` (kernel) | **2.31.0** | tag `v2.31.0`; `testnet` branch |
-| axona-bridge | **2.14.0** | embeds kernel 2.31.0 |
-| axona-peer (the axona.net app) | **3.27.0** | on kernel 2.31.0 |
+| `@axona/protocol` (kernel) | **2.32.0** | tag `v2.32.0`; `testnet` branch |
+| axona-bridge | **2.15.0** | embeds kernel 2.32.0 |
+| axona-peer (the axona.net app) | **3.28.0** | on kernel 2.32.0 |
 | minimal-pubsub-browser (demo) | **1.17.0** | served at demo-testnet |
-| axona-relay (new) | **0.6.0** | headless Node supernode |
+| axona-relay | **0.7.1** | headless Node supernode (+ pub/sub CLI & MCP server) |
 | **Production (still live, separate)** | kernel **2.16.0** / bridge 2.12.0 / peer 3.24.0 | untouched `axona/4` network |
 
 ## Network partition (the load-bearing change)
@@ -34,14 +34,18 @@ system changes.
   192–255 reserved). `geoCellId`, `geoCellCenter`, `geoCellSubCenters`,
   `geoCellHalf`.
 
-## Region names (v2.30 → v2.31)
+## Region names (v2.32 — one name per region)
 
-- Every region has **two names** — one per S2 level-3 sub-cell ("half"); both
-  resolve to the same code. Homogeneous cells (one country / open ocean) share
-  one name.
-- API: `REGION_NAMES[code]=[a,b]`, `regionNames(code)`, half-aware
-  `regionName(code,lat,lng)`, `regionCode(name)`, `resolveRegion(name|code)`,
-  `regionNameForLatLng`.
+- Every region has exactly **one** name, so a region always presents the same
+  label (no location-dependent flip-flop). Collapse rule: an ocean-half beside a
+  land-half takes the land name; a multi-country cell takes its dominant city;
+  homogeneous cells keep their name. A name is usually unique to one code, but an
+  area larger than one cell may span adjacent codes (e.g. `centrlam`); `regionCode`
+  returns the canonical (lowest) code.
+- API: `REGION_NAMES[code]` is a **string**; `regionName(code)→string` (no
+  lat/lng half-arg); `regionCode(name)`, `resolveRegion(name|code)`,
+  `regionNameForLatLng(lat,lng)`. `regionNames(code)→[name]` is a deprecated
+  one-element back-compat shim.
 - Conventions: ≤8 chars `[a-z0-9_]`; open ocean = `<oce3>_<hex>` (pac_68, atl_0a,
   ind_22, sou_a3, arc_44); small islands **claim-once**; large landmasses span
   cells with a single-letter compass suffix; curated country/city names.
@@ -88,8 +92,8 @@ observable security drop-logging via `onLog` (2.26) · bounded internal maps (2.
   ephemeral "additional" nodes. A subset of the bridge: routes, roots pub/sub,
   relays signaling; runs **no** public server, mints **no** TURN, no admission gate.
 - **S2 region visualizer**: `axona-protocol/examples/s2-region-visualizer` — 3D
-  globe, both region names + code per cell.
+  globe, one name + code per cell.
 
-## Repos (all have a `testnet` branch @ kernel 2.31.0)
+## Repos (all have a `testnet` branch @ kernel 2.32.0)
 
 axona-protocol · axona-peer · axona-bridge · dht-sim · axona-docs · **axona-relay** (new, public)

@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.7.8 \quad 2026-06-08\par}
+{\small An Axona Architecture Note \quad v0.7.9 \quad 2026-06-08\par}
 \end{center}
 \vfill
 \null
@@ -222,14 +222,16 @@ ID starting with \texttt{0x44}; a peer in Virginia starts with
 \texttt{0x89}. Two peers in the same region share a leading byte;
 two random peers share only the bits their keys happen to share.
 
-\marginnote{Each of the 192 cells carries \emph{two} human-readable
-names --- one per S2 level-3 sub-cell (the cell's two ``halves'') ---
-and both resolve to the same code, so a user sees the label nearest
-their actual location while the address stays stable. Homogeneous cells
-(one country, open ocean) share a single name. The kernel ships the
-canonical table and the \texttt{regionName}/\texttt{regionCode}/
-\texttt{resolveRegion} helpers; the \texttt{s2-region-visualizer} example
-renders all 192 with both names and the hex code on a globe.}
+\marginnote{Each of the 192 cells carries exactly \emph{one}
+human-readable name, so a region always presents the same label
+(no location-dependent flip-flop). Where a cell straddles an ocean and a
+landmass the land name wins; a multi-country cell takes its dominant city;
+homogeneous cells (one country, open ocean) keep their name. A name is
+usually unique to one code, though an area larger than one cell may span
+adjacent codes. The kernel ships the canonical table and the
+\texttt{regionName}/\texttt{regionCode}/\texttt{resolveRegion} helpers; the
+\texttt{s2-region-visualizer} example renders all 192 ---
+one name and the hex code each --- on a globe.}
 
 The address space is treated as \texttt{BigInt} in every line of
 running code. The wire format is 66-character lowercase hex --- the

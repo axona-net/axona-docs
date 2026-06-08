@@ -8,7 +8,7 @@ The guide assumes you already know JavaScript + Node + a browser. It does
 not assume any DHT / WebRTC / cryptography background — concepts are
 introduced where they're needed.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v2.31.0)
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v2.32.0)
 - **Browser SDK**: [@axona-net/axona-peer](https://github.com/axona-net/axona-peer) (v3.27.0)
 - **WebSocket bridge**: [@axona-net/axona-bridge](https://github.com/axona-net/axona-bridge) (v2.14.0)
 - **Live network**: `wss://bridge.axona.net`
@@ -105,7 +105,7 @@ only.
 ```
 mkdir my-axona-app && cd my-axona-app
 npm init -y
-npm install @axona/protocol@github:axona-net/axona-protocol#v2.31.0
+npm install @axona/protocol@github:axona-net/axona-protocol#v2.32.0
 ```
 
 You now have `node_modules/@axona/protocol/src/` with the full kernel.
@@ -812,7 +812,7 @@ open" from "channels are open *and* carrying authenticated routing." A
 sustained `true` (across several polls) means the mesh looks connected
 but isn't actually routing; `boundCount`/`meshBound` are the honest
 usable-peer counts. Cheap; safe for a status dashboard. See the
-[API reference §8 health()](Axona-API-Reference-v2.31.0.md) for the full shape.
+[API reference §8 health()](Axona-API-Reference-v2.32.0.md) for the full shape.
 
 ### 8.4 Logs and errors
 
@@ -1547,7 +1547,7 @@ programmatically.
 
 ```js
 WIRE_VERSION         // '1.0'
-KERNEL_VERSION       // '2.31.0'
+KERNEL_VERSION       // '2.32.0'
 UPGRADE_CLOSE_CODE   // 4426
 ```
 
@@ -1555,10 +1555,10 @@ UPGRADE_CLOSE_CODE   // 4426
 
 ## Where to go next
 
-- **[Quick Start](Quick-Start-v2.31.0.md)** — if someone you're onboarding has
+- **[Quick Start](Quick-Start-v2.32.0.md)** — if someone you're onboarding has
   five minutes, send them here instead of this 1500-line guide.
 
-- **[API Reference](Axona-API-Reference-v2.31.0.md)** — when you're past the
+- **[API Reference](Axona-API-Reference-v2.32.0.md)** — when you're past the
   conceptual material and just need the signature for a specific call.
 
 - **Read the source of the reference peer**:

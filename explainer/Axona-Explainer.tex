@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.4.28 \quad 2026-06-07\par}
+{\small An Axona Explainer \quad v0.4.29 \quad 2026-06-08\par}
 \end{center}
 \vfill
 \null
@@ -184,7 +184,7 @@ Kademlia node IDs are random. A node in Tokyo and a node in Berlin have IDs with
 
 G-DHT changes one thing: the \textbf{first 8 bits} of every node ID encode where the node says it is on Earth.
 
-The trick uses Google's S2 library, which divides Earth's surface into cells along a curve called a \textbf{Hilbert curve}.\marginnote{Hilbert curves are space-filling: they trace a single continuous path that visits every cell in a grid. Their useful property is that consecutive points on the curve are also adjacent in space.} Its useful property: places near each other on Earth get cell numbers near each other. So XORing two S2 cell numbers gives a small result for nearby places and a large one for distant places.\marginnote{There are 192 of these cells covering the globe, and each carries a short human name as well as a number---two names per cell, actually, so wherever you are you see the one nearest you (a peer in Virginia sees \texttt{useast}; one in the Bahamas sees \texttt{bahamas}; both resolve to the same cell). The routing only ever uses the number; the names are just for people.}
+The trick uses Google's S2 library, which divides Earth's surface into cells along a curve called a \textbf{Hilbert curve}.\marginnote{Hilbert curves are space-filling: they trace a single continuous path that visits every cell in a grid. Their useful property is that consecutive points on the curve are also adjacent in space.} Its useful property: places near each other on Earth get cell numbers near each other. So XORing two S2 cell numbers gives a small result for nearby places and a large one for distant places.\marginnote{There are 192 of these cells covering the globe, and each carries a short human name as well as a number---one name per cell, so a place always shows the same label (anyone in the \texttt{useast} cell sees \texttt{useast}, every time). The routing only ever uses the number; the names are just for people.}
 
 % --- Figure 1: Hilbert curve (Random IDs vs S2 IDs grid) ----------
 % Single-column figure with margin caption (tufte idiom).  Comes

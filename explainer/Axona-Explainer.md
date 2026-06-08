@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.28 · 2026-06-07 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.29 · 2026-06-08 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -58,7 +58,7 @@ G-DHT uses Google's S2 library, which divides Earth's surface into cells along a
 
 Now your node ID looks like: `[8-bit geographic cell][256-bit hash of your public key]` — a 264-bit address space, encoded as 66 lowercase hex characters in the wire protocol.
 
-There are 192 of these cells covering the globe, and each carries a short human name as well as a number — two names per cell, in fact, so wherever you are you see the one nearest you (a peer in Virginia sees `useast`; one in the Bahamas sees `bahamas`; both resolve to the same cell). The routing only ever uses the number; the names are just for people.
+There are 192 of these cells covering the globe, and each carries a short human name as well as a number — one name per cell, so a place always shows the same label (anyone in the `useast` cell sees `useast`, every time). The routing only ever uses the number; the names are just for people.
 
 The routing algorithm doesn't change at all, but XOR distance now approximately tracks physical distance. When a node looks for a "close" peer in ID space, it tends to find one that's also physically close. Local traffic stays local. The 20-hop world tour becomes a 13-hop journey around the neighborhood, with each hop maybe 7 ms instead of 100.
 
