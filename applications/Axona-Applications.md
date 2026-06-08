@@ -57,7 +57,7 @@ properties carry every case:
   application traffic, and any operator can run one (a federated bridge mesh is
   on the roadmap).
 - **Authenticated, not anonymous-by-accident.** Every peer link is established
-  through the `axona/4` authenticated handshake, with the mesh channel-binding
+  through the `axona/5` authenticated handshake, with the mesh channel-binding
   value bound to the DTLS certificate fingerprints — so a relaying bridge cannot
   transparently MITM "direct" peer traffic.
 - **Signed and fresh.** Every published message is an Ed25519-signed envelope
@@ -640,7 +640,7 @@ primitive:
   with per-publisher sequence numbers and a freshness window — so a stale or
   replayed report cannot be re-injected at a fresh subscriber, which matters
   acutely for an incident feed.
-- **Anonymous but authenticated transport.** The `axona/4` handshake plus mesh
+- **Anonymous but authenticated transport.** The `axona/5` handshake plus mesh
   channel-binding means reports travel end-to-end without a central operator
   and without a relaying bridge being able to read or rewrite them.
 

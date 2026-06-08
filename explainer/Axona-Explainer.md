@@ -195,7 +195,7 @@ A network with no boss has no central authority to vouch for anyone. So how do y
 
 Recall the node address: `[8-bit region][256-bit hash of your public key]`. That second part isn't random — it's a SHA-256 hash of your **public key** (one half of a cryptographic key pair; the other half, the *private* key, never leaves your device). Your key *is* your address. Three things follow, with no server in the loop:
 
-- **You can't wear someone else's address.** When two peers connect, each must prove it holds the private key matching the address it claims, by signing a fresh one-time challenge tied to that exact connection. Claim an address whose key you don't hold and the signature doesn't check out — the connection is refused. So no peer can impersonate another, and no peer can park itself at a chosen address to intercept a victim's traffic. (Under the hood this is the `axona/4` handshake.)
+- **You can't wear someone else's address.** When two peers connect, each must prove it holds the private key matching the address it claims, by signing a fresh one-time challenge tied to that exact connection. Claim an address whose key you don't hold and the signature doesn't check out — the connection is refused. So no peer can impersonate another, and no peer can park itself at a chosen address to intercept a victim's traffic. (Under the hood this is the `axona/5` handshake.)
 
 - **Every published message is signed.** A publish carries its author's public key and a signature over the contents. Any receiver verifies that signature itself before handing the message to the application. Alter the message and the signature breaks; forge the author and it breaks. Receivers trust the math, not the messenger — even if the message arrived relayed through a dozen strangers.
 
@@ -248,9 +248,9 @@ A skeptic would push back: "Sure, but maybe the geographic prefix is doing all t
 
 An **ablation study** answers this. (An ablation study removes one feature and re-runs everything to see what that feature actually contributed.) Strip the geographic prefix entirely — random IDs again — and re-run the comparison.
 
-Result: with **zero geographic information** at 25,000 nodes, Axona still routes **~40% faster than Kademlia** (513 ms vs 852 ms). The learning is doing real work, not sharpening pre-existing geographic structure.
+Result: with **zero geographic information** at 25,000 nodes, Axona still routes **~60% faster than Kademlia** (344 ms vs 860 ms). The learning is doing real work, not sharpening pre-existing geographic structure.
 
-Add the geographic prefix back in and the gap widens to about 68%. Geography helps; geography is not necessary.
+Add the geographic prefix back in and *global* latency barely moves (341 ms): on globally-random lookups there is no locality to exploit, so learning carries the result alone. The prefix earns its keep on *regional* traffic — where peers in the same cell start close — not on globe-spanning lookups. Geography helps regionally; geography is not necessary.
 
 This is the kind of clean control experiment that should accompany any claim of this kind.
 
