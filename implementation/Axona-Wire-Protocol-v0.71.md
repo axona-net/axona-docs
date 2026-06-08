@@ -8,6 +8,17 @@
 **Date:** 2026-05-17
 **Status:** locked-in for the production peer/bridge integration. Subsequent revisions update version field.
 
+> **Update (2026-06-07).** This draft documents the original Phase-3 wire at
+> `proto: "axona/3"`. The shipping kernel has since split that single marker into
+> **`WIRE_VERSION` (now `2.0`)** and the authenticated-handshake tag
+> **`AUTH_PROTO` (now `axona/5`)**, and folds the epoch into the signed
+> connect-time transcript so cross-epoch peers cannot complete a handshake (the
+> `axona/4 → axona/5` network partition). For the current, canonical wire +
+> handshake, see the [Architecture note](../architecture/Axona-Architecture.tex)
+> and the kernel's `src/transport/handshake.js` + `handshake-auth.js`. The frame
+> shapes and message-type vocabulary below remain accurate; only the version
+> markers and the epoch-binding have advanced.
+
 ---
 
 ## 0. Design principles

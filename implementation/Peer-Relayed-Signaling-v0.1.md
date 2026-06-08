@@ -48,7 +48,7 @@ genuinely optional in steady state.
 - **Discovery.** `triadic_introduce` hands a node a *candidate* nodeId for a
   peer it isn't connected to; `peer-list` does the same at join. The missing
   piece is the signaling *conduit*, not the introduction.
-- **End-to-end channel auth.** Every WebRTC channel runs the `axona/4`
+- **End-to-end channel auth.** Every WebRTC channel runs the `axona/5`
   handshake (pubkey → nodeId-suffix proof + signature over the link CBV) and is
   bound to the peer's **DTLS-certificate fingerprint** (finding A-1). This holds
   **regardless of who relayed the SDP** — which is exactly what makes relaying
@@ -112,11 +112,11 @@ One new routed message (Wire Protocol spec to be amended):
 
 | Message | Path | Auth | Notes |
 |---|---|---|---|
-| `mesh:signal` | routed (`route_msg`) → `to` | channel-layer (`axona/4`) on the *resulting* link; payload opaque to relays | carries SDP offer/answer/ICE; terminal node feeds `mesh.onSignal` |
+| `mesh:signal` | routed (`route_msg`) → `to` | channel-layer (`axona/5`) on the *resulting* link; payload opaque to relays | carries SDP offer/answer/ICE; terminal node feeds `mesh.onSignal` |
 
 No new signed-object type is required: unlike `kill`/`touch`, the signaling
 bytes don't need their own signature, because the **connection they bootstrap is
-authenticated end-to-end** by `axona/4` + DTLS-fingerprint binding. A forged or
+authenticated end-to-end** by `axona/5` + DTLS-fingerprint binding. A forged or
 tampered `mesh:signal` can at worst fail to produce a valid channel (the
 handshake rejects it) — it cannot produce an *unauthenticated* one. Payloads are
 size- and rate-capped at ingress (reuse the D-1 inbound caps).
@@ -126,7 +126,7 @@ size- and rate-capped at ingress (reuse the D-1 inbound caps).
 - **Malicious / curious relay.** A relaying peer can **drop or delay**
   signaling (denial of service / slow path) and can **observe metadata** ("A is
   trying to reach C", and the ICE candidates, which expose IPs). It **cannot
-  MITM** the resulting channel: `axona/4` proves each endpoint's pubkey→nodeId,
+  MITM** the resulting channel: `axona/5` proves each endpoint's pubkey→nodeId,
   and the DTLS-fingerprint CBV binds the media path, so a relay that swaps in
   its own offer fails the mutual check. This is strictly **no worse than the
   bridge today**, which already sees the same metadata — and it removes the
@@ -342,7 +342,7 @@ Ran `axona-protocol/test/integration/mesh_relay_webrtc.mjs`
 **actual WebRTC offer/answer/ICE/DTLS negotiation**, carried over a peer relay
 instead of the bridge. Three real `RTCPeerConnection` peers (the
 `node-datachannel` polyfill), each a real `MeshManager` + `MeshAuth` (the
-shipping mesh + axona/4 code), keyed by stable nodeId.
+shipping mesh + axona/5 code), keyed by stable nodeId.
 
 Scenario: **A↔B** and **B↔C** bootstrap as real, authenticated channels
 (models "met through the bridge at join"); then the **bridge is closed** (the
@@ -360,7 +360,7 @@ the kernel `mesh:signal` step will.
   direct-signaling delivery occurred after the bridge closed** (guard = 0);
 - **DTLS fingerprints are present for A↔C on both ends and cross-match**
   (A.local == C.remote, C.local == A.remote);
-- **axona/4 binds A↔C end-to-end** — confirming the §5 safety claim on a real
+- **axona/5 binds A↔C end-to-end** — confirming the §5 safety claim on a real
   relay-formed channel: *the connection is authenticated regardless of who
   relayed the SDP* (A-1's fingerprint binding holds; a relay that rewrote the
   SDP would produce divergent fingerprints and fail the mutual signature);
@@ -387,7 +387,7 @@ stale synapse so A holds C's nodeId but has no channel/synapse to it (the
 discovered-but-unconnected production state, §3.3); (4) `A.connectViaRelay(C)`.
 With the bridge **process dead**, A formed a NEW authenticated direct
 `RTCDataChannel` to C — offer/answer/ICE relayed A→B→C over the live mesh —
-axona/4 bound end-to-end, live RTT flowing over the direct channel. **14/14,
+axona/5 bound end-to-end, live RTT flowing over the direct channel. **14/14,
 stable across repeated runs.** Because the bridge was dead and A↔C had no prior
 channel, the SDP/ICE could only have crossed via the peer relay.
 
@@ -488,7 +488,7 @@ relay hop is **structurally impossible** (no one peer can carry the offer
 straight to the target), so a formed channel proves the SDP/ICE **chained
 through ≥2 distinct pure intermediaries**, which the harness instruments and
 prints. Observed: the headline pair is consistently **3–4 routed relay hops**
-apart and forms a real `RTCDataChannel` + axona/4 binding + live RTT with the
+apart and forms a real `RTCDataChannel` + axona/5 binding + live RTT with the
 **bridge dead**; the relay chain shows 3–5 distinct pure intermediaries. A bulk
 phase then drives **every** router-reachable non-adjacent pair: routing reaches
 **100%** of them and ≈93–100% complete the full ICE channel (the occasional
@@ -554,7 +554,7 @@ offerer retry loop. Guarded by `smoke_mesh_negotiation_watchdog.js` (14).
   fallback. The negotiation's own retry plus the v2.22.0 watchdog bound and
   re-drive any stuck attempt.
 - *Security of the relay path.* Confirmed safe: a malicious intermediary cannot
-  MITM (the channel binds to the real DTLS fingerprints via the signed axona/4
+  MITM (the channel binds to the real DTLS fingerprints via the signed axona/5
   CBV — a substituted fingerprint fails mutual verify), cannot forge an
   authenticated channel, cannot blackhole an introduction (only the true target
   consumes; every other hop forwards), and routing is loop-bounded by `MAX_HOPS`.

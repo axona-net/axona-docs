@@ -127,7 +127,7 @@ documentation in `axona-net/axona-docs`.
 ### Capabilities realized since v0.3.38
 
 - **264-bit address space.** Identity = `8-bit S2 geo prefix ‖ sha256(Ed25519 pubkey)`; topics share the space (public, publisher-keyed, and synthetic-regional modes).
-- **Authenticated transport (`axona/4`).** Every bind proves the peer's pubkey hashes to its nodeId suffix; WebRTC channels are bound to their DTLS-certificate fingerprint (MITM-resistant). A bidirectional version-gate handshake lets bridges reject sub-floor clients with a clear upgrade signal.
+- **Authenticated transport (`axona/5`).** Every bind proves the peer's pubkey hashes to its nodeId suffix; WebRTC channels are bound to their DTLS-certificate fingerprint (MITM-resistant). A bidirectional version-gate handshake lets bridges reject sub-floor clients with a clear upgrade signal.
 - **Unified, signed pub/sub.** Ed25519-signed envelopes, verified at K-closest ingress; replication to the K-closest root set; a bounded replay queue (default 100, ceiling 256) with deterministic seq-ordered eviction; hold-time TTL (24 h, 48 h ceiling); a per-publisher quota on open topics; per-publisher monotonic `seq` + a freshness window for anti-replay.
 - **Lifecycle controls, all self-authenticating.** `unsub`; `kill` (creator-only retract + tombstone); `unpub` (owner-only queue removal); `pull` (by `msgId` or latest); `metrics` (swept across the whole K-closest root set; unowned-topic metrics readable by anyone, owner-keyed metrics owner-only).
 - **Soft-state subscriptions.** Re-announced every ~10 s (`refreshIntervalMs`); a root expires a subscriber after 30 s (`maxSubscriptionAgeMs`).
@@ -196,7 +196,7 @@ artifacts (see the *Implementation Status* mapping above).
 | `identity/` | `deriveIdentity`, `nodeid` | Ed25519 keygen + 264-bit nodeId derivation |
 | `persistence/` | `interface`, `indexeddb`, `file` | `PersistenceAdapter` + browser and Node adapters |
 | `transport/` | `web/`, `node/`, `sim/` | `Transport.web()` (bridge-WS + WebRTC-mesh composite), `Transport.node()` (WS), `Transport.sim()` (in-process) |
-| | `handshake`, `handshake-auth`, `wire` | Version gate, the `axona/4` authenticated handshake, the frame codec |
+| | `handshake`, `handshake-auth`, `wire` | Version gate, the `axona/5` authenticated handshake, the frame codec |
 | `utils/` | `hexid`, `s2`, `geo` | BigInt↔hex, S2 geo-cell prefix, distance helpers |
 
 ### 1.3 The integration surface
@@ -302,14 +302,14 @@ transport-agnostic — routing and pub/sub call only this contract.
   two sub-transports: a **bridge WebSocket** (signaling relay + bootstrap, and a
   fallback data path to the bridge's own nodeId) and a **WebRTC mesh** (direct
   peer-to-peer DataChannels). `webTransport` owns the bridge-socket lifecycle:
-  the version-gate + `axona/4` hello, ping/pong with stale detection,
+  the version-gate + `axona/5` hello, ping/pong with stale detection,
   welcome/RTT exposure, and auto-reconnect.
 - **`Transport.node()`** — a Node WebSocket transport for server-class peers and
   the headless test harness.
 - **`Transport.sim()`** — an in-process `SimNetwork` used by the simulator and
   the kernel's own smoke tests; same contract, zero sockets.
 
-### 3.3 Authentication — `axona/4`
+### 3.3 Authentication — `axona/5`
 
 Every bind is gated on proof (`handshake-auth`): the peer presents its pubkey,
 which must hash to the 256-bit suffix of the nodeId it claims, and signs a
@@ -363,7 +363,7 @@ central key registry — trust in a pubkey is the application's policy.
 
 The **bridge** is the rendezvous. It is a WebSocket broker that (a) relays
 WebRTC offer/answer/ICE between browsers (`peer-list` / `peer-joined` /
-`signal`), (b) runs the `axona/4` auth + version gate at connect, and (c)
+`signal`), (b) runs the `axona/5` auth + version gate at connect, and (c)
 embeds a **full `AxonaPeer`** so it participates in routing and pub/sub like any
 node. A joining peer connects to the bridge, authenticates, receives `welcome`
 (connId + server nonce) and `peer-list`, forms its WebRTC mesh, and calls
@@ -424,7 +424,7 @@ The wire format has its own living specification — **`Axona-Wire-Protocol-v0.7
 (in `implementation/`) — which is authoritative; this section summarizes it.
 
 Frames are JSON over the transport. A connection opens with the version-gate
-hello and the `axona/4` authenticated hello (pubkey + signed nonce; DTLS
+hello and the `axona/5` authenticated hello (pubkey + signed nonce; DTLS
 fingerprint on the mesh). Application traffic is then **routed** (`req`/`res`)
 or **direct** (`ntf`) messages carrying a type and body. The pub/sub types
 include `pubsub:subscribe-k` / `pubsub:publish-k` (replication to the K-closest
