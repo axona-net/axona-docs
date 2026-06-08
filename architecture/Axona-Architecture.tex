@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.7.6 \quad 2026-06-03\par}
+{\small An Axona Architecture Note \quad v0.7.7 \quad 2026-06-07\par}
 \end{center}
 \vfill
 \null
@@ -141,8 +141,18 @@ runs in the browser.
 introducer service at \texttt{bridge.axona.net}. Runs an embedded
 \texttt{AxonaPeer} of its own (so it's a full DHT participant, not
 just a relay), gates connecting peers behind a version handshake,
-relays WebRTC signaling between browsers, and forwards Axona wire
-frames addressed to its own embedded peer.
+mints short-lived TURN credentials, relays WebRTC signaling between
+browsers, and forwards Axona wire frames addressed to its own
+embedded peer.
+
+\item[\texttt{axona-relay} (headless supernode).] A Node process that
+joins the mesh over \emph{real} WebRTC (a spec \texttt{RTCPeerConnection}
+from \texttt{node-datachannel}) and runs the same kernel stack a browser
+peer runs --- routing lookups, rooting pub/sub topics, relaying signaling
+for others --- but with no DOM, no public server, and no TURN minting. It
+is a strict \emph{subset} of the bridge: it dials a bridge once for
+bootstrap, then is a first-class peer. Running several relays strengthens
+routing and pub/sub durability without any of them being an inbound server.
 \end{description}
 
 \marginnote{A fourth component, \texttt{dht-sim}, runs the kernel
@@ -151,10 +161,10 @@ benchmarks. It's not part of the production stack but shares the
 same \texttt{@axona/protocol} library; every change that ships to
 production also has to pass the simulator's 25{,}000-node battery.}
 
-The three components carry their own semver tracks because each
+Each component carries its own semver track because each
 ships to a different audience: kernel changes need API-level
-discipline; peer changes are user-visible UI; bridge changes are
-operational deploys. But they all share the same kernel version,
+discipline; peer changes are user-visible UI; bridge and relay changes
+are operational deploys. But they all share the same kernel version,
 visible at runtime through \texttt{/healthz} (bridge), the
 \texttt{welcome} frame (any peer connecting), and the version row in
 the peer UI.
@@ -211,6 +221,15 @@ SHA-256 of the peer's Ed25519 public key. A peer in London has an
 ID starting with \texttt{0x44}; a peer in Virginia starts with
 \texttt{0x89}. Two peers in the same region share a leading byte;
 two random peers share only the bits their keys happen to share.
+
+\marginnote{Each of the 192 cells carries \emph{two} human-readable
+names --- one per S2 level-3 sub-cell (the cell's two ``halves'') ---
+and both resolve to the same code, so a user sees the label nearest
+their actual location while the address stays stable. Homogeneous cells
+(one country, open ocean) share a single name. The kernel ships the
+canonical table and the \texttt{regionName}/\texttt{regionCode}/
+\texttt{resolveRegion} helpers; the \texttt{s2-region-visualizer} example
+renders all 192 with both names and the hex code on a globe.}
 
 The address space is treated as \texttt{BigInt} in every line of
 running code. The wire format is 66-character lowercase hex --- the
@@ -548,15 +567,23 @@ just the first instance of the generic admit path, not a special case.
 \begin{enumerate}
 \setlength{\itemsep}{0pt}
 \item \textbf{Connect + version gate.} The node opens a WebSocket to a
-bridge and exchanges \texttt{client-hello}/\texttt{server-hello}. A
-sub-minimum peer is closed with 4426 before it can do anything else.
+bridge and exchanges \texttt{client-hello}/\texttt{server-hello}. The
+bridge checks the wire major (\texttt{REQUIRED\_WIRE\_MAJOR}, currently
+\texttt{2} --- the \texttt{axona/5} epoch) and a per-namespace version
+floor (\texttt{flagDayFloor}: a kernel-2.x floor or a peer-app-3.x
+floor); a peer on the wrong epoch or below the floor is closed with 4426
+before it can do anything else. Because the epoch is folded into the
+signed transcript of the next step, this gate is not merely advisory: an
+\texttt{axona/4} node and an \texttt{axona/5} node \emph{cannot} complete
+a handshake, so the older production network and the testnet are
+cryptographically partitioned.
 
 \item \textbf{Welcome.} The bridge replies with \texttt{welcome},
 carrying the connection id and a fresh \texttt{serverNonce}; both sides
 now hold the per-connection channel-binding value (CBV) the next step
 signs over.
 
-\item \textbf{Authenticated handshake (\texttt{axona/4}).} Each side
+\item \textbf{Authenticated handshake (\texttt{axona/5}).} Each side
 sends a \texttt{hello} (the responder a \texttt{hello-ack}) carrying its
 Ed25519 public key and a signature over the link's CBV, and verifies
 the other: the presented pubkey must hash to the 256-bit suffix of the
@@ -578,7 +605,7 @@ node binds.
 \item \textbf{Fan out to the mesh.} The bridge broadcasts
 \texttt{peer-joined} and hands the new node a \texttt{peer-list}. The
 node negotiates WebRTC data channels to those peers (SDP relayed via
-the bridge), and each channel runs the \emph{same} \texttt{axona/4}
+the bridge), and each channel runs the \emph{same} \texttt{axona/5}
 hello --- now additionally bound to the peer's DTLS-certificate
 fingerprint --- firing the same \texttt{onPeerBound} admit. The
 synaptome fills with direct mesh peers; the bridge stops being the only
