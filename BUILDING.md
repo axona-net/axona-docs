@@ -76,7 +76,6 @@ git mv "explainer/Axona Explainer v0.4.27.pdf" history/explainer/
 
 ## Known errata
 
-- `explainer/Axona-Explainer.tex` references `../images/Axonal-PubSub-Healing.png`,
-  which is **missing from `images/`** (the `_src/Axonal-PubSub-Healing.pdf` exists).
-  Regenerate the PNG (see Figures) or point the `\includegraphics` at the `_src`
-  PDF before re-rendering the explainer.
+- _None currently._ (The previously-missing `images/Axonal-PubSub-Healing.png`
+  was regenerated from `images/_src/Axonal-PubSub-Healing.pdf` via
+  `pdftoppm -png -r 300` on 2026-06-07; the explainer renders cleanly.)

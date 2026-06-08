@@ -66,7 +66,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Explainer \quad v0.4.27 \quad 2026-05-30\par}
+{\small An Axona Explainer \quad v0.4.28 \quad 2026-06-07\par}
 \end{center}
 \vfill
 \null
@@ -184,7 +184,7 @@ Kademlia node IDs are random. A node in Tokyo and a node in Berlin have IDs with
 
 G-DHT changes one thing: the \textbf{first 8 bits} of every node ID encode where the node says it is on Earth.
 
-The trick uses Google's S2 library, which divides Earth's surface into cells along a curve called a \textbf{Hilbert curve}.\marginnote{Hilbert curves are space-filling: they trace a single continuous path that visits every cell in a grid. Their useful property is that consecutive points on the curve are also adjacent in space.} Its useful property: places near each other on Earth get cell numbers near each other. So XORing two S2 cell numbers gives a small result for nearby places and a large one for distant places.
+The trick uses Google's S2 library, which divides Earth's surface into cells along a curve called a \textbf{Hilbert curve}.\marginnote{Hilbert curves are space-filling: they trace a single continuous path that visits every cell in a grid. Their useful property is that consecutive points on the curve are also adjacent in space.} Its useful property: places near each other on Earth get cell numbers near each other. So XORing two S2 cell numbers gives a small result for nearby places and a large one for distant places.\marginnote{There are 192 of these cells covering the globe, and each carries a short human name as well as a number---two names per cell, actually, so wherever you are you see the one nearest you (a peer in Virginia sees \texttt{useast}; one in the Bahamas sees \texttt{bahamas}; both resolve to the same cell). The routing only ever uses the number; the names are just for people.}
 
 % --- Figure 1: Hilbert curve (Random IDs vs S2 IDs grid) ----------
 % Single-column figure with margin caption (tufte idiom).  Comes
@@ -471,7 +471,7 @@ Recall the node address: \texttt{[8-bit region][256-bit hash of public key]}. Th
 
 \begin{itemize}
 \setlength{\itemsep}{2pt}
-  \item \textbf{You can't wear someone else's address.} When two peers connect, each must prove it holds the private key matching the address it claims, by signing a fresh one-time challenge tied to that exact connection.\sidenote{Under the hood this is the \texttt{axona/4} handshake.} Claim an address whose key you don't hold and the signature doesn't check out---the connection is refused. No peer can impersonate another, and none can park itself at a chosen address to intercept a victim's traffic.
+  \item \textbf{You can't wear someone else's address.} When two peers connect, each must prove it holds the private key matching the address it claims, by signing a fresh one-time challenge tied to that exact connection.\sidenote{Under the hood this is the \texttt{axona/5} handshake. The protocol epoch is folded into what each side signs, so a node on one epoch literally cannot complete a handshake with a node on another---which is how the live network and the test network stay cleanly separated.} Claim an address whose key you don't hold and the signature doesn't check out---the connection is refused. No peer can impersonate another, and none can park itself at a chosen address to intercept a victim's traffic.
   \item \textbf{Every published message is signed.} A publish carries its author's public key and a signature over the contents; any receiver verifies that signature itself before handing the message to the application. Alter the message and the signature breaks; forge the author and it breaks. Receivers trust the math, not the messenger---even when the message arrived relayed through a dozen strangers.
   \item \textbf{The region is the one thing you \emph{don't} prove}---on purpose. The 8-bit prefix is a hint you choose, your ``area code,'' so you are free to claim any region; but as Idea~\#1 showed, lying about it only makes your \emph{own} connections slower. Identity is math you can't fake; location is a hint you're free to pick.
 \end{itemize}
@@ -605,7 +605,7 @@ The structural payoff of the G-DHT prefix is most visible here.  On global looku
 
 Axona then adds learning on top.  The AP scoring weights short-RTT edges so heavily that the synaptome converges to a structure where almost every reinforced edge is a low-latency one.  Regional lookups become a few short hops, and Axona's $108$\,ms at $5{,}000$ nodes is already comfortably below the $3\delta$ global floor---because the effective $\delta$ \emph{within} a continental region is a fraction of the global pairwise median.  G-DHT shows what locality buys you structurally; Axona shows what locality buys you when the protocol also learns.
 
-\newthought{A note on these figures.} The per-size sweeps in this section are from the v0.93.0 benchmark, run on the project's earlier ``flat-Hilbert'' geographic partition. The current build uses Google's standard S2 cells, which shifts regional latencies by a few percent without changing the ordering or the flat-with-scale shape. On the current partition the $25{,}000$-node reference points are \textbf{268~ms} for a global lookup and \textbf{152~ms} for a $2{,}000$~km regional lookup---still hugging the same floor.
+\newthought{A note on these figures.} The per-size sweeps in this section are from the v0.93.0 benchmark (May 2026), run on the project's earlier ``flat-Hilbert'' geographic partition. The current build uses Google's standard S2 cells, which shifts regional latencies by a few percent without changing the ordering or the flat-with-scale shape. Re-measured on \texttt{@axona/protocol} v2.31.0 (June 2026), the $25{,}000$-node global lookup sits at about $1.7\times$ the floor and the curve keeps the same flat-with-scale shape and protocol ordering---Axona still plateaus while Kademlia climbs. (Absolute milliseconds scale with the host the simulator runs on; the multiple over the floor is the host-independent figure, which is why the chart above is labelled with its measurement build.)
 
 % =====================================================================
 % IX. ABLATION
@@ -616,9 +616,9 @@ Axona then adds learning on top.  The AP scoring weights short-RTT edges so heav
 
 An \textbf{ablation study} answers this.\marginnote{An ablation study removes one feature and re-runs everything to see what that feature actually contributed. It's the cleanest way to attribute a result to a specific mechanism.} Strip the geographic prefix entirely---random IDs again---and re-run the comparison.
 
-Result: with \textbf{zero geographic information} at 25{,}000 nodes, Axona still routes \textbf{$\sim$40\% faster than Kademlia} ($513$~ms vs $852$~ms). The learning is doing real work, not sharpening pre-existing geographic structure.
+Result: with \textbf{zero geographic information} at 25{,}000 nodes, Axona still routes \textbf{$\sim$60\% faster than Kademlia} ($344$~ms vs $860$~ms). The learning is doing real work, not sharpening pre-existing geographic structure.
 
-Add the geographic prefix back in and the gap widens to about $68\%$. Geography helps; geography is not necessary.
+Add the geographic prefix back in and \emph{global} latency barely moves ($341$~ms): on globally-random lookups there is no locality to exploit, so learning carries the result alone. The prefix earns its keep on \emph{regional} traffic---where peers in the same cell start close together---not on globe-spanning lookups. Geography helps regionally; geography is not necessary.
 
 This is the kind of clean control experiment that should accompany any claim of this kind.
 
