@@ -62,7 +62,7 @@ classical Kademlia (\KDHT) and a geographically-prefixed variant we
 call the Geographic DHT (\GDHT).  \GDHT places an 8-bit S2 cell
 prefix at the top of every node identifier so that XOR distance in
 ID space approximates physical distance, reducing 500\,km regional
-lookup latency by $4.7\times$ over Kademlia at $25\,000$ nodes.
+lookup latency by $4.27\times$ over Kademlia at $25\,000$ nodes.
 \axona layers a Hebbian learning rule on top of \GDHT: every routing
 edge carries a \emph{weight} that grows on successful traffic
 (long-term potentiation) and decays without it, and a single
@@ -168,7 +168,7 @@ geographic position.  With this prefix, XOR distance in identifier
 space approximates physical distance, and the bootstrap routing
 table is biased toward local peers without any change to the
 routing algorithm.  \GDHT reduces $500$\,km regional lookup
-latency by $4.7\times$ over Kademlia at $25\,000$ nodes
+latency by $4.27\times$ over Kademlia at $25\,000$ nodes
 (\S\ref{sec:gdht}).
 
 \item \textbf{\axona}, a learning-adaptive DHT layered above the

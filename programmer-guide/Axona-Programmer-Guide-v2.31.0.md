@@ -8,9 +8,9 @@ The guide assumes you already know JavaScript + Node + a browser. It does
 not assume any DHT / WebRTC / cryptography background — concepts are
 introduced where they're needed.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v2.16.0)
-- **Browser SDK**: [@axona-net/axona-peer](https://github.com/axona-net/axona-peer) (v3.24.0)
-- **WebSocket bridge**: [@axona-net/axona-bridge](https://github.com/axona-net/axona-bridge) (v2.6.0)
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v2.31.0)
+- **Browser SDK**: [@axona-net/axona-peer](https://github.com/axona-net/axona-peer) (v3.27.0)
+- **WebSocket bridge**: [@axona-net/axona-bridge](https://github.com/axona-net/axona-bridge) (v2.14.0)
 - **Live network**: `wss://bridge.axona.net`
 - **Security model**: see §3.5 below and the [security changelog](../SECURITY-CHANGELOG.md) — the v2 line adds an authenticated-identity handshake, channel binding, a pub/sub trust boundary, and verified routing admission.
 
@@ -105,7 +105,7 @@ only.
 ```
 mkdir my-axona-app && cd my-axona-app
 npm init -y
-npm install @axona/protocol@github:axona-net/axona-protocol#v2.16.0
+npm install @axona/protocol@github:axona-net/axona-protocol#v2.31.0
 ```
 
 You now have `node_modules/@axona/protocol/src/` with the full kernel.
@@ -315,13 +315,14 @@ cell at level 8 (~256 buckets covering Earth). The bottom 256 bits are
 `sha256(pubkeyBytes)`. Both are deterministic given the inputs; the
 random element is the Ed25519 keypair.
 
-You can also pass an existing keypair:
+`deriveIdentity` always mints a fresh key (pass `extractable: true` if you need
+to export it). To **reuse** an identity across runs, serialize it and restore —
+don't try to inject a keypair into `deriveIdentity`:
 
 ```js
-const identity = await deriveIdentity({
-  lat: 38.0, lng: -77.0,
-  keypair: { pubkey: pubBytes, privateKey: cryptoKey },
-});
+const identity = await deriveIdentity({ lat: 38.0, lng: -77.0, extractable: true });
+const blob     = await dumpIdentity(identity);   // JSON-safe envelope
+const same     = await loadIdentity(blob);        // restores the same nodeId
 ```
 
 ### 4.2 Persisting an identity
@@ -906,17 +907,20 @@ class MyAdapter extends PersistenceAdapter {
 }
 ```
 
-The kernel ships two ready-made adapters:
+The kernel ships two ready-made adapters, as **classes** behind sub-path imports
+(so neither pulls `indexedDB` into Node nor `node:fs` into the browser bundle):
 
-- **`createIndexedDbPersistence({ dbName })`** — browser, IndexedDB.
-- **`createFilePersistence({ path })`** — Node, single JSON file.
+- **`IndexedDBPersistence({ dbName })`** — browser, IndexedDB — `@axona/protocol/persistence/indexeddb.js`
+- **`FilePersistence({ dir })`** — Node, JSON files under `dir` (default `./.axona`) — `@axona/protocol/persistence/file.js`
 
-Pass one to the AxonaPeer constructor:
+Pass an instance as the constructor's **`persist`** option:
 
 ```js
+import { IndexedDBPersistence } from '@axona/protocol/persistence/indexeddb.js';
+
 const peer = new AxonaPeer({
   domain, node, identity,
-  persistence: createIndexedDbPersistence({ dbName: 'my-app' }),
+  persist: new IndexedDBPersistence({ dbName: 'my-app' }),
 });
 await peer.start();
 ```
@@ -933,7 +937,8 @@ For testing / migration:
 const state = await peer.snapshot();
 // state = { identity?, subscriptions, synaptome, ... }
 
-await peer.fromSnapshot(state);
+// fromSnapshot is a STATIC factory, not an instance method:
+const restored = await AxonaPeer.fromSnapshot(state, { engine, node, transport });
 ```
 
 This is the same data the auto-persister uses; you can store it
@@ -1366,7 +1371,7 @@ no TypeScript yet.
 ### 15.1 Identity
 
 ```js
-deriveIdentity({ lat, lng, keypair? })
+deriveIdentity({ lat, lng, extractable? })
   → Promise<Identity>
 
 dumpIdentity(identity)
@@ -1392,7 +1397,7 @@ new AxonaPeer({
   domain,                            // AxonaDomain (shared mesh state)
   node,                              // NeuronNode (local routing state)
   identity,                          // Identity from §15.1
-  persistence: <PersistenceAdapter>, // optional
+  persist: <PersistenceAdapter>, // optional
 })
 
 await peer.start();
@@ -1511,12 +1516,12 @@ xorDistance(aBigInt, bBigInt)            // BigInt
 ### 15.10 Persistence adapters
 
 ```js
-import { createIndexedDbPersistence } from '@axona/protocol/persistence/indexeddb.js';
-import { createFilePersistence }      from '@axona/protocol/persistence/file.js';
+import { IndexedDBPersistence } from '@axona/protocol/persistence/indexeddb.js';
+import { FilePersistence }      from '@axona/protocol/persistence/file.js';
 
-const adapter = createIndexedDbPersistence({ dbName: 'my-app' });
+const adapter = new IndexedDBPersistence({ dbName: 'my-app' });
 // or
-const adapter = createFilePersistence({ path: './state.json' });
+const adapter = new FilePersistence({ dir: './state' });   // JSON files under dir (default ./.axona)
 ```
 
 ### 15.11 Errors
@@ -1542,7 +1547,7 @@ programmatically.
 
 ```js
 WIRE_VERSION         // '1.0'
-KERNEL_VERSION       // '2.16.0'
+KERNEL_VERSION       // '2.31.0'
 UPGRADE_CLOSE_CODE   // 4426
 ```
 

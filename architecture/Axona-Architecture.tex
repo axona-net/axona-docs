@@ -417,13 +417,16 @@ axons to transient WebRTC failures still delivers cleanly.
 \section{The Transport Layer}
 
 \newthought{Transport is where addresses meet sockets.} The kernel's
-\texttt{Transport} contract is a small surface: \texttt{start},
-\texttt{stop}, \texttt{send} (request/response), \texttt{notify}
-(fire-and-forget), \texttt{isConnected}, \texttt{bindPeer},
-\texttt{boundPeers}, \texttt{onPeerBound}, \texttt{onRequest},
-\texttt{onNotification}, \texttt{onPeerDied}. Every concrete
-transport implements this surface and the upper layers don't care
-which one is wired in.
+\texttt{Transport} contract is a small 12-method surface:
+\texttt{start}, \texttt{stop}, \texttt{getLocalNodeId},
+\texttt{openConnection}, \texttt{closeConnection}, \texttt{isConnected},
+\texttt{send} (request/response), \texttt{notify} (fire-and-forget),
+\texttt{onRequest}, \texttt{onNotification}, \texttt{onPeerDied},
+\texttt{getLatency}. Every concrete transport implements this surface
+and the upper layers don't care which one is wired in. (Peer
+\emph{binding} --- the authenticated \texttt{bindPeer}/\texttt{onPeerBound}
+admission flow --- lives in the concrete web/node transports on top of
+this contract, not in the contract itself.)
 
 Three concrete implementations ship:
 

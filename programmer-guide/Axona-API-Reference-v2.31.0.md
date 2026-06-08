@@ -923,29 +923,33 @@ class PersistenceAdapter {
 Implement this to plug in your own storage (Redis, S3, postgres, etc.).
 Two built-in implementations:
 
-#### `createIndexedDbPersistence({ dbName })` → `PersistenceAdapter`
+Both ship as **classes** behind sub-path imports (so neither pulls
+`globalThis.indexedDB` into Node nor `node:fs` into browser bundles), and you
+pass an instance as the constructor's **`persist`** option.
+
+#### `IndexedDBPersistence({ dbName })`
 
 Browser. Uses a single object store inside the named DB.
 
 ```js
-import { createIndexedDbPersistence } from '@axona/protocol';
+import { IndexedDBPersistence } from '@axona/protocol/persistence/indexeddb.js';
 
 const peer = new AxonaPeer({
   domain, node, identity,
-  persistence: createIndexedDbPersistence({ dbName: 'my-app' }),
+  persist: new IndexedDBPersistence({ dbName: 'my-app' }),
 });
 ```
 
-#### `createFilePersistence({ path })` → `PersistenceAdapter`
+#### `FilePersistence({ dir })`
 
-Node. Single JSON file on disk.
+Node. Writes JSON files under `dir` (default `./.axona`).
 
 ```js
-import { createFilePersistence } from '@axona/protocol';
+import { FilePersistence } from '@axona/protocol/persistence/file.js';
 
 const peer = new AxonaPeer({
   domain, node, identity,
-  persistence: createFilePersistence({ path: './state.json' }),
+  persist: new FilePersistence({ dir: './state' }),
 });
 ```
 
@@ -956,9 +960,7 @@ const state = await peer.snapshot();
 // state = { identity?, subscriptions, synaptome, lookups, … }
 // — any JSON-safe object
 
-await peer.fromSnapshot(state);
-
-// static factory:
+// restore via the static factory (fromSnapshot is static, not an instance method):
 const peer = await AxonaPeer.fromSnapshot(state, { engine, node, transport });
 ```
 
@@ -1201,8 +1203,8 @@ stable. Homogeneous cells (a single country, open ocean) share one name.
 ```js
 regionNames(code)            // → [nameHalf0, nameHalf1]   e.g. regionNames(0x89) → ['bahamas','useast']
 regionName(code, lat?, lng?) // → string — half-aware when lat/lng given (else half0)
-regionCode(name)             // → integer code | undefined  (inverse of the above)
-resolveRegion(nameOrCode)    // → { code, names, ... }      accepts a name or a numeric/hex code
+regionCode(name)             // → integer code | null  (inverse of the above)
+resolveRegion(nameOrCode)    // → integer code | null  — accepts a name OR a numeric/hex code, normalizes to the code
 regionNameForLatLng(lat,lng) // → string — region name for a coordinate
 REGION_NAMES                 // → frozen [half0, half1][] indexed by code [0,192)
 ```

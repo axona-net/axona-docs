@@ -1,6 +1,6 @@
 # Axona: A Learning-Adaptive DHT and Axonal Pub/Sub
 
-*An Axona explainer · v0.4.27 · 2026-05-30 · David A. Smith · Axona.net*
+*An Axona explainer · v0.4.28 · 2026-06-07 · David A. Smith · Axona.net*
 
 > *The technology is shaped by the mission.*
 
@@ -57,6 +57,8 @@ G-DHT uses Google's S2 library, which divides Earth's surface into cells along a
 ![S2 cell decomposition of Earth's surface, projected through six cube faces along a Hilbert space-filling curve. Nearby points on the globe land at numerically close cell IDs; XOR distance in identifier space therefore approximates physical distance, for free.](../images/S2-Map.png)
 
 Now your node ID looks like: `[8-bit geographic cell][256-bit hash of your public key]` — a 264-bit address space, encoded as 66 lowercase hex characters in the wire protocol.
+
+There are 192 of these cells covering the globe, and each carries a short human name as well as a number — two names per cell, in fact, so wherever you are you see the one nearest you (a peer in Virginia sees `useast`; one in the Bahamas sees `bahamas`; both resolve to the same cell). The routing only ever uses the number; the names are just for people.
 
 The routing algorithm doesn't change at all, but XOR distance now approximately tracks physical distance. When a node looks for a "close" peer in ID space, it tends to find one that's also physically close. Local traffic stays local. The 20-hop world tour becomes a 13-hop journey around the neighborhood, with each hop maybe 7 ms instead of 100.
 
@@ -359,7 +361,7 @@ The point of fixing the grid early was not measurement aesthetics. It was a meth
 
 Before measuring any learning-adaptive protocol, we needed something to measure against. Two classical DHT designs went in first, both implemented as real runnable code paths inside the simulator and both running the same benchmark grid every later protocol would be judged against.
 
-**K-DHT** is plain Kademlia: 64-bit random node identifiers, XOR distance, K=20 buckets, α=3 parallel queries. No locality, no learning. It is the dominant deployed DHT in production — BitTorrent, IPFS, Ethereum's peer-discovery layer, and Tor v3 hidden services all run Kademlia variants — and therefore the baseline every new design has to beat to justify itself.
+**K-DHT** is plain Kademlia: random node identifiers in the same 264-bit address space all three protocols share, XOR distance, K=20 buckets, α=3 parallel queries. No locality, no learning. It is the dominant deployed DHT in production — BitTorrent, IPFS, Ethereum's peer-discovery layer, and Tor v3 hidden services all run Kademlia variants — and therefore the baseline every new design has to beat to justify itself.
 
 **G-DHT** is K-DHT with one structural change: the top 8 bits of every node identifier encode the S2 cell of its claimed position (the construction is in §"Idea #1: Put the Address in the Address"). XOR distance now approximately tracks physical distance for free; the routing algorithm is unchanged. G-DHT tests an important boundary question — how much of the lookup-latency win comes from *structure* and how much from *learning* — and is also the substrate Axona's learning is eventually layered onto in the deployed protocol.
 
