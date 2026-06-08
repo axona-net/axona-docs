@@ -4,7 +4,7 @@ size: 16:9
 theme: default
 paginate: true
 header: ""
-footer: "AXONA · v0.20 · June 2026"
+footer: "AXONA · v0.21 · June 2026"
 style: |
   /* ── Tufte-inspired typography + cream paper ─────────────────── */
   @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Inconsolata:wght@400;500&display=swap');
@@ -164,7 +164,7 @@ style: |
 
 <div class="meta">
 
-June 2026 · v0.20 · pre-seed pitch
+June 2026 · v0.21 · pre-seed pitch
 Source: <a href="https://github.com/axona-net">github.com/axona-net</a> · live: <a href="https://axona.net">axona.net</a> · simulator: <a href="https://axona-net.github.io/dht-sim/">axona-net.github.io/dht-sim</a>
 Contact: <a href="mailto:davidasmith@gmail.com">davidasmith@gmail.com</a>
 
@@ -382,7 +382,7 @@ Strip the S2 prefix entirely (random IDs, no locality):
 
 #### Methodology
 
-25,000 nodes · 500 lookups per cell · k=20 · α=3 · 264-bit IDs (8-bit S2 prefix + 256-bit SHA-256) · δ median 68 ms one-way · 3δ floor 204 ms. Source CSV: <code>programmer-guide/benchmarks-25k/2026-05-21_25k_5protocols_5tests_v0.93.0.csv</code>. Open-source repo: <a href="https://github.com/axona-net/dht-sim">github.com/axona-net/dht-sim</a>.
+25,000 nodes · 500 lookups per cell · k=20 · α=3 · 264-bit IDs (8-bit S2 prefix + 256-bit SHA-256) · δ median 68 ms one-way · 3δ floor 204 ms. Source CSV: <code>programmer-guide/benchmarks-25k/2026-05-21_25k_5protocols_5tests_v0.93.0.csv</code>. Re-verified on <code>@axona/protocol</code> v2.31.0 (June 2026): protocol ordering and the at-the-floor / 100%-delivery results hold; absolute milliseconds scale with the measurement host, so the multiple over the 3δ floor is the host-independent figure. Open-source repo: <a href="https://github.com/axona-net/dht-sim">github.com/axona-net/dht-sim</a>.
 
 </div>
 </div>
