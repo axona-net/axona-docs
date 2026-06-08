@@ -35,7 +35,7 @@
 \newcommand{\NXseventeen}{NX-17\xspace}
 
 % ── Title and authors ────────────────────────────────────────────────────────
-\title{Axona: A Learning-Adaptive Distributed Hash\\Table and Axonal Publish/Subscribe\\[0.3em]{\normalsize\normalfont v0.4.01 \quad 2026-05-23}}
+\title{Axona: A Learning-Adaptive Distributed Hash\\Table and Axonal Publish/Subscribe\\[0.3em]{\normalsize\normalfont v0.5.0 \quad 2026-06-07}}
 
 \author{
 \IEEEauthorblockN{David A. Smith}
@@ -67,11 +67,12 @@ lookup latency by $4.7\times$ over Kademlia at $25\,000$ nodes.
 edge carries a \emph{weight} that grows on successful traffic
 (long-term potentiation) and decays without it, and a single
 vitality-based admission gate governs every edge insertion.  At
-$25\,000$ nodes \axona routes global lookups at $1.33\times$ the
+$25\,000$ nodes \axona routes global lookups at $1.66\times$ the
 Dabek $3\delta$ analytical floor for any recursive $O(\log N)$ DHT
---- within $68$\,ms of the theoretical lower bound --- versus
-Kademlia's $4.13\times$.  An ablation that strips the geographic
-prefix shows learning alone beats Kademlia by $39\%$.  Built-in
+--- and the multiple \emph{flattens} with scale where Kademlia's
+climbs --- versus
+Kademlia's $4.19\times$.  An ablation that strips the geographic
+prefix shows learning alone beats Kademlia by $60\%$.  Built-in
 axonal pub/sub achieves $100\%$ delivery and recovers from
 single-bridge network partitions through cooperative re-stitching
 driven by traffic-induced edge creation.  All code, data, and the
@@ -180,8 +181,9 @@ governs every edge insertion (\S\ref{sec:axona}).
 
 \item \textbf{First measurement of an $O(\log N)$ DHT at the
 Dabek $3\delta$ analytical floor.}  At $25\,000$ nodes \axona
-routes at $1.33\times$ the floor, within $68$\,ms of the
-theoretical lower bound; Kademlia sits at $4.13\times$
+routes at $1.66\times$ the floor and stays in the
+$1.5$--$1.7\times$ band from $5\,000$ to $50\,000$ nodes, while
+Kademlia climbs from $3.5\times$ to $4.5\times$
 (\S\ref{sec:eval-floor}).
 
 \item \textbf{Built-in axonal publish/subscribe} that achieves
@@ -193,7 +195,7 @@ cooperative re-stitching (\S\ref{sec:pubsub},
 
 \item \textbf{Geography ablation.}  Stripping the \GDHT prefix
 and re-running the comparison shows that with \emph{no}
-geographic structure, \axona still routes $39\%$ faster than
+geographic structure, \axona still routes $60\%$ faster than
 Kademlia at $25\,000$ nodes (\S\ref{sec:eval-geo}).  Learning is
 doing real work, not sharpening pre-existing geographic
 structure.
@@ -865,7 +867,7 @@ network changes.  \axona's contribution is to layer
 traffic-driven learning on top of \GDHT's structural locality.
 The geography ablation (\S\ref{sec:eval-geo}) confirms that the
 two contributions are independent: with the \GDHT prefix
-removed (geoBits$=0$), \axona still routes $39\%$ faster than
+removed (geoBits$=0$), \axona still routes $60\%$ faster than
 Kademlia at $25\,000$ nodes purely from learning.
 
 \subsection{Cooperative trust and security tradeoff}
@@ -939,33 +941,39 @@ latency at three network sizes.
 \caption{Global-lookup latency (ms) versus the $3\delta$
 analytical floor at three network sizes.  Parenthesized values
 are multiplicative overhead over the floor.  $\delta$ is
-sampled per sweep over $10\,000$ random node pairs.  $25\,000$
-node measurements are from sim v0.93.0 / \texttt{@axona/protocol}
-v1.1.2 (May 2026).}
+sampled per sweep over $10\,000$ random node pairs.  All three
+sizes were measured on one host with \texttt{@axona/protocol}
+v2.31.0 (June 2026); absolute milliseconds scale with host load,
+so the multiplicative overhead over the floor is the
+host-independent figure.}
 \label{tab:floor}
 \small
 \begin{tabular}{@{}lrrrrr@{}}
 \toprule
 $N$ & $\delta$ (ms) & $3\delta$ floor (ms) & \KDHT & \GDHT & \textbf{\axona} \\
 \midrule
-$5\,000$  & $67.9$ & $204$ & $410$\ ($2.01\times$) & $268$\ ($1.32\times$) & $\mathbf{240}$\ ($\mathbf{1.18\times}$) \\
-$25\,000$ & $68.0$ & $204$ & $842$\ ($4.13\times$) & $826$\ ($4.05\times$) & $\mathbf{272}$\ ($\mathbf{1.33\times}$) \\
-$50\,000$ & $68.9$ & $207$ & $548$\ ($2.65\times$) & $291$\ ($1.41\times$) & $\mathbf{264}$\ ($\mathbf{1.28\times}$) \\
+$5\,000$  & $67.3$ & $202$ & $705$\ ($3.49\times$) & $722$\ ($3.58\times$) & $\mathbf{304}$\ ($\mathbf{1.50\times}$) \\
+$25\,000$ & $68.6$ & $206$ & $863$\ ($4.19\times$) & $824$\ ($4.00\times$) & $\mathbf{341}$\ ($\mathbf{1.66\times}$) \\
+$50\,000$ & $67.6$ & $203$ & $914$\ ($4.50\times$) & $972$\ ($4.79\times$) & $\mathbf{348}$\ ($\mathbf{1.71\times}$) \\
 \bottomrule
 \end{tabular}
 \end{table*}
 
 The result has three parts.
 
-\paragraph{\axona plateaus at the floor.}
-At $25\,000$ and $50\,000$ nodes \axona sits at
-$1.28$--$1.33\times$ the $3\delta$ floor.  Within the
-geometric-series decomposition of Eq.~\ref{eq:dabek}, the
-residual $\sim\!30\%$ overhead has a clean structural
-explanation: \axona averages $4.5$--$5.5$ hops where a
-Dabek-ideal protocol would take $\sim\!3$, and each ``extra''
-hop costs $\sim\!\delta/2 \approx 34$\,ms --- exactly the
-geometric tail the series predicts.
+\paragraph{\axona plateaus near the floor.}
+Across all three sizes \axona sits at $1.5$--$1.7\times$ the
+$3\delta$ floor, and the multiple \emph{flattens} as $N$ grows
+($1.50 \to 1.66 \to 1.71\times$) while \KDHT and \GDHT climb to
+$4$--$5\times$.  Within the geometric-series decomposition of
+Eq.~\ref{eq:dabek}, the residual overhead has a clean structural
+explanation: \axona averages $6$--$8$ hops where a Dabek-ideal
+protocol would take $\sim\!3$, and each ``extra'' hop costs
+$\sim\!\delta/2 \approx 34$\,ms --- the geometric tail the series
+predicts.  These runs use \texttt{MAX\_HOPS}$=40$ and reach a
+true $100\%$ success at every size, so the hop average now
+includes the hard tail that earlier, lower-ceiling measurements
+abandoned.
 
 \paragraph{Kademlia worsens with $N$.}
 \KDHT pays full per-hop RTT on every hop because it ignores
@@ -1003,10 +1011,10 @@ conditions.}
 \textbf{Protocol} & \textbf{geoBits$=0$} & \textbf{geoBits$=8$} &
 \textbf{Improvement} \\
 \midrule
-\KDHT & $852$ & $842$ & --- (baseline) \\
-\GDHT & $1060$\textsuperscript{$\dagger$} & $826$ & --- (geo is mechanism) \\
-\textbf{\axona} & $\mathbf{513}$ & $\mathbf{272}$ &
-$\mathbf{-40\%}$ from learning \\
+\KDHT & $860$ & $863$ & --- (baseline) \\
+\GDHT & $887$\textsuperscript{$\dagger$} & $824$ & --- (geo is mechanism) \\
+\textbf{\axona} & $\mathbf{344}$ & $\mathbf{341}$ &
+$\mathbf{-60\%}$ vs \KDHT \\
 \bottomrule
 \multicolumn{4}{l}{\footnotesize\textsuperscript{$\dagger$}\GDHT at
 geoBits$=0$ falls back to a slower} \\
@@ -1016,19 +1024,27 @@ geographic gradient.}
 \end{table}
 
 The headline: \emph{with no geographic information whatsoever},
-\axona still routes $\sim\!40\%$ faster than Kademlia at
-$25\,000$ nodes purely from learning.  Add the S2 prefix back
-in and the gap widens to $68\%$.  This is the cleanest possible
-``learning helps'' claim: every confound (bootstrap strategy,
-identifier structure, geographic prefix) is controlled, and the
-routing/learning algorithm still wins.  Geography helps;
-geography is not necessary.
+\axona still routes $\sim\!60\%$ faster than Kademlia at
+$25\,000$ nodes, purely from learning --- and adding the S2
+prefix back leaves \emph{global} latency essentially unchanged
+($341$ vs $344$\,ms).  Geography, in other words, is not what
+drives global performance: learning is.  The prefix earns its
+keep on \emph{regional} lookups, where same-cell peers begin
+XOR-close (the sharply lower regional latencies underlying
+\S\ref{sec:eval-floor}); on globally-random lookups there is no
+locality for it to exploit, so learning carries the result
+alone.  This is the cleanest possible ``learning helps'' claim:
+every confound (bootstrap strategy, identifier structure,
+geographic prefix) is controlled, and the routing/learning
+algorithm still wins.  Geography helps regionally; geography is
+not necessary.
 
 The opposite-sign result for \GDHT --- it gets \emph{worse} at
-geoBits$=0$, from $826$ to $1060$\,ms --- is the consistency
-check that the ablation is set up correctly: \GDHT's entire
-strategy is ``follow the prefix.''  With no prefix to follow it
-loses the locality benefit that defines it.
+geoBits$=0$, from $824$ to $887$\,ms (and drops below $100\%$
+success) --- is the consistency check that the ablation is set
+up correctly: \GDHT's entire strategy is ``follow the prefix.''
+With no prefix to follow it loses the locality benefit that
+defines it.
 
 \subsection{Churn-cell hop count}
 \label{sec:eval-churn}
@@ -1049,18 +1065,22 @@ $25\,000$ nodes.  $100\%$ success across all three protocols.}
 \toprule
 \textbf{Protocol} & \textbf{Hops} & \textbf{Latency (ms)} \\
 \midrule
-\KDHT & $4.12$ & $762$ \\
-\GDHT & $5.10$ & $767$ \\
-\textbf{\axona} & $\mathbf{4.38}$ & $\mathbf{239}$ \\
+\KDHT & $4.20$ & $795$ \\
+\GDHT & $5.08$ & $748$ \\
+\textbf{\axona} & $\mathbf{7.40}$ & $\mathbf{345}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The hop counts are close ($4.1$ to $5.1$), but \axona's
-\emph{latency} is $3.2\times$ lower than either reference.  The
-difference comes from where the routing decisions land: \axona's
-AP scoring weights short-RTT edges so heavily that even a hop
-``inefficient'' by raw count is short in wall-clock time.
+\axona takes \emph{more} hops than the references here ($7.4$
+vs $4.2$--$5.1$): it completes the hard tail of churn-disrupted
+lookups that a lower hop ceiling would abandon, so the average
+is honest at a true $100\%$ success.  Yet its \emph{latency} is
+still $\sim\!2.2\times$ lower than either reference ($345$\,ms
+vs $748$--$795$).  The difference comes from where the routing
+decisions land: \axona's AP scoring weights short-RTT edges so
+heavily that a path longer by raw hop count is still far shorter
+in wall-clock time.
 
 \subsection{Pub/sub robustness and partition healing}
 \label{sec:eval-slice}
@@ -1206,14 +1226,16 @@ automatically.
 
 We have presented \axona, a learning-adaptive distributed hash
 table and integrated publish/subscribe protocol that operates
-within $1.28$--$1.33\times$ the Dabek $3\delta$ analytical floor
-for recursive $O(\log N)$ routing at $50\,000$ nodes.
+within $1.5$--$1.7\times$ the Dabek $3\delta$ analytical floor
+for recursive $O(\log N)$ routing, holding that band from
+$5\,000$ to $50\,000$ nodes while the baselines climb to
+$4$--$5\times$.
 Compared to two classical baselines --- Kademlia and the
 geographically-prefixed \GDHT --- \axona's per-edge weight
 combined with vitality-based admission produces routing
 behavior that approaches the theoretical floor of any
 $O(\log N)$ design.  An ablation that strips the geographic
-prefix shows learning alone outperforms Kademlia by $40\%$,
+prefix shows learning alone outperforms Kademlia by $60\%$,
 demonstrating that the contribution is structural rather than a
 consequence of locality engineering.  Built-in axonal pub/sub
 achieves $100\%$ baseline delivery and dissolves single-bridge
