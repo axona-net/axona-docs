@@ -3,8 +3,8 @@
 Get a working pub/sub roundtrip in **under five minutes**. Two Node
 peers, one process, no browser, no bridge. Once it works you've
 verified your setup; jump to the
-[Programmer Guide](Axona-Programmer-Guide-v2.16.0.md) for the full picture
-and the [API Reference](Axona-API-Reference-v2.16.0.md) for every exported symbol.
+[Programmer Guide](Axona-Programmer-Guide-v2.31.0.md) for the full picture
+and the [API Reference](Axona-API-Reference-v2.31.0.md) for every exported symbol.
 
 ## Prerequisites
 
@@ -171,11 +171,11 @@ Programmer Guide.
 
 | Want to… | Read |
 |---|---|
-| Understand the mental model | [Programmer Guide §3](Axona-Programmer-Guide-v2.16.0.md#3-mental-model) |
-| Build a chat / forum / feed app | [Programmer Guide §12](Axona-Programmer-Guide-v2.16.0.md#12-worked-example-a-regional-chat-app) |
+| Understand the mental model | [Programmer Guide §3](Axona-Programmer-Guide-v2.31.0.md#3-mental-model) |
+| Build a chat / forum / feed app | [Programmer Guide §12](Axona-Programmer-Guide-v2.31.0.md#12-worked-example-a-regional-chat-app) |
 | Hook up a real WebRTC + bridge stack | [`axona-peer/src/axona_node.js`](https://github.com/axona-net/axona-peer/blob/main/src/axona_node.js) — the reference browser wiring |
-| Look up a specific function | [API Reference](Axona-API-Reference-v2.16.0.md) |
-| Run a bridge locally | [Programmer Guide §11](Axona-Programmer-Guide-v2.16.0.md#11-the-bridge) |
+| Look up a specific function | [API Reference](Axona-API-Reference-v2.31.0.md) |
+| Run a bridge locally | [Programmer Guide §11](Axona-Programmer-Guide-v2.31.0.md#11-the-bridge) |
 
 ## Troubleshooting
 

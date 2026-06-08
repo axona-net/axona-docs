@@ -254,7 +254,7 @@ authority, central trust server, or reputation service. A node's
 identity *is* its keypair. As of kernel v2.16.0:
 
 - **Identity is provable, not asserted.** A nodeId's bottom 256 bits are
-  `SHA-256(pubkey)`, and every connection runs the `axona/4` handshake:
+  `SHA-256(pubkey)`, and every connection runs the `axona/5` handshake:
   the peer proves it holds the key (Ed25519 signature), and the proof is
   bound to *that specific live connection* so it can't be replayed onto
   another link. A peer cannot claim an id it doesn't own.
@@ -798,7 +798,7 @@ peer.health();
 //   axonRoles: [{ topic, isRoot, children, cacheSize }],
 //   wireVersion, started,
 //   transport: {           // null on sim/node; populated on the web transport
-//     boundCount,          // peers authenticated via axona/4
+//     boundCount,          // peers authenticated via axona/5
 //     meshChannels, meshOpen, meshBound,   // raw vs open vs authenticated channels
 //     bridgeState,
 //   },
@@ -811,7 +811,7 @@ open" from "channels are open *and* carrying authenticated routing." A
 sustained `true` (across several polls) means the mesh looks connected
 but isn't actually routing; `boundCount`/`meshBound` are the honest
 usable-peer counts. Cheap; safe for a status dashboard. See the
-[API reference §8 health()](Axona-API-Reference-v2.16.0.md) for the full shape.
+[API reference §8 health()](Axona-API-Reference-v2.31.0.md) for the full shape.
 
 ### 8.4 Logs and errors
 
@@ -1550,10 +1550,10 @@ UPGRADE_CLOSE_CODE   // 4426
 
 ## Where to go next
 
-- **[Quick Start](Quick-Start-v2.16.0.md)** — if someone you're onboarding has
+- **[Quick Start](Quick-Start-v2.31.0.md)** — if someone you're onboarding has
   five minutes, send them here instead of this 1500-line guide.
 
-- **[API Reference](Axona-API-Reference-v2.16.0.md)** — when you're past the
+- **[API Reference](Axona-API-Reference-v2.31.0.md)** — when you're past the
   conceptual material and just need the signature for a specific call.
 
 - **Read the source of the reference peer**:

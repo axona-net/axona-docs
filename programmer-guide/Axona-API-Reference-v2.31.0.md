@@ -6,8 +6,8 @@ deep-customization surfaces are at the end.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v2.16.0.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v2.16.0.md) — mental model + worked
+- [Quick Start](Quick-Start-v2.31.0.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v2.31.0.md) — mental model + worked
   example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects (authenticated handshake, channel binding, pub/sub
@@ -141,7 +141,7 @@ input.
 Generate a fresh 264-bit Ed25519 identity. Top 8 bits of the resulting
 `id` encode the S2 cell containing `(lat, lng)`; the bottom 256 bits are
 `SHA-256(pubkey)`, so the nodeId is **self-authenticating** — a peer can
-only claim an id it holds the private key for (this is what the `axona/4`
+only claim an id it holds the private key for (this is what the `axona/5`
 handshake checks; see §17).
 
 ```js
@@ -675,10 +675,10 @@ peer.health();
 //   wireVersion:   '1.0',
 //   started:       true,
 //   transport: {                      // null on sim/node; populated on web
-//     boundCount:   9,                // peers authenticated via axona/4
+//     boundCount:   9,                // peers authenticated via axona/5
 //     meshChannels: 8,                // WebRTC data channels (any state)
 //     meshOpen:     8,                // open data channels
-//     meshBound:    8,                // open AND axona/4-authenticated
+//     meshBound:    8,                // open AND axona/5-authenticated
 //     bridgeState:  'open',
 //   },
 //   meshDegraded:  false,             // true ⇒ channels open but NOT bound
@@ -686,7 +686,7 @@ peer.health();
 ```
 
 `meshDegraded` is the **routing-truth** signal: `true` means data
-channels are open but the `axona/4` handshake hasn't authenticated them,
+channels are open but the `axona/5` handshake hasn't authenticated them,
 so no verified routing is flowing. A single `true` tick can be a normal
 mid-handshake transient; treat a value that stays `true` across several
 polls as the real signal. (`boundCount`/`meshBound` are the honest
@@ -1057,7 +1057,7 @@ The production browser transport: a WebSocket to the bridge for
 bootstrap + signaling, and a WebRTC mesh for direct peer-to-peer
 traffic. It owns the bridge socket lifecycle (reconnect/backoff,
 ping/pong, stale detection), the version-gate handshake, and the
-`axona/4` authenticated-identity handshake on both the bridge link and
+`axona/5` authenticated-identity handshake on both the bridge link and
 every mesh link.
 
 #### `webTransport(opts)` → `CompositeTransport`
@@ -1090,10 +1090,10 @@ transport.onBridgeState((state, detail) => {});   // → unsub
 transport.onWelcome((info) => {});                 // → unsub (replays last)
 transport.onPingTraffic((dir) => {});              // 'sent' | 'recv'
 transport.reconnectNow();                          // force an immediate reconnect (tab resume)
-transport.boundPeers();                            // bigint[] — axona/4-authenticated peers
+transport.boundPeers();                            // bigint[] — axona/5-authenticated peers
 ```
 
-Channel binding (finding A-1): each mesh link's `axona/4` proof is
+Channel binding (finding A-1): each mesh link's `axona/5` proof is
 bound to that connection's DTLS certificate fingerprint, so a
 fingerprint-rewriting bridge cannot transparently MITM "direct" peer
 traffic. The bridge is trusted for signaling only, never for the
@@ -1186,10 +1186,30 @@ overrides, or analytics on top of the address space.
 
 ```js
 geoCellId(lat, lng, bits)               // → integer — S2 cell ID at the given bit depth
+geoCellSubCenters(code)                 // → [center0, center1] — the cell's two level-3 sub-cell centers
+geoCellHalf(lat, lng)                   // → 0 | 1 — which half (sub-cell) a point falls in
 haversine(lat1, lng1, lat2, lng2)       // → km between two points
 roundTripLatency(lat1, lng1, lat2, lng2) // → ms — rough fiber estimate
 randomU32()                              // → 0..2**32 - 1
 ```
+
+**Region names.** Each of the 192 region codes carries **two** human-readable
+names — one per S2 sub-cell ("half") — and both resolve to the same code, so a
+user sees the label nearest their actual location while the address stays
+stable. Homogeneous cells (a single country, open ocean) share one name.
+
+```js
+regionNames(code)            // → [nameHalf0, nameHalf1]   e.g. regionNames(0x89) → ['bahamas','useast']
+regionName(code, lat?, lng?) // → string — half-aware when lat/lng given (else half0)
+regionCode(name)             // → integer code | undefined  (inverse of the above)
+resolveRegion(nameOrCode)    // → { code, names, ... }      accepts a name or a numeric/hex code
+regionNameForLatLng(lat,lng) // → string — region name for a coordinate
+REGION_NAMES                 // → frozen [half0, half1][] indexed by code [0,192)
+```
+
+Names match `/^[a-z0-9_]{1,8}$/`; open-ocean cells are `<ocean3>_<hex>`
+(`pac_68`, `atl_0a`, …). The interactive `examples/s2-region-visualizer/`
+renders all 192 with both names + the code.
 
 Sub-path import for the remaining geo helpers (`@axona/protocol/utils/geo.js`):
 `getRegion`, `getContinent`, several XOR routing-table builders. Rarely
@@ -1200,9 +1220,9 @@ needed by app code.
 ### 16. Constants
 
 ```js
-WIRE_VERSION         // '1.0'        — wire format major.minor
-KERNEL_VERSION       // '2.16.0'     — kernel semver
-AUTH_PROTO           // 'axona/4'    — authenticated-identity handshake tag
+WIRE_VERSION         // '2.0'        — wire format major.minor
+KERNEL_VERSION       // '2.31.0'     — kernel semver
+AUTH_PROTO           // 'axona/5'    — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426         — WebSocket close code for version mismatch
 ID_BITS              // 264
 HEX_CHARS            // 66
@@ -1221,7 +1241,7 @@ summary of what's enforced as of kernel v2.16.0. Everything here is
 **self-authenticating** — no certificate authority, no central trust
 server, no reputation service.
 
-- **Authenticated identity (`axona/4`).** A nodeId's bottom 256 bits are
+- **Authenticated identity (`axona/5`).** A nodeId's bottom 256 bits are
   `SHA-256(pubkey)`, and every connection runs a handshake proving the
   peer holds that key (BIND: pubkey hashes to the id · POSSESS: Ed25519
   signature · CHANNEL: the signature is bound to this live connection so
@@ -1240,7 +1260,7 @@ server, no reputation service.
 - **Verified routing admission (eclipse resistance).** Routing-table
   entries are *earned*: a peer named in routing gossip is a candidate,
   admitted only after this node connects and the peer authenticates via
-  `axona/4`. Forged gossip cannot inject hops. (Observe this via
+  `axona/5`. Forged gossip cannot inject hops. (Observe this via
   `health().meshDegraded` and `boundCount`.)
 - **Key hygiene.** Browser identities can hold a **non-extractable**
   signing key (`deriveIdentity({ extractable: false })`); `loadIdentity`
@@ -1258,7 +1278,7 @@ public changelog lists only resolved items.
 
 `@axona/protocol` v2.x is stable for the application surface
 documented in §§1–9. The transport + protocol surface (§§10–12, incl.
-the browser `webTransport` and the `axona/4` security model in §17) is
+the browser `webTransport` and the `axona/5` security model in §17) is
 also stable but expect occasional additions (new transport factories,
 new bootstrap services). Low-level utilities (§§13–16) may grow but
 won't change incompatibly.
