@@ -98,7 +98,7 @@ Effort key: **S** ≤ half-day · **M** ~1–2 days · **L** multi-day / archite
 | # | ID | Sev | Fix | Effort | Notes |
 |---|----|-----|-----|--------|-------|
 | 10 | **D-2** | High | Bridge WS: Origin allow-list, `maxPayload`, pending-connection cap. | **S** | Standard `ws` server options; closes unauth flood/OOM. Bridge-only deploy. |
-| 11 | **C-3** | High | Metrics: bind `metricsResp` to the proven `fromId` (no attacker-named `requesterId`); make the ownership gate **fail closed** when the replay cache is empty; stop tree-wide broadcast. | **M** | Reflection vector; pairs with B-1 mindset. |
+| 11 | **C-3** | **Crit-adjacent** *(re-rated 2026-06-09)* | Metrics: bind `metricsResp` to the proven `fromId` (never the attacker-named `requesterId` — `AxonaManager.js:2155`); make the ownership gate **fail closed** when the replay cache is empty (`:2128` reads `replayCache?.[0]`, so an empty cache reads as *unowned*); stop tree-wide broadcast. | **M** | **Reflection/amplification to an arbitrary victim** on unowned (all region-keyed) topics — same primitive class as the Critical **B-1**, and **live-exploitable since the 2026-06-08 go-live**. Pull to the front of the next wave. See [SECURITY-STATUS-v2.32.0.md](SECURITY-STATUS-v2.32.0.md) §3 Wave A. |
 | 12 | **D-3** | Med | Dedup by content-hash, not attacker-chosen `publishId`; actually use the declared-but-unused `_seenPublishTtlMs`. | **M** | Prevents forced-eviction re-delivery. |
 | 13 | **E-3** | Low | Bridge-link CBV: add a peer nonce (currently server-only) so a captured hello-ack can't be replayed. | **S** | |
 
@@ -127,7 +127,7 @@ Effort key: **S** ≤ half-day · **M** ~1–2 days · **L** multi-day / archite
 2. ~~**B-2** + **B-4** + **D-1**~~ ✅ v2.7.0 — finish the Pub/Sub trust-boundary batch.
 3. ~~**C-2** + **E-4**~~ ✅ v2.9.0 — envelope freshness once canonicalization is total.
 4. ~~**B-3**~~ ✅ v2.8.0 — the routing-integrity keystone (largest single item; eclipse prevention).
-5. **D-2** + **C-3** + **D-3** — bridge/metrics hardening.  ← **next**
+5. **C-3** *(re-rated Crit-adjacent 2026-06-09 — reflection/amplification, live since go-live)* + **D-2** + **D-3** — bridge/metrics hardening.  ← **next**
 6. **F-1** + **F-2** — privacy quick wins.
 7. **A-2**, **E-2**, then **E-1** (after the PoW-vs-Vivaldi decision).
 
