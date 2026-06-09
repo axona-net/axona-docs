@@ -9,14 +9,18 @@
 
 ## 1. Executive summary
 
-The **integrity and authenticity** half of the security model is built, shipped, and now live for everyone: mutually-authenticated handshake, content-verified pub/sub, replay/freshness, gossip-poisoning (eclipse-via-routing-table) prevention, and a cryptographic network partition. **Both open Criticals from the v2.6.0 audit closed in Wave 1 (v2.7.0); there is no open Critical, and no open High that touches confidentiality or key-compromise.**
+The **integrity and authenticity** half of the security model is built, shipped, and now live for everyone: mutually-authenticated handshake, content-verified pub/sub, replay/freshness, gossip-poisoning (eclipse-via-routing-table) prevention, and a cryptographic network partition. **Both Criticals from the v2.6.0 audit closed in Wave 1 (v2.7.0), and no open item touches confidentiality or key-compromise.** One open item — **C-3** (metrics reflection) — is **re-rated Critical-adjacent on review (2026-06-09)**: it is a B-1-class reflection/amplification primitive that the go-live turned from theoretical into live-exploitable (see §3, Wave A).
 
-The open work clusters on the **availability / anonymity / anti-abuse** frontier — exactly where cryptography does *not* help, and where (per our standing posture) we can measure latency but not the behavior the gaps would enable. Two facts raise the priority versus when the register was written:
+The open work clusters on the **availability / anonymity / anti-abuse** frontier — exactly where cryptography does *not* help, and where (per our standing posture) we can measure latency but not the behavior the gaps would enable. Two facts changed the priority calculus versus when the register was written:
 
-1. The network is **live and public**, so the punch-list's "pre-adoption, low-value-target" discount is expiring.
-2. The register is **public**, so open items are readable until fixed.
+1. The network is **live and public** (since the 2026-06-08 cutover), so the punch-list's "pre-adoption, low-value-target" discount **has expired** — availability/abuse items are now exploitable against real users.
+2. The register is **public**, so open items (including the C-3 recipe) are readable until fixed.
 
-**The single most important open item is E-1 (targeted address-grinding / placement)** — the keystone of the eclipse-and-surveillance class, and the gap behind both the pub/sub root-vantage risk and the anonymity weaknesses. It needs an approach decision (PoW vs Vivaldi) before scheduling.
+**Two items lead, on different axes:**
+- **Most urgent (tactical, live-exploitable now): C-3** — metrics reflection/amplification to an arbitrary victim on unowned (i.e. all region-keyed) topics. Re-rated Critical-adjacent; pulled to the front of Wave A.
+- **Most important (strategic): E-1** — targeted address-grinding / placement, the keystone of the eclipse-and-surveillance class and the gap behind both the pub/sub root-vantage risk and the anonymity weaknesses. Needs the PoW-vs-Vivaldi decision before scheduling.
+
+> **Live-network posture (2026-06-09).** `axona.net` / `bridge.axona.net` are serving real peers on the `axona/5` line. Two facts are now operationally true rather than theoretical: the production **bridge is a live metadata vantage point** (it sees IP↔pubkey↔region↔subscription — F-4, inherent), and every meshed peer **exposes its IP to its mesh neighbors** via WebRTC ICE. The cheapest mitigation for the latter — a **TURN-relayed-candidates-only** privacy switch — is hereby promoted from the research tier (Wave E) to a **near-term optional control**.
 
 ## 2. What's resolved (the baseline now in production)
 
@@ -42,8 +46,8 @@ Ordered by **severity × exploitability × blast-radius**, then effort. Effort: 
 ### Wave A — Bridge & metrics hardening *(next; mostly bridge-only deploys)*
 | ID | Sev | Issue | Plan | Effort |
 |---|---|---|---|---|
-| **D-2** | High | Bridge WS has no Origin allow-list / `maxPayload` / pending-connection cap | Standard `ws` server hardening; closes unauth flood/OOM | S |
-| **C-3** | High | Metrics reply bound to attacker-named `requesterId`; ownership gate fails *open* on empty replay cache | Bind to proven `fromId`; fail closed; stop tree-wide broadcast | M |
+| **C-3** | **Crit-adjacent** | **Metrics reflection/amplification.** For *unowned* topics (every region-keyed topic) the ownership gate is skipped and the metrics response is sent to the **attacker-named `requesterId`** (`AxonaManager.js:2155`) → a small request reflects a larger payload to any victim nodeId; same primitive class as B-1 (Critical). Compounded by a **fail-open**: an empty `replayCache` makes an owned topic read as unowned (`:2128` → `anchor=null → owned=false`), opening the gate exactly when state is thin. Live-exploitable since go-live. | Send only to the **proven `meta.fromId`** (never `payload.requesterId`); make the ownership gate **fail closed** when the cache is empty; drop the tree-wide broadcast. | M |
+| **D-2** | High | Bridge WS has no Origin allow-list / `maxPayload` / pending-connection cap (`server.js`: `Access-Control-Allow-Origin: *`) | Standard `ws` server hardening; closes unauth flood/OOM | S |
 | **D-3** | Med | Dedup TTL (`_seenPublishTtlMs`) declared but unused | *Largely addressed* by content-addressed msgId (v2.23.0); finish the TTL-eviction nit | S |
 | **E-3** | Low | Bridge-link CBV is server-nonce only | Add a peer nonce so a captured hello-ack can't replay | S |
 
@@ -57,14 +61,14 @@ Ordered by **severity × exploitability × blast-radius**, then effort. Effort: 
 ### Wave C — Privacy at rest & in the app
 | ID | Sev | Issue | Plan | Effort |
 |---|---|---|---|---|
-| **F-1** | High | Full-precision lat/lng persisted, undermining the geo-privacy premise at rest | Quantize stored region to the 8-bit S2 cell | S |
+| **F-1** | High → Med | Coordinate precision at rest. *Verified:* the browser peer persists one of 15 curated `REGIONS` points (not the user's true GPS), so the browser-at-rest leak is largely already closed. The residual is the **kernel `dumpIdentity` envelope + relay identity file**, which persist whatever precision the caller passed (relay auto-detect / `RELAY_LAT` is city-level) | Quantize to the 8-bit S2 cell **at the `dumpIdentity` boundary** (covers relay + any file persistence) | S |
 | **F-2** | Med | No CSP; `window.axona` exposes the live identity/topology to in-page script | Add CSP; trim the exposed surface | S–M |
 | **F-3 / F-5** | Med / Low | Cross-topic linkage (`signerPubkey` + stable region); enumerable sequential connIds | Randomize connIds (S); F-3 is the design question feeding the anonymity track | M / S |
 
 ### Wave D — Identity placement & handshake
 | ID | Sev | Issue | Plan | Effort |
 |---|---|---|---|---|
-| **A-2** | High | Handshake transcript not bound to recipient/role (`expectNodeId` usually null) → a proof can be re-aimed | Directed transcript: bind to recipient/role id | M |
+| **A-2** | High | Directed-transcript binding (`expectNodeId`) **exists on the node WS transport** (`wstransport.js:187–285`, bridge↔relay) but is **absent on the web/mesh transport** — the browser-peer↔bridge and peer↔peer paths (≈all real users), where the transcript is unbound and a proof can be re-aimed | Wire the existing `expectNodeId` binding into the web/mesh transport (`transport/web/*`) — primitive already exists, just unthreaded | M |
 | **E-2** | Med | Persisted private key unencrypted at rest (FilePersistence / bridge path; browser already uses non-extractable keys) | Passphrase or platform keystore | M |
 
 ### Wave E — The strategic keystone *(highest design importance; "cryptography can't fix this")*
