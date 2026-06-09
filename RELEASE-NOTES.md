@@ -7,6 +7,25 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v2.32.0 — one name per region + production flag-day cutover (2026-06-08)
+
+**Production cutover.** `axona.net` / `bridge.axona.net` migrated from the
+`axona/4` / kernel-2.16 network to this `axona/5` line (bridge `2.15.0`, peer
+`3.28.0`). It's a hard partition: pre-2.28 `axona/4` peers are refused at the
+gate (WS close `4426`) and reload into the new line. The earlier `axona/4`
+network is retired; the SF testnet (`testnet.axona.net`) now runs as the
+**staging line ahead of `main`** rather than a separate epoch.
+
+**One name per region.** Each of the 192 S2 region cells now carries exactly
+**one** canonical name (previously two, one per sub-cell), so a region always
+presents the same label — no location-dependent flip-flop. The collapse rule:
+an ocean-half beside a land-half takes the land name; a multi-country cell takes
+its dominant city; homogeneous cells keep their name. `regionName(code)` now
+returns a string (no lat/lng half-arg); `regionNames(code)` is a deprecated
+one-element back-compat shim. A name is usually unique to one code, but an area
+larger than one cell may span adjacent codes — `regionCode` returns the
+canonical (lowest) code. (Supersedes the 2.31.0 two-name scheme.)
+
 ## v2.29.0 — pub/sub replay backlog fix (2026-06-06)
 
 Compatible minor on the 2.x epoch (`WIRE_VERSION`/`AUTH_PROTO` unchanged), so

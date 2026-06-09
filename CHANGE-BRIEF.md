@@ -14,14 +14,15 @@ system changes.
 | axona-peer (the axona.net app) | **3.28.0** | on kernel 2.32.0 |
 | minimal-pubsub-browser (demo) | **1.17.0** | served at demo-testnet |
 | axona-relay | **0.7.1** | headless Node supernode (+ pub/sub CLI & MCP server) |
-| **Production (still live, separate)** | kernel **2.16.0** / bridge 2.12.0 / peer 3.24.0 | untouched `axona/4` network |
+| **Production** (axona.net / bridge.axona.net) | kernel **2.32.0** / bridge 2.15.0 / peer 3.28.0 | **cut over to `axona/5` on 2026-06-08** (was 2.16.0 / `axona/4`) |
 
 ## Network partition (the load-bearing change)
 
 - `AUTH_PROTO` **axona/4 → axona/5**; `WIRE_VERSION` **1.0 → 2.0**. The epoch is
   folded into the value each side signs at connect time, so a cross-epoch
-  handshake can't complete — at the mesh layer **or** the bridge. Production
-  (`axona/4`) and the testnet (`axona/5`) are **cryptographically isolated**.
+  handshake can't complete — at the mesh layer **or** the bridge. The
+  **2026-06-08 flag-day** cut production over to `axona/5`; any remaining
+  `axona/4` peer is partitioned out by construction.
 - Bridge gate at `client-hello`: `REQUIRED_WIRE_MAJOR=2`; `flagDayFloor()`
   classifies the version by major (≥3 → `MIN_PEER_APP_VERSION`, else
   `MIN_KERNEL_VERSION`); reject = WS close **4426**. Testnet floors:
@@ -82,8 +83,8 @@ observable security drop-logging via `onLog` (2.26) · bounded internal maps (2.
 
 ## Infrastructure
 
-- **Production** (untouched, `axona/4`): `axona.net` (peer), `bridge.axona.net`,
-  `turn.axona.net` — kernel 2.16.0.
+- **Production** (`axona/5` since the 2026-06-08 cutover): `axona.net` (peer),
+  `bridge.axona.net`, `turn.axona.net` — kernel 2.32.0 / bridge 2.15.0 / peer 3.28.0.
 - **SF testnet** (`axona/5`, DigitalOcean SFO3): `testnet.axona.net` (peer app +
   bridge at one origin), `demo-testnet.axona.net` (kernel demo at domain root),
   self-hosted **coturn** TURN minted by the bridge.

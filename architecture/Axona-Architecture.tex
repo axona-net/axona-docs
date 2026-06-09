@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.7.9 \quad 2026-06-08\par}
+{\small An Axona Architecture Note \quad v0.7.10 \quad 2026-06-08\par}
 \end{center}
 \vfill
 \null
@@ -580,8 +580,9 @@ floor); a peer on the wrong epoch or below the floor is closed with 4426
 before it can do anything else. Because the epoch is folded into the
 signed transcript of the next step, this gate is not merely advisory: an
 \texttt{axona/4} node and an \texttt{axona/5} node \emph{cannot} complete
-a handshake, so the older production network and the testnet are
-cryptographically partitioned.
+a handshake. The 2026-06-08 flag-day migrated production to \texttt{axona/5}
+and retired the \texttt{axona/4} network; any peer on a superseded epoch is
+partitioned out by construction.
 
 \item \textbf{Welcome.} The bridge replies with \texttt{welcome},
 carrying the connection id and a fresh \texttt{serverNonce}; both sides
