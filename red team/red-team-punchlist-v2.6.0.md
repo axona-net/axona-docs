@@ -1,5 +1,17 @@
 # Axona Security Punch List — consolidated, prioritized (v2.6.0)
 
+> **Status update — 2026-06-09 (kernel v2.32.0, now live in production).** This
+> v2.6.0 register is preserved as the point-in-time consolidated audit. Since it
+> was written the network completed the `axona/4 → axona/5` flag-day cutover
+> (2026-06-08), and Waves 1–3 shipped in full: **both open Criticals are closed**
+> (B-1, B-2 @ v2.7.0), along with B-3 (v2.8.0), B-4 / C-1 / D-1 (v2.7.0), and
+> C-2 / E-4 (v2.9.0). The message-lifecycle, bridgeless-mesh, and
+> content-addressed-msgId work landed across v2.10–v2.28, and the 2026-06-05
+> stability addendum (below) closed SP-1…SP-5. The **current** consolidated
+> status — what's shipped on the live line plus the remaining plan (Waves A–F,
+> incl. the open SP-6 / SP-10 / SP-11 anti-abuse items and the **E-1** placement
+> keystone) — is **[SECURITY-STATUS-v2.32.0.md](SECURITY-STATUS-v2.32.0.md)**.
+
 **Date:** 2026-05-31
 **Inputs merged:**
 - Internal *Security Sweep v2 — post-`axona/4`* (5-auditor fresh-eyes pass; `red-team-analysis-v2-post-axona4.md`)
@@ -146,12 +158,15 @@ consistent with the other red-team analyses already in this folder. The trade
 accepted: live exploit detail is publicly readable until each item is fixed,
 which lowers the bar for an opportunistic attacker on the deployed network.
 
-Two mitigations make this a reasonable trade rather than a reckless one:
-- The two open **Criticals are availability/abuse** issues (reflection/
+Two mitigations made this a reasonable trade rather than a reckless one — and
+both now hold more strongly (see the 2026-06-09 status update at the top):
+- The two **Criticals were availability/abuse** issues (reflection/
   amplification, memory-exhaustion DoS), **not** confidentiality or
-  key-compromise — and the network is pre-adoption / low-value-target today.
-- The fix for the cheapest Critical (**B-1**) is a few lines; closing the
-  exposure window is mostly a function of shipping Wave 1 quickly.
+  key-compromise — and **both shipped closed in Wave 1 (v2.7.0)**. No open
+  Critical remains.
+- The remaining open items (Waves A–F in
+  [SECURITY-STATUS-v2.32.0.md](SECURITY-STATUS-v2.32.0.md)) are High-and-below
+  availability / privacy / abuse work on a network still early in adoption.
 
 The public `SECURITY-CHANGELOG.md` remains **resolved-items-only** regardless —
 this register is where open work is tracked; the changelog is where shipped
