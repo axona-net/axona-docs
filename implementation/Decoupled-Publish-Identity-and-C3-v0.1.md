@@ -138,7 +138,7 @@ A challenge-response (responder sends a nonce) is stronger against replay than a
 
 | # | Decision | Options | Recommendation |
 |---|---|---|---|
-| **a** | Anti-abuse anchor once publishID can be freely minted | (i) quota on injecting **transport identity**; (ii) **PoW** on publish-key minting; (iii) both | (i) now (cheap, closes SP-10 regression); (iii) if/when E-1 picks PoW — same primitive |
+| **a** | Anti-abuse anchor once publishID can be freely minted | (i) quota on injecting **transport identity**; (ii) **PoW** on publish-key minting; (iii) both | **DECIDED (2026-06-09): (ii) PoW** — memory-hard, pubkey-bound, per-role difficulty, shipped at difficulty 0 now. Quota anchors on the (PoW-bearing) **publish** key, preserving the decoupling. See [`architecture/E-1-Placement-Defense-v0.1.md`](../architecture/E-1-Placement-Defense-v0.1.md). Adds a `signerPow` nonce field to signed envelopes (no-op at difficulty 0) |
 | **b** | Publish-key lifecycle | stable (strong C-2 replay) vs rotating (unlinkable) | App-selectable; default **stable**, expose rotating as a privacy mode with the replay caveat |
 | **c** | `OwnershipProof` shape | self-timestamped vs challenge-response nonce | Challenge-response for owned reads/unpub; self-timestamped acceptable for kill |
 | **d** | Does a publishID carry an S2 prefix? | yes (owned-topic placement works as today) vs region-pinned vs prefixless | Yes — publish key gets a prefix so owned-topic K-closest placement is well-defined |
