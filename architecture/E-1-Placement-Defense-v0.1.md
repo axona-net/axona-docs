@@ -73,15 +73,47 @@ The `OwnershipProof` seam (handoff §6) is **unaffected** — PoW adds a minting
 
 1. ✅ **DONE — kernel v2.34.0 (2026-06-10, on testnet).** `pow` nonce in the auth hello + `signerPow` in the envelope, both **siblings** (self-binding to the pubkey, outside the signed transcript/core ⇒ wire-compatible with 2.33.0). Per-role verifier `src/pow/pow.js` (`powMint`/`powVerify`/`powBits`/`powCalibrate`), difficulty a frozen protocol constant `POW_DIFFICULTY={transport:0,publish:0}`. Checked at the handshake-admit and publish-ingress gates as **no-ops at difficulty 0**. ⚠️ The shipped work hash is **SHA-256 (scaffolding only)** — it gates nothing at difficulty 0; **step 3 must first swap it for a memory-hard fn** (Argon2id/scrypt). Tests `test/smoke_pow.js`; live-verified by the relay e2e suite.
 2. Land the publish-identity decoupling (handoff Part 2) with quota anchored on the publish key (§7(a) now answered). *(Demand-gated.)*
-3. When a threat appears (or proactively): **first swap the SHA-256 scaffolding hash for a memory-hard fn**, then raise transport-role difficulty (anti-eclipse, Stage 4a) and publish-role difficulty (anti-flood, Stage 4b) to calibrated values (use `powCalibrate` device data); these ride one coordinated bump and only THEN warrant a public `SECURITY-CHANGELOG.md` entry.
+3. **Stage 4 — turn difficulty on.** When a threat appears (or proactively): **first swap the SHA-256 scaffolding hash for a memory-hard fn**, then raise transport-role difficulty (anti-eclipse, Stage 4a) and publish-role difficulty (anti-flood, Stage 4b) to calibrated values (use `powCalibrate` device data); these ride one coordinated bump (soft `MIN_KERNEL` floor raise — no wire-epoch partition, since the fields already travel) and only THEN warrant a public `SECURITY-CHANGELOG.md` entry.
+4. **Stage 5 — proof-of-tenure** *(forward-looking; design note only, see §6).* Convert the one-time `pow` into an **accumulating, periodically-re-minted proof of longevity**, bound to *time* (not work) via a beacon-seeded chain or a VDF. Gated behind Stage 4 (reuses its memory-hard hash).
 
-## 6. References
+## 6. Stage 5 (forward-looking): proof-of-tenure
+
+**Status:** design note, not committed — no code. Gated behind Stage 4 (difficulty must be live, and it reuses Stage 4's memory-hard hash). Originated in the 2026-06-10 design review: *"the PoW can be computed in the background and regularly saved — a continuously improving proof, demonstrating longevity on the network."* See `[[design_pow_address_decoupling]]`.
+
+### 6.1 Motivation
+Stage 4's honest limitation (§3, *one-time cost = deterrent, not a bar*): a position is bought once and held forever. Stage 5 reframes PoW from a **one-time admission gate** into an **accumulating proof of tenure** — a node grinds in the background and periodically saves a steadily-stronger proof, so a long-lived honest node visibly out-proves a freshly-minted Sybil swarm. Tenure becomes a *self-certified* signal the network can weight (K-closest selection, admission tiebreaks, routing preference), and it complements the *observed* behavioral-vitality / route-around work (black-hole-nodes, Endo attestation): self-asserted longevity **+** externally-observed good behavior = defense in depth.
+
+### 6.2 ⚠️ The trap: accumulated work ≠ time
+A naïve accumulator — "keep grinding higher difficulty, save the best" — measures **cumulative compute = hashpower × time, NOT elapsed time.** An attacker with a GPU farm forges "two years of tenure" in an afternoon; memory-hardness narrows the gap but does not close it. A tenure proof buyable with hashpower is a longevity costume over a hashpower contest. **The whole design hinges on binding each increment to time, not work.**
+
+### 6.3 Binding to time — two options
+Each increment must consume an input that **did not exist before**, so the proof can be neither precomputed nor fast-forwarded:
+
+1. **Beacon-seeded sequential chain.** Each saved proof commits to `(previous_proof ‖ fresh_public_beacon)`, where the beacon is a periodic, unforgeable-in-advance value. The chain grows only as fast as beacons arrive, so **its length is capped by real elapsed time** regardless of how many machines you own; per-link depth is rate-limited so hashpower can't substitute for length. Lighter to build; verify = re-walk the links.
+2. **Verifiable Delay Function (VDF).** Inherently *sequential* — parallel machines give no speedup — so wall-clock time is the cost by construction. The rigorous option (this is exactly Chia's "proof of time"); heavier to implement and parameterize, but the cleanest "continuously present since T."
+
+### 6.4 Storage
+Already half-built: kernel v2.35.0 persists the transport `pow` in the identity envelope (`dumpIdentity`/`loadIdentity`). A tenure token (chain head + beacon refs, or a VDF checkpoint) extends that same slot — small, cheap to persist, cheap to verify.
+
+### 6.5 Open caveats / decisions (resolve before this is more than a note)
+- **Patient adversary.** Tenure starves *fresh* Sybil swarms, but a funded attacker can **pre-age many identities in parallel** from day one (each chain is sequential, but N chains run concurrently across N identities). Tenure is a real signal fresh swarms lack — not a bar against a provisioned, patient adversary. It stacks with the per-position Stage-4 mint cost and observed vitality; not a silver bullet.
+- **Tenure ≠ usefulness.** The proof says the *key* persisted and grinded; not that the node *routed or served*. Do not conflate with behavioral vitality.
+- **Incumbency bias.** Weighting routing/K-closest by tenure risks rich-get-richer / ossification. Tenure should be a tiebreak or floor, not a monopoly — pick the weighting curve accordingly.
+- **Beacon source (make-or-break).** Axona has no blockchain. What is the unforgeable, periodic, network-agreed beacon? A bridge-rotated nonce is simplest but reintroduces a trust point; a mesh-gossiped checkpoint is more decentralized but needs agreement. **Resolve this first** — it determines whether option (1) is even viable, else fall back to a VDF (no external beacon needed).
+
+## 7. References
 
 ### Prior art (this design composes known primitives — it is not novel crypto)
 *Citations verified 2026-06-10 against source PDFs in the maintainer's local `references/` library (gitignored — copyrighted, not committed; filenames noted for the maintainer).*
 - **Hashcash** — Adam Back, *Hashcash — A Denial of Service Counter-Measure* (paper dated 1 Aug 2002; mechanism originally proposed May 1997). The `H(input‖nonce)`-has-N-leading-zero-bits proof-of-work primitive used here (and by Bitcoin). *(local: `references/hashcash.pdf`)*
 - **S/Kademlia** — Ingmar Baumgart & Sebastian Mies, *S/Kademlia: A Practicable Approach Towards Secure Key-Based Routing* (ICPADS 2007). The canonical crypto-puzzle Sybil/eclipse defense for DHTs — its abstract: *"limiting free nodeId generation with crypto puzzles"* — and the source of the **static** (address-constraining) vs **dynamic** (separate-nonce) puzzle distinction §3.6 turns on. Also cited in `whitepaper/Axona-Whitepaper.md`. *(local: `references/SKademlia_2007.pdf`)*
 - **Douceur** — John R. Douceur, *The Sybil Attack* (IPTPS 2002). The upstream impossibility result: without a trusted authority, distinguishing identities requires a *resource proof* — the reason a self-authenticating network needs PoW at all. *(local: `references/sybil.pdf`)*
+
+### Forward — Stage 5 proof-of-tenure (§6); not yet in the local `references/` library, citations unverified against source
+- **Verifiable Delay Functions** — D. Boneh, J. Bonneau, B. Bünz, B. Fisch (CRYPTO 2018). The VDF concept (option 6.3.2).
+- B. Wesolowski, *Efficient Verifiable Delay Functions* (EUROCRYPT 2019); K. Pietrzak, *Simple Verifiable Delay Functions* (ITCS 2019) — the two practical VDF constructions.
+- M. Mahmoody, T. Moran, S. Vadhan, *Publicly Verifiable Proofs of Sequential Work* (ITCS 2013) — the timestamped sequential-work primitive behind option 6.3.1.
+- **Chia** — Cohen & Pietrzak, *Simple Proofs of Sequential Work* / the Chia "proof of space and time" — the worked precedent for VDF-based proof-of-time in a live P2P network.
 
 ### Axona docs
 - `architecture/Axona-vs-Vivaldi-v0.1.md` — why Vivaldi ≠ Axona's measured-RTT metric (predicted-coordinate model error + manipulation surface).
