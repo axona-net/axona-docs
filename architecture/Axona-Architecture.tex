@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.7.10 \quad 2026-06-08\par}
+{\small An Axona Architecture Note \quad v0.7.11 \quad 2026-06-10\par}
 \end{center}
 \vfill
 \null
@@ -1342,6 +1342,45 @@ available. The bridge serves over HTTPS; the peer's GitHub Pages
 deployment enforces HTTPS at the Pages level; the demo at
 \texttt{demo.axona.net} required Let's Encrypt cert provisioning
 before identity derivation would run at all.
+
+\subsection*{Proof of work, decoupled from the address}
+
+\newthought{Identity minting is gated by a proof of work} (the E-1
+placement defense), shipped \emph{inert} at difficulty~0 in kernel
+v2.34 so that difficulty is a tunable protocol parameter rather than a
+format change.\footnote{This composes known primitives, not new
+crypto. A.~Back, \emph{Hashcash} (1997) --- the
+$H(\mathrm{input}\,\|\,\mathrm{nonce})$ leading-zero-bits primitive;
+I.~Baumgart \& S.~Mies, \emph{S/Kademlia} (ICPADS 2007) --- crypto-puzzle
+Sybil/eclipse resistance for DHTs, and the \emph{static}
+(ID-constraining) vs \emph{dynamic} (separate-nonce) puzzle distinction
+this design turns on; J.~Douceur, \emph{The Sybil Attack} (IPTPS 2002)
+--- the upstream result that a self-authenticating network needs a
+resource proof at all.} The work is a search for a nonce such that
+$H(\mathrm{domain}\,\|\,\mathrm{role}\,\|\,\mathrm{pubkey}\,\|\,
+\mathrm{nonce})$ carries at least $N$ leading zero bits; the winning
+nonce rides as a sibling wire field (\texttt{pow} on the hello,
+\texttt{signerPow} on the envelope). Per-role difficulty is intentional
+--- a transport identity can be ground into a root position (eclipse)
+and warrants a higher cost; a publish key can only flood, so its cost
+is calibrated to anti-flood, not anti-eclipse.
+
+\newthought{Crucially, the work is never on the address.} The nodeId
+remains \texttt{[prefix]||SHA-256(pubkey)} and is unconstrained by the
+PoW at any difficulty. Encoding the work \emph{into} the address --- the
+``vanity address'' form, S/Kademlia's static puzzle --- would be
+catastrophic for a heterogeneous keyspace: forcing leading-zero address
+bits clusters every PoW'd publisher (and the owned topics it anchors)
+onto \texttt{0x000\ldots}, the keyspace edge, collapsing the DHT's
+uniform load distribution --- and only a \emph{subset} of identities
+(publish keys) is PoW'd, while transport IDs and topics stay uniform. A
+trailing-zero variant would preserve placement (XOR closeness is
+dominated by the high bits) but re-couple difficulty to the address
+format, reviving the flag-day. The separate nonce avoids both: zero
+address bits constrained, full address entropy, difficulty tunable in
+place.\marginnote{Before any difficulty $>0$ ships, the scaffolding
+work hash (currently SHA-256) must be replaced with a memory-hard
+function so phone/browser minters aren't out-classed by ASIC grinders.}
 
 % =====================================================================
 % XIII. PRODUCTION DEPLOYMENT
