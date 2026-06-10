@@ -132,9 +132,21 @@ single-thread sufficiency.
 **Harness shape:** a static page runs trials in a **Web Worker** (matches the real
 mint path; isolates an OOM so it's reported, not silent). Peak memory via
 `wasmMemory.buffer.byteLength` (+ `measureUserAgentSpecificMemory()` when
-cross-origin isolated). The included `collector.js` serves the page with COOP/COEP
-(→ `crossOriginIsolated`) and gathers each device's result JSON to `results.jsonl`
-(optional Axona-topic dogfood via the relay CLI).
+cross-origin isolated).
+
+**Shareable + self-reporting (deployed).** Pages serves the repo root, so the
+harness is live at **<https://demo.axona.net/bench/pow-wasm/>** — share the link,
+testers hit Run, and (auto-publish on by default) the result is **published over
+the live Axona network** to topic `pow-bench/results`. Collect from any local
+node — Axona relaying its own telemetry:
+
+```bash
+node axona-relay/src/cli.js sub "pow-bench/results" --region useast --for 3600
+```
+
+(Verified end-to-end on prod: a result published to the topic is received by that
+command.) The LAN `collector.js` (serves with COOP/COEP for the accurate memory
+API + threads) stays as the cross-origin-isolated alternative.
 
 **Phased run:**
 1. **Node baseline** — param→cost curve, no browser.
