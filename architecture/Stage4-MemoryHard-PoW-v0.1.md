@@ -113,7 +113,46 @@ publish key on both devices:
 This is a Stage-3 (publishID-decoupling) concern; noted here because it is the
 prerequisite for the multi-device effort-split to mean anything.
 
-## 6. References
+## 6. Benchmark plan (the phone-WASM go/no-go gate)
+
+The function pick (§4) is **not committed without this measurement.** A runnable
+harness lives in the kernel repo at **`bench/pow-wasm/`** (works today against the
+SHA-256 baseline; memory-hard candidates drop in as `candidates/*.js` implementing
+the contract in `candidates/template.js`).
+
+**The question:** at a memory parameter that fits the weakest supported phone,
+does the candidate (a) **fit without OOM-killing the tab**, (b) give an acceptable
+**foreground mint time**, and (c) keep **verify at µs scale**? If neither candidate
+clears it → lower difficulty, go background-only, or fall back to Argon2id.
+
+**Metrics** (per candidate × device × param): mint p50/p90/p99, verify ms, **peak
+WASM linear memory + OOM flag**, thermal degradation over a sustained run,
+single-thread sufficiency.
+
+**Harness shape:** a static page runs trials in a **Web Worker** (matches the real
+mint path; isolates an OOM so it's reported, not silent). Peak memory via
+`wasmMemory.buffer.byteLength` (+ `measureUserAgentSpecificMemory()` when
+cross-origin isolated). The included `collector.js` serves the page with COOP/COEP
+(→ `crossOriginIsolated`) and gathers each device's result JSON to `results.jsonl`
+(optional Axona-topic dogfood via the relay CLI).
+
+**Phased run:**
+1. **Node baseline** — param→cost curve, no browser.
+2. **Desktop browser** — catch WASM issues (memory growth, SIMD, threads); DevTools
+   CPU-throttle for dev iteration (simulates CPU, *not* memory/thermal).
+3. **Real phones** — the decision data (your phone + PC + a low-end Android); plus
+   optionally a cloud device lab (BrowserStack / AWS Device Farm) for breadth.
+   Non-negotiable — emulators don't reproduce mobile memory limits or thermal.
+4. **Passive field data** — once a candidate is flagged in, the shipped
+   `powCalibrate` + relay logging gather real cross-device numbers over time
+   (difficulty still 0 → pure measurement).
+
+**Output:** a table `candidate × param × device → {mint, verify, peak mem, OOM?,
+thermal}` → read off the **largest memory param that fits the support-floor phone
+without OOM**, and the **difficulty at that param giving an acceptable mint**. That
+tuple *is* the Stage-4 parameter decision.
+
+## 7. References
 
 - **Equihash** — A. Biryukov & D. Khovratovich, *Equihash: Asymmetric
   Proof-of-Work Based on the Generalized Birthday Problem* (NDSS 2016).
