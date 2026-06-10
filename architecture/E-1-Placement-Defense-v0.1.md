@@ -78,9 +78,10 @@ The `OwnershipProof` seam (handoff §6) is **unaffected** — PoW adds a minting
 ## 6. References
 
 ### Prior art (this design composes known primitives — it is not novel crypto)
-- **Hashcash** — Adam Back, *Hashcash — A Denial of Service Counter-Measure* (1997/2002). The `H(input‖nonce)`-has-N-leading-zero-bits proof-of-work primitive used here (and by Bitcoin).
-- **S/Kademlia** — Baumgart & Mies, *S/Kademlia: A Practicable Approach Towards Secure Key-Based Routing* (ICPADS 2007). The canonical crypto-puzzle Sybil/eclipse defense for DHTs, and the source of the **static** (address-constraining) vs **dynamic** (separate-nonce) puzzle distinction §3.6 turns on. *(Already cited in `whitepaper/Axona-Whitepaper.md`.)*
-- **Douceur** — J. Douceur, *The Sybil Attack* (IPTPS 2002). The upstream impossibility result: without a trusted authority, distinguishing identities requires a *resource proof* — the reason a self-authenticating network needs PoW at all.
+*Citations verified 2026-06-10 against source PDFs in the maintainer's local `references/` library (gitignored — copyrighted, not committed; filenames noted for the maintainer).*
+- **Hashcash** — Adam Back, *Hashcash — A Denial of Service Counter-Measure* (paper dated 1 Aug 2002; mechanism originally proposed May 1997). The `H(input‖nonce)`-has-N-leading-zero-bits proof-of-work primitive used here (and by Bitcoin). *(local: `references/hashcash.pdf`)*
+- **S/Kademlia** — Ingmar Baumgart & Sebastian Mies, *S/Kademlia: A Practicable Approach Towards Secure Key-Based Routing* (ICPADS 2007). The canonical crypto-puzzle Sybil/eclipse defense for DHTs — its abstract: *"limiting free nodeId generation with crypto puzzles"* — and the source of the **static** (address-constraining) vs **dynamic** (separate-nonce) puzzle distinction §3.6 turns on. Also cited in `whitepaper/Axona-Whitepaper.md`. *(local: `references/SKademlia_2007.pdf`)*
+- **Douceur** — John R. Douceur, *The Sybil Attack* (IPTPS 2002). The upstream impossibility result: without a trusted authority, distinguishing identities requires a *resource proof* — the reason a self-authenticating network needs PoW at all. *(local: `references/sybil.pdf`)*
 
 ### Axona docs
 - `architecture/Axona-vs-Vivaldi-v0.1.md` — why Vivaldi ≠ Axona's measured-RTT metric (predicted-coordinate model error + manipulation surface).

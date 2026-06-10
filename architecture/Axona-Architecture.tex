@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.7.11 \quad 2026-06-10\par}
+{\small An Axona Architecture Note \quad v0.7.12 \quad 2026-06-10\par}
 \end{center}
 \vfill
 \null
@@ -1349,14 +1349,16 @@ before identity derivation would run at all.
 placement defense), shipped \emph{inert} at difficulty~0 in kernel
 v2.34 so that difficulty is a tunable protocol parameter rather than a
 format change.\footnote{This composes known primitives, not new
-crypto. A.~Back, \emph{Hashcash} (1997) --- the
+crypto. A.~Back, \emph{Hashcash --- A Denial of Service Counter-Measure}
+(2002; orig.\ proposed 1997) --- the
 $H(\mathrm{input}\,\|\,\mathrm{nonce})$ leading-zero-bits primitive;
-I.~Baumgart \& S.~Mies, \emph{S/Kademlia} (ICPADS 2007) --- crypto-puzzle
-Sybil/eclipse resistance for DHTs, and the \emph{static}
-(ID-constraining) vs \emph{dynamic} (separate-nonce) puzzle distinction
-this design turns on; J.~Douceur, \emph{The Sybil Attack} (IPTPS 2002)
---- the upstream result that a self-authenticating network needs a
-resource proof at all.} The work is a search for a nonce such that
+I.~Baumgart \& S.~Mies, \emph{S/Kademlia: A Practicable Approach Towards
+Secure Key-Based Routing} (ICPADS 2007) --- crypto-puzzle Sybil/eclipse
+resistance for DHTs, and the \emph{static} (ID-constraining) vs
+\emph{dynamic} (separate-nonce) puzzle distinction this design turns on;
+J.~R.~Douceur, \emph{The Sybil Attack} (IPTPS 2002) --- the upstream
+result that a self-authenticating network needs a resource proof at
+all.} The work is a search for a nonce such that
 $H(\mathrm{domain}\,\|\,\mathrm{role}\,\|\,\mathrm{pubkey}\,\|\,
 \mathrm{nonce})$ carries at least $N$ leading zero bits; the winning
 nonce rides as a sibling wire field (\texttt{pow} on the hello,
