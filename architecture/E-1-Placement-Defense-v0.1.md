@@ -43,6 +43,7 @@ It also has the boring virtues: self-verifying in one hash (no verification-DoS)
 3. **Difficulty is a protocol parameter**, fixed (no decentralized difficulty-adjustment oracle needed), **bumpable** by version. Fixed difficulty erodes with Moore's law; revisit per release.
 4. **Per-role difficulty** (see §4): transport identities (which can eclipse) carry the higher difficulty; publish identities (which can only flood) carry a lower one calibrated to anti-flood, not anti-eclipse.
 5. **Ship the field NOW at difficulty 0.** Add the `pow` nonce to the identity/envelope format immediately, as a no-op (difficulty 0 = no requirement). Costs honest users nothing today, but makes raising difficulty later a **parameter change, not an identity-format flag-day.** Build the lever loose; tighten under threat.
+6. **The work is on a SEPARATE puzzle hash — never on the address.** The difficulty applies to `leadingZeroBits(H(domain‖role‖pubkey‖nonce)) ≥ N`; the node/publisher address is `[prefix]‖SHA-256(pubkey)` and is **never constrained by the PoW** at any difficulty. This is the deliberate rejection of the **address-encoded ("vanity address") form** — the S/Kademlia *static* puzzle, where the node ID itself must carry leading-zero bits. Encoding the work into the address is *catastrophic for a heterogeneous keyspace*: if only a SUBSET of identities are PoW'd (publishIDs, but not the uniformly-distributed transport IDs and topics), forcing **leading-zero address bits** clusters every PoW'd publisher — and the owned topics they anchor — onto `0x000…`, the keyspace edge, collapsing the DHT's uniform load distribution. (A **trailing-zero** address variant would preserve placement, since XOR closeness is dominated by the high bits — but it still re-couples difficulty to the address format, reviving the flag-day. The separate nonce avoids both: zero address bits constrained, full address entropy, tunable difficulty.) This decoupling is the S/Kademlia *dynamic* puzzle applied as the sole mechanism. *(Independently re-derived in the 2026-06-10 design review; see [[design_pow_address_decoupling]].)*
 
 ### Honest limitations
 - **One-time cost = deterrent, not an absolute bar.** Pay once, hold the position forever; a funded attacker still gets in. PoW raises a targeted surveillance/eclipse from "free and instant" to "hours of memory-hard compute per topic." That's a real threat-model change, not impossibility.
@@ -75,6 +76,13 @@ The `OwnershipProof` seam (handoff §6) is **unaffected** — PoW adds a minting
 3. When a threat appears (or proactively): **first swap the SHA-256 scaffolding hash for a memory-hard fn**, then raise transport-role difficulty (anti-eclipse, Stage 4a) and publish-role difficulty (anti-flood, Stage 4b) to calibrated values (use `powCalibrate` device data); these ride one coordinated bump and only THEN warrant a public `SECURITY-CHANGELOG.md` entry.
 
 ## 6. References
+
+### Prior art (this design composes known primitives — it is not novel crypto)
+- **Hashcash** — Adam Back, *Hashcash — A Denial of Service Counter-Measure* (1997/2002). The `H(input‖nonce)`-has-N-leading-zero-bits proof-of-work primitive used here (and by Bitcoin).
+- **S/Kademlia** — Baumgart & Mies, *S/Kademlia: A Practicable Approach Towards Secure Key-Based Routing* (ICPADS 2007). The canonical crypto-puzzle Sybil/eclipse defense for DHTs, and the source of the **static** (address-constraining) vs **dynamic** (separate-nonce) puzzle distinction §3.6 turns on. *(Already cited in `whitepaper/Axona-Whitepaper.md`.)*
+- **Douceur** — J. Douceur, *The Sybil Attack* (IPTPS 2002). The upstream impossibility result: without a trusted authority, distinguishing identities requires a *resource proof* — the reason a self-authenticating network needs PoW at all.
+
+### Axona docs
 - `architecture/Axona-vs-Vivaldi-v0.1.md` — why Vivaldi ≠ Axona's measured-RTT metric (predicted-coordinate model error + manipulation surface).
 - `implementation/Decoupled-Publish-Identity-and-C3-v0.1.md` §7(a) (anti-abuse anchor — now answered by this record).
 - `red team/SECURITY-STATUS-v2.32.0.md` (E-1 keystone, Wave E).
