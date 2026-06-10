@@ -25,10 +25,25 @@ The open work clusters on the **availability / anonymity / anti-abuse** frontier
 > **Wave A Stage 1 — SHIPPED to testnet (kernel v2.33.0, 2026-06-09).** **C-3**
 > (metrics reflection + fail-open), **SP-11** (kill removes all dup copies), and
 > **SP-10** (anon-publish quota) are fixed and **deployed + verified on the SF
-> testnet** (`testnet.axona.net`: bridge 2.16.0 / kernel 2.33.0, peer 3.29.0);
-> wire-compatible with 2.32.0 (no flag-day). **Production (`main`) stays at
-> 2.32.0 pending validation.** See `SECURITY-CHANGELOG.md` (v2.33.0). Next:
-> promote to production, then Stage 2 (PoW scaffolding at difficulty 0).
+> testnet**; wire-compatible with 2.32.0 (no flag-day). See
+> `SECURITY-CHANGELOG.md` (v2.33.0).
+>
+> **Wave A Stage 2 — SHIPPED to testnet (kernel v2.34.0, 2026-06-10).** PoW
+> **scaffolding at difficulty 0** (INERT): the `pow` (transport hello) and
+> `signerPow` (envelope) nonce fields, a per-role memory-hard-ready verifier
+> (`src/pow/pow.js`), and `powCalibrate` now travel the wire and are checked at
+> the existing handshake-admit / publish-ingress gates as no-ops. This locks the
+> format so transport-PoW (E-1 anti-eclipse, Stage 4a) and publish-PoW (§7a
+> anti-flood, Stage 4b) can later be switched on by a **parameter** change, not a
+> format flag-day. Wire-compatible with 2.33.0 (sibling fields, ignored by older
+> peers). Verified on the live mesh by the relay e2e suite (S1–S4 + A1/A2). The
+> scaffolding hash is SHA-256 — it gates nothing at difficulty 0 and **must be
+> swapped for a memory-hard fn before any difficulty > 0**. No public
+> `SECURITY-CHANGELOG` entry yet: it protects nothing until difficulty is raised.
+>
+> **Production (`main`) stays at 2.32.0 pending validation** of the testnet line.
+> Next: promote Stages 1–2 to production; Stage 3 (publish-identity decoupling)
+> is demand-gated; Stage 4 turns on difficulty when warranted.
 
 ## 2. What's resolved (the baseline now in production)
 

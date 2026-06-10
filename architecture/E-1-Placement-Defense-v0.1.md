@@ -70,9 +70,9 @@ The `OwnershipProof` seam (handoff §6) is **unaffected** — PoW adds a minting
 
 ## 5. Sequencing
 
-1. **Add `pow` nonce to the identity format and `signerPow` to the envelope, at difficulty 0** (no-op; avoids a future format flag-day). Memory-hard verifier in place, difficulty as a protocol constant.
-2. Land the publish-identity decoupling (handoff Part 2) with quota anchored on the publish key (§7(a) now answered).
-3. When a threat appears (or proactively): raise transport-role difficulty (anti-eclipse) and publish-role difficulty (anti-flood) to calibrated values; document in `SECURITY-CHANGELOG.md`.
+1. ✅ **DONE — kernel v2.34.0 (2026-06-10, on testnet).** `pow` nonce in the auth hello + `signerPow` in the envelope, both **siblings** (self-binding to the pubkey, outside the signed transcript/core ⇒ wire-compatible with 2.33.0). Per-role verifier `src/pow/pow.js` (`powMint`/`powVerify`/`powBits`/`powCalibrate`), difficulty a frozen protocol constant `POW_DIFFICULTY={transport:0,publish:0}`. Checked at the handshake-admit and publish-ingress gates as **no-ops at difficulty 0**. ⚠️ The shipped work hash is **SHA-256 (scaffolding only)** — it gates nothing at difficulty 0; **step 3 must first swap it for a memory-hard fn** (Argon2id/scrypt). Tests `test/smoke_pow.js`; live-verified by the relay e2e suite.
+2. Land the publish-identity decoupling (handoff Part 2) with quota anchored on the publish key (§7(a) now answered). *(Demand-gated.)*
+3. When a threat appears (or proactively): **first swap the SHA-256 scaffolding hash for a memory-hard fn**, then raise transport-role difficulty (anti-eclipse, Stage 4a) and publish-role difficulty (anti-flood, Stage 4b) to calibrated values (use `powCalibrate` device data); these ride one coordinated bump and only THEN warrant a public `SECURITY-CHANGELOG.md` entry.
 
 ## 6. References
 - `architecture/Axona-vs-Vivaldi-v0.1.md` — why Vivaldi ≠ Axona's measured-RTT metric (predicted-coordinate model error + manipulation surface).
