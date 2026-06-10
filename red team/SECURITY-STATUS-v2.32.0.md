@@ -22,6 +22,14 @@ The open work clusters on the **availability / anonymity / anti-abuse** frontier
 
 > **Live-network posture (2026-06-09).** `axona.net` / `bridge.axona.net` are serving real peers on the `axona/5` line. Two facts are now operationally true rather than theoretical: the production **bridge is a live metadata vantage point** (it sees IP↔pubkey↔region↔subscription — F-4, inherent), and every meshed peer **exposes its IP to its mesh neighbors** via WebRTC ICE. The cheapest mitigation for the latter — a **TURN-relayed-candidates-only** privacy switch — is hereby promoted from the research tier (Wave E) to a **near-term optional control**.
 
+> **Wave A Stage 1 — SHIPPED to testnet (kernel v2.33.0, 2026-06-09).** **C-3**
+> (metrics reflection + fail-open), **SP-11** (kill removes all dup copies), and
+> **SP-10** (anon-publish quota) are fixed and **deployed + verified on the SF
+> testnet** (`testnet.axona.net`: bridge 2.16.0 / kernel 2.33.0, peer 3.29.0);
+> wire-compatible with 2.32.0 (no flag-day). **Production (`main`) stays at
+> 2.32.0 pending validation.** See `SECURITY-CHANGELOG.md` (v2.33.0). Next:
+> promote to production, then Stage 2 (PoW scaffolding at difficulty 0).
+
 ## 2. What's resolved (the baseline now in production)
 
 | Area | Guarantee | Shipped |

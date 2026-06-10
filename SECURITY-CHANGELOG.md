@@ -16,6 +16,27 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.33.0 — 2026-06-09  *(SF testnet; production promotion pending)*
+
+### Pub/sub abuse hardening — metrics can't be turned into a reflector, and a retraction is now complete
+
+Wire-compatible with v2.32.0 (no envelope/identity change).
+
+- **Metrics responses go only to the proven requester.** A topic-metrics reply
+  is now delivered solely to the cryptographically authenticated channel peer
+  that asked — never to an address named in the request payload. A request can
+  therefore no longer be turned into a reflection/amplification toward a chosen
+  victim, and the redundant tree-wide broadcast that multiplied it is removed.
+- **Metrics ownership fails closed.** When a root cannot establish a topic's
+  owner (empty replay cache), the owner-sensitive subscriber count is withheld
+  rather than disclosed.
+- **A retraction removes every copy.** `kill` now drops all cached copies of a
+  message's content, not just the first — identical re-gossiped content can no
+  longer survive its own retraction.
+- **Anonymous publishes can't dodge the flood cap.** Unsigned publishes share a
+  single per-publisher quota bucket on open topics, so omitting a signature no
+  longer bypasses the per-publisher limit.
+
 ## Kernel v2.28.0 — 2026-06-06
 
 ### A node authenticates only within its own network; an active publisher's replay protection no longer weakens under load; dropped-message logging is now observable
@@ -588,4 +609,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-06.*
+*Last updated: 2026-06-09.*
