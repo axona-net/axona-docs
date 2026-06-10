@@ -41,9 +41,20 @@ The open work clusters on the **availability / anonymity / anti-abuse** frontier
 > swapped for a memory-hard fn before any difficulty > 0**. No public
 > `SECURITY-CHANGELOG` entry yet: it protects nothing until difficulty is raised.
 >
-> **Production (`main`) stays at 2.32.0 pending validation** of the testnet line.
-> Next: promote Stages 1–2 to production; Stage 3 (publish-identity decoupling)
-> is demand-gated; Stage 4 turns on difficulty when warranted.
+> **PROMOTED TO PRODUCTION — kernel v2.34.0 (2026-06-10).** Stages 1+2 are now
+> live on `axona.net` / `bridge.axona.net` (bridge 2.17.0, peer 3.30.0), verified
+> end-to-end; rolling update, wire-compatible with the prior 2.32.0 (no flag-day).
+>
+> **Testnet now leads at kernel v2.35.0** with Stage-4 prep (inert at difficulty
+> 0): the transport PoW nonce is **persisted** in the identity envelope (no
+> re-mint per load once difficulty > 0); difficulty is **injectable** for tests /
+> a coordinated dial (`setPowDifficulty`), with the enforcement gates now
+> covered by tests at difficulty > 0; and the relay **logs PoW calibration** at
+> startup (device solve-rate → Stage-4 difficulty data).
+>
+> Next: Stage 4 — swap the SHA-256 scaffolding hash for a memory-hard fn, then
+> raise transport (4a, anti-eclipse) / publish (4b, anti-flood) difficulty as a
+> coordinated cutover; Stage 3 (publish-identity decoupling) stays demand-gated.
 
 ## 2. What's resolved (the baseline now in production)
 

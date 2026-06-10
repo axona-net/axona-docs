@@ -16,7 +16,7 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
-## Kernel v2.33.0 — 2026-06-09  *(SF testnet; production promotion pending)*
+## Kernel v2.33.0 — 2026-06-09  *(in production 2026-06-10)*
 
 ### Pub/sub abuse hardening — metrics can't be turned into a reflector, and a retraction is now complete
 
@@ -609,4 +609,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-09.*
+*Last updated: 2026-06-10.*
