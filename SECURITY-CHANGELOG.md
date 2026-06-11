@@ -16,6 +16,30 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.36.0 — 2026-06-11
+
+### A retraction now survives replica divergence and subscriber reloads
+
+Wire-additive over v2.35.0 (adds the `pubsub:kill-sync` direct message; no
+envelope or identity change, so old and new nodes interoperate).
+
+- **A killed message stays killed across the whole root set.** A topic is
+  replicated across several root axons. A root that applies a creator-authorized
+  `kill` now re-gossips the **signed** kill to the current root set until the
+  replicas converge; any replica that had missed it re-verifies the kill against
+  the message it holds and removes + tombstones that message. The retraction
+  travels as the signed kill object — re-checked against the message it names —
+  so it stays creator-authorized end to end and can never be used to suppress a
+  message the sender did not author. What a user sees: a retracted message no
+  longer reappears after a subscriber reloads.
+- **A root never replays a message it has tombstoned.** Replay-on-(re)subscribe
+  now also filters tombstoned messages on the *sending* side, so a lingering
+  cache entry cannot leak a retracted message to a freshly-joined subscriber
+  whose own tombstone set is still empty.
+
+Bounded by design: re-gossip is gated to recent retraction activity, so there is
+no steady-state cost and kill traffic stays proportional to actual retractions.
+
 ## Kernel v2.33.0 — 2026-06-09  *(in production 2026-06-10)*
 
 ### Pub/sub abuse hardening — metrics can't be turned into a reflector, and a retraction is now complete
@@ -609,4 +633,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-10.*
+*Last updated: 2026-06-11.*
