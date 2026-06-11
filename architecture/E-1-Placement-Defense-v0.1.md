@@ -1,6 +1,6 @@
 # E-1 — Targeted-Placement Defense: Decision Record
 
-**Version:** v0.1 · **Date:** 2026-06-09 · **Status:** **DECIDED — proof-of-work (memory-hard), Vivaldi/RTT rejected.**
+**Version:** v0.1 · **Date:** 2026-06-09 · **Rev:** 2026-06-11 (added §4 "Why transport difficulty must lead") · **Status:** **DECIDED — proof-of-work (memory-hard), Vivaldi/RTT rejected.**
 **Baseline:** kernel v2.32.0 (live `axona/5` line).
 **Feeds:** `implementation/Decoupled-Publish-Identity-and-C3-v0.1.md` §7(a); `red team/SECURITY-STATUS-v2.32.0.md` (E-1 keystone).
 **Standing constraint:** no central authority / CA / reputation service. Self-authenticating only.
@@ -61,6 +61,22 @@ This is where PoW earns its keep. The earlier objection to decoupling the **publ
 5. **It localizes the rotating-key privacy tension to exactly the right place.** Stable transportID: mint once, PoW paid once, no tension. Rotating publishID (the unlinkable-publisher privacy mode): pays a puzzle per rotation — a coherent, *opt-in* cost ("unlinkability costs a puzzle per persona"), and made cheaper by the lower publish-role difficulty in (4).
 
 **Net:** PoW is the prerequisite that makes the publishID decoupling *safe*. It converts my earlier critique ("publishID is downstream of E-1") into a clean dependency: **ship the PoW field first (even at difficulty 0); then the publish-identity work proceeds with its anti-flood anchor already answered, without re-coupling to the transport identity.**
+
+### Why transport difficulty must lead — and what caps it
+
+§4(4) lists transport > publish as a degree of freedom; here is why the inequality is **structural**, not a tuning preference.
+
+**The eclipse attack lives entirely in transport-ID space.** A publisher/topic key is mapped into the *same* metric space as transport addresses and is rooted by the K transport IDs XOR-closest to it. To surveil or censor a target publisher, an attacker must occupy those K-closest slots — i.e. obtain *transport* IDs near the target key, which (since `transportID = prefix‖SHA-256(pubkey)`) means grinding pubkeys (§1). **The publish-role PoW does nothing against this** — it bounds how many content streams an identity can flood, not where nodes land relative to a victim. For eclipse, the transport puzzle is the *only* PoW lever.
+
+**Few-but-each-expensive vs many-but-each-cheap.** The two attacks have opposite cost shapes. Eclipse needs only ~K identities at one chosen target, so deterrence must be a **high per-identity** cost. Flood needs *many* identities, so even a modest per-identity cost accrues across the volume. Transport difficulty is therefore set against the per-node bar that makes K placements uneconomic; publish difficulty only against quota-evasion economics. **transport ≥ publish is the consequence, not a preference.**
+
+**Decoupling (§3 item 6) is why the per-node bar must be high.** With the puzzle on a separate hash — never the address — the attacker grinds *proximity* with cheap SHA-256 and pays the memory-hard puzzle only on the ~K candidates actually deployed. So the eclipse cost ≈ **K × (one transport puzzle)**: a low transport difficulty barely dents it (K cheap puzzles), and the difficulty must be loaded onto the transport role to bite.
+
+**Memory-hardness is what makes K × puzzle a real number.** Plain SHA-256 would let an attacker mint those K identities ~10²–10³× cheaper than an honest phone — K placements trivially funded. Memory-hard minting collapses that hardware gap: the 2026-06 phone-WASM benchmark (cuckoo / equihash across an M4, a Galaxy S24 Ultra, and an iPhone; see `Stage4-MemoryHard-PoW-v0.1.md`) measures a device spread of only **~1–2× at the deployable operating point**, not orders of magnitude. So the attacker's per-node cost ≈ an honest phone's, and K placements cost ~K phone-equivalents of memory-hard work. That parity — not the raw puzzle cost — is the property eclipse resistance actually rests on.
+
+**What caps transport difficulty: the phone floor.** Every honest node — phones included — must mint a transport puzzle to join routing, so transport difficulty is **bounded above by the weakest honest device**, which the same benchmark maps: the deployable window is ≈ equihash B=16–18 (a few hundred MB, single-digit seconds), set by iOS-Safari's per-tab memory ceiling (the binding constraint — it page-crashes above ~B=19 where Android/desktop keep going). You therefore **cannot raise transport difficulty until eclipse is impossible** — the ceiling is a phone, not the attacker's budget.
+
+**Consequence.** Transport PoW raises the price *per placed node* up to that phone-affordable ceiling; closing the residual gap is the job of the **non-PoW placement layers** — K-closest publisher-signature verification (B-4), self-proximity gating on promotion (B-2), disjoint-path lookups, and the gossip→candidate-pool hardening (B-3) that stops a placed node from being *believed* cheaply. PoW makes K nodes expensive; those layers make K nodes insufficient or detectable. **Calibrate transport difficulty to the phone floor, then rely on the placement layers for the rest — PoW alone will not bar a funded eclipse** (consistent with §3 "Honest limitations").
 
 ### Concrete wire/enforcement note
 For the anti-flood property to bite, a root must be able to check a publisher's PoW before granting a quota slot. Since PoW is over `pubkey`, the verifier needs `(pubkey, nonce)`:
