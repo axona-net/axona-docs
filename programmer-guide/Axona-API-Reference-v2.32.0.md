@@ -204,7 +204,12 @@ The peer is the per-node DHT contract implementation.
 
 Construct a peer. Required:
 
-- `domain` — an `AxonaDomain` instance (shared routing parameters).
+- `domain` — an `AxonaDomain` instance (shared routing parameters, e.g. `{ k: 20 }`).
+  Mind the two distinct "K"s: the Kademlia **routing** parameter **`k` = 20**
+  (`AxonaDomain._k` — sizes the closest-set for *lookups*) is **not** the pub/sub
+  **replication factor `R` = 5** (`AxonaManager.rootSetSize` — the root-set size
+  that *anchors each topic*). "K-closest" elsewhere names the generic
+  find-closest-`N` operation both use (`N = k` for routing, `N = R` for replication).
 - `node` — a `NeuronNode` (or any object with `{id, alive, transport, synaptome}`).
 - `identity` — from `deriveIdentity`; needed for signed publishes.
 

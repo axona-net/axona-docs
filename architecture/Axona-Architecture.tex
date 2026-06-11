@@ -779,7 +779,13 @@ top of Axona routing but doesn't reuse the synaptome for state ---
 each peer maintains a separate set of \emph{axon roles}, one per
 topic it's chosen as an axon for. A role holds a topic ID, a set of
 children (subscribers), a replay cache, and a $K$-replicated peer
-set (the other root axons for the same topic).
+set (the other root axons for the same topic).\footnote{Notation:
+this replication factor is the \emph{root-set size} $R=5$
+(\texttt{AxonaManager.rootSetSize})---distinct from the Kademlia
+\emph{routing} parameter $k=20$ (\texttt{AxonaDomain.\_k}), which
+sizes the closest-set used for \emph{lookups}. ``K-closest''
+throughout names the generic find-closest-$N$ operation both use:
+$N=k$ for routing, $N=R$ for replication.}
 
 Subscriber-side flow:
 

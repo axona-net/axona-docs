@@ -134,7 +134,8 @@ You should see:
 **That's it.** You just ran:
 
 - Ed25519 identity derivation (264-bit nodeIds, S2-cell-prefixed for us-east)
-- A signed envelope publish through `AxonaManager`'s K-closest replication
+- A signed envelope publish replicated to the topic's **R = 5** root axons (the
+  root-set size — distinct from the Kademlia routing parameter **k = 20**)
 - A `since: 'all'` subscriber receiving the cached message
 
 The full version of this with comments and a verifier is at

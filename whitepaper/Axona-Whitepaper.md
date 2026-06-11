@@ -522,7 +522,7 @@ A subscribe message in Axona is simultaneously a liveness probe, a tree-attach r
 
 ### 6.7 Production Refinements (live Axona deployment)
 
-Real-network deployment of the pub/sub layer (see §17) exposed three corner cases the simulator's abstracted network model hadn't surfaced. Each was fixed in the protocol layer; the production semantics now diverge slightly from the textbook K-closest model.
+Real-network deployment of the pub/sub layer (see §17) exposed three corner cases the simulator's abstracted network model hadn't surfaced. Each was fixed in the protocol layer; the production semantics now diverge slightly from the textbook K-closest model. (Terminology: the *replication factor* is **R = 5** — the root-set size — distinct from the Kademlia *routing* parameter **k = 20**; "K-closest" denotes the generic find-closest-*N* operation both use.)
 
 **Lazy-axon promotion.** Under the upstream protocol, a K-closest node that received a `pubsub:publish-k` for a topic it didn't yet hold a role for would *drop* the message (forwarding it via a routed walk that landed on another empty-role node and gave up). This meant **publish-before-subscribe lost messages**: by the time a subscriber registered, the publisher's earlier messages had been discarded everywhere. The fix is to promote any K-closest receiver to a (childless) root role on first publish, immediately seeding the replay cache. When a subscriber later attaches, the existing `_maybeSendReplay` path serves the cache. Empty-role rootGraceMs (60 s default) bounds the cost: nodes that never accumulate subscribers garbage-collect during the refresh sweep.
 
