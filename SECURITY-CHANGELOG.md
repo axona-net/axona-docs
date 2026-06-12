@@ -16,6 +16,35 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.37.0–v2.39.0 — 2026-06-12
+
+### Pub/sub messages converge across replicas (no silent loss), and old browsers can join
+
+Wire-additive over v2.36.0 (new `pubsub:msgsync` / `msgsync-resp` direct messages;
+no envelope or identity change — old and new nodes interoperate).
+
+- **A delivered message can no longer go permanently missing.** Replay-on-
+  (re)subscribe was filtered by a single high-water timestamp, which can't
+  represent a hole: once you received anything newer than a gap, that gap was
+  masked forever. Subscribers now report the content-ids they actually hold and a
+  root replays exactly the complement, so a missed message is backfilled rather
+  than lost (v2.37.0).
+- **The R root replicas reconcile, so any root carries every publisher's feed.**
+  A publish only reaches the *publisher's* K-closest root set, which need not be a
+  subscriber's. Roots now exchange digests of held content-ids with their
+  K-closest siblings and pull what they're missing. **Pulled messages are
+  RE-VERIFIED** — a sibling root is not trusted: the publisher signature (B-4) and
+  the content-address are re-checked exactly as on live ingress, so reconciliation
+  cannot be used to inject a forged or content-poisoned message; tombstoned
+  (killed) messages are never resurrected through it (v2.39.0).
+- **Old browsers without native WebCrypto Ed25519 can now derive an identity and
+  join at all** (older Chrome / Samsung Internet / many WebViews), via a vendored
+  pure-JS Ed25519 fallback. Native devices are unchanged and keep the
+  **non-extractable** signing key (finding H4); the software fallback's key lives
+  in JS memory and is therefore extractable, so the H4 hardening is a native-only
+  property — used only where the alternative is "cannot connect." Signatures
+  interoperate both ways (same RFC 8032 curve) (v2.38.0).
+
 ## Kernel v2.36.0 — 2026-06-11
 
 ### A retraction now survives replica divergence and subscriber reloads
@@ -633,4 +662,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-11.*
+*Last updated: 2026-06-12.*
