@@ -16,6 +16,34 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.40.0 — 2026-06-12
+
+### Infrastructure nodes can host topics without subscribing to them
+
+Wire-additive over v2.39.0 — and in fact uses **no new wire message at all**: a
+host announces itself with the same `pubsub:subscribe-k` a subscriber already
+sends, so every existing kernel recruits a host with no flag day. `WIRE_VERSION`
+is unchanged.
+
+- **Hosting is now decoupled from consuming.** A relay or other infrastructure
+  node can call `host()` to volunteer as a root/replica — storing and serving a
+  topic for other peers — without registering as a *subscriber* of it. Previously
+  the only way a node entered a topic's serving fabric was to `sub()`, which also
+  made it a consumer (local delivery) of data it only meant to carry. A host
+  registers no delivery handler and is never added to the node's own
+  subscription set, so it forwards and serves but consumes nothing.
+- **Two scopes, both least-privilege by proximity.** `host(topic)` serves one
+  named topic; `host()` (no argument) volunteers the node for *its own keyspace
+  neighborhood* — it gets recruited for whatever topics land near its id and
+  nothing else. Neither bypasses the B-2 proximity gate: a host still only ends
+  up rooting topics it is genuinely K-closest to, so the primitive cannot force a
+  node into the serving set for arbitrary/distant topics. A node that hosts a
+  topic it is far from simply wastes its *own* memory and harms no one.
+- **No new trust.** A recruited host caches a message only after the same
+  publisher-signature (B-4) and content-address checks every root applies on
+  ingress, and serves replays exactly as a root already does. Hosting changes
+  *who volunteers to carry* a topic, not *what is accepted* onto it.
+
 ## Kernel v2.37.0–v2.39.0 — 2026-06-12
 
 ### Pub/sub messages converge across replicas (no silent loss), and old browsers can join
