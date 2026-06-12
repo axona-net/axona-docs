@@ -1,13 +1,13 @@
 # Axona API Reference
 
 Reference for every public symbol exported from `@axona/protocol`
-v2.32.0. Organized by what application developers actually reach for;
+v2.40.0. Organized by what application developers actually reach for;
 deep-customization surfaces are at the end.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v2.32.0.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v2.32.0.md) — mental model + worked
+- [Quick Start](Quick-Start-v2.40.0.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v2.40.0.md) — mental model + worked
   example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects (authenticated handshake, channel binding, pub/sub
@@ -464,6 +464,40 @@ which no key can own) — are readable by anyone. For an **owner-keyed** topic
 (`publisher` = a real node ID) only that owner gets a response; everyone else's
 request is declined (self-authenticating, no gatekeeper). So `metrics()` on
 someone else's owned topic resolves with zeroed/empty counters, not their data.
+
+#### `peer.host(topicName?, opts?)` → `Promise<{ ok, scope, topicId? }>`
+
+Store and serve a topic for other peers **without subscribing to it** (kernel
+≥ v2.40.0) — the relay / infrastructure primitive. It makes the node a willing
+root/replica so publishes land on it and subscribers pull replays from it, but
+it registers **no handler** and delivers nothing to your app.
+
+- `peer.host('news/world', { publisher: synth })` — host one named topic.
+- `peer.host()` — no argument: host this node's **own keyspace neighborhood**,
+  i.e. get recruited as a root for whatever topics fall near its node ID ("host
+  whatever lands near me"). This is the zero-config relay mode.
+
+`opts.publisher` selects the topic-id derivation exactly like `peer.sub`
+(default = this node's feed, `null` = public topic, hex = someone else's feed).
+`peer.unhost(topicName?)` reverses it (omit the topic to turn off keyspace
+hosting). `health().hosting` reports `{ keyspace, topics }`.
+
+```js
+// a headless relay that serves whatever is near it, consuming nothing:
+await peer.host();
+
+// or host specific app topics:
+await peer.host('pow-bench/results', { publisher: synth });
+```
+
+**Decoupled from `sub`.** Hosting answers "I'll carry this for others";
+subscribing answers "I want to receive this." A host is never added to your
+subscription set and fires no delivery handler. Under the hood it announces
+with the same `pubsub:subscribe-k` a subscriber sends, so existing roots
+recruit it with no wire change, and it respects the proximity gate — a host
+only roots topics it is genuinely K-closest to. Before v2.40.0 the only way a
+node joined a topic's serving fabric was to `sub()`, so a relay that meshed but
+never subscribed carried nothing.
 
 #### `peer.kill(topicName, msgId, opts?)` → `Promise<{ ok }>`
 
@@ -1231,7 +1265,7 @@ needed by app code.
 
 ```js
 WIRE_VERSION         // '2.0'        — wire format major.minor
-KERNEL_VERSION       // '2.32.0'     — kernel semver
+KERNEL_VERSION       // '2.40.0'     — kernel semver
 AUTH_PROTO           // 'axona/5'    — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426         — WebSocket close code for version mismatch
 ID_BITS              // 264

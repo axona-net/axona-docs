@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.7.12 \quad 2026-06-10\par}
+{\small An Axona Architecture Note \quad v0.7.13 \quad 2026-06-12\par}
 \end{center}
 \vfill
 \null
@@ -412,6 +412,23 @@ axon in each set overlaps, delivery succeeds. With $K=5$ and
 synaptomes that converge under the bridge's peer-list dissemination,
 overlap is typically 4 or 5 of 5 --- so a publish that loses two
 axons to transient WebRTC failures still delivers cleanly.
+
+Three convergence mechanisms close the residual gaps where ``one axon
+overlaps'' is not guaranteed --- a publish lands on the \emph{publisher's}
+K-closest set, which need not be a given subscriber's. \textbf{Gap-safe
+replay} (kernel v2.37.0): a (re)subscriber reports the content-IDs it
+actually holds (a bounded \texttt{have} digest) and a root replays exactly
+the complement, so a hole in the middle is backfilled rather than masked by
+a single high-water timestamp. \textbf{Root-to-root anti-entropy} (v2.39.0):
+each root periodically exchanges digests of held content-IDs with its
+K-closest siblings and pulls what it is missing --- and \emph{re-verifies}
+every pulled message (publisher signature B-4 + content-address), so a
+sibling root cannot inject a forged or content-poisoned message and a killed
+message is never resurrected. \textbf{Kill convergence} (v2.36.0):
+recently-applied retractions are re-gossiped to the current root set, so a
+replica that missed the original kill still drops and tombstones the message
+rather than re-serving it to a reloading subscriber. All three are
+wire-additive --- old and new nodes interoperate.
 
 % =====================================================================
 % VI. THE TRANSPORT LAYER
@@ -1184,6 +1201,38 @@ ceiling.
 
 \noindent Returns \texttt{\{ publishes, subscribers, deliveries,
 pulls, reshares, relayCount \}}.
+
+\smallskip
+\noindent\texttt{await peer.host(topic?, opts?)}\quad
+\emph{store + serve a topic for others, without subscribing (kernel
+v2.40.0)}
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{topic}] string, \emph{or omitted}. With a topic, the node
+hosts that one topic. Omitted, the node hosts its \textbf{own keyspace
+neighborhood} --- it is recruited as a root for whatever topics fall near
+its node ID (``host whatever lands near me''), the natural mode for a
+relay.
+\item[\texttt{opts.publisher}] same publisher-anchor semantics as
+\texttt{sub}, selecting which feed's topic ID to host.
+\end{description}
+
+\noindent Hosting is \textbf{decoupled from subscribing}: a host stores and
+serves a topic for other peers but is \emph{not} a consumer of it --- it
+registers no delivery handler and is never added to the node's own
+subscription set. Mechanically it announces itself with the \emph{same}
+\texttt{pubsub:subscribe-k} a subscriber already sends, so existing roots
+recruit it with no wire change (no flag day), then caches and serves
+replays exactly as a root does. It respects the proximity gate (B-2): a
+host only ends up rooting topics it is genuinely among the K-closest to, so
+the primitive cannot force a node into the serving set for arbitrary or
+distant topics. \texttt{peer.unhost(topic?)} reverses it;
+\texttt{health().hosting} reports \texttt{\{ keyspace, topics \}}. This is
+the participation primitive for relays and other infrastructure that should
+\emph{carry} a topic without consuming it --- before it, a node entered a
+topic's serving fabric only by subscribing, so a relay that meshed but
+never subscribed carried nothing.
 
 \subsection*{Message lifecycle (kernel v2.10.0)}
 

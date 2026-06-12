@@ -7,6 +7,74 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v2.40.0 — decoupled `host()` primitive: serve topics without subscribing (2026-06-12)
+
+Wire-additive over 2.39.0, and uses **no new wire message**: a host announces with
+the same `pubsub:subscribe-k` a subscriber already sends, so every existing kernel
+recruits a host with no flag day (`WIRE_VERSION` unchanged at `2.0`).
+
+- **`peer.host(topic)` / `peer.host()` / `peer.unhost(...)`.** Infrastructure
+  nodes (relays) can now **store + serve** a topic for other peers *without*
+  subscribing as a consumer. `host(topic)` serves one named topic; `host()` (no
+  argument) volunteers the node for its **own keyspace neighborhood** — recruited
+  as a root for whatever topics land near its id ("host whatever lands near me").
+  A host registers no delivery handler and is never added to `mySubscriptions`;
+  `health().hosting` surfaces the state.
+- **Why it was needed.** A node only enters a topic's serving fabric once it's
+  *discoverable* there, and the only action that announced a node used to be
+  `sub()` — so a relay that meshed but never subscribed showed zero pub/sub roles
+  forever. `host()` supplies the announcement without the consumer semantics. It
+  respects the B-2 proximity gate: a host only ever roots topics it is genuinely
+  K-closest to.
+- **Relay v0.10.0.** Defaults to keyspace hosting (`RELAY_HOST_KEYSPACE=1`), so a
+  relay participates with **zero topic config**; `RELAY_TOPICS` now *hosts* named
+  topics instead of issuing no-op subscribes. Verified live: a fresh relay climbs
+  to `roles=174, subs=0` within seconds.
+- **Versions.** kernel `2.39.0 → 2.40.0`; bridge `2.20.0 → 2.21.0`; peer
+  `3.31.0 → 3.32.0` (app `v0.40.0`); relay `0.9.3 → 0.10.0`; PoW benchmark
+  `v0.16.0 → 0.17.0`; Axona-share `v0.7.0 → 0.8.0`.
+
+## v2.39.0 — root-to-root pub/sub anti-entropy (2026-06-12)
+
+Wire-additive (new `pubsub:msgsync` / `msgsync-resp` direct messages; no envelope
+or identity change). A publish only reaches the *publisher's* K-closest root set,
+which need not be a *subscriber's* — so a subscriber attached to a different root
+could miss it. Roots now exchange digests of held content-ids with their K-closest
+siblings and pull what they're missing. **Pulled messages are re-verified** — the
+publisher signature (B-4) and the content-address are re-checked exactly as on
+live ingress, so a sibling root cannot inject a forged or content-poisoned
+message, and tombstoned (killed) messages are never resurrected. Closes the
+residual divergence left after 2.37.0's subscriber-side fix.
+
+## v2.38.0 — Ed25519 software fallback: old browsers can join (2026-06-12)
+
+Older browsers without native WebCrypto Ed25519 (older Chrome, Samsung Internet,
+many WebViews) previously couldn't derive an identity at all — `generateKey` threw
+and the peer never connected. A vendored pure-JS Ed25519 fallback (`@noble/ed25519`
+v2.3.0, over the universal `crypto.subtle.digest('SHA-512')`) lets them mint an
+identity and join. Native devices are unchanged and keep the **non-extractable**
+signing key (finding H4); the software key lives in JS memory and is therefore
+extractable, so the H4 hardening is a native-only property — used only where the
+alternative is "cannot connect." Signatures interoperate both ways (same RFC 8032
+curve).
+
+## v2.37.0 — gap-safe replay: no more silently-lost messages (2026-06-12)
+
+Replay-on-(re)subscribe was filtered by a single high-water timestamp, which can't
+represent a *hole*: once you'd received anything newer than a gap, that gap was
+masked forever. Subscribers now report the content-ids they actually hold (a
+bounded `have` digest in the subscribe payload) and a root replays exactly the
+complement — a missed message is backfilled rather than lost. Wire-additive.
+
+## v2.36.0 — kill convergence: a retraction survives reloads (2026-06-11)
+
+Wire-additive (adds the `pubsub:kill-sync` direct message). A killed message
+stayed killed only on the roots that saw the kill; a replica that missed it could
+re-serve the message to a reloading subscriber — the reported "I killed it and it
+came back" bug. Recently-applied kills are now re-gossiped to the current root
+set, so a replica that missed the original kill removes and tombstones the
+message.
+
 ## v2.32.0 — one name per region + production flag-day cutover (2026-06-08)
 
 **Production cutover.** `axona.net` / `bridge.axona.net` migrated from the
