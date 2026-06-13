@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 340" font-family="Georgia, 'EB Garamond', serif">
+  <style>
+    .pill  { fill:#fff; stroke:#2d7373; stroke-width:1.4; }
+    .pillt { font-family:'Inconsolata', Menlo, monospace; fill:#1a4d4d; font-size:14px; }
+    .step  { fill:#888; font-size:12px; }
+    .arrow { stroke:#2d7373; stroke-width:1.6; fill:none; marker-end:url(#a); }
+    .ui    { fill:#fbfbf6; stroke:#d8d4ca; stroke-width:1.3; }
+    .uit   { fill:#6b6b6b; font-size:12px; font-family:'Inconsolata', Menlo, monospace; }
+    .cap   { fill:#444; font-size:13.5px; font-style:italic; }
+    .rust  { fill:#b94e36; }
+  </style>
+  <defs>
+    <marker id="a" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#2d7373"/>
+    </marker>
+  </defs>
+
+  <!-- four API steps -->
+  <g>
+    <rect x="24"  y="56" width="160" height="46" rx="23" class="pill"/>
+    <text x="104" y="84" text-anchor="middle" class="pillt">deriveIdentity()</text>
+    <text x="104" y="44" text-anchor="middle" class="step">1 · a keypair + id</text>
+
+    <rect x="216" y="56" width="160" height="46" rx="23" class="pill"/>
+    <text x="296" y="84" text-anchor="middle" class="pillt">webTransport()</text>
+    <text x="296" y="44" text-anchor="middle" class="step">2 · mesh + bridge</text>
+
+    <rect x="408" y="56" width="160" height="46" rx="23" class="pill"/>
+    <text x="488" y="84" text-anchor="middle" class="pillt">new AxonaPeer()</text>
+    <text x="488" y="44" text-anchor="middle" class="step">3 · start()</text>
+
+    <rect x="600" y="56" width="136" height="46" rx="23" class="pill"/>
+    <text x="668" y="79" text-anchor="middle" class="pillt">sub() /</text>
+    <text x="668" y="95" text-anchor="middle" class="pillt">pub()</text>
+    <text x="668" y="44" text-anchor="middle" class="step">4 · talk</text>
+
+    <path class="arrow" d="M186 79 L214 79"/>
+    <path class="arrow" d="M378 79 L406 79"/>
+    <path class="arrow" d="M570 79 L598 79"/>
+  </g>
+
+  <!-- the app it produces -->
+  <text x="24" y="158" class="cap">…which is the whole of <tspan class="rust" font-style="normal" font-weight="600">Axona Minimal</tspan>:</text>
+  <rect x="24" y="176" width="360" height="38" rx="7" class="ui"/>
+  <text x="40" y="200" class="uit">topic&#160;&#160;&#160; minimal/chat</text>
+  <rect x="24" y="222" width="280" height="38" rx="7" class="ui"/>
+  <text x="40" y="246" class="uit">message&#160; type and press Send</text>
+  <rect x="312" y="222" width="72" height="38" rx="7" style="fill:#b94e36;"/>
+  <text x="348" y="246" text-anchor="middle" style="fill:#fff;font-size:14px;font-family:Georgia,serif;">Send</text>
+  <rect x="24" y="268" width="360" height="50" rx="7" class="ui"/>
+  <text x="40" y="290" class="uit">received</text>
+  <text x="40" y="308" class="uit" style="fill:#b94e36;">you &#183; hello, mesh</text>
+
+  <!-- caption -->
+  <text x="420" y="200" class="cap">≈ 60 lines, no framework.</text>
+  <text x="420" y="224" class="cap">Open it in two tabs and a</text>
+  <text x="420" y="244" class="cap">message crosses between them</text>
+  <text x="420" y="264" class="cap">over the live mesh.</text>
+  <text x="420" y="298" class="uit" style="fill:#2d7373;">demo.axona.net/apps/axona-minimal</text>
+</svg>
