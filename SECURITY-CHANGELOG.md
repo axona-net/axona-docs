@@ -16,6 +16,26 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.40.2 — 2026-06-12
+
+### The malformed-frame guard now covers every pub/sub handler
+
+No wire change. v2.40.1 stopped a malformed frame from *crashing* a node (the
+dispatch boundary contains any handler error), but a present-but-malformed
+routing id still threw inside handlers v2.40.1 hadn't individually hardened (e.g.
+the `subscribe-k` handler), producing error-log noise on every such frame.
+
+- **PROTECTED: a malformed routing id is rejected before any handler.** A single
+  guard wraps all pub/sub handler registrations and drops a frame whose `topicId`
+  or `fromId` is present-but-malformed — so a truncated id from a peer
+  mid-teardown (or a hostile peer) is silently ignored network-wide, not just
+  caught after the fact.
+- **PROTECTED: a malformed remote `fromId` is dropped, never coerced to `null`.**
+  This closes a subtle trap: several handlers treat a `null` `fromId` as
+  "locally originated ⇒ trusted", so silently nulling a malformed *remote* id
+  could have let an unauthenticated frame onto a trusted path. The guard drops it
+  instead.
+
 ## Kernel v2.40.1 — 2026-06-12
 
 ### A malformed inbound frame can no longer crash a node

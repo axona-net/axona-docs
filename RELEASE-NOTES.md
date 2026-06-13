@@ -7,6 +7,24 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v2.40.2 — malformed-frame guard now covers every pub/sub handler (2026-06-12)
+
+Follow-up to 2.40.1. The same truncated `fromId` (a peer tearing down mid-
+shutdown) also reached `_onSubscribeDirect` (the `subscribe-k` handler) and
+others that 2.40.1 hadn't individually hardened. 2.40.1 had already stopped the
+*crash* — the dispatch boundary catches the rejection — but the handler still
+threw, producing noisy error logs. 2.40.2 drops the malformed frame at the
+**registration boundary**, so it's silently ignored across the board.
+
+- **One guard wraps all 27 pub/sub handler registrations.** A frame whose
+  `topicId` or `fromId` is *present but malformed* is dropped before the handler
+  runs. Absent ids stay valid (genuinely local-origin); a malformed *remote*
+  `fromId` is **dropped, never coerced to `null`** — several handlers treat a
+  null `fromId` as "locally originated ⇒ trusted", and this avoids that trap.
+- **Regression test extended** (`smoke_msgsync_robustness.js`, 13 checks): the
+  exact `subscribe-k` + truncated-`fromId` case is dropped before the handler,
+  and well-formed frames still pass.
+
 ## v2.40.1 — a malformed frame can't crash a node (2026-06-12)
 
 Patch over 2.40.0; no wire change. Reported by a host-node operator quitting many
