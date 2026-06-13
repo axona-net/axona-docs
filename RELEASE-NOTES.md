@@ -7,6 +7,24 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v2.40.3 — malformed-frame robustness centralized at the dispatch boundary (2026-06-12)
+
+Code-quality follow-up to 2.40.2 — same guarantee, broader coverage, far less
+surface. 2.40.2 wrapped all **27** pub/sub handler registrations in a guard, which
+was brittle (a 28th handler could silently forget it) and incomplete (it only
+checked `topicId`/`fromId`, not the other id fields handlers parse —
+`subscriberId`, `publisher`, `peerRoots`, …). 2.40.3 removes that per-site guard
+and moves the robustness **one layer down**, into the AxonaPeer dispatch boundary
+that already wraps every handler:
+
+- A corrupt sender id (`fromId`) — invalid for *every* subsystem, not just
+  pub/sub — is dropped once, at the transport dispatch.
+- Any handler that throws on *any* malformed id is contained and **classified**: a
+  malformed-id error (now tagged `AXONA_BAD_ID` by `fromHex`) is logged as a
+  debug-level churn drop; anything else stays a loud error. This covers every id
+  field and every current-or-future handler automatically — no per-site guard to
+  forget.
+
 ## v2.40.2 — malformed-frame guard now covers every pub/sub handler (2026-06-12)
 
 Follow-up to 2.40.1. The same truncated `fromId` (a peer tearing down mid-

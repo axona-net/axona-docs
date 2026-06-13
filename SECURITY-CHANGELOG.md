@@ -16,6 +16,19 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.40.3 — 2026-06-12
+
+### Malformed-frame protection centralized to one dispatch-layer guard
+
+Refactor of the 2.40.2 guard — same guarantee, broader coverage, smaller surface.
+The per-registration guard (which only checked `topicId`/`fromId` and could be
+forgotten on a new handler) is replaced by one check at the AxonaPeer dispatch
+boundary that wraps **every** handler: a corrupt sender id is dropped at the
+transport layer for all subsystems, and any handler error on a malformed id —
+*any* field, current or future handler — is contained and classified
+(`AXONA_BAD_ID` → a quiet churn-time drop, not a loud error). No new handler can
+bypass it.
+
 ## Kernel v2.40.2 — 2026-06-12
 
 ### The malformed-frame guard now covers every pub/sub handler
