@@ -16,6 +16,26 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.40.1 — 2026-06-12
+
+### A malformed inbound frame can no longer crash a node
+
+No wire change. A received pub/sub frame carrying a malformed id — e.g. a
+**truncated `fromId`** from a peer tearing down mid-shutdown — reached an `async`
+handler that parsed the id with a throwing decoder; the synchronous throw became a
+rejected promise the dispatch's `try/catch` couldn't catch, escalating to a Node
+`unhandledRejection` that terminates the process. A remote peer could therefore
+crash a node with a single malformed frame.
+
+- **PROTECTED: untrusted ids are parsed defensively.** The anti-entropy and
+  kill-convergence handlers now drop a frame whose `topicId`/`fromId` isn't a
+  well-formed id, instead of throwing on it.
+- **PROTECTED: no handler can leak an unhandled rejection.** The direct-message
+  dispatch now contains an async handler's rejection as well as a synchronous
+  throw (matching the routed-message path), so a bug or hostile frame in any
+  single handler is logged and dropped rather than killing the node — defense in
+  depth across the whole handler class.
+
 ## Kernel v2.40.0 — 2026-06-12
 
 ### Infrastructure nodes can host topics without subscribing to them

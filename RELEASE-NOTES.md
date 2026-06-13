@@ -7,6 +7,27 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v2.40.1 — a malformed frame can't crash a node (2026-06-12)
+
+Patch over 2.40.0; no wire change. Reported by a host-node operator quitting many
+nodes at once: a peer tearing down mid-shutdown delivered a **truncated `fromId`**
+(3 chars), and the anti-entropy handler (`_onMsgSync`) parsed it with a throwing
+`fromHex` — `RangeError: hex id must be 66 chars, got 3`. Because the handler is
+`async`, that synchronous throw became a *rejected promise* the direct-dispatch
+`try/catch` couldn't see, escalating to a Node `unhandledRejection` (process
+death).
+
+- **Handler hardening.** `_onMsgSync` / `_onMsgSyncResp` / `_onKillSync` now parse
+  ids from received frames with a tolerant helper that **drops a malformed frame**
+  instead of throwing.
+- **Dispatch boundary.** The `AxonaPeer` direct-handler dispatch now catches an
+  async handler's *rejection* (not just a synchronous throw), mirroring the routed
+  path — so **no** direct handler can leak an `unhandledRejection`, defending the
+  whole class, not just this one field.
+- **Regression test.** `smoke_msgsync_robustness.js`: malformed `topicId`/`fromId`
+  frames are dropped (well-formed ones still answered), and a throwing async
+  handler produces no `unhandledRejection`.
+
 ## v2.40.0 — decoupled `host()` primitive: serve topics without subscribing (2026-06-12)
 
 Wire-additive over 2.39.0, and uses **no new wire message**: a host announces with
