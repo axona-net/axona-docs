@@ -1,0 +1,141 @@
+% =====================================================================
+% Axona — Synopsis and Implications
+% David A. Smith, Axona.net
+%
+% Compile with:  tectonic Axona-Synopsis.tex
+%                (or: pdflatex Axona-Synopsis.tex, run twice)
+% Requires: tufte-latex, xcolor, microtype
+% House style: the Axona explainer's tufte-handout format.
+% =====================================================================
+
+\documentclass[nobib]{tufte-handout}
+
+\usepackage[utf8]{inputenc}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{microtype}
+\usepackage{fancyhdr}
+\usepackage{etoolbox}
+\usepackage{needspace}
+
+% Prevent section-heading orphans (house hotfix, matches the explainer).
+\pretocmd{\section}{\needspace{6\baselineskip}}{}{}
+\pretocmd{\subsection}{\needspace{4\baselineskip}}{}{}
+
+\definecolor{rust}{RGB}{185,78,54}
+\definecolor{rustsoft}{RGB}{212,168,150}
+\definecolor{inkmuted}{RGB}{102,102,102}
+
+\title{Axona — Synopsis and Implications}
+\author[David A. Smith]{David A. Smith \\[0.3em] \emph{\small Axona.net}}
+\date{}
+
+\begin{document}
+
+% Visible page numbers, no letterspaced running heads (matches the explainer).
+\fancypagestyle{axonaplain}{%
+  \fancyhf{}%
+  \renewcommand{\headrulewidth}{0pt}%
+  \fancyfoot[C]{\thepage}%
+}
+\pagestyle{axonaplain}
+
+% --------------------------------------------------------------------
+% Compact title block (a one-page synopsis: no separate title page)
+% --------------------------------------------------------------------
+\begin{center}
+{\fontsize{34}{38}\selectfont \textsc{Axona}\par}
+\vspace{0.35em}
+{\Large\itshape Synopsis and Implications\par}
+\vspace{0.5em}
+{\small David A.~Smith \quad\textperiodcentered\quad \emph{Axona.net} \quad\textperiodcentered\quad v0.1 \quad\textperiodcentered\quad 2026-06-12\par}
+\end{center}
+
+\vspace{0.4em}
+\noindent\begin{quote}
+\itshape\color{inkmuted}
+Axona is not a wiring diagram. Axona is a process. It is defined less by its
+topology than by what flows through it --- and that is no longer on paper. The
+first version is in the wild; anyone can use it.
+\end{quote}
+\vspace{0.4em}
+
+% --------------------------------------------------------------------
+\section*{What it is}
+
+Axona is a peer-to-peer substrate for addressing, routing, and
+publish/subscribe messaging that runs with no platform in the middle. Three
+properties define it. It is \textbf{self-authenticating}: a participant's
+identity is its own cryptographic keypair, verified directly by its
+peers.\sidenote{No certificate authority, no registrar, no
+identity broker to petition, surveil, or revoke through. You are your key.} It
+is \textbf{geo-aware but not geo-fenced}: node addresses carry a coarse
+geographic prefix that biases routing toward locality --- an area code, not a
+wall --- so traffic stays efficient and community-scaled while no one is
+partitioned out. And it is \textbf{infrastructurally diffuse}: a single
+bootstrap broker introduces new peers, but the mesh sustains itself
+peer-to-peer, converges its state through replication and anti-entropy, and runs
+in an ordinary browser or an aging phone.\sidenote{The barrier to participation
+is a keypair and a tab.}
+
+We can harden the security model, close failure modes, and tune the protocol,
+and each such change nudges the network's behavior. But we cannot \emph{measure}
+that behavior. We can measure latency. The social consequence travels on the
+same wire and is invisible to us.
+
+\section*{What is genuinely new}
+
+We have built censorship-resistant media before --- onion routing,
+content-addressed storage, gossip social networks. Axona's pub/sub layer
+extends that lineage with a sharper consequence: it furnishes \textbf{ungovernable
+mobilization and un-censorable assembly}. A topic cannot be deplatformed,
+because there is no platform; a message cannot be reliably unsaid, because
+retraction is best-effort and any holder of the bytes keeps them; a movement
+cannot be switched off at a chokepoint, because the chokepoint does not exist.
+For people organizing under hostile infrastructure --- dissidents, mutual-aid
+networks, civil-defense communications when centralized systems fail or are
+seized --- this is a profound civic good. Assembly is among the oldest of
+liberties, and Axona returns it to a form no intermediary can withdraw.
+
+The qualitatively new element is \emph{who is on the network}. When the
+publishers and subscribers are largely AI agents rather than people, Axona
+becomes the medium in which \textbf{machine-speed information cascades occur with
+no platform standing in the middle to dampen them}. Human cascades are bounded
+by human tempo --- attention, fatigue, the friction of reading and deciding.
+Agent cascades are not. A signal, a rumor, a coordination instruction can
+propagate across a swarm and trigger action faster than any human, institution,
+or regulator can observe it, let alone intervene.\sidenote{Markets already gave
+us the flash crash as a preview. Axona generalizes that dynamic from prices to
+arbitrary coordination --- and removes the one thing every prior platform,
+however biased or captured, also happened to supply: a brake.}
+
+\section*{The dual-use reality}
+
+The properties that shelter the dissident shelter the harasser; the assembly
+that cannot be censored is also the assembly that cannot be moderated; the
+cascade that cannot be dampened carries disinformation as readily as a flood
+warning. This is not a flaw to be engineered away --- it is the \emph{same
+property} seen from two sides. \textbf{Un-censorable and un-governable are one
+fact.} To build a medium that no power can silence is to build a medium that no
+power can stop, including powers we would want stopped, and including non-human
+actors operating at a tempo our institutions were never designed to match.
+
+\section*{Why we proceed, and what we owe}
+
+We build it because the alternative --- assembly and speech held permanently at
+the discretion of a few intermediaries, now augmented by AI that those same
+intermediaries control --- is its own grave risk. A neutral, self-owned
+substrate is a hedge against that concentration. But neutrality is not innocence.
+The responsibility that platforms discharged badly does not vanish when the
+platform does; it devolves onto the architecture, onto the applications built
+atop it, and onto the norms of the communities --- human and agentic --- that
+inhabit it. Our obligation is to name this plainly, to shape the affordances
+that govern a cascade --- the cost of an identity, the pull of proximity, the
+reach of a retraction, the rate of spread --- with that cascade in mind, and to
+keep studying the process we have set loose.
+
+\vspace{0.3em}
+\noindent\textbf{\color{rust}Axona is in the wild now. The experiment is no
+longer on paper.}
+
+\end{document}
