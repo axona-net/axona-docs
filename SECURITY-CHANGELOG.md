@@ -16,6 +16,28 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.41.1 — 2026-06-13
+
+### A signed publish discloses WHO, not WHERE — publisher location stays private
+
+A signed envelope authenticates its author with `signerPubkey` (the raw Ed25519
+verification key) and nothing more. The publisher's geographic region — the S2
+cell encoded in the **top byte of its node-id** — is deliberately **not** carried
+in the envelope, and it cannot be recovered from the public key (the node-id is
+`S2-prefix ‖ SHA-256(pubkey)`; only the hash half is derivable from the key).
+
+- **PROTECTED: a subscriber learns the publisher's identity, never their
+  location.** Verifying a message tells you the exact key that signed it and lets
+  you re-derive the content address — but reveals nothing about where the
+  publisher sits. Location disclosure is not part of authentication.
+- An application that *wants* to show a sender's region must opt in explicitly by
+  placing it in its own message payload (the **Axona Minimal** demo does this as a
+  worked example), keeping the choice — and the disclosure — visible at the
+  application layer rather than baked into the protocol.
+
+(Briefly, v2.41.0 carried the publisher's node-id on the envelope; v2.41.1 removes
+it. The signed-envelope shape, `msgId`, and signature are unchanged — no flag day.)
+
 ## Kernel v2.40.3 — 2026-06-12
 
 ### Malformed-frame protection centralized to one dispatch-layer guard
@@ -743,4 +765,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-12.*
+*Last updated: 2026-06-13.*
