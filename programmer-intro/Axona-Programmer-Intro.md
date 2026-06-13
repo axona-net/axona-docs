@@ -4,7 +4,7 @@ size: 16:9
 theme: default
 paginate: true
 header: ""
-footer: "AXONA · Programmer Intro · v0.3"
+footer: "AXONA · Programmer Intro · v0.4"
 style: |
   /* ── Tufte-inspired typography + cream paper ─────────────────── */
   @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Inconsolata:wght@400;500&display=swap');
@@ -166,7 +166,7 @@ style: |
 
 <div class="meta">
 
-June 2026 · v0.3 · a ~30-minute talk
+June 2026 · v0.4 · a ~30-minute talk
 Live: <a href="https://demo.axona.net/apps/axona-minimal/">demo.axona.net/apps/axona-minimal</a> · Docs: <a href="https://github.com/axona-net/axona-docs">github.com/axona-net/axona-docs</a>
 
 </div>
@@ -215,10 +215,11 @@ The first version is in the wild; anyone can connect.
 
 # Addresses are places
 
-- <span class="head">Every id is 264 bits.</span> The top 8 bits are an S2 geographic cell; the rest is SHA-256 of the public key. Topic ids are built the same way.
-- <span class="head">Closeness is XOR distance.</span> The top byte dominates, so routing favors locality — without fencing anyone out.
+- <span class="head">A node id is 264 bits.</span> Top 8 = your S2 geographic cell, the rest = SHA-256 of your key. XOR distance on that top byte makes routing favor locality.
+- <span class="head">A topic id, same shape — you pick the region.</span> The S2 prefix is the publisher's choice, not your own cell, so a topic roots anywhere (the demo: us-east).
+- <span class="head">The publish id carries no geography.</span> Just the signing key — no S2 prefix — so a post proves <em>who</em> wrote it, never <em>where</em> they are.
 
-<img src="../images/Node-Address.svg" alt="node id and topic id bit structure" style="width:100%; margin-top:12px;" />
+<img src="../images/Node-Address.svg" alt="node id, topic id, and publish id bit structure" style="width:90%; margin-top:8px;" />
 
 </div>
 <div class="margin">
@@ -267,6 +268,7 @@ A node roots the topics near it; a sparse region's root set simply spills to the
 - <span class="head">Identity = keypair.</span> The address is derived from the public key, and the transport handshake is mutually authenticated and channel-bound — a man-in-the-middle that swaps the media fingerprint fails the bind.
 - <span class="head">Signed, verified at ingress.</span> A signed publish is checked against the publisher's key at the root, before it is cached or fanned out. Spoofed-signature spam dies at the edge.
 - <span class="head">You can only act for yourself.</span> A subscribe or unsubscribe is honored only for the authenticated peer's own id — no subscribing a victim, no silencing one.
+- <span class="head">Who, not where.</span> A signed post proves its author by key, but the envelope carries no location — the publisher's S2 region is never on the wire. An app reveals a sender's region only by choosing to.
 - <span class="head">Bounded &amp; content-addressed.</span> A node only roots topics it is closest to; the message id is the hash of its content; a per-publisher sequence and TTL drop stale or replayed envelopes. Memory-hard proof-of-work prices a publish identity against Sybils.
 
 </div>
@@ -323,13 +325,14 @@ A shared room uses a region-anchored publisher, so every peer in the region deri
 
 # Axona Minimal, in three steps
 
-<p class="codecap">Connect — derive an identity, open the transport, build the node + peer:</p>
+<p class="codecap">Connect — locate the user, derive the identity, build the node + peer:</p>
 
 ```js
-const identity  = await deriveIdentity({ lat: ANCHOR.center.lat, lng: ANCHOR.center.lng });
+const here      = await whereAmI();                 // real GPS, or us-east on denial
+const identity  = await deriveIdentity({ lat: here.lat, lng: here.lng });
 const transport = webTransport({ bridgeUrl: BRIDGE, identity });
 const node      = new NeuronNode({ id: BigInt('0x' + identity.id),
-                                   lat: ANCHOR.center.lat, lng: ANCHOR.center.lng });
+                                   lat: here.lat, lng: here.lng });
 node.transport  = transport;
 const peer = new AxonaPeer({ domain: new AxonaDomain({ k: 20 }), node, identity, transport });
 await transport.start(identity.id);
@@ -342,16 +345,18 @@ await peer.start();
 await peer.sub(topic, (env) => {
   if (!env || env.deleted || seen.has(env.msgId)) return;
   seen.add(env.msgId);
-  render(env.message, env.signerPubkey, false, topic);
+  const { text, pub } = env.message;          // pub = the node-id we chose to share
+  render(text, idLabel(pub), false, topic);   // idLabel → "region:userID"
 }, { publisher: ANCHOR.publisher, since: 'all' });
 ```
 
-<p class="codecap">Publish — render optimistically, dedup the echo:</p>
+<p class="codecap">Publish — attach our publish id so subscribers can show the region:</p>
 
 ```js
-const msgId = await peer.pub(topic, text, { publisher: ANCHOR.publisher });
+const msgId = await peer.pub(topic, { text, pub: identity.id },
+                             { publisher: ANCHOR.publisher });
 seen.add(msgId);
-render(text, null, true, topic);
+render(text, idLabel(identity.id), true, topic);
 ```
 
 </div>
@@ -360,6 +365,10 @@ render(text, null, true, topic);
 <img src="../images/Build-Flow.svg" alt="deriveIdentity to webTransport to AxonaPeer to sub/pub, producing the Axona Minimal UI" style="width:100%; margin-bottom:8px;" />
 
 That is the entire networking story. Everything else in the file is DOM glue.
+
+#### Sharing the region is the app's call
+
+The protocol signs <em>who</em>, never <em>where</em>. To show a sender's region this app opts in — it puts its own node-id in the post (<code>pub</code>) and reads <code>region:userID</code> off it. The disclosure stays visible, at the app layer.
 
 </div>
 </div>
@@ -373,7 +382,7 @@ That is the entire networking story. Everything else in the file is DOM glue.
 
 # Try it, then go deeper
 
-- <span class="head">Run it.</span> <a href="https://demo.axona.net/apps/axona-minimal/">demo.axona.net/apps/axona-minimal</a> — open two tabs and watch a message cross between them. Add <code>?region=uswest</code> to land in another keyspace.
+- <span class="head">Run it.</span> <a href="https://demo.axona.net/apps/axona-minimal/">demo.axona.net/apps/axona-minimal</a> — open two tabs and watch a message cross between them. Each line shows the sender's region, read off its publish id.
 - <span class="head">Read it.</span> The Explainer (how the routing works), the Architecture note (kernel · transport · bridge · wire), and the API Reference for every exported symbol.
 - <span class="head">Host it.</span> Run a relay (<code>axona-relay</code>) to carry your region's topics, or stand up your own bridge — the one piece you bootstrap from.
 

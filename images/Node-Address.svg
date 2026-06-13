@@ -1,35 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 320" font-family="Georgia, 'EB Garamond', serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" font-family="Georgia, 'EB Garamond', serif">
   <style>
     .lbl   { fill:#1a1a1a; font-size:17px; }
     .sub   { fill:#6b6b6b; font-size:13px; }
     .mono  { font-family:'Inconsolata', Menlo, monospace; fill:#1a1a1a; font-size:14px; }
     .teal  { fill:#2d7373; font-size:13px; }
-    .cap   { fill:#444; font-size:14px; font-style:italic; }
+    .cap   { fill:#444; font-size:13.5px; font-style:italic; }
     .seg-geo  { fill:#d9e6e6; stroke:#2d7373; stroke-width:1.4; }
     .seg-hash { fill:#f1ede0; stroke:#c9c4b6; stroke-width:1.4; }
   </style>
 
   <!-- node id row -->
-  <text x="40" y="38" class="lbl"><tspan font-weight="600">node id</tspan> — 264 bits</text>
-  <rect x="40"  y="52" width="108" height="56" rx="7" class="seg-geo"/>
-  <rect x="148" y="52" width="572" height="56" rx="7" class="seg-hash"/>
-  <text x="94"  y="78" text-anchor="middle" class="teal" font-weight="600">S2 geo cell</text>
-  <text x="94"  y="96" text-anchor="middle" class="sub">8 bits</text>
-  <text x="434" y="78" text-anchor="middle" class="lbl">SHA-256( public key )</text>
-  <text x="434" y="96" text-anchor="middle" class="sub">256 bits — bound to your keypair</text>
+  <text x="40" y="30" class="lbl"><tspan font-weight="600">node id</tspan> — 264 bits · your place in the mesh</text>
+  <rect x="40"  y="42" width="108" height="50" rx="7" class="seg-geo"/>
+  <rect x="148" y="42" width="572" height="50" rx="7" class="seg-hash"/>
+  <text x="94"  y="65" text-anchor="middle" class="teal" font-weight="600">S2 geo cell</text>
+  <text x="94"  y="82" text-anchor="middle" class="sub">8 bits</text>
+  <text x="434" y="65" text-anchor="middle" class="lbl">SHA-256( public key )</text>
+  <text x="434" y="82" text-anchor="middle" class="sub">256 bits — your actual region</text>
 
   <!-- topic id row -->
-  <text x="40" y="160" class="lbl"><tspan font-weight="600">topic id</tspan> — same shape</text>
-  <rect x="40"  y="174" width="108" height="56" rx="7" class="seg-geo"/>
-  <rect x="148" y="174" width="572" height="56" rx="7" class="seg-hash"/>
-  <text x="94"  y="200" text-anchor="middle" class="teal" font-weight="600">publisher's</text>
-  <text x="94"  y="216" text-anchor="middle" class="teal">S2 prefix</text>
-  <text x="434" y="200" text-anchor="middle" class="lbl">SHA-256( publisher : topic )</text>
-  <text x="434" y="218" text-anchor="middle" class="sub">256 bits</text>
+  <text x="40" y="128" class="lbl"><tspan font-weight="600">topic id</tspan> — same shape, but you pick the region</text>
+  <rect x="40"  y="140" width="108" height="50" rx="7" class="seg-geo"/>
+  <rect x="148" y="140" width="572" height="50" rx="7" class="seg-hash"/>
+  <text x="94"  y="161" text-anchor="middle" class="teal" font-weight="600">publisher's</text>
+  <text x="94"  y="178" text-anchor="middle" class="teal">S2 prefix</text>
+  <text x="434" y="163" text-anchor="middle" class="lbl">SHA-256( publisher : topic )</text>
+  <text x="434" y="181" text-anchor="middle" class="sub">prefix is the publisher's choice — any region, not only your own</text>
 
-  <!-- annotation -->
-  <path d="M 94 250 L 94 270 L 300 270" fill="none" stroke="#2d7373" stroke-width="1.2"/>
-  <text x="312" y="266" class="cap">the top byte dominates XOR distance —</text>
-  <text x="312" y="286" class="cap">so &#8220;near in the keyspace&#8221; tracks &#8220;near on Earth.&#8221;</text>
-  <text x="312" y="306" class="sub">An area code, not a wall: it biases routing, it doesn&#8217;t partition.</text>
+  <!-- publish id row -->
+  <text x="40" y="226" class="lbl"><tspan font-weight="600">publish id</tspan> — the key that signs a post · <tspan font-style="italic" fill="#6b6b6b">no geography</tspan></text>
+  <rect x="40" y="238" width="680" height="50" rx="7" class="seg-hash"/>
+  <text x="380" y="261" text-anchor="middle" class="lbl">Ed25519 public key — <tspan font-style="italic">no S2 prefix</tspan></text>
+  <text x="380" y="279" text-anchor="middle" class="sub">proves WHO signed a message, never WHERE they are</text>
 </svg>
