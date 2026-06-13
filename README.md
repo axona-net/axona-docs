@@ -57,8 +57,7 @@ This repo uses three terms consistently:
 
 ## Programmer guide
 
-Three companion documents in [`programmer-guide/`](programmer-guide/),
-sized by how deep you want to go:
+Start with the **[Programmer Introduction](programmer-intro/Axona%20Programmer%20Intro%20v0.1.pdf)** ([`.tex`](programmer-intro/Axona-Programmer-Intro.tex)) — a ~30-minute tufte talk handout: what Axona is, how it works, the security model, the API you actually call, and a build-along of the live **[Axona Minimal](https://demo.axona.net/apps/axona-minimal/)** app (topic / message / received, ~60 lines). Then go deeper with the three companion documents in [`programmer-guide/`](programmer-guide/), sized by how far you want to go:
 
 | Doc | Read when | Length |
 |---|---|---|

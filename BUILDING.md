@@ -15,6 +15,7 @@ applies to **all** documents.
 | Architecture | `architecture/Axona-Architecture.tex` | `architecture/Axona Architecture v<X>.pdf` |
 | Applications | `applications/Axona-Applications.tex` | `applications/Axona Applications v<X>.pdf` |
 | Synopsis | `synopsis/Axona-Synopsis.tex` (tufte-handout) | `synopsis/Axona Synopsis v<X>.pdf` |
+| Programmer intro | `programmer-intro/Axona-Programmer-Intro.tex` (tufte-handout) | `programmer-intro/Axona Programmer Intro v<X>.pdf` |
 
 A companion `.md` may exist for prose review, but **the `.tex` is authoritative**
 for the rendered PDF.
