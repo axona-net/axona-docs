@@ -4,7 +4,7 @@ size: 16:9
 theme: default
 paginate: true
 header: ""
-footer: "AXONA · Programmer Intro · v0.2"
+footer: "AXONA · Programmer Intro · v0.3"
 style: |
   /* ── Tufte-inspired typography + cream paper ─────────────────── */
   @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600&family=Inconsolata:wght@400;500&display=swap');
@@ -166,7 +166,7 @@ style: |
 
 <div class="meta">
 
-June 2026 · v0.2 · a ~30-minute talk
+June 2026 · v0.3 · a ~30-minute talk
 Live: <a href="https://demo.axona.net/apps/axona-minimal/">demo.axona.net/apps/axona-minimal</a> · Docs: <a href="https://github.com/axona-net/axona-docs">github.com/axona-net/axona-docs</a>
 
 </div>
@@ -323,21 +323,26 @@ A shared room uses a region-anchored publisher, so every peer in the region deri
 
 # Axona Minimal, in three steps
 
-<p class="codecap">Connect — derive an identity, open the transport, build the peer:</p>
+<p class="codecap">Connect — derive an identity, open the transport, build the node + peer:</p>
 
 ```js
-const id   = await deriveIdentity({ lat, lng });
-const tr   = webTransport({ bridgeUrl: BRIDGE, identity: id });
-const peer = new AxonaPeer({ domain, node, identity: id, transport: tr });
-await tr.start(id.id); await peer.start();
+const identity  = await deriveIdentity({ lat: ANCHOR.center.lat, lng: ANCHOR.center.lng });
+const transport = webTransport({ bridgeUrl: BRIDGE, identity });
+const node      = new NeuronNode({ id: BigInt('0x' + identity.id),
+                                   lat: ANCHOR.center.lat, lng: ANCHOR.center.lng });
+node.transport  = transport;
+const peer = new AxonaPeer({ domain: new AxonaDomain({ k: 20 }), node, identity, transport });
+await transport.start(identity.id);
+await peer.start();
 ```
 
 <p class="codecap">Subscribe — the handler gets each envelope:</p>
 
 ```js
 await peer.sub(topic, (env) => {
-  if (env.deleted || seen.has(env.msgId)) return;
-  render(env.message, env.signerPubkey);
+  if (!env || env.deleted || seen.has(env.msgId)) return;
+  seen.add(env.msgId);
+  render(env.message, env.signerPubkey, false, topic);
 }, { publisher: ANCHOR.publisher, since: 'all' });
 ```
 
@@ -346,6 +351,7 @@ await peer.sub(topic, (env) => {
 ```js
 const msgId = await peer.pub(topic, text, { publisher: ANCHOR.publisher });
 seen.add(msgId);
+render(text, null, true, topic);
 ```
 
 </div>
