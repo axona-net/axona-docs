@@ -16,6 +16,36 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.42.0 — 2026-06-13
+
+### Bridge discovery + failover, without a trusted directory
+
+Bridges can now advertise themselves on a public `axona:bridge-directory` topic,
+and clients collect that list at launch and fail over to a saved alternate when
+their configured bridge is unreachable on a later launch. The directory is
+open — any bridge may publish — so the trust model is built to assume that.
+
+- **PROTECTED: a bridge can't impersonate you or read your traffic, whichever
+  one you use.** A bridge is only a rendezvous/signaling broker; the mesh is
+  mutually authenticated and channel-bound and the media is end-to-end DTLS.
+  Failing over to an unknown bridge can cost you availability or expose
+  connection metadata, but never message integrity, authorship, or content — so
+  discovery from an open directory is safe by construction.
+- **PROTECTED: a poisoned directory can't redirect you off your bridge.** The
+  configured primary is a trusted root and is **never auto-replaced**; the
+  directory only adds *fallbacks*, consulted only when the primary won't open.
+  Candidates are ranked by the client's **own first-party experience** (bridges
+  it has personally bootstrapped through, by recency + latency) ahead of unknown
+  third-party entries — reputation it observed itself, not anything a bridge
+  claims. Entries are signed and self-expiring (48 h), and only `wss://` URLs are
+  accepted (no downgrade to an unencrypted bridge).
+- The **testnet bridge is excluded** (`BRIDGE_DIRECTORY=off`): it runs an
+  independent fleet and must not advertise into the directory production apps read.
+
+(A bridge-role proof-of-work to price directory entries against Sybil flooding,
+and gossiped/aggregate reputation, are noted as future work — the first cut
+relies on signing + first-party reputation + trusted roots.)
+
 ## Kernel v2.41.1 — 2026-06-13
 
 ### A signed publish discloses WHO, not WHERE — publisher location stays private

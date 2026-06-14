@@ -7,6 +7,29 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v2.42.0 — bridge directory: discovery + failover (2026-06-13)
+
+Bridges can advertise themselves on a public `axona:bridge-directory` topic so
+clients can discover them and fail over when their configured bridge is down.
+
+- **Kernel** — new `bridgeDirectory.js`: `BRIDGE_DIRECTORY_TOPIC`,
+  `buildBridgeEntry` / `validateBridgeEntry` (signed `{url,lat,lng,label,ver,ts}`;
+  `wss://` only), and `rankBridges` — the layered failover model (configured roots
+  → bridges the client has personally bootstrapped through, by recency + latency →
+  fresh signed third-party entries by proximity + tenure). Additive; no wire change.
+- **Bridge** (`axona-bridge` v2.22.0) — publishes its entry on launch and once a
+  day. New env: `BRIDGE_PUBLIC_URL` (advertised wss endpoint) and `BRIDGE_DIRECTORY`
+  (`on`|`off`). The **testnet bridge sets `BRIDGE_DIRECTORY=off`** (independent
+  fleet). `/healthz` now reports `directory.{enabled,url}`.
+- **App** (`axona-peer` v3.34.0) — at launch, probes the primary first and fails
+  over to a saved alternate if it's unreachable; once mesh-ready, does a one-shot
+  subscribe to the directory, merges entries into a localStorage book (with
+  first-party reputation: tenure, time-to-mesh, success/recency), then
+  unsubscribes. The primary is never auto-replaced. The testnet host skips the
+  directory entirely.
+
+See SECURITY-CHANGELOG (v2.42.0) for the trust model.
+
 ## v2.40.3 — malformed-frame robustness centralized at the dispatch boundary (2026-06-12)
 
 Code-quality follow-up to 2.40.2 — same guarantee, broader coverage, far less
