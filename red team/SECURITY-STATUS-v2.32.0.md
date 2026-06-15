@@ -1,5 +1,14 @@
 # Axona Security Status & Remediation Plan
 
+> **Superseded — 2026-06-15.** The current consolidated status is
+> [`SECURITY-STATUS-v2.43.0.md`](SECURITY-STATUS-v2.43.0.md) (kernel v2.43.0), with
+> the ranked open items in [`red-team-punchlist-v2.43.0.md`](red-team-punchlist-v2.43.0.md).
+> Since this v2.32.0 snapshot: **C-3 / SP-10 / SP-11 closed** (v2.33.0), the E-1
+> PoW format shipped inert at difficulty 0 (v2.34.0), and the publisher-location-
+> privacy property landed (v2.41.1); the external bridge assessment (G-series) and
+> the *Gates to Gradients* affordances (GG-series) were folded into the v2.43.0
+> register. This document is preserved as the point-in-time snapshot.
+
 **Date:** 2026-06-09
 **Line:** `axona/5` / kernel **v2.32.0** — live in production (`axona.net` / `bridge.axona.net`) since the 2026-06-08 flag-day cutover; the SF testnet (`testnet.axona.net`) is the staging line ahead of `main`.
 **Sources:** consolidated register [`red-team-punchlist-v2.6.0.md`](red-team-punchlist-v2.6.0.md) (+ its 2026-06-05 stability addendum), reconciled against [`../SECURITY-CHANGELOG.md`](../SECURITY-CHANGELOG.md) (shipped guarantees) and [`../RELEASE-NOTES.md`](../RELEASE-NOTES.md).
