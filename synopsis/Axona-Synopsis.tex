@@ -48,7 +48,7 @@
 \vspace{0.35em}
 {\Large\itshape Synopsis and Implications\par}
 \vspace{0.5em}
-{\small David A.~Smith \quad\textperiodcentered\quad \emph{Axona.net} \quad\textperiodcentered\quad v0.5 \quad\textperiodcentered\quad 2026-06-15\par}
+{\small David A.~Smith \quad\textperiodcentered\quad \emph{Axona.net} \quad\textperiodcentered\quad v0.6 \quad\textperiodcentered\quad 2026-06-15\par}
 \end{center}
 
 \vspace{0.4em}
@@ -87,7 +87,9 @@ advertise themselves and peers discover them automatically --- so there is
 \textbf{no single point of failure}, not even the rendezvous a newcomer first
 reaches in.\sidenote{Knock a bridge offline and clients fail over to another;
 stand a new one up anywhere and the mesh finds it without a software update ---
-the rendezvous becomes a moving target with no address to seize.}
+no single \emph{fixed} address to block. (A determined adversary who enumerates
+the whole fleet at once is a harder, separate problem: the open directory raises
+that bar but does not by itself defeat it.)}
 
 We can harden the security model, close failure modes, and tune the protocol,
 and each such change nudges the network's behavior. But we cannot \emph{measure}

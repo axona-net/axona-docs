@@ -16,6 +16,33 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Bridge v2.26.0 — 2026-06-15
+
+### Bridge hardening — less metadata exposed, smaller public surface
+
+Operator-side and metadata-minimisation hardening for the signaling bridge, from
+a structured external assessment of the deployment model. No kernel or wire
+change; bridges update independently.
+
+- **PROTECTED: a TURN relay can no longer correlate a peer's sessions by its
+  credential.** The short-lived TURN username is now an ephemeral per-session
+  random token (`<expiry>:<random>`) instead of carrying the peer's stable
+  node-id. A relay operator — who may be a different party from the signaling
+  bridge — sees no stable per-peer handle to link allocations across time.
+- **PROTECTED: the raw bridge port isn't world-reachable on a standard deploy.**
+  The installer binds the Node process to loopback (`HOST=127.0.0.1`); every
+  request must arrive through nginx (TLS, access logging, real client IP, rate
+  limits). Connection metadata can't be harvested by hitting the app port
+  directly.
+- **PROTECTED: the public health endpoint discloses only liveness + version.**
+  Unauthenticated `/healthz` returns status, bridge version, and kernel version;
+  the full topology body and the per-connection `/diag` view (IPs, node-ids,
+  user-agents) now require an operator token. The network's bootstrap topology is
+  no longer free for the asking.
+- The operator guide now leads with **review-and-pin-a-release** for the
+  installer (over `curl | bash` from HEAD) and documents operator security and
+  legal considerations.
+
 ## Kernel v2.42.0 — 2026-06-13
 
 ### Bridge discovery + failover, without a trusted directory
