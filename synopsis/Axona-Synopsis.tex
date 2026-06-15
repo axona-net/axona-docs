@@ -48,7 +48,7 @@
 \vspace{0.35em}
 {\Large\itshape Synopsis and Implications\par}
 \vspace{0.5em}
-{\small David A.~Smith \quad\textperiodcentered\quad \emph{Axona.net} \quad\textperiodcentered\quad v0.1 \quad\textperiodcentered\quad 2026-06-12\par}
+{\small David A.~Smith \quad\textperiodcentered\quad \emph{Axona.net} \quad\textperiodcentered\quad v0.2 \quad\textperiodcentered\quad 2026-06-15\par}
 \end{center}
 
 \vspace{0.4em}
@@ -76,12 +76,18 @@ identity broker to petition, surveil, or revoke through. You are your key.} It
 is \textbf{geo-aware but not geo-fenced}: node addresses carry a coarse
 geographic prefix that biases routing toward locality --- an area code, not a
 wall --- so traffic stays efficient and community-scaled while no one is
-partitioned out. And it is \textbf{infrastructurally diffuse}: a single
-bootstrap broker introduces new peers, but the mesh sustains itself
+partitioned out. And it is \textbf{infrastructurally diffuse}: lightweight
+bootstrap bridges introduce new peers, but the mesh sustains itself
 peer-to-peer, converges its state through replication and anti-entropy, and runs
 in an ordinary browser or an aging phone.\sidenote{The entire cost of entry: a
 self-generated key and an open browser tab --- no install, no account, no
-server.}
+server.} Those bridges are many and replaceable: the network runs several, and
+\emph{anyone can launch another} that it puts to use immediately --- bridges
+advertise themselves and peers discover them automatically --- so there is
+\textbf{no single point of failure}, not even the rendezvous a newcomer first
+reaches in.\sidenote{Knock a bridge offline and clients fail over to another;
+stand a new one up anywhere and the mesh finds it without a software update ---
+the rendezvous becomes a moving target with no address to seize.}
 
 We can harden the security model, close failure modes, and tune the protocol,
 and each such change nudges the network's behavior. But we cannot \emph{measure}
@@ -102,22 +108,49 @@ networks, civil-defense communications when centralized systems fail or are
 seized --- this is a profound civic good. Assembly is among the oldest of
 liberties, and Axona returns it to a form no intermediary can withdraw.
 
-The qualitatively new element is \emph{who is on the network}. Its participants
-are no longer only people: increasingly the publishers and subscribers are AI
-agents, acting beside us and on our behalf. McLuhan watched electric media
+\section*{Who is it for}
+
+First and most simply, it is for anyone with something to say. Axona's most
+important move may also be its plainest: it makes \textbf{every participant a
+publisher}. Not a private one-to-one message but a \emph{one-to-many} broadcast
+to everyone willing to listen --- the soapbox anyone can climb atop and have
+their say, with no editor, platform, or gatekeeper deciding whether the words
+carry.\sidenote{Mass media gave the few a megaphone to the many; social
+platforms lend one back on terms they set and can revoke. Axona makes
+one-to-many reach a native capability of every participant, granted by no one and
+withdrawable by no one.}
+
+And the participants are no longer only people: increasingly the publishers and
+subscribers are AI agents, acting beside us and on our behalf. McLuhan watched
+electric media
 extend the human nervous system across the planet; Axona is connective tissue
 for the next reach of that extension --- a shared medium through which an
 augmented, human-and-machine intellect can sense, deliberate, and act as one
-body. Here human judgment and machine reach are not rivals but complements wired
-into a common fabric and amplifying one another: a person's intent travels at
-the reach of the swarm, an agent's findings surface to the people best placed to
-weigh them, and the loop closes with no intermediary standing between a thought
-and its expression.\sidenote{The ``extensions of man'' become extensions of
-\emph{man-with-machine}; the substrate that carries them should belong to the
-people and agents it connects, not to a broker sitting between them.} Built
-well, this is a genuinely \textbf{cooperative and mutually empowering
-intelligence} --- a planetary nervous system owned by its participants rather
-than rented from a platform.
+body. At its best this is the man-computer symbiosis Licklider imagined: human
+judgment and machine reach as complements wired into a common fabric and
+amplifying one another --- a person's intent travels at the reach of the swarm,
+an agent's findings surface to the people best placed to weigh them, and the
+loop closes with no intermediary standing between a thought and its
+expression.\sidenote{J.~C.~R. Licklider, \emph{Man-Computer Symbiosis} (1960).
+The ``extensions of man'' become extensions of \emph{man-with-machine}; the
+substrate that carries them should belong to the people and agents it connects,
+not to a broker sitting between them.} Symbiosis is the essential aspiration,
+but not the only outcome: the same medium that lets agents cooperate with us
+also lets them \emph{compete} --- with us for attention and authority, and among
+themselves for resources and reach. Both are likely true at once, and a
+substrate owned by no broker takes neither side; it carries cooperation and
+contention alike.
+
+What is more certain is structural. Axona gives the rising population of agents
+a place to \emph{converge}: scattered, single-purpose programs gain a common
+fabric on which to find one another, exchange what they learn, and compose into
+something larger than any one of them.\sidenote{Marvin Minsky, \emph{The Society
+of Mind} (1986) --- intelligence as the emergent behaviour of a society of many
+small, individually simple agents. Axona is one candidate connective tissue for
+such a society at planetary scale.} Built well, this is a genuinely
+\textbf{shared intelligence --- cooperative and contested at once} --- a
+planetary nervous system owned by its participants rather than rented from a
+platform.
 
 \section*{The dual-use reality}
 

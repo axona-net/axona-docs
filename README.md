@@ -42,7 +42,7 @@ This repo uses three terms consistently:
 
 ## Supplementary material
 
-- **[`synopsis/`](synopsis/)** — the [**Axona Synopsis and Implications**](synopsis/Axona%20Synopsis%20v0.1.pdf) ([`.tex`](synopsis/Axona-Synopsis.tex)) — a one-page position note (tufte-handout): what Axona is, what is genuinely new (ungovernable mobilization, un-censorable assembly, and machine-speed agent cascades with no platform in the middle to dampen them), and the dual-use reality of an un-censorable medium.
+- **[`synopsis/`](synopsis/)** — the [**Axona Synopsis and Implications**](synopsis/Axona%20Synopsis%20v0.2.pdf) ([`.tex`](synopsis/Axona-Synopsis.tex)) — a one-page position note (tufte-handout): what Axona is, what is genuinely new (ungovernable mobilization, un-censorable assembly, and machine-speed agent cascades with no platform in the middle to dampen them), and the dual-use reality of an un-censorable medium.
 - **[`BUILDING.md`](BUILDING.md)** — the standard build process for every typeset doc (LaTeX source → tectonic → versioned PDF, archive the prior to history/). Read this before bumping any document.
 - **[`TESTNET.md`](TESTNET.md)** — the SF testnet (staging line) quick-reference: live URLs (`testnet.axona.net` peer + `demo-testnet.axona.net` demo), the version matrix, how to run the apps against the testnet bridge, and the security/bug fixes on the line now live in production.
 - **[`RELEASE-NOTES.md`](RELEASE-NOTES.md)** — changes shipped in the kernel and the apps, newest-first and keyed to kernel version.
