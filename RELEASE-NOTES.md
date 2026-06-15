@@ -7,6 +7,27 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v2.44.0 — re-subscribe (since:'all') re-delivers (2026-06-15)
+
+Bug: unsubscribe a topic, then re-subscribe with `since:'all'` → the handler
+never fired (and the related "missed alert until reload, fixed by zooming"). The
+re-subscribe genuinely happened, but three per-topic structures survived the
+unsub and each suppressed the redelivery `since:'all'` is supposed to produce:
+the gap-safe **`have` digest** (the roots then think we already hold everything
+and replay nothing — this masks even a `lastSeenTs = 0` floor), the legacy
+**`lastSeenTs`** floor, and the exactly-once **`_appDelivered`** app gate.
+
+- **Kernel v2.44.0** — new `AxonaManager.pubsubResetTopicConsumption(topicId)`
+  clears all three for a topic; called from `pubsubUnsubscribe` and wired into
+  `since:'all'` (`AxonaPeer._applySince`, with an older-kernel fallback).
+  `_appDelivered` is now **topic-scoped** (`topicId:publishId`) so one topic
+  resets without disturbing others. Touches only subscriber-side state — a node
+  that also hosts the topic keeps serving. **Wire-compatible, no flag day.**
+  Regression `test/smoke_resubscribe.js` (17 checks); full kernel suite green.
+- **Re-vendored into all local apps** (each updates independently — no cutover):
+  axona-peer v3.35.0 (axona.net), dht-sim, axona-relay v0.10.4, axona-bridge
+  v2.27.0 (kernel pin → `#v2.44.0`, lockfile regenerated).
+
 ## v2.42.1 — bridge federation: a bridge bootstraps as a node (2026-06-14)
 
 The two prod bridges were separate meshes, so a client on one couldn't discover
