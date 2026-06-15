@@ -7,6 +7,30 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v2.42.1 — bridge federation: a bridge bootstraps as a node (2026-06-14)
+
+The two prod bridges were separate meshes, so a client on one couldn't discover
+the other via the directory. Now a bridge is a node first: on launch it opens an
+OUTBOUND uplink to a known bridge (env `BRIDGE_UPSTREAMS` ∪ persisted ∪ default
+seeds, first reachable, self excluded), integrating its embedded peer into the
+one shared connectome, then re-publishes its directory entry onto the shared mesh
+and subscribes, persisting discovered bridges to `StateDirectory/bridges.json`
+(seeds for next launch). Federation is automatic — every bridge is just a node
+that joined normally.
+
+- **Kernel v2.42.1** — `CompositeTransport.addSubtransport` now replays
+  `onPeerBound` to late-added sub-transports (it previously replayed only
+  request/notification/peerDied). Without this, a uplink added after
+  `peer.start()` never propagated its bound peers into the synaptome. Additive,
+  no wire change.
+- **Bridge v2.23.0** — outbound uplink via the relay's `webTransport` +
+  `node-datachannel`/`ws` polyfill (a CompositeTransport of inbound server WS +
+  uplink); env `BRIDGE_UPSTREAMS`; `node-datachannel` loads lazily (off path
+  unaffected); `/healthz` adds `uplink.{upstream,connected}`.
+- **Verified live**: `bridge-west.axona.net` uplinks to `bridge.axona.net`; a
+  client on either bridge now discovers BOTH. The root bridge stays uplink-less
+  as the seed.
+
 ## v2.42.0 — bridge directory: discovery + failover (2026-06-13)
 
 Bridges can advertise themselves on a public `axona:bridge-directory` topic so
