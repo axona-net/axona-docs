@@ -16,6 +16,44 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.48.0 — 2026-06-16
+
+### Ephemeral transport identities + bounded pub/sub memory
+
+This wave removes the last stable, persisted per-node handle from the
+infrastructure tier and puts hard byte ceilings on the pub/sub paths an
+attacker could otherwise use to grow a node's memory.
+
+- **PROTECTED: a relay or bridge can no longer be tracked across restarts by a
+  stable transport id.** Relays and bridges now mint a fresh in-memory keypair
+  and 264-bit node-id on every start and never write it to disk — there is no
+  identity file and no lock. A restarted infrastructure node re-joins as a new
+  node; nothing on the wire links the new session to the old one. Discovery and
+  first-party reputation key on the node's *URL*, not on the (now-rotating)
+  signer, so resilience is unchanged while the long-lived correlatable handle is
+  gone. (Browser peers were already ephemeral; this extends the property to the
+  always-on nodes.)
+- **PROTECTED: a publish can no longer be linked to a node's identity through
+  its publish id.** The publish id is now an opaque random token with no
+  embedded node-id or region prefix, minted independently of the transport id.
+  Besides closing a correlation channel, this removes a restart-collision class:
+  a fresh node can never reissue a publish id a previous incarnation used.
+- **PROTECTED: replay/anti-entropy responses are byte-bounded and the replay
+  cache is byte-budgeted.** Replay and msgsync responses are now framed to a
+  fixed byte ceiling per message, and the per-topic replay cache evicts on a
+  total-bytes budget (16 MiB) as well as a count. A peer requesting history, or
+  a publisher pushing large messages, can no longer drive a serving node's
+  memory or a single frame past a bounded size.
+- **PROTECTED: oversize publishes fail loud instead of silently vanishing.**
+  `peer.pub` rejects a payload over the reliable-publish floor (15 KiB, the
+  universal WebRTC-receivability bound) with a typed error rather than emitting
+  a message that some peers along the path would silently drop. The protocol
+  ships `@axona/protocol/std/chunk` so applications split large content into
+  individually-receivable chunks. Predictable delivery is a robustness property,
+  but the explicit ceiling also bounds per-message work at every hop.
+
+---
+
 ## Bridge v2.26.0 — 2026-06-15
 
 ### Bridge hardening — less metadata exposed, smaller public surface
@@ -822,4 +860,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-13.*
+*Last updated: 2026-06-16.*

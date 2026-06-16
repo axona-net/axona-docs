@@ -7,6 +7,88 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v2.48.0 — publish IDs decoupled from the transport id (2026-06-16)
+
+Foundational identity-model change (no wire/flag-day impact — `publishId` is an opaque dedup token):
+
+- **`publishId` is no longer `nodeId:counter`.** It was tied to the transport id (so it carried the
+  ephemeral node's S2 prefix) and the counter reset to 0 on every restart, which let a peer drop a
+  genuinely-new publish as a duplicate (`_alreadySeenPublish` runs before the freshness gate). It is
+  now a random, S2-free, collision-safe token by default, and **app-suppliable**:
+  `peer.pub(topic, msg, { publishId })`. Closes the restart-collision bug outright.
+- **New `@axona/protocol/std/publisher`** — `createPublisher()` / `persistentPublisher(key)`:
+  mint, sequence, and (optionally) **persist** a publish-ID stream (browser-localStorage-backed by
+  default), so a logical publisher stays continuous across restarts even though the **transport id
+  is always ephemeral** — and an app can run many concurrent streams (one per channel / file
+  transfer). This is the app-owned half of the identity split: transport id = ephemeral/unlinkable;
+  publish id = app-controlled continuity. `test/smoke_std_publisher.mjs`.
+
+Identity model (now explicit): **Transport ID** (S2-prefixed, ephemeral — never stored, recomputed
+each start) · **Topic ID** (S2-prefixed, content/region-anchored) · **Message ID** (pure content
+hash) · **Publish ID** (S2-free, app-mintable/persistable). Full suite green (65 files).
+
+## v2.47.0 — std library, reliable-publish guard + larger byte-bounded replay (2026-06-16)
+
+From the pub/sub stress campaign + a civildefense.io audit:
+
+- **Relay/replay queue raised 100 → 1024 messages, with a 16 MB per-topic byte cap.**
+  A 2 MB image chunked at ≤15 KB ≈ 175 messages — far over the old 100, so it was
+  unreplayable (O-1). The count cap is now 1024 (`replayCacheSize`), paired with a byte cap
+  (`replayCacheBytes`, default 16 MB) so a high count can't OOM a relay when entries are large;
+  eviction honors whichever binds. Both configurable per `AxonaManager`.
+- **Replay is now byte-framed (the real O-5-on-replay fix).** `_maybeSendReplay` (and root↔root
+  `msgsync-resp`) previously sent the whole backlog in ONE `sendDirect` frame — at ≥16 KB/message
+  that frame was undeliverable, which is why large-message topics returned **nothing** on reload.
+  It now splits into many frames each `< 16 KiB` (`REPLAY_FRAME_BYTES`, `MAX_REPLAY_BATCH`
+  decoupled from cache size). A 150-message backlog replays as ~75 wire-safe frames
+  (`test/smoke_pubsub_bigbacklog.mjs`). `MAX_HAVE` trimmed to 200 so the subscribe digest frame
+  also stays under 16 KiB; `MAX_RELIABLE_PUBLISH_BYTES` set to 15 KiB to leave headroom for the
+  delivery wrapper. **Wire-compatible, no flag day.**
+
+Two app-facing additions:
+
+- **`@axona/protocol/std`** — a new sub-export (NOT kernel core): a standard library of
+  app-layer helpers built only on the public `AxonaPeer` API. First module **`std/chunk`** —
+  reliable large-payload chunking/reassembly: ≤16 KiB messages, completion by *distinct index*
+  (not receipt count), a timeout that *rejects* (after a `pull()` re-request) instead of hanging,
+  a manifest, garbage resistance, and a guard that refuses transfers exceeding the replay-cache
+  ceiling. Replaces the divergent copies in civildefense + axona-share. `test/smoke_std_chunk.js`.
+- **O-5 reliable-publish guard** — `peer.pub` now **fails loud** above the WebRTC-interoperable
+  message floor (**16 KiB**, `MAX_RELIABLE_PUBLISH_BYTES`) instead of letting an unreceivable
+  message be silently dropped mid-mesh. Rationale: a publish must be *receivable* by an arbitrary
+  peer on an arbitrary browser across arbitrary hops, and SCTP `maxMessageSize` is floored by the
+  weakest link — a sender-side or single-hop measurement is not a safe bound. Overridable per
+  `AxonaPeer` (`maxPublishBytes`, capped at the 256 KiB absolute ingress limit) for controlled,
+  known-homogeneous deployments only. The 256 KiB root-ingress abuse cap is unchanged.
+  **Wire-compatible, no flag day** (purely a publisher-side guard).
+
+## v2.45.0 — cold-start anti-entropy drain (2026-06-16)
+
+Reliability: a freshly (re)started or newly-recruited keyspace host holds an
+**empty replay cache** for every topic it roots. Root-to-root anti-entropy
+(Fix 2) backfills it from sibling roots, but only `MSGSYNC_TOPICS_PER_TICK` (8)
+topics per 10 s refresh tick — so a host rooting hundreds of topics took
+*minutes* to converge after a restart, and **answered replays empty during that
+window** (a subscriber whose K-closest landed on the cold host saw a partial or
+empty `since:'all'` replay — the "reload → 0 / usually the last only"
+nondeterminism after relay churn).
+
+- **Kernel v2.45.0** — roles not yet reconciled even once ("cold") are now
+  drained with a large per-tick budget (`MSGSYNC_COLD_BUDGET = 64`), *ahead* of
+  the steady round-robin, so a restarted host converges in a tick or two instead
+  of minutes. A role is marked `synced` once it has initiated reconciliation
+  against a non-empty sibling set; a siblingless cold role stays cold and
+  retries. **Zero steady-state cost** (no cold roles once warm); a one-time
+  burst after (re)join. No wire change — `msgsync`/`msgsync-resp` unchanged, so
+  **no flag day**. Regression `test/smoke_pubsub_coldstart.js`; full suite green.
+- **axona-relay v0.10.6** — the process-level `uncaughtException`/
+  `unhandledRejection` guards now log into the TUI's log panel instead of
+  writing raw `console.error` over the dashboard frame (a caught bridge-blip 502
+  no longer shreds the display). Behaviour unchanged — still catch-and-continue.
+
+Re-vendor + deploy is the gated follow-up (relay/peer/dht-sim/bridge each update
+independently — no cutover).
+
 ## v2.44.0 — re-subscribe (since:'all') re-delivers (2026-06-15)
 
 Bug: unsubscribe a topic, then re-subscribe with `since:'all'` → the handler
