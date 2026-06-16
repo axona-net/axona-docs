@@ -7,6 +7,22 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v2.49.0 — std/chunk reassembler handles a stream of files (2026-06-16)
+
+App-layer fix in `@axona/protocol/std/chunk` (no wire/flag-day impact):
+
+- **`createReassembler` is now multi-file.** It previously locked onto the first
+  file's `fileId` and silently dropped every later file delivered on the same
+  topic — so an app that reuses one reassembler per topic (e.g. an image channel)
+  only ever reassembled the *first* file for receivers; later files reached the
+  sender only through its own optimistic local render. The reassembler now tracks
+  every file by `fileId` and fires `onComplete` once per file as each completes;
+  foreign/garbage files still can't corrupt the one you want, and
+  `missing()/have()/total()` take an optional `id`. Single-file callers
+  (`receiveChunkedBytes`) are unaffected. Regression: smoke_std_chunk #9.
+
+---
+
 ## v2.48.0 — publish IDs decoupled from the transport id (2026-06-16)
 
 Foundational identity-model change (no wire/flag-day impact — `publishId` is an opaque dedup token):
