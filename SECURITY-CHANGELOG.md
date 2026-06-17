@@ -16,6 +16,32 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.50.0 — 2026-06-16
+
+### Authorship can be unlinkable from network presence (dual-key identity)
+
+Optional, additive, no wire change — a peer may sign publishes with a **publish
+identity** separate from its transport identity.
+
+- **PROTECTED: an app can have an accountable, recognizable author without a
+  trackable network presence.** Previously one keypair was both the transport
+  identity (node id, connection) and the publish signer (`signerPubkey`), forcing
+  a choice: persist it (durable authorship, but linkable connections) or keep it
+  ephemeral (unlinkable, but authorship resets every session). A peer can now
+  sign publishes with a distinct, app-held **publish identity** while the
+  transport identity stays ephemeral. The published envelope then carries the
+  publish key only — **no transport-key material** — so an observer cannot tie a
+  publisher's messages to its (rotating) network identity or to a specific
+  connection, while the publisher remains a stable pseudonym that can `kill`/
+  `unpub` its own messages across sessions. Apps may run several publish
+  identities through one peer (`signWith`), e.g. per-channel personas.
+- Scope note (no over-claim): the peer a publisher hands a message to *over its
+  own connection* can still locally correlate that connection with the publish
+  key at send time; at-rest and onward-hop data carry no such link. The default
+  remains single-key (signing with the transport identity) unless an app opts in.
+
+---
+
 ## Kernel v2.48.0 — 2026-06-16
 
 ### Ephemeral transport identities + bounded pub/sub memory

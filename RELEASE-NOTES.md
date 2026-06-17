@@ -7,6 +7,29 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v2.50.0 — dual-key identity: publish identity decoupled from transport (2026-06-16)
+
+Additive, backward-compatible, **no wire/flag-day change** (design note:
+`architecture/Dual-Key-Identity-v0.1.md`):
+
+- **A peer can sign publishes with a PUBLISH identity distinct from its
+  (ephemeral) transport identity**, and run **multiple** publish identities
+  through one peer:
+  - `new AxonaPeer({ publishIdentity })` — default signing key for publishes.
+  - `peer.pub(topic, msg, { signWith })` — per-call override.
+  - Precedence `signWith → publishIdentity → identity (transport)`; omitting both
+    keeps the historical single-key behavior, so existing apps are unchanged.
+- Lets an app have **durable, recognizable authorship** (stable `signerPubkey`;
+  `kill`/`unpub` of its own messages across sessions) **without** a stable
+  transport id — the transport key stays ephemeral/unlinkable. Verified across a
+  simulated transport-id rotation.
+- The change is small because verification, per-publisher sequence, and
+  `kill`/`unpub` ownership were already keyed on `signerPubkey`, not the
+  transport node id. Publish-PoW (`role:'publish'`) remains inert at difficulty 0.
+- Regression: `smoke_dual_key.mjs` (13 checks). Full suite (66 files) green.
+
+---
+
 ## v2.49.0 — std/chunk reassembler handles a stream of files (2026-06-16)
 
 App-layer fix in `@axona/protocol/std/chunk` (no wire/flag-day impact):
