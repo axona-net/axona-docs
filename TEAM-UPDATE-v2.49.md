@@ -1,8 +1,8 @@
-# Team Update — Axona kernel v2.49.0: identity model, `std` library, reliable chunking
+# Team Update — Axona kernel v2.45→v2.50: identity model, `std` library, reliable chunking, dual-key identity
 
 **Audience:** anyone building on `@axona/protocol` (apps, relays, bridges).
-**Status:** shipped to the **testnet** fleet (kernel 2.49.0). Prod is staged but gated.
-**TL;DR:** Transport identities are now **ephemeral everywhere**, a publish is identified by an **app-owned Publish ID** (not the node id), large payloads must go through the new **`@axona/protocol/std`** chunking helper (single publishes are hard-capped at a *receivable* 15 KB), and `std` also gives you a small **persistence** helper for publish streams.
+**Status:** shipped to the **testnet** fleet (kernel **2.50.0**). Prod is staged but gated.
+**TL;DR:** Transport identities are now **ephemeral everywhere**, a publish is identified by an **app-owned Publish ID** (not the node id), large payloads must go through the new **`@axona/protocol/std`** chunking helper (single publishes are hard-capped at a *receivable* 15 KB), `std` also gives you a small **persistence** helper for publish streams, and (new in **v2.50.0**) a peer can sign publishes with a **separate publish identity** — even **several** — so you get durable, recognizable authorship without a linkable transport identity (§3.3).
 
 ---
 
@@ -143,9 +143,34 @@ if (!saved) localStorage.setItem('axona:identity', JSON.stringify(await dumpIden
 
 (Node has no `localStorage` — store the `dumpIdentity` envelope, which is plain JSON, in a file or DB. Or hand `AxonaPeer` a `PersistenceAdapter` as `{ persist }` and it will dump/load the identity for you.)
 
-The trade-off is deliberate: a persistent identity is **linkable** across sessions and topics. That linkability is exactly what durable authorship requires — but it's the privacy cost the ephemeral default avoids. Choose per app.
+The trade-off with persisting the *transport* identity is that it becomes **linkable** across sessions and topics. If you want durable authorship *without* that linkage, use a **separate publish identity** instead — §3.3 (recommended for new apps that need authorship).
 
-### 3.3 Large messages — single publishes are capped at a *receivable* size
+### 3.3 Dual-key identity (new in v2.50.0) — durable authorship without a linkable transport
+
+A peer can sign publishes with a **publish identity** that is **separate from its transport identity**, and can run **several** publish identities through one peer. This is the clean way to get a recognizable, accountable author **without** a persistent (linkable) transport id.
+
+```js
+const transport       = await deriveIdentity({ lat, lng });        // ephemeral — node id, handshake, routing
+const publishIdentity = await loadOrCreatePublishIdentity();        // persisted (dumpIdentity/loadIdentity)
+
+const peer = new AxonaPeer({ domain, node, transport,
+  identity:        transport,        // transport/network identity
+  publishIdentity,                   // default signer for publishes  ← NEW
+});
+
+await peer.pub(topic, msg);                              // signed by publishIdentity
+await peer.pub(topic, msg, { signWith: otherPublishId });// per-call override → many publish keys, one peer
+```
+
+- **Precedence:** `signWith` → `publishIdentity` → `identity` (transport). Omit both and publishes sign with the transport identity exactly as before — **backward-compatible, no wire change**, so dual-key and single-key peers interoperate on the same topic.
+- **What you get:** `envelope.signerPubkey` is the *publish* key, so authorship — recognition across topics/sessions, and `kill`/`unpub` of your own messages — keys off it. The transport key stays **ephemeral and never appears in the envelope**, so an observer can't tie your publishes to your (rotating) network identity. Verified live across a transport-id rotation: same publish key ⇒ same `signerPubkey`.
+- **Multiple publish keys** (your per-channel/per-persona personas): just vary `{ signWith }` per call. Each is an independent author; the receiver verifies each `signerPubkey` independently.
+- **Honest caveat:** the peer you hand a publish to *over your connection* can locally correlate that connection with the publish key at send time; at-rest and onward-hop data carry no such link. Mitigate by publishing through a relay/`host()` node if that matters.
+- **Owned topics:** anchor the topic on the **publish key's** id (`peer.pub(topic, msg, { publisher: publishIdentity.id, signWith: publishIdentity })`) so `kill`/`unpub` ownership survives transport rotation. Region-synthetic / public topics are unaffected.
+
+Full rationale + the gated follow-ups (publish-PoW, prod rollout) in [`architecture/Dual-Key-Identity-v0.1.md`](architecture/Dual-Key-Identity-v0.1.md).
+
+### 3.4 Large messages — single publishes are capped at a *receivable* size
 
 `peer.pub` now **throws** `PublishError(PUBLISH_PAYLOAD_TOO_LARGE)` when a single message serializes larger than the reliable-publish floor:
 
@@ -223,7 +248,7 @@ Properties worth knowing (each is a fix for a real failure we hit):
 
 ### 4.2 `std/publisher` — persist a logical publish stream
 
-The Publish ID is the **dedup token** (not authorship — see §3.2 for that); `std/publisher` is how an app **owns and persists** it so a publish stream stays continuous across reloads / a rotated transport id, with no reset-to-zero collision.
+The Publish ID is the **dedup token** (not authorship — that's the publish identity, §3.3); `std/publisher` is how an app **owns and persists** it so a publish stream stays continuous across reloads / a rotated transport id, with no reset-to-zero collision.
 
 ```js
 import { persistentPublisher } from '@axona/protocol/std';
@@ -237,8 +262,6 @@ await peer.pub(topic, msg, { publisher, publishId: pub.next() });   // note: BOT
 - `persistentPublisher(key, { store? })` — browser-`localStorage`-backed by default; use a distinct `key` per logical stream (one per channel / file transfer / sender) to run several at once.
 - `defaultStore()` — the localStorage `{get,set}` adapter (or `null` when unavailable, e.g. a sandboxed iframe).
 - **Node / non-browser:** there's no `localStorage`, so pass your own store — any object with `get(key)`/`set(key,val)` (file-backed, Redis, etc.): `persistentPublisher('sightings', { store: myStore })`.
-
-A future `std/image` (downsampling/compression) will land here as a sibling module.
 
 A future `std/image` (downsampling/compression) will land here as a sibling module.
 
@@ -257,11 +280,12 @@ You don't call these, but they explain behavior:
 
 ## 6. Migration checklist for app authors
 
-- [ ] **Bump your kernel dependency to ≥ 2.49.0** (npm github-pin `#semver:^2.49.0`, or re-vendor).
+- [ ] **Bump your kernel dependency to ≥ 2.50.0** (npm github-pin `#semver:^2.50.0`, or re-vendor).
 - [ ] **Keep building + threading an `identity`** — `deriveIdentity` → `webTransport({identity})` + `AxonaPeer({identity})` + `identity.id` to `NeuronNode`/`transport.start`. Nothing here is auto-defaulted.
-- [ ] **Decide your persistence stance (two independent choices):**
+- [ ] **Decide your persistence stance (independent choices):**
   - Default (most apps): persist **nothing** — fresh identity each run.
-  - Want **durable authorship** (stable `signerPubkey`, `kill`/`unpub` your own posts later)? Persist the **`identity`** via `dumpIdentity`/`loadIdentity` (§3.2).
+  - Want **durable authorship** (stable `signerPubkey`, `kill`/`unpub` your own posts later) *without* a linkable transport? Use a **separate `publishIdentity`** (persist it via `dumpIdentity`/`loadIdentity`) — §3.3. Need several author personas? Pass `{ signWith }` per call.
+  - (Simpler, but links your connections) persist the **transport `identity`** itself — §3.2.
   - Want **dedup continuity** of a publish stream across restarts? Persist a **Publish ID** via `std/publisher` and pass `publishId: pub.next()` alongside `publisher` (§4.2).
 - [ ] **Route large payloads through `std/chunk`** (`publishChunkedBytes`/`receiveChunkedBytes`, with `throttleMs`). Anything that might exceed ~15 KB — a single oversize `peer.pub` now throws. Convert strings/data-URLs with `stringToBytes`/`bytesToString`; remember `file.bytes` is a `Uint8Array`.
 - [ ] **One reassembler per topic is fine** — it's multi-file now. (If you forked the old single-file behavior, drop it.)
@@ -274,7 +298,8 @@ You don't call these, but they explain behavior:
 - **What do I pass to `webTransport` / `AxonaPeer`?** The `identity` from `deriveIdentity` — the *same object* to both. It's your transport id **and** your signing key. Required; not auto-defaulted.
 - **What do I pass to `transport.start(id)` / `new NeuronNode({ id })`?** `identity.id` (the 66-char hex node id); `NeuronNode` wants `BigInt('0x' + identity.id)`.
 - **Should I just not pass an identity?** No — you always create and pass one. "Ephemeral" = you don't *persist* it by default, not that the kernel makes one for you.
-- **I want to delete my own posts later / be a recognizable author across sessions.** Persist the **`identity`** (`dumpIdentity`/`loadIdentity`) — §3.2. *Not* the publishId.
+- **I want to delete my own posts later / be a recognizable author across sessions.** Persist a **publish identity** and pass it as `AxonaPeer({ publishIdentity })` — §3.3 (keeps the transport id ephemeral/unlinkable). Persisting the transport `identity` itself also works but links your connections (§3.2). *Not* the publishId either way.
+- **Can one peer publish under several identities?** Yes — `peer.pub(topic, msg, { signWith: otherPublishIdentity })` per call (§3.3).
 - **I want a publish stream that never reuses/repeats its dedup token across restarts.** Persist a **Publish ID** with `std/publisher`; pass `publishId: pub.next()` *and* `publisher` — §4.2.
 - **Is `publisher` the same as `publishId`?** No. `publisher` = the topic anchor (which keyspace the topic lives in), same for everyone on the topic. `publishId` = a per-event dedup token.
 - **Does `receiveChunkedBytes` give me a `File`?** No — `{ bytes: Uint8Array, name, mime, size, meta, id }`. Wrap `file.bytes` in a `Blob` for the browser.
@@ -287,12 +312,14 @@ You don't call these, but they explain behavior:
 
 | component | version | network |
 |-----------|---------|---------|
-| kernel `@axona/protocol` | **2.49.0** (tagged) | — |
-| axona-peer | 3.39.0 | testnet |
-| axona-bridge | 2.28.1 (kernel 2.49.0) | testnet (`testnet.axona.net`) |
-| axona-relay | 0.11.1 | testnet |
+| kernel `@axona/protocol` | **2.50.0** (tagged) | — |
+| axona-peer | 3.40.0 | testnet |
+| axona-bridge | 2.28.2 (kernel 2.50.0) | testnet (`testnet.axona.net`) |
+| axona-relay | 0.11.2 | testnet |
 | axona-share | 0.10.1 | GitHub Pages |
 | axona-minimal | 0.2.0 | demo-testnet |
+
+> Dual-key identity (v2.50.0) is live on testnet and under an overnight verification soak (multikey / transport-rotation / single-key interop). Prod + app adoption are gated follow-ups.
 
 Try the reference apps (same build runs against either network via a URL extension):
 
