@@ -12,9 +12,18 @@ We separated **who you are on the wire** (a throwaway, per-session transport ide
 
 ---
 
-## 2. `identity`, `publisher`, `publishId` — three different things
+## 2. Keys & IDs — one keypair, several derived identifiers
 
-The single biggest source of confusion: **`identity`, `publisher`, and `publishId` are not the same thing.** Get these straight and the rest of the API falls into place.
+The single biggest source of confusion is imagining several keys. **There is only ONE key per node** — one Ed25519 keypair from `deriveIdentity({lat,lng})` — and it does two jobs. Everything else below is a *derived* or *opaque* value, **not** a key.
+
+> **One keypair = your identity.**
+> Its public key **hashed** is *where you are* — your **Node ID**.
+> Its public key **raw** is *who you are* — your **`signerPubkey`** on every message.
+> Its **private key signs** (the connection handshake, and every publish).
+> Then: `msgId` = *what* you said · **Topic ID** = *which channel* · **Publish ID** = *which event* (dedup).
+> Only the keypair is secret; the rest are derived or opaque.
+
+### The three things you pass in your code
 
 | Concept | What it is | You pass it to | It controls |
 |---|---|---|---|
@@ -22,11 +31,43 @@ The single biggest source of confusion: **`identity`, `publisher`, and `publishI
 | **`publisher`** | The **topic anchor** — the value every participant uses to derive the same **Topic ID**. Usually a region-synthetic value (`ANCHOR.publisher`) or `null` for a fully public topic. **Not** a key, **not** per-sender. | `peer.pub` / `peer.sub` / `peer.pull(topic, …, { publisher })` | which **Topic ID** (keyspace) the topic lives in |
 | **`publishId`** | A per-event **dedup / exactly-once token**. Opaque string, no location. | `peer.pub(topic, msg, { publishId })` — optional | de-duplication of a publish across the mesh — **nothing else** |
 
-Three *IDs* fall out of these: the **Transport ID** (= `identity.id`, ephemeral by default), the **Topic ID** (from `publisher` + topic name; region-anchored, deterministic), and the **Publish ID** (opaque, app-ownable).
+### How each identifier is built and used
+
+| Identifier | Shape | Built from | On the wire? | How it's verified | Purpose |
+|---|---|---|---|---|---|
+| **Transport / Node ID** | 264-bit, region-prefixed (66 hex) | `S2(lat,lng) ‖ SHA-256(pubkey)` | **Yes — sent together with the pubkey + a signed hello.** The ID alone proves nothing. | Verifier recomputes `SHA-256(pubkey)` and checks it equals the ID's **low 256 bits**, then checks the hello signature against the pubkey. | your address in the DHT keyspace; mesh auth |
+| **`signerPubkey`** | 32-byte Ed25519 pubkey (64 hex) | the public half of your keypair | Yes — in **every** published envelope | it *is* the key the envelope signature is checked against | proves **WHO** authored a message; basis for `kill`/`unpub` authority |
+| **Message ID (`msgId`)** | 256-bit, **no** prefix (64 hex) | `SHA-256(canonical({ publisher: signerPubkey, message }))` | Yes — but receivers **recompute** it, never trust the sent value | recompute & compare: tampering the body, or swapping the author, changes it | content address (`pull(msgId)`), content-level dedup, tamper-evidence |
+| **Topic ID** | 264-bit, region-prefixed | anchored: `pub[0:2] ‖ SHA-256(pub + ':' + topic)`; public: `00 ‖ SHA-256(topic)` | derived identically by everyone (not "claimed") | deterministic — same inputs ⇒ same ID | which channel / which keyspace a topic lives in |
+| **`publisher`** (topic anchor) | a node-id-shaped value, or `null` | app's choice — often a **synthetic region anchor** (`<region-byte>‖0…0`), *not* anyone's real key | as the input to Topic-ID derivation | n/a — not a secret, nothing to verify | makes every participant derive the **same** Topic ID |
+| **Publish ID** | opaque token (e.g. `pub_ab12…:7`) | random, or app-owned via `std/publisher` | Yes | n/a | exactly-once / dedup of one event — nothing else |
+
+> **On the region prefix:** only the **hash half** of the Node ID is cryptographically bound to your key. The top 8-bit S2 region prefix is **self-asserted** (a routing hint you choose from your lat/lng) — it is *not* provable from the key, and it is *not* in the message envelope. Anti-grinding defenses for the prefix live elsewhere; the envelope discloses **who** (`signerPubkey`), never **where**.
+
+### What actually travels for one publish (the signed envelope)
+
+```
+{ message,                          // your payload
+  signerPubkey: <64-hex>,           // your identity's PUBLIC key — "who"
+  signature:    'ed25519:<128-hex>',// over a DOMAIN-TAGGED core: { domain, seq, ts, topic, message }
+  seq, ts,                          // per-publisher monotonic sequence + timestamp
+  msgId:        <64-hex>,           // content hash — receivers RECOMPUTE it, never trust the sent value
+  topic,                            // Topic ID derived from it
+  publishId:    <token> }           // dedup token
+```
+A receiver checks the **signature against `signerPubkey`** and **recomputes `msgId`**. Together these make every field tamper-evident: a changed body breaks both; a changed `seq`/`ts`/`topic` breaks the signature; a swapped author breaks the recomputed `msgId`.
+
+### ⚠️ "publisher" is an overloaded word
+
+The token `publisher` means **two unrelated things** depending on where you see it:
+- in **`deriveTopicId` / `peer.pub({ publisher })`** → the **topic anchor** (an addressing input, usually a synthetic region value, no key behind it);
+- inside the **`msgId`** formula → the **author's pubkey** (`signerPubkey`).
+
+Whenever this doc says "the `publisher` option," it means the **topic anchor**.
 
 ### What the keys do — and what they don't
 
-- `deriveIdentity({lat,lng})` mints a fresh **Ed25519 keypair**; your node id is derived from its public key. The same identity **signs every publish**, so `envelope.signerPubkey` = your identity's public key — a stable pseudonymous author, **never your location** (the node id's S2 prefix is not in the envelope and can't be recovered from the key). **Publisher location stays out of the protocol.**
+- `deriveIdentity({lat,lng})` mints a fresh **Ed25519 keypair**; your node id is derived from its public key. The same identity **signs every publish**, so `envelope.signerPubkey` = your identity's public key — a stable pseudonymous author, **never your location**. **Publisher location stays out of the protocol.**
 - **Authorship is the `identity`, not the `publishId`.** Recognizing a sender across topics/sessions, and deleting (`kill`) or retracting (`unpub`) your own messages later, all key off `signerPubkey` — i.e. the **identity keypair**. The `publishId` has nothing to do with authorship.
 - Infra nodes (relays/bridges) derive **non-extractable** keys (`extractable:false`) *because* they're deliberately throwaway. An app that wants to **keep** its identity derives it extractable (the default) and persists it — see §3.2.
 
