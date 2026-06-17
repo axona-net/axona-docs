@@ -1,11 +1,11 @@
-# Team Update — Axona kernel **v2.50.0**
+# Team Update — Axona kernel **v2.51.0**
 
 **Audience:** anyone building on `@axona/protocol` (apps, relays, bridges).
-**Status:** live on the **testnet** fleet (kernel 2.50.0). Prod is staged but gated.
+**Status:** kernel 2.51.0 tagged; rolling to the **testnet** fleet. Prod is staged but gated.
 
 ## TL;DR
 
-1. **Two kinds of keypair, your choice.** A node always has a **transport** keypair (its address + connection). Optionally it can also have one or more **publish** keypairs that sign your messages — so you get a *recognizable, accountable author* without a *trackable network identity*. (Default stays single-key; existing apps unchanged.)
+1. **Two distinct keypairs — and the rule that keeps them apart.** A node always has a **transport** keypair (its address + connection). To **publish**, a node uses a **publish** keypair — a *separate* key that signs your messages. **The transport key never signs publishes.** Reusing one key for both is key-reuse and is refused by default; `peer.pub` now requires a publish identity. An app may hold **several** publish keys (per-call `signWith`). This gives a *recognizable, accountable author* without a *trackable network identity*.
 2. **Everything that isn't a keypair is a derived or opaque value** — Node ID, `signerPubkey`, Topic ID, Message ID, Publish ID. None of them is a secret.
 3. **Large payloads go through `@axona/protocol/std`.** A single publish is capped at a *receivable* ~15 KB; bigger content is chunked + reassembled by the `std/chunk` helper. `std/publisher` persists a publish-stream's dedup token.
 4. **You persist only what you need:** nothing (default), a **publish identity** (durable authorship), and/or a **Publish ID** (dedup continuity). Three independent switches — §6.
@@ -16,12 +16,12 @@
 
 > **Keypairs are the only secrets. Everything else is computed from them or is just a label.**
 
-A node has:
+A node has two kinds of keypair, with **separate jobs that never overlap**:
 
-- **One transport keypair** — always. It is your **Node ID** (address in the mesh) and authenticates your **connection**.
-- **Zero or more publish keypairs** — optional. Each signs publishes as a distinct **author** (`signerPubkey`).
+- **One transport keypair** — always. It is your **Node ID** (address in the mesh) and authenticates your **connection**. It does **not** sign publishes.
+- **One or more publish keypairs** — required to publish. Each signs your messages as a distinct **author** (`signerPubkey`). A subscribe-only peer needs none; a publishing peer needs at least one.
 
-In **single-key mode** (the default) the transport keypair also signs your publishes — one keypair does both jobs. In **dual-key mode** you hand the peer a separate publish keypair, and *that* signs publishes while the transport keypair stays disposable.
+**Key separation is enforced:** `peer.pub` signs with a publish identity (`signWith` or the peer's `publishIdentity`) and **never falls back to the transport key** — a signed publish without one is refused (`PUBLISH_NO_PUBLISH_IDENTITY`). Signing with the transport key is possible *only* by passing it explicitly as `signWith` — an intentional, discouraged override, never the default. Why: one key doing both the connection and authorship is key-reuse; splitting them also lets the transport key stay ephemeral (unlinkable) while the publish key is a stable, accountable author.
 
 From those keypairs, everything else is derived:
 
@@ -39,10 +39,10 @@ From those keypairs, everything else is derived:
 
 | Keypair | Created by | Lifetime (default) | Used for | Appears on the wire as |
 |---|---|---|---|---|
-| **Transport identity** | `deriveIdentity({lat,lng})` | **ephemeral** — fresh per run, not stored | Node ID; the connection handshake (channel-bound); DHT routing; subscribing; direct messages | the Node ID + pubkey in the **handshake** (never in a message envelope) |
-| **Publish identity** *(opt-in, v2.50)* | `deriveIdentity({lat,lng})` | **persistent** — you store it | signing publishes → `signerPubkey`; `kill`/`unpub` authority; owning a topic | `signerPubkey` + `signature` in **every published envelope** |
+| **Transport identity** | `deriveIdentity({lat,lng})` | **ephemeral** — fresh per run, not stored | Node ID; the connection handshake (channel-bound); DHT routing; subscribing; direct messages. **Never signs publishes.** | the Node ID + pubkey in the **handshake** (never in a message envelope) |
+| **Publish identity** | `deriveIdentity({lat,lng})` | **persist it** for durable authorship (or per-session if you don't need that) | signing publishes → `signerPubkey`; `kill`/`unpub` authority; owning a topic | `signerPubkey` + `signature` in **every published envelope** |
 
-Both are ordinary Ed25519 keypairs from the same `deriveIdentity` call — the difference is purely **what you use each one for** and **whether you persist it**.
+Both are ordinary Ed25519 keypairs from the same `deriveIdentity` call — the difference is purely **what you use each one for** (transport vs. authorship) and **whether you persist it**. They must be **different keys**: a publishing peer creates both.
 
 ```js
 import { deriveIdentity } from '@axona/protocol';
@@ -93,44 +93,37 @@ Receiver checks: **signature against `signerPubkey`** + **recompute `msgId`**. A
 
 The construction is the same in every mode; only the identity you give it changes.
 
-### 4a. Single-key (default — simplest)
+### 4a. A publishing peer (the standard setup)
+
+You always build a **transport** identity (for the connection) and, to publish, a **publish** identity (the signer). Two keys, two jobs.
 
 ```js
 import { AxonaPeer, AxonaDomain, NeuronNode, deriveIdentity } from '@axona/protocol';
 import { webTransport } from '@axona/web';
 
-const identity  = await deriveIdentity({ lat, lng });          // one keypair, both jobs
-const transport = webTransport({ bridgeUrl, identity });        // identity is REQUIRED here
-const node      = new NeuronNode({ id: BigInt('0x' + identity.id), lat, lng });
-node.transport  = transport;
-const peer      = new AxonaPeer({ domain: new AxonaDomain({ k: 20 }), node, identity, transport });
-
-await transport.start(identity.id);   // pass identity.id (the 66-hex Node ID)
-await peer.start();
-
-await peer.pub('chat/general', { text: 'hi' }, { publisher });  // signed by `identity`
-await peer.sub('chat/general', (env) => console.log(env.signerPubkey, env.message), { publisher, since: 'all' });
-```
-
-### 4b. Dual-key (durable authorship, unlinkable transport)
-
-Hand the peer a **separate, persisted publish identity**. The transport identity stays ephemeral.
-
-```js
 const transport       = await deriveIdentity({ lat, lng });        // ephemeral — address + connection
-const publishIdentity = await loadOrCreatePublishIdentity(region); // persisted — see §6
+const publishIdentity = await loadOrCreatePublishIdentity(region); // your author key — persist it (§6)
 
+const tx   = webTransport({ bridgeUrl, identity: transport });      // transport identity is REQUIRED here
+const node = new NeuronNode({ id: BigInt('0x' + transport.id), lat, lng });
+node.transport = tx;
 const peer = new AxonaPeer({
   domain: new AxonaDomain({ k: 20 }), node, transport,
-  identity:        transport,        // transport/network identity
-  publishIdentity,                   // ← default signer for publishes (NEW in v2.50)
+  identity:        transport,         // transport/network identity (handshake, routing)
+  publishIdentity,                    // signs your publishes  → envelope.signerPubkey
 });
 
-await peer.pub('chat/general', { text: 'hi' }, { publisher });     // signed by publishIdentity
-// → envelope.signerPubkey === publishIdentity.pubkeyHex; transport key never appears
+await tx.start(transport.id);         // pass the transport Node ID (66-hex)
+await peer.start();
+
+await peer.pub('chat/general', { text: 'hi' }, { publisher });   // signed by publishIdentity
+await peer.sub('chat/general', (env) => console.log(env.signerPubkey, env.message), { publisher, since: 'all' });
+// envelope.signerPubkey === publishIdentity.pubkeyHex; the transport key never appears in a publish.
 ```
 
-### 4c. Multiple publish identities (per call)
+A **subscribe-only** peer needs no publish identity — just the transport identity.
+
+### 4b. Multiple publish identities (per call)
 
 Run as many author personas as you like through one peer with a per-call override:
 
@@ -142,8 +135,9 @@ await peer.pub('forum/general', { text: 'as alice' }, { publisher, signWith: ali
 await peer.pub('forum/general', { text: 'as bob'   }, { publisher, signWith: bob });
 ```
 
-**Signing precedence:** `signWith` → `publishIdentity` → `identity` (transport).
-Omit all of it and publishes sign with the transport identity exactly as before — **no wire change**, dual-key and single-key peers interoperate on the same topic.
+**Signing precedence:** `signWith` → the peer's `publishIdentity`. There is **no fallback to the transport key**: a signed `peer.pub` with neither throws `PublishError(PUBLISH_NO_PUBLISH_IDENTITY)`. (`{ sign: false }` publishes anonymously and needs no key.)
+
+> **Intentional override (discouraged):** to sign with the transport key anyway, pass it explicitly — `peer.pub(topic, msg, { signWith: transport })`. This is the only way to do it, and it's never implicit. Prefer a dedicated publish key.
 
 > **Owned topics:** if you want a topic only you can publish to / `kill` on, anchor it on the **publish key**: `peer.pub(topic, msg, { publisher: alice.id, signWith: alice })`. Then `kill`/`unpub` authority survives transport rotation. (Region-synthetic and public topics are unaffected.)
 
@@ -210,10 +204,12 @@ Decide each separately. Most apps need **none**.
 
 | Want | Persist | How | Effect |
 |---|---|---|---|
-| Nothing (default) | — | — | fresh transport identity each run; unlinkable; authorship resets each session |
+| Minimal (throwaway/demo) | mint an **ephemeral publish identity** each run (still separate from transport) | just `deriveIdentity` at start, pass as `publishIdentity` | unlinkable; authorship resets each session |
 | **Durable authorship** (recognizable author; `kill`/`unpub` your own posts later) — *without* linkable connections | the **publish identity** keypair | `dumpIdentity` / `loadIdentity`, pass as `AxonaPeer({ publishIdentity })` | stable `signerPubkey` across sessions; transport stays ephemeral |
 | Stable address across restarts (rarely needed) | the **transport identity** keypair | same, pass as `identity` | stable Node ID — but your connections become linkable |
 | **Dedup continuity** of a publish stream | the **Publish ID** | `std/publisher` | no repeated/duplicate event ids across restarts |
+
+Note: a publishing peer always has a publish identity — the only choice is whether you **persist** it (durable author) or mint it **per session** (resets). The transport key is never used for signing.
 
 Persisting an identity keypair (publish or transport) uses the same two calls:
 
@@ -248,7 +244,7 @@ This is *fail-loud*: code that used to "work" on small images but silently trunc
 
 - [ ] **Kernel ≥ 2.50.0** (npm github-pin `#semver:^2.50.0`, or re-vendor).
 - [ ] **Build + thread a transport `identity`** (`deriveIdentity` → `webTransport({identity})` + `AxonaPeer({identity})`; `identity.id` to `NeuronNode`/`transport.start`). Nothing is auto-defaulted.
-- [ ] **Need durable authorship?** Create + persist a **publish identity** and pass `AxonaPeer({ publishIdentity })`. Multiple personas → `peer.pub(…, { signWith })`. (Leave it out for single-key behavior.)
+- [ ] **A publishing peer needs a publish identity** — pass `AxonaPeer({ publishIdentity })` (or per-call `{ signWith }`). **Persist it** (`dumpIdentity`/`loadIdentity`) for durable authorship, or mint per session if you don't need that. The transport key will not sign — a signed `peer.pub` without a publish identity now throws. Multiple personas → `{ signWith }`.
 - [ ] **Owned topics:** anchor on the publish key (`{ publisher: pubKey.id, signWith: pubKey }`).
 - [ ] **Large payloads → `std/chunk`** (`publishChunkedBytes`/`receiveChunkedBytes`, `throttleMs`). `file.bytes` is a `Uint8Array`; strings via `stringToBytes`/`bytesToString`.
 - [ ] **Need dedup continuity?** `std/publisher` → pass `publishId: pub.next()` alongside `publisher`.
@@ -259,7 +255,7 @@ This is *fail-loud*: code that used to "work" on small images but silently trunc
 ## 9. FAQ
 
 - **What do I pass to `webTransport` / `AxonaPeer`?** The transport `identity` from `deriveIdentity` — the *same object* to both; `identity.id` to `NeuronNode`/`transport.start`. Required, not auto-defaulted.
-- **How many keypairs are there?** One by default (transport, does both jobs). Two if you opt into a separate `publishIdentity`. More publish keys via `signWith`.
+- **How many keypairs are there?** A transport keypair (always) plus a publish keypair to publish (a subscribe-only peer needs none). The transport key never signs publishes. Multiple publish keys via `signWith`.
 - **Recognize an author across sessions / delete my own posts later?** Persist a **publish identity** (§6). Not the `publishId`.
 - **`publisher` vs `publishId`?** `publisher` = topic anchor (which keyspace). `publishId` = per-event dedup token. Unrelated.
 - **Can I prove a message has a given `publishId`?** No — it's unauthenticated. Put the id inside `message` if you need it bound to the author.
@@ -272,12 +268,14 @@ This is *fail-loud*: code that used to "work" on small images but silently trunc
 
 | component | version | network |
 |---|---|---|
-| kernel `@axona/protocol` | **2.50.0** (tagged) | — |
-| axona-peer | 3.40.0 | testnet |
-| axona-bridge | 2.28.2 (kernel 2.50.0) | testnet (`testnet.axona.net`) |
-| axona-relay | 0.11.2 | testnet |
-| axona-share | 0.10.1 | GitHub Pages |
-| axona-minimal | 0.2.0 | demo-testnet |
+| kernel `@axona/protocol` | **2.51.0** (tagged) | — |
+| axona-peer | 3.41.0 | testnet (rolling) |
+| axona-bridge | kernel 2.51.0 | testnet (rolling) |
+| axona-relay | 0.11.x | testnet (rolling) |
+| axona-share | 0.11.0 | GitHub Pages (rolling) |
+| axona-minimal | 0.3.0 | demo-testnet (rolling) |
+
+> Kernel 2.51.0 is tagged and all reference apps now carry a publish identity. The testnet fleet (bridge/relay/peer/demo/Pages) is mid-rollout from 2.50.0 → 2.51.0.
 
 - **Image sharing:** <https://axona-net.github.io/axona-share/?net=testnet>
 - **Minimal pub/sub:** <https://demo-testnet.axona.net/apps/axona-minimal/>

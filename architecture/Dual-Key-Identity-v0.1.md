@@ -85,7 +85,7 @@ const peer = new AxonaPeer({
 
 1. **This note** — team review of the model + the open questions above.
 2. **Prototype (gated):** thread `publishIdentity` through `AxonaPeer`/`buildEnvelope` behind a smoke test (single-key default preserved; dual-key signs + verifies + `kill`s across a simulated transport-id rotation). No deploy.
-3. **Cut a kernel tag**, re-vendor consumers, update the [team update](../TEAM-UPDATE-v2.50.md) §2/§3.2.
+3. **Cut a kernel tag**, re-vendor consumers, update the [team update](../TEAM-UPDATE-v2.51.md) §2/§3.2.
 4. **App adoption:** apps that want durable authorship + unlinkable transport opt in by supplying a persisted `publishIdentity`.
 
 — v0.1, drafted 2026-06-16.

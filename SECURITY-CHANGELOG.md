@@ -16,6 +16,21 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v2.51.0 — 2026-06-16
+
+### Transport/authorship key separation is enforced (no implicit key reuse)
+
+- **PROTECTED: a node's connection (transport) key can no longer silently double as
+  its authorship (signing) key.** `peer.pub` signs publishes with a dedicated publish
+  identity and never falls back to the transport identity; a signed publish without
+  one is refused (`PUBLISH_NO_PUBLISH_IDENTITY`). This removes a key-reuse footgun —
+  the same keypair both authenticating your connection and signing your content — and
+  makes the *unlinkable transport / accountable author* split the **default** posture
+  rather than an opt-in. Signing with the transport key remains possible only as an
+  explicit, per-call choice (`signWith`), never implicitly.
+
+---
+
 ## Kernel v2.50.0 — 2026-06-16
 
 ### Authorship can be unlinkable from network presence (dual-key identity)

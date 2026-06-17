@@ -7,6 +7,25 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v2.51.0 — publish identity required to sign (key separation enforced) (2026-06-16)
+
+No wire/flag-day change, but a **behavior change** for publishers:
+
+- `peer.pub` signs with `signWith ?? publishIdentity` and **no longer falls back to
+  the transport identity**. A signed publish with neither throws
+  `PublishError(PUBLISH_NO_PUBLISH_IDENTITY)`.
+- Rationale: reusing one keypair for both the connection (transport) and authorship
+  (publishing) is key reuse. Publishing is authored by a **publish keypair**; an app
+  may hold several (per-call `signWith`). Signing with the transport key is possible
+  only via an explicit `{ signWith }` — intentional and discouraged, never implicit.
+- Migration: a publishing peer passes `AxonaPeer({ publishIdentity })` or per-call
+  `{ signWith }`; `{ sign: false }` (anonymous) is unaffected. Reference apps updated
+  (axona-share 0.11.0, axona-minimal 0.3.0, axona-peer 3.41.0).
+- `smoke_dual_key` updated (refusal + explicit-override + anonymous cases); full
+  suite (66 files) green.
+
+---
+
 ## v2.50.0 — dual-key identity: publish identity decoupled from transport (2026-06-16)
 
 Additive, backward-compatible, **no wire/flag-day change** (design note:
