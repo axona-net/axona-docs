@@ -12,26 +12,49 @@ We separated **who you are on the wire** (a throwaway, per-session transport ide
 
 ---
 
-## 2. The three IDs (this is the core mental model)
+## 2. `identity`, `publisher`, `publishId` — three different things
 
-Axona now has **three distinct identifiers**. Keeping them straight is the whole update.
+The single biggest source of confusion: **`identity`, `publisher`, and `publishId` are not the same thing.** Get these straight and the rest of the API falls into place.
 
-| ID | Width / shape | Lifetime | Who sets it | Encodes location? |
-|----|---------------|----------|-------------|-------------------|
-| **Transport ID** (node id) | 264-bit = `[8-bit S2 region prefix ‖ SHA-256(pubkey)]` | **Ephemeral** — re-minted every process start, never persisted | kernel, from a fresh keypair | **Yes** (S2 region prefix) — so it never goes in the envelope |
-| **Topic ID** | 264-bit, S2-prefixed (derived from `publisher` + topic name) | Stable for the topic | derived deterministically by everyone | Yes (region of the topic anchor) |
-| **Publish ID** | opaque string, **no** S2 prefix | App-controlled; may be persisted across restarts | **the app** (or the kernel mints a random one) | **No** |
+| Concept | What it is | You pass it to | It controls |
+|---|---|---|---|
+| **`identity`** | Your node's **Ed25519 keypair** (from `deriveIdentity({lat,lng})`). It is BOTH your **transport / node id** (`id = [8-bit S2 region prefix ‖ SHA-256(pubkey)]`) AND your **signing key**. | `webTransport({ identity })` **and** `new AxonaPeer({ identity })` — the *same* object — plus `identity.id` to `NeuronNode` / `transport.start` | `envelope.signerPubkey` (WHO published); authority to `kill`/`unpub` your own messages; your address in the mesh |
+| **`publisher`** | The **topic anchor** — the value every participant uses to derive the same **Topic ID**. Usually a region-synthetic value (`ANCHOR.publisher`) or `null` for a fully public topic. **Not** a key, **not** per-sender. | `peer.pub` / `peer.sub` / `peer.pull(topic, …, { publisher })` | which **Topic ID** (keyspace) the topic lives in |
+| **`publishId`** | A per-event **dedup / exactly-once token**. Opaque string, no location. | `peer.pub(topic, msg, { publishId })` — optional | de-duplication of a publish across the mesh — **nothing else** |
 
-### What the keys do
+Three *IDs* fall out of these: the **Transport ID** (= `identity.id`, ephemeral by default), the **Topic ID** (from `publisher` + topic name; region-anchored, deterministic), and the **Publish ID** (opaque, app-ownable).
 
-- Each node holds an **Ed25519 keypair**, minted per session via `deriveIdentity({lat,lng})`. The browser/relay derive it **non-extractable** (`extractable:false`) — the private key signs but can never be exported.
-- A published message carries a **signed envelope**. The signature proves **WHO** signed it (`signerPubkey`) — a stable pseudonymous author — **never WHERE** they are. The node id's S2 region prefix is *not* in the envelope, and the region can't be recovered from the key. **Publisher location stays out of the protocol.** (Apps that *want* to share a sender's region do it explicitly in the payload — that's an app choice, not a protocol leak.)
-- The **Topic ID** is region-anchored on purpose (geographic routing locality), derived from a `publisher` value + the topic string, so every participant computes the same id regardless of where they sit.
+### What the keys do — and what they don't
+
+- `deriveIdentity({lat,lng})` mints a fresh **Ed25519 keypair**; your node id is derived from its public key. The same identity **signs every publish**, so `envelope.signerPubkey` = your identity's public key — a stable pseudonymous author, **never your location** (the node id's S2 prefix is not in the envelope and can't be recovered from the key). **Publisher location stays out of the protocol.**
+- **Authorship is the `identity`, not the `publishId`.** Recognizing a sender across topics/sessions, and deleting (`kill`) or retracting (`unpub`) your own messages later, all key off `signerPubkey` — i.e. the **identity keypair**. The `publishId` has nothing to do with authorship.
+- Infra nodes (relays/bridges) derive **non-extractable** keys (`extractable:false`) *because* they're deliberately throwaway. An app that wants to **keep** its identity derives it extractable (the default) and persists it — see §3.2.
+
+### What to pass where (you still build and thread an `identity` — this did not change)
+
+```js
+import { AxonaPeer, AxonaDomain, NeuronNode, deriveIdentity } from '@axona/protocol';
+import { webTransport } from '@axona/web';
+
+const identity  = await deriveIdentity({ lat, lng });        // keypair = transport id + signer
+const transport = webTransport({ bridgeUrl, identity });     // REQUIRED — webTransport throws without it
+const node      = new NeuronNode({ id: BigInt('0x' + identity.id), lat, lng });
+node.transport  = transport;
+const peer      = new AxonaPeer({ domain: new AxonaDomain({ k: 20 }), node, identity, transport });
+
+await transport.start(identity.id);   // pass identity.id — the 66-char hex node id
+await peer.start();
+```
+
+Nothing here is auto-defaulted: create **one** `identity`, pass **that same object** to both `webTransport` and `AxonaPeer`, and pass **`identity.id`** to `NeuronNode` and `transport.start`. "Ephemeral" only means the *default* is to not persist `identity` between runs — **not** that the kernel invents one for you.
 
 ### The rule to remember
 
-> **Never store the transport/node id. Compute a fresh one on every start.**
-> If you need continuity across restarts, persist the **Publish ID** instead — that's what it's for.
+> - **By default, don't persist `identity`.** A fresh one per run is the privacy-preserving default (browsers always worked this way).
+> - **Need dedup continuity** across restarts (a logical stream that never repeats/reuses)? Persist a **Publish ID** with `std/publisher` — §4.2.
+> - **Need durable authorship** — a stable `signerPubkey` across sessions, or the ability to `kill`/`unpub` your own posts later? Persist the **`identity` keypair** — §3.2.
+>
+> These two are **independent**: do either, both, or neither.
 
 ---
 
@@ -52,15 +75,34 @@ await peer.pub(topic, msg, { publisher });                 // fine for fire-and-
 await peer.pub(topic, msg, { publisher, publishId: pub.next() });
 ```
 
+Two things to keep straight here: you still pass **`publisher`** (the topic anchor) on every call — `publishId` is an *additional*, optional option, not a replacement. And `publishId` is **dedup only**; it does not make you a recognizable author and does not grant `kill`/`unpub` rights (that's the `identity` — §3.2).
+
 Why we changed it: the old publish id was derived from the node id + a counter that **reset to 0 on restart**. With ephemeral transport ids (below), a restarted node could reuse an old `nodeId:counter` and have its *new* publishes silently deduped as already-seen. Decoupling the Publish ID (random token, or app-persisted) removes that collision class.
 
-### 3.2 Ephemeral transport identity — don't persist the node id
+### 3.2 Identity: ephemeral by default, persistent if you need durable authorship
 
-Every node (now including **relays and bridges**, not just browsers) mints a fresh keypair + node id on each start and writes nothing to disk. Practically:
+By default every node — now including **relays and bridges**, not just browsers — mints a **fresh** keypair + node id on each start and writes nothing to disk. For most apps that's what you want:
 
-- Remove any code that saves/loads a node identity file.
+- Remove any code that saves/loads a node identity file "to keep the same nodeId."
 - Don't key application state on the node id — it changes every run.
-- Discovery & reputation key on the node's **URL** (for infra) or the **Publish ID / signer** (for app streams), not on the transport id.
+- Discovery & reputation key on the node's **URL** (for infra), not on the transport id.
+
+**But if your app needs durable authorship** — a stable `signerPubkey` that subscribers recognize across topics and sessions, and the ability to `kill` (delete) or `unpub` (retract) *your own* past messages in a later session — then you must **persist the `identity` keypair** (not the publishId; `kill`/`unpub` are owner-only and must be signed by the original creator's key). Persist it yourself with `dumpIdentity`/`loadIdentity`:
+
+```js
+import { deriveIdentity, dumpIdentity, loadIdentity } from '@axona/protocol';
+
+const saved = localStorage.getItem('axona:identity');        // your storage of choice
+const identity = saved
+  ? await loadIdentity(JSON.parse(saved))                    // same keypair, id, signerPubkey as last time
+  : await deriveIdentity({ lat, lng });                      // extractable defaults to true, so it can be dumped
+if (!saved) localStorage.setItem('axona:identity', JSON.stringify(await dumpIdentity(identity)));
+// …then pass `identity` to webTransport + AxonaPeer exactly as in §2.
+```
+
+(Node has no `localStorage` — store the `dumpIdentity` envelope, which is plain JSON, in a file or DB. Or hand `AxonaPeer` a `PersistenceAdapter` as `{ persist }` and it will dump/load the identity for you.)
+
+The trade-off is deliberate: a persistent identity is **linkable** across sessions and topics. That linkability is exactly what durable authorship requires — but it's the privacy cost the ephemeral default avoids. Choose per app.
 
 ### 3.3 Large messages — single publishes are capped at a *receivable* size
 
@@ -90,26 +132,44 @@ import { chunkBytes, createReassembler,
 
 Turns a byte array too big for one publish into a set of self-describing messages and reassembles them byte-exactly, tolerating reordering, duplicates, and late/replay joiners. Each chunk is sized so the **enveloped** message stays under the 15 KB reliable floor.
 
-**Low-level (you drive pub/sub):**
+**Use the high-level helpers by default** — they handle the throttling, ordering, retry-on-gap, and timeout for you:
 
 ```js
-// sender
-const { messages, fileId, n } = chunkBytes(bytes, { name: 'photo.jpg', mime: 'image/jpeg', meta });
-for (const m of messages) await peer.pub(topic, m, { publisher });   // manifest first, then chunks
+// sender — throttleMs spaces the publishes so a burst doesn't overrun the channel.
+// It DEFAULTS TO 0, so pass it (≈150ms is what the reference apps use).
+const { topic } = await publishChunkedBytes(peer, bytes, { name, mime, meta, publisher, throttleMs: 150 });
 
-// receiver — ONE reassembler can handle a whole STREAM of files on a topic
+// receiver — resolves with the file, or REJECTS on timeout (never hangs)
+const file = await receiveChunkedBytes(peer, topic, { publisher, timeoutMs: 30000 });
+```
+
+**What `file` is:** a plain object `{ bytes, name, mime, size, meta, id }` — **`file.bytes` is a `Uint8Array`** (not a DOM `File`, not a plain array). To render an image: `URL.createObjectURL(new Blob([file.bytes], { type: file.mime }))`.
+
+**Strings, data URLs, walls of text** — `chunk` works in **bytes**, so convert at the edges with the bundled helpers:
+
+```js
+import { stringToBytes, bytesToString } from '@axona/protocol/std/chunk';
+
+await publishChunkedBytes(peer, stringToBytes(dataUrlOrText), { publisher });  // mime/meta optional — omit them
+const file = await receiveChunkedBytes(peer, topic, { publisher });
+const text = bytesToString(file.bytes);                                        // your string back, verbatim
+```
+- A **data URL** already encodes its own mime, so you can omit `mime`/`meta`. Caveat: a data URL is *already* base64, and `chunk` base64-encodes again internally → ~1.8× the raw image on the wire. If you can, chunk the **raw** bytes instead (`new Uint8Array(await blob.arrayBuffer())`, put mime in `meta`) and rebuild the data URL on receive — no double-encoding. Plain text has no such penalty.
+- **Short text doesn't need chunking at all.** If the message + metadata serialize under ~14 KB (a 2-page note is usually 4–8 KB), just `peer.pub(topic, obj, { publisher })` directly. Reach for `std/chunk` only when a payload might cross the 15 KB reliable cap.
+
+**Low-level (only if you must drive pub/sub yourself):** mirror what the helper does — **throttle between publishes** (an un-spaced `for` loop will drop chunks), and feed every received message to one reassembler:
+
+```js
+// sender — manifest first, then chunks, spaced out
+const { messages } = chunkBytes(bytes, { name: 'photo.jpg', mime: 'image/jpeg', meta });
+for (const m of messages) { await peer.pub(topic, m, { publisher }); await sleep(150); }
+
+// receiver — ONE reassembler handles a whole STREAM of files on the topic
 const r = createReassembler(
   (file) => show(file.bytes, file.mime, file.meta),     // fires once per completed file
   { onProgress: (p) => console.log(`${p.have}/${p.total}`) },
 );
 await peer.sub(topic, (env) => r.accept(env.message), { publisher, since: 'all' });
-```
-
-**High-level (helper drives pub/sub for you):**
-
-```js
-const { topic } = await publishChunkedBytes(peer, bytes, { name, mime, meta });
-const file      = await receiveChunkedBytes(peer, topic, { timeoutMs: 30000 });  // resolves or REJECTS
 ```
 
 Properties worth knowing (each is a fix for a real failure we hit):
@@ -122,18 +182,22 @@ Properties worth knowing (each is a fix for a real failure we hit):
 
 ### 4.2 `std/publisher` — persist a logical publish stream
 
-The Publish ID is the dedup token; `std/publisher` is how an app **owns and persists** it so a stream stays continuous across reloads / a rotated transport id / multiple devices.
+The Publish ID is the **dedup token** (not authorship — see §3.2 for that); `std/publisher` is how an app **owns and persists** it so a publish stream stays continuous across reloads / a rotated transport id, with no reset-to-zero collision.
 
 ```js
 import { persistentPublisher } from '@axona/protocol/std';
 
-const pub = persistentPublisher('sightings');     // restores {id, seq} from localStorage, or mints fresh
-await peer.pub(topic, msg, { publishId: pub.next() });   // '<base>:<n>', advances + persists each call
+const pub = persistentPublisher('sightings');            // restores {id, seq} from localStorage, or mints fresh
+await peer.pub(topic, msg, { publisher, publishId: pub.next() });   // note: BOTH options — publisher (topic anchor) AND publishId
+// pub.next() → '<base>:<n>', advancing + persisting the counter each call
 ```
 
 - `createPublisher({ id?, seq?, store?, key? })` — ephemeral by default; pass a `{get,set}` store to persist (the sequence is written on every `next()`, so it never reuses a value after a restart).
 - `persistentPublisher(key, { store? })` — browser-`localStorage`-backed by default; use a distinct `key` per logical stream (one per channel / file transfer / sender) to run several at once.
 - `defaultStore()` — the localStorage `{get,set}` adapter (or `null` when unavailable, e.g. a sandboxed iframe).
+- **Node / non-browser:** there's no `localStorage`, so pass your own store — any object with `get(key)`/`set(key,val)` (file-backed, Redis, etc.): `persistentPublisher('sightings', { store: myStore })`.
+
+A future `std/image` (downsampling/compression) will land here as a sibling module.
 
 A future `std/image` (downsampling/compression) will land here as a sibling module.
 
@@ -153,11 +217,28 @@ You don't call these, but they explain behavior:
 ## 6. Migration checklist for app authors
 
 - [ ] **Bump your kernel dependency to ≥ 2.49.0** (npm github-pin `#semver:^2.49.0`, or re-vendor).
-- [ ] **Remove node-identity persistence.** Don't save/load the transport id; don't key state on it.
-- [ ] **Route large payloads through `std/chunk`.** Anything that might exceed ~15 KB. A single oversize `peer.pub` now throws.
+- [ ] **Keep building + threading an `identity`** — `deriveIdentity` → `webTransport({identity})` + `AxonaPeer({identity})` + `identity.id` to `NeuronNode`/`transport.start`. Nothing here is auto-defaulted.
+- [ ] **Decide your persistence stance (two independent choices):**
+  - Default (most apps): persist **nothing** — fresh identity each run.
+  - Want **durable authorship** (stable `signerPubkey`, `kill`/`unpub` your own posts later)? Persist the **`identity`** via `dumpIdentity`/`loadIdentity` (§3.2).
+  - Want **dedup continuity** of a publish stream across restarts? Persist a **Publish ID** via `std/publisher` and pass `publishId: pub.next()` alongside `publisher` (§4.2).
+- [ ] **Route large payloads through `std/chunk`** (`publishChunkedBytes`/`receiveChunkedBytes`, with `throttleMs`). Anything that might exceed ~15 KB — a single oversize `peer.pub` now throws. Convert strings/data-URLs with `stringToBytes`/`bytesToString`; remember `file.bytes` is a `Uint8Array`.
 - [ ] **One reassembler per topic is fine** — it's multi-file now. (If you forked the old single-file behavior, drop it.)
-- [ ] **If you need stream continuity across restarts, adopt `std/publisher`** and pass `publishId: pub.next()` to `peer.pub`.
 - [ ] **Expose the kernel version** in your app's UI/health surface (`KERNEL_VERSION`) so the deployed kernel is obvious at a glance.
+
+---
+
+## 6.5 FAQ (quick reference)
+
+- **What do I pass to `webTransport` / `AxonaPeer`?** The `identity` from `deriveIdentity` — the *same object* to both. It's your transport id **and** your signing key. Required; not auto-defaulted.
+- **What do I pass to `transport.start(id)` / `new NeuronNode({ id })`?** `identity.id` (the 66-char hex node id); `NeuronNode` wants `BigInt('0x' + identity.id)`.
+- **Should I just not pass an identity?** No — you always create and pass one. "Ephemeral" = you don't *persist* it by default, not that the kernel makes one for you.
+- **I want to delete my own posts later / be a recognizable author across sessions.** Persist the **`identity`** (`dumpIdentity`/`loadIdentity`) — §3.2. *Not* the publishId.
+- **I want a publish stream that never reuses/repeats its dedup token across restarts.** Persist a **Publish ID** with `std/publisher`; pass `publishId: pub.next()` *and* `publisher` — §4.2.
+- **Is `publisher` the same as `publishId`?** No. `publisher` = the topic anchor (which keyspace the topic lives in), same for everyone on the topic. `publishId` = a per-event dedup token.
+- **Does `receiveChunkedBytes` give me a `File`?** No — `{ bytes: Uint8Array, name, mime, size, meta, id }`. Wrap `file.bytes` in a `Blob` for the browser.
+- **Big text / data URLs?** `stringToBytes` in, `bytesToString` out. Under ~14 KB? Skip chunking — just `peer.pub`.
+- **Node, not browser?** No `localStorage`: pass your own `{get,set}` store to `persistentPublisher`, and store the `dumpIdentity` JSON in a file/DB.
 
 ---
 
