@@ -16,6 +16,59 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v3.0.0 — 2026-06-18
+
+A breaking flag-day: the identity, authorship, and addressing model was rebuilt
+from first principles around three separate concerns — connection (node
+identity), authorship (author identity), and addressing (topic descriptor). The
+signed envelope now binds a structured topic **descriptor** `{ region, owner,
+name, write }` instead of a bare string, so the wire format changed (WIRE_VERSION
+2.0 → 3.0) and the whole network moves together.
+
+### Write policy is enforced at the storing node, not just claimed by the sender
+
+- **PROTECTED: an owner-only topic can only carry messages signed by its owner.**
+  A topic descriptor declares its write policy (`open` — anyone may publish,
+  self-signed; or `owner` — only the named author key). The author signs the full
+  descriptor, and the node that stores/serves the topic independently recomputes
+  the topic id from the signed descriptor and, for `write: 'owner'`, requires
+  `signerPubkey === owner` before accepting the message — at every ingress path
+  (direct publish, K-closest relay accept, and anti-entropy sync). A publish that
+  names someone else's owner-only topic is refused both at the publisher
+  (`WRITE_POLICY_VIOLATION`) and again at the root, so a feed or profile topic
+  cannot be spoofed by a third party even if they reach a storing node directly.
+
+### Authorship is location-free and never carries connection material
+
+- **PROTECTED: an author identity is a keypair and nothing else — no node id, no
+  region, no coordinates.** Authorship (`createAuthorIdentity`) is fully separated
+  from connection (`createNodeIdentity`): the published envelope discloses *who*
+  signed (the author key) and the *topic descriptor*, never *where* the publisher
+  is. Owner-anchored topics are placed at a region deterministically derived from
+  the author id (key-derived placement), so a profile/feed is discoverable from
+  the author id alone without the author disclosing a location. Signing is
+  `signWith`-only with an explicit author identity; the transport/node key can
+  never sign a publish, and an unsigned publish must opt in explicitly
+  (`ANONYMOUS`). This makes the *unlinkable transport / accountable author* split
+  structural rather than conventional.
+
+### Hermetic wire partition from the pre-v0.3 network
+
+- **PROTECTED: a pre-v0.3 (string-topic) peer and a v0.3 (descriptor-topic) peer
+  cannot silently half-talk.** Because the signed envelope's topic shape changed,
+  the two builds would otherwise reject each other's messages *after* admission —
+  a silent "my publish isn't delivered" failure. WIRE_VERSION major 3 makes the
+  refusal happen cleanly at the handshake: the bridge admits only wire-major-3
+  peers and returns `UPGRADE_REQUIRED` to anything older, so the cutover is
+  hermetic and observable rather than a quiet data-plane mismatch.
+
+Scope note (no over-claim): as in v2.50/v2.51, the peer a publisher hands a
+message to over its own connection can still locally correlate that connection
+with the author key at send time; the protocol carries no location, but it does
+not defend against network-level traffic analysis (out of scope for v1).
+
+---
+
 ## Kernel v2.51.0 — 2026-06-16
 
 ### Transport/authorship key separation is enforced (no implicit key reuse)
@@ -901,4 +954,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-16.*
+*Last updated: 2026-06-18.*
