@@ -15,8 +15,10 @@
 > - §3 fixed the misplaced "who signed / never where" sentence under Node Identity.
 > - **D7** — a topic's *write policy* (open vs owner-only) is now **separate from
 >   namespacing**, enabling author **inboxes/walls** (post *to* someone).
-> - **D6** — **key-derived placement** lets an owner-anchored topic (profile,
->   avatar, inbox) be **found from the Author ID alone**, without leaking location.
+> - **D6** — topic **region is explicit, or defaults to the publisher's own node
+>   region** when omitted; it is **never derived from the author key** (an Author ID
+>   has no region). Reverses the earlier "key-derived placement" idea, which would
+>   have manufactured a hot spot on a handful of arbitrary regions.
 > - Region **name ↔ code ↔ lat/lng** + the populated-region list become a
 >   first-class protocol module (§8).
 
@@ -147,23 +149,27 @@ same nodes.
 - **Placement — the `regionByte`** — **always a real, populated region; never
   global** (a single prefix would funnel a topic's whole traffic onto the few nodes
   nearest it: an unscalable hot spot + single point of failure). Set one of two ways:
-  - **publisher-chosen** — default = the publisher's own region (`peer.region`), or
-    any chosen real region. For topics whose full `(region, owner, name)` reference
-    you share out-of-band.
-  - **key-derived** (D6) — `regionByte = aRealRegion(SHA-256(ownerId))` — for
-    owner-anchored topics that must be **discoverable from the Author ID alone**
-    (profile, avatar, "well-known" endpoint, inbox). Anyone holding the owner's
-    Author ID computes the same region, so they find the topic with no prior
-    coordination; and because it's a deterministic *pseudo-random real* region, it
-    reveals **nothing about the author's actual location**. This is how, given only
-    an Author ID from a message, an app deterministically finds that author's public
-    profile or posts to their inbox — without republishing to every region and
-    without leaking location.
+  - **explicit** — name any real region in the descriptor. For topics whose full
+    `(region, owner, name)` reference you share out-of-band, or where the app wants a
+    deliberate region (e.g. a city lobby).
+  - **omitted → the publisher's own node region** — when `region` is absent, the
+    `regionByte` defaults to the top byte of the *publisher's* Node ID (the real S2
+    cell it already occupies). Two co-located peers converge on the same topic id
+    with no region named; reading the feed from elsewhere means naming the region
+    explicitly.
 
-  Because region is part of the address, it is a **shared coordinate** — it travels
-  with the topic reference, or is computed from the owner key — and is **never**
-  re-derived from the *reader's* own region. *(Future: restrict choosable/derived
-  regions to populated/land cells.)*
+  **Region is never derived from the author key.** An Author ID is location-free — it
+  has no region — so there is nothing real to recover from it. Hashing an Author ID
+  into a region byte (`aRealRegion(SHA-256(ownerId))`) was considered and **rejected**:
+  the hash lands on an *arbitrary* cell, those cells cluster in the few populated
+  regions whose IDs happen to sit closest to the hash outputs (many hashes map to the
+  ocean and snap to the nearest land region), and the result is a **manufactured hot
+  spot** — every author's "discoverable" topic piled onto a handful of unlucky regions,
+  the exact unscalable funnel the real-region rule exists to avoid. So discovery of an
+  author's feed needs **both** the Author ID **and** the region it was published in;
+  region is a shared coordinate that travels with the topic reference, and is **never**
+  re-derived from the reader's region either. *(Future: restrict choosable regions to
+  populated/land cells.)*
 
 - **No global broadcast primitive.** A topic the whole world must see picks one real
   region (a deliberate, app-visible hot spot) or is sharded across regions at the app
@@ -231,17 +237,17 @@ await peer.pub({ name: 'lobby' }, msg, { signWith: me });                       
 await peer.pub({ name: 'lobby', region: 'us-east' }, msg, { signWith: me });    // …a chosen region
 await peer.pub({ name: 'lobby' }, msg, { signWith: ANONYMOUS });                // explicitly anonymous
 
-// AUTHOR FEED (profile/broadcast) — owner-only, discoverable from the Author ID:
-await peer.pub({ owner: me.authorId, name: 'profile', write: 'owner' }, profile, { signWith: me });
-//    placement is key-derived from me.authorId → anyone with my Author ID finds it.
+// AUTHOR FEED (profile/broadcast) — owner-only; name a region so others can find it:
+await peer.pub({ region: 'us-east', owner: me.authorId, name: 'profile', write: 'owner' }, profile, { signWith: me });
+//    readers need my Author ID AND this region (region is omitted ⇒ my node region).
 
 // AUTHOR INBOX — post TO someone: their Author ID as owner, signed with YOUR key:
-await peer.pub({ owner: aliceAuthorId, name: 'inbox', write: 'open' }, msg, { signWith: me });
+await peer.pub({ region: 'us-east', owner: aliceAuthorId, name: 'inbox', write: 'open' }, msg, { signWith: me });
 
 // SUBSCRIBE — same address; uses the node identity, needs no author key:
-await peer.sub({ name: 'lobby' }, onMsg, { since: 'all' });                                  // open lobby
-await peer.sub({ owner: aliceAuthorId, name: 'profile' }, onMsg, { since: 'all' });          // read Alice's profile (key-derived placement)
-await peer.sub({ owner: me.authorId, name: 'inbox' }, onMsg, { since: 'all' });              // read my own inbox
+await peer.sub({ name: 'lobby' }, onMsg, { since: 'all' });                                          // open lobby (my node region)
+await peer.sub({ region: 'us-east', owner: aliceAuthorId, name: 'profile' }, onMsg, { since: 'all' }); // read Alice's profile (owner + region)
+await peer.sub({ region: 'us-east', owner: me.authorId, name: 'inbox' }, onMsg, { since: 'all' });    // read my own inbox
 // onMsg receives each message with its Author ID (or none, for anonymous).
 ```
 
@@ -260,10 +266,10 @@ Rules a developer must internalize, and nothing more:
   `signWith: ANONYMOUS`. No default, no fallback to the node key; omitting a signer is
   an **error**.
 - **A topic is `(region, owner?, name)` + a write policy** — addressing, not
-  identity. `region` defaults to `peer.region`, is any real region (never global), or
-  is **key-derived** for author-discoverable topics; `owner` is an **Author ID**
-  (public key) that namespaces it; `write` is `open` or `owner` (decoupled from
-  whether there's an owner); `name` is the label.
+  identity. `region` is any real region you name (never global), or defaults to the
+  **publisher's own node region** when omitted — **never derived from the author key**;
+  `owner` is an **Author ID** (public key) that namespaces it; `write` is `open` or
+  `owner` (decoupled from whether there's an owner); `name` is the label.
 - **Persist an author (`persistAs`) only** if you want to be recognized across
   sessions / retract later — the only persistence decision most apps make.
 
@@ -284,7 +290,7 @@ Rules a developer must internalize, and nothing more:
 | Create an identity | **`createNodeIdentity`**, **`createAuthorIdentity`** | ~~`deriveIdentity`~~, ~~`loadOrCreateAuthor`~~, ~~`dumpIdentity`/`loadIdentity`~~ |
 | Choose the signer | **`signWith`** (an author, or `ANONYMOUS`) | ~~`sign: false`~~, ~~`useAuthor`~~ / any default author |
 | Topic address | **`(region, owner?, name)` + write policy** | ~~`publisher`~~, ~~"anchor"~~ |
-| Topic placement | **publisher-chosen** or **key-derived** region (real regions only) | ~~global / `0x00`~~ |
+| Topic placement | **explicit region**, else the **publisher's node region** (real regions only) | ~~global / `0x00`~~, ~~key-derived from the author~~ |
 | Per-event dedup | the **Message ID** | ~~`publishId`~~ / ~~`persistentPublisher`~~ |
 
 ## 8. Build checklist (make the code match this model)
@@ -298,11 +304,13 @@ Rules a developer must internalize, and nothing more:
 3. **`AxonaPeer({ nodeIdentity, domain, transport })`** — no author key in the
    constructor; no default-author mechanism. `signWith` per `pub()`; missing signer →
    error; remove the `sign:` boolean.
-4. **Key-derived placement (D6)** — a helper that maps an Author ID → a real region
-   (`aRealRegion(SHA-256(ownerId))`) for author-discoverable topics.
+4. **Region default (D6)** — when a publish omits `region`, resolve the `regionByte`
+   to the **publisher's own node region** (the top byte of its Node ID); the region is
+   **never** derived from the author key. The peer supplies its node region to the
+   addressing layer (only the peer knows it).
 5. **Region module in the protocol (not example code)** — `name ↔ code ↔ lat/lng`
-   converters **and the canonical list of populated/valid regions** (also what
-   key-derived placement and the land-only future note require). `peer.region` →
+   converters **and the canonical list of populated/valid regions** (what the
+   node-region default and the land-only future note require). `peer.region` →
    `{ code, name }`.
 6. **`publishId` removed** (§9·D1); dedup is the Message ID.
 7. **Thread `signWith` through `publishChunkedBytes`** so chunked transfers choose
@@ -334,12 +342,18 @@ owner's **Author ID**. Open topics retained. **Confirmed.**
 `useAuthor`/default-author dropped; every publish names its signer with `signWith`
 (or `ANONYMOUS`). **Confirmed.**
 
-**D6 — Key-derived placement for discoverable per-author topics.** An owner-anchored
-topic meant to be found from the Author ID alone (profile, avatar, well-known
-endpoint, inbox) is placed by `regionByte = aRealRegion(SHA-256(ownerId))` — a
-deterministic *real* region, unrelated to the author's actual location. Solves
-profile/avatar discovery without republishing to every region and without leaking
-location. **Confirmed** (resolves Howard's profile-discovery question).
+**D6 — Region is explicit, else the publisher's node region; never author-derived.**
+A topic's `regionByte` is the region named in the descriptor, or — when `region` is
+omitted — the **publisher's own node region** (the top byte of its Node ID, a real
+S2 cell it occupies). It is **never** derived from the author key. *(Revised — was
+"key-derived placement," `regionByte = aRealRegion(SHA-256(ownerId))`.)* That idea was
+**rejected**: an Author ID has no region, so hashing one yields an *arbitrary* cell;
+those cells cluster onto the handful of populated regions whose IDs sit closest to the
+hash outputs (most of the hash space maps to ocean and snaps to the nearest land),
+manufacturing exactly the hot spot the real-region rule exists to prevent. Discovering
+an author's feed therefore needs **both** the Author ID **and** its region (named
+explicitly, or shared with the topic reference). **Confirmed** (revised after the
+hot-spot analysis).
 
 **D7 — Topic write policy is separate from namespacing.** A topic's *namespace*
 (optional `owner`) and its *write policy* (`open` vs `owner-only`) are independent.

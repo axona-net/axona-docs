@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.8.0 \quad 2026-06-18\par}
+{\small An Axona Architecture Note \quad v0.8.1 \quad 2026-06-18\par}
 \end{center}
 \vfill
 \null
@@ -112,7 +112,7 @@
 % =====================================================================
 \section{The Stack}
 
-\newthought{Axona ships as three repositories} that compose into one
+\newthought{Axona ships as four repositories} that compose into one
 running system. Each layer has a single
 responsibility,\sidenote{The pattern is intentional. A peer's
 business logic should never need to know the wire format; a bridge
@@ -155,7 +155,7 @@ bootstrap, then is a first-class peer. Running several relays strengthens
 routing and pub/sub durability without any of them being an inbound server.
 \end{description}
 
-\marginnote{A fourth component, \texttt{dht-sim}, runs the kernel
+\marginnote{A fifth repository, \texttt{dht-sim}, runs the kernel
 against a simulated network for protocol research and regression
 benchmarks. It's not part of the production stack but shares the
 same \texttt{@axona/protocol} library; every change that ships to
@@ -263,22 +263,26 @@ with the publisher.
 bare string but a structured descriptor --- \texttt{\{region, owner?,
 name, write\}} --- and its ID is \texttt{topicId =
 regionByte~||~sha256(canonical(\{owner, name, write\}))}, so the top
-byte is always a \emph{real} S2 cell. The region comes from one of
-three rules: an explicit \texttt{region} places the topic where the
-application chooses; if \texttt{region} is omitted but an \texttt{owner}
-(Author ID) is given, the region is key-derived from
-\texttt{sha256(authorId)} --- a real, populated cell that discloses no
-location, so an owned feed is discoverable from the Author ID alone;
-if both are omitted the call throws (an open topic must name a
-region). There is no synthetic publisher and no \texttt{00}
-``global'' bucket: every topic lands in a populated region, and peers
-in that region are XOR-closest to it, which is what makes regional
-pub/sub route naturally.\sidenote{The \texttt{write} field is part of
-the descriptor and folds into the hash: \texttt{open} lets anyone
-publish (self-signed), \texttt{owner} restricts publishing to the named
-owner Author ID. Because \texttt{owner} and \texttt{write} live inside
-the signed descriptor, a host recomputes the topic ID and enforces
-write authorisation statelessly --- see \S\,XII.}
+byte is always a \emph{real}, routable S2 cell. The region comes from
+one of two rules: an explicit \texttt{region} places the topic where
+the application chooses; if \texttt{region} is omitted, it defaults to
+the \emph{publisher's own node region} --- the top byte of its node ID,
+which is a real cell the publisher already occupies. The region is
+\emph{never} derived from the author key: an Author ID has no region,
+and hashing one into a region would dump every author's topics into a
+single arbitrary cell, manufacturing a hot spot in whatever populated
+region happened to fall closest. There is no synthetic publisher and no
+\texttt{00} ``global'' bucket: every topic lands in a populated region,
+and peers in that region are XOR-closest to it, which is what makes
+regional pub/sub route naturally.\sidenote{Because the omitted-region
+default is the \emph{publisher's} region, two co-located peers converge
+on the same topic id without naming a region; cross-region discovery
+names the region explicitly (typically alongside the owner and name).
+The \texttt{write} field also folds into the hash: \texttt{open} lets
+anyone publish (self-signed), \texttt{owner} restricts publishing to the
+named owner Author ID. Because \texttt{owner} and \texttt{write} live
+inside the signed descriptor, a host recomputes the topic ID and
+enforces write authorisation statelessly --- see \S\,XII.}
 
 The Activation Potential (AP) routing formula, the K-closest
 selector, and the synaptome's stratum buckets all operate on this
@@ -881,8 +885,8 @@ Subscriber-side flow:
 \begin{enumerate}
 \setlength{\itemsep}{0pt}
 \item Compute \texttt{topicId} from the topic \emph{descriptor}: an
-8-bit region prefix (the descriptor's \texttt{region}, or key-derived
-from \texttt{owner} when region is omitted) followed by
+8-bit region prefix (the descriptor's \texttt{region}, or the
+publisher's own node region when region is omitted) followed by
 \textsc{sha256} of the canonical \texttt{\{owner, name, write\}}. No
 synthetic publisher is involved.
 \item Find the $K$ peers closest to \texttt{topicId} in the local
@@ -1226,10 +1230,11 @@ maximum drain window in ms.
 \texttt{\{ region?, owner?, name, write? \}} (\emph{not} a string).
 Three canonical shapes: an open lobby \texttt{\{ region, name \}}
 (anyone may publish); an author feed
-\texttt{\{ owner, name, write: 'owner' \}} (region key-derived from the
-owner, or explicit; owner-only writes); an author inbox
-\texttt{\{ region, owner, name \}} (open write under an owner
-namespace).
+\texttt{\{ region, owner, name, write: 'owner' \}} (owner-only writes;
+if \texttt{region} is omitted it defaults to the publisher's own node
+region, so subscribers must name the region to read it from elsewhere);
+an author inbox \texttt{\{ region, owner, name \}} (open write under an
+owner namespace).
 \item[\texttt{message}] JSON-serializable payload.
 \item[\texttt{signWith}] \textbf{required.} An \emph{author} identity
 from \texttt{createAuthorIdentity}; the publish is signed with its
@@ -1256,8 +1261,9 @@ roots enforce the same at ingress). Returns a Promise resolving to the
 \item[\texttt{topic}] structured descriptor
 \texttt{\{ region?, owner?, name, write? \}} --- same addressing as
 \texttt{pub}. To read another author's feed, pass their \texttt{owner}
-Author ID; key-derived placement makes that feed discoverable from the
-Author ID alone.
+Author ID together with the feed's \texttt{region} --- an Author ID has
+no region of its own, so discovery needs both the owner key and the
+region the feed was published in.
 \item[\texttt{handler}] function \texttt{(envelope) => void}\;
 invoked for each delivery. The envelope is
 \texttt{\{ msgId, seq, ts, topic, message, signerPubkey? \}}
@@ -1516,15 +1522,22 @@ relay-accept, and anti-entropy sync. A publish naming someone else's
 owner-only topic is refused at the publisher
 (\texttt{WRITE\_POLICY\_VIOLATION}) and again at the root, so a feed or
 profile cannot be spoofed by a third party even reaching a storing node
-directly. Because authorship is location-free, an owned feed stays
-discoverable from the Author ID alone (key-derived placement) without
-the owner disclosing where they are; the signed envelope reveals
-\emph{who} signed and \emph{which} topic, never \emph{where}.\sidenote{A
-scope caveat, not an over-claim: the peer a publisher hands a message to
-over its own connection can still locally correlate that connection with
-the author key at send time, and the protocol carries no defence against
+directly. Authorship itself is location-free: the signed envelope reveals
+\emph{who} signed (the Author ID) and \emph{which} topic, but the Author
+ID carries no region and never appears in a node address. The one place
+location can surface is the topic's region byte. When a publisher names
+an explicit \texttt{region}, that byte is the region they chose, not
+where they are --- an author publishing into \texttt{useast} from
+anywhere discloses nothing about their own location. When
+\texttt{region} is \emph{omitted}, it defaults to the publisher's own
+node region, which does disclose that coarse cell; a
+location-conscious author therefore names a region explicitly rather
+than leaning on the omitted-region default.\sidenote{A scope caveat, not
+an over-claim: the peer a publisher hands a message to over its own
+connection can still locally correlate that connection with the author
+key at send time, and the protocol carries no defence against
 network-level traffic analysis (out of scope for v1). At-rest and
-onward-hop data carry no location link.}
+onward-hop data carry no location link beyond the chosen region byte.}
 
 Persistence is opt-in. The kernel's
 \texttt{PersistenceAdapter} contract exposes
@@ -1598,15 +1611,21 @@ function so phone/browser minters aren't out-classed by ASIC grinders.}
 % =====================================================================
 \section{Production Deployment}
 
-\newthought{The public stack runs at three URLs.}
+\newthought{The public stack runs at four URLs.}
 
 \begin{description}
 \setlength{\itemsep}{0pt}
-\item[\texttt{bridge.axona.net}.] The deployed bridge. Runs on a
+\item[\texttt{bridge.axona.net}.] The east (primary) bridge. Runs on a
 DigitalOcean droplet, started by systemd, kept current via
 \texttt{git pull \&\& npm ci --omit=dev \&\& systemctl restart}.
 Exposes \texttt{/healthz} for monitoring. Listens on
 \texttt{wss://} only; HTTP requests are redirected.
+
+\item[\texttt{bridge-west.axona.net}.] A second federated bridge in a
+western region, same deploy shape. It holds an \emph{uplink} to the east
+bridge so the two embedded peers share one connectome and the bridge
+directory federates across both --- a peer dialing either one reaches
+the same mesh.
 
 \item[\texttt{axona.net}.] The reference peer application, served
 via GitHub Pages from the \texttt{axona-peer} repo's main branch.
@@ -1666,10 +1685,17 @@ What's coming sits inside the existing seams:
 
 \begin{description}
 \setlength{\itemsep}{0pt}
-\item[\textbf{Federated bridges.}] Multiple bridges in different
-geographic regions, gossiping peer-lists so a peer connected to
-one bridge can be reached from another. Single-bridge today is a
-deployment simplification, not a protocol constraint.
+\item[\textbf{Multi-bridge gossip.}] Production \emph{already} runs
+federated bridges --- an east \texttt{bridge.axona.net} and a west
+\texttt{bridge-west.axona.net}, joined by an outbound \emph{uplink} so
+the pair share one connectome: each bridge's embedded peer runs a
+\texttt{CompositeTransport} (inbound browser WebSocket \emph{plus} an
+uplink client dialing the peer bridge), and the bridge directory
+federates across both. What remains future is full $N$-way peer-list
+gossip, so a peer connected to one bridge is \emph{directly} reachable
+from any other beyond today's uplink bootstrap chain. Either way it is a
+deployment story, not a protocol constraint --- routing already treats
+each bridge as an ordinary nodeId.
 
 \item[\textbf{Demote the bridge to an ordinary peer.}] Federated
 bridges remove the single \emph{rendezvous}; this companion change
@@ -2185,7 +2211,7 @@ import { webTransport } from '/src/transport/web/index.js';
 const DEMO_VERSION = '1.18.0';
 const BRIDGE_URL   = new URLSearchParams(window.location.search).get('bridge')
                   // Served from a testnet host (e.g. demo-testnet.axona.net) →
-                  // default to the testnet bridge (2.28.0 / axona-5 / wire-2),
+                  // default to the testnet bridge (3.0.0 / axona/5 / wire-3),
                   // which also hands back the testnet TURN. Production hosts →
                   // the prod introducer. ?bridge= still overrides either way.
                   || (location.hostname.includes('testnet') ? 'wss://testnet.axona.net'

@@ -7,6 +7,39 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v3.1.0 — region resolution: explicit, else publisher node region; never author-derived (2026-06-18)
+
+Wire-compatible point release on top of v3.0.0 (the envelope carries the resolved
+region, so a v3.0.0 storing node and a v3.1.0 publisher derive the same topic id —
+no flag day).
+
+- A topic's region resolves to the explicit `region` in the descriptor, or — when
+  omitted — to the **publisher's own node region** (top byte of its Node ID), and
+  otherwise throws. It is **never** derived from the author key.
+- Removed `keyDerivedRegion` (and `POPULATED_CODES`): an Author ID is location-free,
+  so hashing it into a region produced an arbitrary cell that clustered onto a few
+  populated regions — a manufactured hot spot. `POPULATED_REGIONS` is retained.
+- `AxonaPeer` injects its node region at topic-resolution time (only the peer knows
+  it). Discovering another author's feed now needs the Author ID **and** its region.
+- Reference soak scenario `keyderiv` → `ownerdefault`; full kernel suite green.
+- Bumped: peer 3.44.0, relay 0.13.0, bridge 2.30.0, dht-sim vendor resync.
+
+## v3.0.0 — identity / authorship / addressing rebuilt (breaking flag-day) (2026-06-18)
+
+WIRE_VERSION 2.0 → 3.0; the whole network moves together. Three separated
+concerns — connection (node identity), authorship (author identity), addressing
+(topic descriptor):
+
+- `createNodeIdentity` (264-bit Node ID = region byte ‖ SHA-256(pubkey)) and
+  location-free `createAuthorIdentity` (keypair only — no id, no region) replace the
+  single `deriveIdentity`/`publishIdentity` surface.
+- Topics are structured descriptors `{ region, owner?, name, write }`; the signed
+  envelope binds the descriptor, and `topicId = regionByte ‖ SHA-256(canonical({owner,name,write}))`.
+- **Write policy** (`open`/`owner`) enforced at the storing node at every ingress
+  path (`WRITE_POLICY_VIOLATION`).
+- `publishId` removed; per-event dedup is the content-addressed Message ID. Signing
+  is `signWith`-only (an author, or the `ANONYMOUS` sentinel) — no default signer.
+
 ## v2.51.0 — publish identity required to sign (key separation enforced) (2026-06-16)
 
 No wire/flag-day change, but a **behavior change** for publishers:

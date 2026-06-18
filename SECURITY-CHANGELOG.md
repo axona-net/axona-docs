@@ -16,6 +16,26 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v3.1.0 — 2026-06-18
+
+A point release that fixes how a topic's region is chosen. Wire-compatible with
+v3.0.0 — the envelope carries the already-resolved region, so a v3.0.0 storing
+node recomputes the same topic id as a v3.1.0 publisher; no flag day.
+
+### Topic placement can no longer be steered onto a handful of regions
+
+- **PROTECTED: a topic's region is always a real cell the publisher legitimately
+  occupies, and is never a function of an author key.** Region resolves to the
+  explicit `region` in the descriptor, or — when omitted — to the publisher's own
+  node region (the top byte of its Node ID). It is never derived from the Author
+  ID. An Author ID is location-free, so hashing one into a region byte produced an
+  arbitrary cell; because most of that hash space maps to ocean and snaps to the
+  nearest populated region, author-derived placement concentrated many authors'
+  topics onto a small set of unlucky regions — a keyspace hot spot whose
+  XOR-closest peers would absorb disproportionate storage and fan-out. Region
+  selection is now decoupled from author identity, preserving location-free
+  authorship while keeping every topic on a routable, real-region cell.
+
 ## Kernel v3.0.0 — 2026-06-18
 
 A breaking flag-day: the identity, authorship, and addressing model was rebuilt
