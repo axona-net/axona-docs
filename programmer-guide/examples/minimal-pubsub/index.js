@@ -1,76 +1,70 @@
 // =====================================================================
 // minimal-pubsub — two Axona peers in one Node process, pub/sub roundtrip.
 //
-// What this demonstrates:
-//   * deriveIdentity → 264-bit Ed25519 identity in a chosen S2 cell
-//   * Two SimTransports on a shared SimNetwork (kernel's in-process router)
+// What this demonstrates (kernel v3.2.0):
+//   * createNodeIdentity → 264-bit Ed25519 CONNECTION identity in an S2 cell
+//   * createAuthorIdentity → a location-free AUTHORSHIP key to sign publishes
+//   * Two SimTransports on a shared SimNetwork (the kernel's in-process router)
 //   * Composing AxonaPeer + AxonaManager from the kernel primitives
-//   * Region-keyed topics via a synthetic publisher
+//   * Structured topic descriptors { region, name } (open topic) + signWith
 //   * peer.pub / peer.sub roundtrip across two distinct peers
 //
-// Run:  node index.js
+// Run:  npm install && node index.js
 //
-// For real-world browser/Node wiring (WebRTC + bridge fallback, etc.),
-// see https://github.com/axona-net/axona-peer/blob/main/src/axona_node.js
-// — this example is intentionally simpler to keep the moving parts visible.
+// For real-world browser/Node wiring (WebRTC + bridge), see the Quick Start
+// (../../Quick-Start-v3.2.0.md) and apps/axona-minimal in axona-protocol —
+// this example uses the in-process sim transport to keep the parts visible.
 // =====================================================================
 
 import {
   AxonaPeer, AxonaDomain, NeuronNode, AxonaManager, Synapse,
   SimNetwork, simTransport,
-  deriveIdentity,
-  geoCellId, clz264,
+  createNodeIdentity, createAuthorIdentity,
+  clz264,
 } from '@axona/protocol';
 
-// ── 1. Region helpers ────────────────────────────────────────────────
-// us-east (Virginia).  Both peers are in this cell.
+// ── 1. Region ────────────────────────────────────────────────────────
+// us-east (Virginia). Both peers mint their node identity in this cell.
 const US_EAST = { lat: 38.0, lng: -77.0 };
-
-function regionSynthPublisher({ lat, lng }) {
-  const s2 = geoCellId(lat, lng, 8);
-  // 2 hex chars (S2 prefix) + 64 zero hex chars = 66 char synthetic id.
-  return s2.toString(16).padStart(2, '0') + '0'.repeat(64);
-}
 
 // ── 2. Build a peer ──────────────────────────────────────────────────
 // One function, called twice — once for alice, once for bob — wires
-// identity + transport + node + AxonaPeer + AxonaManager together.
+// node identity + transport + node + AxonaPeer + AxonaManager together.
 
 async function makePeer({ network, region }) {
-  // 2a. Derive a 264-bit Ed25519 identity in this region's S2 cell.
-  const identity = await deriveIdentity(region);
+  // 2a. Mint a 264-bit Ed25519 CONNECTION identity in this region's S2 cell.
+  //     (This is the node/transport key — distinct from an author key.)
+  const identity = await createNodeIdentity({ lat: region.lat, lng: region.lng });
 
   // 2b. Open a SimTransport on the shared SimNetwork.
   const transport = simTransport({ network, identity, heartbeatMs: 0 });
   await transport.start(identity.id);
 
-  // 2c. Build the local DHT node.  NeuronNode holds the synaptome and
-  //     routing state; AxonaDomain holds parameters shared across peers.
-  //     NeuronNode XORs ids as BigInts internally, so convert from
-  //     identity.id (hex string) to BigInt at construction time.
-  const node     = new NeuronNode({
+  // 2c. Build the local DHT node. NeuronNode holds the synaptome and routing
+  //     state; AxonaDomain holds parameters shared across peers. NeuronNode
+  //     XORs ids as BigInts, so convert identity.id (hex) to BigInt here.
+  const node   = new NeuronNode({
     id:  BigInt('0x' + identity.id),
     lat: region.lat, lng: region.lng,
   });
   node.transport = transport;
-  const domain   = new AxonaDomain({ k: 20 });
+  const domain = new AxonaDomain({ k: 20 });
 
-  // 2d. AxonaPeer is the per-node DHT contract implementation.
-  const peer = new AxonaPeer({ domain, node, identity, transport });
+  // 2d. AxonaPeer is the per-node DHT contract implementation. In v3 the
+  //     CONNECTION key is passed as `nodeIdentity` (there is no `identity`
+  //     param, and no default author — publishes name their signer per-call).
+  const peer = new AxonaPeer({ domain, node, nodeIdentity: identity, transport });
   await peer.start();
 
-  // 2e. AxonaManager handles pub/sub.  It needs a `dht` adapter that
-  //     forwards K-closest, sendDirect, routeMessage, and handler
-  //     registration to our AxonaPeer.  Most of these are 1-line
-  //     delegations; sendDirect special-cases self-target for local
-  //     dispatch.
+  // 2e. AxonaManager handles pub/sub. It needs a `dht` adapter that forwards
+  //     K-closest / sendDirect / routeMessage / handler registration to our
+  //     AxonaPeer. sendDirect special-cases self-target for local dispatch.
   const dht = {
     getSelfId:       () => peer.getNodeId(),
     findKClosest:    (...args) => peer.findKClosest(...args),
     routeMessage:    (...args) => peer.routeMessage(...args),
     sendDirect:      async (peerId, type, payload) => {
       if (peerId === peer.getNodeId()) {
-        // Local-loopback: dispatch into our own direct handler table.
         const h = peer._directHandlers?.get(type);
         if (!h) return false;
         try { await h(payload, { fromId: peer.getNodeId(), type }); return true; }
@@ -82,7 +76,7 @@ async function makePeer({ network, region }) {
     onDirectMessage: (type, h) => peer.onDirectMessage(type, h),
   };
   const axonaManager = new AxonaManager({ dht });
-  peer._axonaManager = axonaManager;       // hand the AM directly to the peer
+  peer._axonaManager = axonaManager;       // hand the AM to the peer
   return { peer, identity };
 }
 
@@ -93,11 +87,13 @@ const network = new SimNetwork();
 const { peer: alice, identity: aliceId } = await makePeer({ network, region: US_EAST });
 const { peer: bob,   identity: bobId   } = await makePeer({ network, region: US_EAST });
 
-// Open a SimNetwork channel between alice and bob so they're directly
-// reachable, then admit each other to their synaptomes.  Real transports
-// (WebRTC mesh, WebSocket bridge) do this admission via the axona:hello
-// / hello-ack handshake at channel-open time — see axona-peer's
-// axona_node.js for the production wiring.
+// alice needs an AUTHOR identity to sign her publish with. (A peer can hold
+// several; each publish picks one via signWith. There is no default signer.)
+const aliceAuthor = await createAuthorIdentity();
+
+// Open a SimNetwork channel between alice and bob, then admit each other to
+// their synaptomes. Real transports (WebRTC mesh, WS bridge) do this admission
+// via the axona:hello / hello-ack handshake at channel-open time.
 await alice._transport.openConnection(bobId.id);
 
 function admitSynapse(localPeer, remoteBigInt) {
@@ -114,14 +110,15 @@ admitSynapse(bob,   BigInt('0x' + aliceId.id));
 
 console.log('[alice] nodeId:', aliceId.id);
 console.log('[bob]   nodeId:', bobId.id);
+console.log('[alice] author:', aliceAuthor.authorId.slice(0, 16) + '…');
 
-// Give the kernel a tick to admit each other to their synaptomes.
 await new Promise(r => setTimeout(r, 50));
 
 // ── 4. Pub/sub roundtrip ─────────────────────────────────────────────
+// A topic is a structured descriptor. { region, name } with no owner is an
+// OPEN topic: anyone may publish (self-signed) and anyone may subscribe.
 
-const TOPIC     = 'us-east/hello-world';
-const publisher = regionSynthPublisher(US_EAST);
+const TOPIC = { region: 'useast', name: 'hello-world' };
 
 const received = [];
 const sub = await bob.sub(TOPIC, (envelope) => {
@@ -131,23 +128,22 @@ const sub = await bob.sub(TOPIC, (envelope) => {
     message:      envelope.message,
     signerPubkey: envelope.signerPubkey?.slice(0, 16) + '…',
   });
-}, { publisher, since: 'all' });
+}, { since: 'all' });
 
 console.log('[bob]   subscribed:', sub.topicId);
 
 // Wait for the subscribe-k frame to reach alice's role.
 await new Promise(r => setTimeout(r, 100));
 
-const msgId = await alice.pub(TOPIC, 'hello from alice', { publisher });
+const msgId = await alice.pub(TOPIC, 'hello from alice', { signWith: aliceAuthor });
 console.log('[alice] published msgId=' + msgId);
 
 // Let the publish-k → cache → fan-out cycle complete.
 await new Promise(r => setTimeout(r, 200));
 
 console.log();
-console.log(received.length === 1
-  ? '✓ roundtrip ok — bob received alice\'s envelope'
-  : `✗ roundtrip failed — expected 1 envelope, got ${received.length}`);
-
-await sub.stop();
-process.exit(received.length === 1 ? 0 : 1);
+const ok = received.length === 1 && received[0].signerPubkey === aliceAuthor.authorId;
+console.log(ok
+  ? '✓ roundtrip ok — bob received alice\'s envelope, signed by alice\'s author'
+  : `✗ roundtrip failed — expected 1 envelope signed by alice, got ${received.length}`);
+process.exit(ok ? 0 : 1);
