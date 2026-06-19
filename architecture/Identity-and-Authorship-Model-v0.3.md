@@ -270,6 +270,9 @@ Rules a developer must internalize, and nothing more:
   **publisher's own node region** when omitted — **never derived from the author key**;
   `owner` is an **Author ID** (public key) that namespaces it; `write` is `open` or
   `owner` (decoupled from whether there's an owner); `name` is the label.
+  *(The `region` field accepts a region **name or its code** interchangeably —
+  `'useast'` ≡ `'0x89'` ≡ `137` — all normalize to the same region byte, which is
+  the leading byte of the topic ID.)*
 - **Persist an author (`persistAs`) only** if you want to be recognized across
   sessions / retract later — the only persistence decision most apps make.
 

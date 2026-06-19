@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.8.1 \quad 2026-06-18\par}
+{\small An Axona Architecture Note \quad v0.8.2 \quad 2026-06-19\par}
 \end{center}
 \vfill
 \null
@@ -265,7 +265,9 @@ name, write\}} --- and its ID is \texttt{topicId =
 regionByte~||~sha256(canonical(\{owner, name, write\}))}, so the top
 byte is always a \emph{real}, routable S2 cell. The region comes from
 one of two rules: an explicit \texttt{region} places the topic where
-the application chooses; if \texttt{region} is omitted, it defaults to
+the application chooses (given as a region \emph{name or its code} ---
+\texttt{'useast'} $\equiv$ \texttt{0x89} $\equiv$ \texttt{137}, all
+normalising to the same region byte); if \texttt{region} is omitted, it defaults to
 the \emph{publisher's own node region} --- the top byte of its node ID,
 which is a real cell the publisher already occupies. The region is
 \emph{never} derived from the author key: an Author ID has no region,
