@@ -7,6 +7,25 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v3.2.0 — write default keyed on owner; topic ID as a read handle (2026-06-19)
+
+Not a wire change (WIRE 3.0 unchanged); one topic shape relocates.
+
+- **`write` defaults by `owner` presence.** No owner ⇒ the topic is `open` (`write`
+  ignored). An owner ⇒ `write` defaults to `'owner'` (owner-only); pass
+  `write:'open'` explicitly for an owner-namespaced open topic (inbox). So
+  `{owner, name}` ≡ `{owner, name, write:'owner'}` — forgetting `write` can no
+  longer silently leave an owned feed world-writable. Only the bare `{owner, name}`
+  shape changes id (now the owned feed, previously the open inbox).
+- **Topic ID is a shareable read handle.** `sub`, `pull`, and `metrics` accept
+  either a descriptor or a bare 66-hex topic ID (from `deriveTopicId`). Publishing
+  (and `kill`/`unpub`) still require the descriptor — a bare id is rejected, because
+  the storing node must recompute the id from the descriptor to enforce the write
+  policy (a hash can't reveal its owner). Share the ID to read; share the descriptor
+  to write.
+- Bumped: peer 3.45.0, relay 0.14.0, bridge 2.31.0, dht-sim vendor resync. New
+  programmer-guide doc: `Topic-IDs-v3.2.0`.
+
 ## v3.1.0 — region resolution: explicit, else publisher node region; never author-derived (2026-06-18)
 
 Wire-compatible point release on top of v3.0.0 (the envelope carries the resolved

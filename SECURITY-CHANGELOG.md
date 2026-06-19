@@ -16,6 +16,32 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v3.2.0 — 2026-06-19
+
+A point release (wire-compatible with v3.0/v3.1) that removes a write-policy
+footgun and clarifies the read-vs-write capability split.
+
+### Naming an owner can no longer leave the feed accidentally world-writable
+
+- **PROTECTED: `write` now defaults to `'owner'` whenever a topic names an `owner`.**
+  Previously `write` defaulted to `'open'` regardless, so an owned feed written as
+  `{ region, owner, name }` without an explicit `write:'owner'` resolved to an
+  *open* topic that anyone could publish to. Now an `owner` implies owner-only by
+  default; an owner-namespaced topic that anyone may post to (an inbox) must opt in
+  with an explicit `write:'open'`. A topic with no owner is necessarily open
+  (`write` is ignored), so the policy can never name an owner it won't enforce.
+
+### A topic ID is a read capability, not a write capability
+
+- **PROTECTED: publishing still requires the full descriptor; a bare topic ID is
+  accepted only for reading.** `sub`/`pull`/`metrics` may be addressed by the
+  shareable 66-hex topic ID, but `pub` (and `kill`/`unpub`) reject a bare ID and
+  require the `{ region, owner, name, write }` descriptor. The storing node
+  recomputes the id from the descriptor to enforce `signer === owner`; since a topic
+  ID is a hash that cannot reveal its owner, accepting writes addressed by ID alone
+  would let anyone who learned an owned feed's ID post to it. Read handles are
+  freely shareable; write authorization always travels with the descriptor.
+
 ## Kernel v3.1.0 — 2026-06-18
 
 A point release that fixes how a topic's region is chosen. Wire-compatible with
@@ -974,4 +1000,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-18.*
+*Last updated: 2026-06-19.*
