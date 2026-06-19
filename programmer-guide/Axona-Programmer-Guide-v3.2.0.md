@@ -713,7 +713,7 @@ Each topic's replay queue is bounded:
 
 The cache is in-memory and vanishes when an axon disconnects. A topic with no
 subscribers and no host for a short grace window is swept -- so without a
-hosting node (7.7), replay history can be lost even before its hold elapses.
+hosting node (7.9), replay history can be lost even before its hold elapses.
 
 ### 7.5 Subscriptions are soft-state leases
 
@@ -758,7 +758,39 @@ Two honesty notes:
   may never see the purge. An anonymous message cannot be killed.
 - `unpub` is owner-only and unavailable on open (ownerless) topics.
 
-### 7.7 Pull and metrics
+### 7.7 Message hold time: idempotent publish, touch, and the 48h ceiling
+
+A message's hold (expiry) is set **once** -- when a root first stores it -- off
+the signed `ts`, clamped to receive-time. Two consequences trip people up:
+
+**Re-publishing the same message does not extend its life.** Because the msgId
+is `SHA-256(author + message)` (no `ts`, `seq`, or nonce -- see 3.4), publishing
+the identical payload again yields the **same msgId**, so a root recognizes it as
+already-held and drops it as a duplicate. The existing entry's hold is left
+exactly as it was -- it keeps counting down. While a message is live,
+re-publishing it is an idempotent no-op, not a refresh.
+
+**To keep a live message alive, `touch` it (or `pull` it).** `peer.touch(topic,
+msgId, { signWith })` resets the hold to `now + hold`; a `pull` slides the hold
+the same way as a side effect of the read (locally, on the serving replica). Use
+`touch` for a pinned status or a current value you want to outlast its default
+hold without re-publishing.
+
+**But everything is capped at an absolute 48h ceiling.** Both `touch` and `pull`
+are clamped to `ceilingAt = original_ts + 48h`. You can hold a message right up to
+that ceiling, but **not past it** -- touching forever does not beat the cap. Once
+a message fully expires and is swept from every replica, re-publishing the
+identical content is accepted as **fresh** again (same msgId, a brand-new 48h
+ceiling). If you want an independently-addressable copy *before* the old one
+expires, give it a distinct msgId by adding a nonce to `message`.
+
+Putting it together with `kill`: duplicates collapse to one logical message, so a
+single `kill(topic, msgId)` retracts it -- there is no second copy left behind.
+The tombstone that blocks re-acceptance is itself finite-lived, and because the
+msgId is topic-independent, the same content published to two different topics
+must be killed in each.
+
+### 7.8 Pull and metrics
 
 ```js
 // Fetch one envelope by its content hash (e.g. from a reshare link), or the
@@ -777,7 +809,7 @@ messages expire or are killed); `subscribers` is the max direct-child count
 any one axon reported -- good for "X people are in this room" UX, not for
 billing. Both `pull` and `metrics` take a descriptor or a bare Topic ID.
 
-### 7.8 Hosting a topic without subscribing (`host` / `unhost`)
+### 7.9 Hosting a topic without subscribing (`host` / `unhost`)
 
 A relay or archive node wants to *store and serve* a topic without consuming
 it. That is `host`, decoupled from `sub` on purpose -- hosting is "I will
