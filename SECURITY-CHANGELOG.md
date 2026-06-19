@@ -90,9 +90,11 @@ name, write }` instead of a bare string, so the wire format changed (WIRE_VERSIO
   region, no coordinates.** Authorship (`createAuthorIdentity`) is fully separated
   from connection (`createNodeIdentity`): the published envelope discloses *who*
   signed (the author key) and the *topic descriptor*, never *where* the publisher
-  is. Owner-anchored topics are placed at a region deterministically derived from
-  the author id (key-derived placement), so a profile/feed is discoverable from
-  the author id alone without the author disclosing a location. Signing is
+  is. *(As shipped in v3.0.0, owner-anchored topics were placed at a region
+  key-derived from the author id, making a feed discoverable from the author id
+  alone. **Revised in v3.1.0** — see above: a topic's region is explicit or the
+  publisher's own node region and is never derived from the author key, so
+  discovering an owned feed needs the owner Author ID **and** its region.)* Signing is
   `signWith`-only with an explicit author identity; the transport/node key can
   never sign a publish, and an unsigned publish must opt in explicitly
   (`ANONYMOUS`). This makes the *unlinkable transport / accountable author* split
