@@ -16,6 +16,22 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v3.3.0 — 2026-06-19
+
+A behavior fix on the publish path (wire-compatible).
+
+### Re-publishing identical content no longer duplicates or double-delivers
+
+- **PROTECTED: each msgId occupies one replay-cache slot and is delivered once,
+  even if the same content is published repeatedly.** The live publish path
+  previously deduped only on the random per-publish `publishId`, so re-publishing
+  identical content (same author + message ⇒ same msgId) stored a second cache
+  entry and re-delivered to subscribers. Both ingress paths now upsert by content
+  hash: a re-publish replaces the prior entry (one entry per msgId) and is not
+  re-fanned to subscribers who already received it. This removes a duplicate-cache
+  amplification vector (a publisher could inflate a topic's retained-message count
+  by re-sending the same payload) and gives exactly-once delivery per msgId.
+
 ## Kernel v3.2.0 — 2026-06-19
 
 A point release (wire-compatible with v3.0/v3.1) that removes a write-policy

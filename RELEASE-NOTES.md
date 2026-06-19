@@ -7,6 +7,26 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v3.3.0 — re-publishing the same message upserts (replace older, deliver once) (2026-06-19)
+
+Not a wire change.
+
+- The live publish path (`_onPublish` + `_onPublishDirect`) deduped only on the
+  random per-publish `publishId`, so re-publishing identical content (same author +
+  message ⇒ same msgId) **double-stored** the replay cache (`current_count → 2`)
+  and **double-delivered** to subscribers.
+- Now both paths **upsert by msgId**: a publish whose content hash already exists
+  in the topic's replay cache **replaces** the prior entry (always one entry per
+  msgId, the newest — which sets a fresh hold and a fresh 48h ceiling) and is
+  **delivered once** (current subscribers aren't re-notified; late subscribers get
+  it via replay-on-subscribe). Different authors of identical text keep distinct
+  msgIds and are not collapsed.
+- So re-publishing is now the way to **refresh / keep alive** a message (resets the
+  ceiling); `touch`/`pull` still slide the hold but stay bounded by the existing
+  ceiling. New regression smoke `smoke_pubsub_republish`. Programmer Guide §7.7
+  rewritten to match.
+- Bumped: peer 3.46.0, relay 0.15.0, bridge 2.32.0, dht-sim vendor resync.
+
 ## v3.2.0 — write default keyed on owner; topic ID as a read handle (2026-06-19)
 
 Not a wire change (WIRE 3.0 unchanged); one topic shape relocates.

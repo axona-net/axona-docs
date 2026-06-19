@@ -758,37 +758,40 @@ Two honesty notes:
   may never see the purge. An anonymous message cannot be killed.
 - `unpub` is owner-only and unavailable on open (ownerless) topics.
 
-### 7.7 Message hold time: idempotent publish, touch, and the 48h ceiling
+### 7.7 Message hold time: re-publish refresh, touch, and the ceiling
 
-A message's hold (expiry) is set **once** -- when a root first stores it -- off
-the signed `ts`, clamped to receive-time. Two consequences trip people up:
+A message's hold (expiry) is set off its signed `ts` when a root stores it,
+clamped to receive-time and bounded by a 48h ceiling. Three things to know:
 
-**Re-publishing the same message does not extend its life.** Because the msgId
-is `SHA-256(author + message)` (no `ts`, `seq`, or nonce -- see 3.4), publishing
-the identical payload again yields the **same msgId**, so a root recognizes it as
-already-held and drops it as a duplicate. The existing entry's hold is left
-exactly as it was -- it keeps counting down. While a message is live,
-re-publishing it is an idempotent no-op, not a refresh.
+**Re-publishing the same message refreshes it (an upsert).** The msgId is
+`SHA-256(author + message)` (no `ts`/`seq`/nonce -- see 3.4), so re-publishing the
+identical payload yields the **same msgId**. As of kernel v3.3.0 the storing node
+**upserts**: it replaces the older copy with the new one, so there's always exactly
+one entry per msgId -- the newest -- and the new publish sets a **fresh hold and a
+fresh 48h ceiling**. So re-publishing *does* keep a message alive (indefinitely,
+if you keep doing it). It is **delivered once**: subscribers who already received
+that msgId are not re-notified, and late subscribers get it once via
+replay-on-subscribe. (Different authors of identical text have **different**
+msgIds and are not collapsed; add a nonce to `message` for an
+independently-addressable copy by the same author.)
 
-**To keep a live message alive, `touch` it (or `pull` it).** `peer.touch(topic,
-msgId, { signWith })` resets the hold to `now + hold`; a `pull` slides the hold
-the same way as a side effect of the read (locally, on the serving replica). Use
-`touch` for a pinned status or a current value you want to outlast its default
-hold without re-publishing.
+**`touch` (or `pull`) also refreshes, but cannot reset the ceiling.**
+`peer.touch(topic, msgId, { signWith })` resets the hold to `now + hold`; a `pull`
+slides it the same way as a side effect of the read (locally, on the serving
+replica). Both are clamped to the entry's **current** `ceilingAt`. So: use
+`touch` to extend a message *without re-publishing or re-notifying* (bounded by
+the existing ceiling); re-publish when you also want a fresh ceiling and to
+re-establish the content as the newest entry.
 
-**But everything is capped at an absolute 48h ceiling.** Both `touch` and `pull`
-are clamped to `ceilingAt = original_ts + 48h`. You can hold a message right up to
-that ceiling, but **not past it** -- touching forever does not beat the cap. Once
-a message fully expires and is swept from every replica, re-publishing the
-identical content is accepted as **fresh** again (same msgId, a brand-new 48h
-ceiling). If you want an independently-addressable copy *before* the old one
-expires, give it a distinct msgId by adding a nonce to `message`.
+**The ceiling.** An entry can never outlive its `ceilingAt = ts + 48h` via
+`touch`/`pull`. A re-publish sets a new `ts`, hence a new ceiling -- which is why
+re-publishing can extend indefinitely while touching cannot.
 
-Putting it together with `kill`: duplicates collapse to one logical message, so a
-single `kill(topic, msgId)` retracts it -- there is no second copy left behind.
-The tombstone that blocks re-acceptance is itself finite-lived, and because the
-msgId is topic-independent, the same content published to two different topics
-must be killed in each.
+With `kill`: because there is one entry per msgId, a single
+`kill(topic, msgId, { signWith })` retracts it -- no stale copy is left behind.
+The tombstone that blocks re-acceptance is finite-lived, and since the msgId is
+topic-independent, the same content published to two different topics must be
+killed in each.
 
 ### 7.8 Pull and metrics
 
