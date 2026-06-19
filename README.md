@@ -61,14 +61,15 @@ Start with the **[Programmer Introduction](programmer-intro/Axona%20Programmer%2
 
 | Doc | Read when | Length |
 |---|---|---|
-| **[Quick Start](programmer-guide/Quick-Start-v2.40.0.md)** · [PDF](programmer-guide/Quick-Start-v2.40.0.pdf) | You want a working pub/sub roundtrip in 5 minutes. Copy three commands + one file, run, done. | ~150 lines |
-| **[Axona API Reference](programmer-guide/Axona-API-Reference-v2.40.0.md)** · [PDF](programmer-guide/Axona-API-Reference-v2.40.0.pdf) | You're building and need to look up a specific call: signature, params, returns, errors, example for every public export. | ~700 lines |
-| **[Programmer Guide](programmer-guide/Axona-Programmer-Guide-v2.40.0.md)** · [PDF](programmer-guide/Axona-Programmer-Guide-v2.40.0.pdf) | You're starting a new application against Axona. Mental model, identity, topic addressing, pub/sub semantics, the bridge, a worked chat-app example, common pitfalls, production checklist. | ~1500 lines |
-| **[Topic IDs](programmer-guide/Topic-IDs-v3.2.0.md)** · [PDF](programmer-guide/Topic-IDs-v3.2.0.pdf) | You need to address a topic precisely: open vs owned topics, the `{region, owner?, name, write}` descriptor, region as name **or** code, who can publish/subscribe, and how to construct & share a topic ID. Reflects the **current v3.2.0** model. | ~180 lines |
+| **[Quick Start](programmer-guide/Quick-Start-v3.2.0.md)** · [PDF](programmer-guide/Quick-Start-v3.2.0.pdf) | You want a working pub/sub roundtrip in 5 minutes. Mint two identities, build a peer on the live bridge, publish + subscribe to an open topic. | ~210 lines |
+| **[Axona API Reference](programmer-guide/Axona-API-Reference-v3.2.0.md)** · [PDF](programmer-guide/Axona-API-Reference-v3.2.0.pdf) | You're building and need to look up a specific call: signature, params, returns, errors, example for every public export — including topic addressing (descriptors, `deriveTopicId`, the read-handle vs descriptor split). | ~1500 lines |
+| **[Programmer Guide](programmer-guide/Axona-Programmer-Guide-v3.2.0.md)** · [PDF](programmer-guide/Axona-Programmer-Guide-v3.2.0.pdf) | You're starting a new application against Axona. Mental model, node + author identity, **topics & addressing** (descriptors, write policy, region, sharing topic IDs), pub/sub semantics + lifecycle, the bridge, a worked chat-app example, pitfalls, production checklist. | ~1450 lines |
 
-The first three track `@axona/protocol` v2.40.0 (the version is in each
-filename); the Quick Start's example runs verbatim from a fresh
-`npm init`.
+All three track `@axona/protocol` **v3.2.0** (the version is in each filename;
+the kernel currently deployed is at each app's version row and the bridge's
+`/healthz`). The topic-addressing reference (formerly a standalone Topic-IDs
+note) is now folded into the Programmer Guide (Topics & Addressing) and the API
+Reference (Pub/sub → Topic addressing).
 
 A runnable copy of the Quick Start lives at
 [`programmer-guide/examples/minimal-pubsub/`](programmer-guide/examples/minimal-pubsub/)
