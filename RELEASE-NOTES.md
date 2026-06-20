@@ -7,23 +7,47 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v3.3.3 — re-publish upsert made correct across the multi-root mesh (2026-06-20)
+
+Not a wire change. Three patch releases that take v3.3.0's re-publish-upsert from
+"correct on a single root" to "correct on the live mesh, every path":
+
+- **v3.3.1 — exactly-once delivery, keyed on msgId.** v3.3.0 deduped delivery on the
+  random per-publish `publishId` and only suppressed re-fan-out when one root saw
+  both publishes — so on the live mesh (several K-closest roots, each seeing one
+  copy) a re-publish still **double-delivered**. `_deliverToApp` now dedups on the
+  content id (`postHash` = msgId), so a message reaches the app **at most once**
+  however many roots/paths carry it. The re-publish also fans out normally (instead
+  of being suppressed) so **every replica** refreshes its own hold — a re-publish is
+  a *fleet-wide* keep-alive, not a single-root one.
+- **v3.3.2 — cache upsert centralized.** Moved the "one entry per msgId" upsert into
+  `_addToReplayCache` so every ingress path (routed publish, direct publish-k,
+  sub-axon deliver, replay re-cache) converges to a single entry — closing a residual
+  double-*cache* on keyspace-hosting roots that received a copy via the deliver path.
+- **v3.3.3 — content id always present.** The upsert key is now backfilled from the
+  envelope's `msgId` when an ingress frame arrives without an explicit `postHash`, so
+  the dedup can never be silently skipped for envelope content.
+
+Net: re-publishing identical content (same author + message ⇒ same msgId) **replaces**
+the older copy everywhere (one entry per msgId, newest — fresh hold + fresh 48h
+ceiling) and is **delivered exactly once**. Re-publishing is the way to refresh /
+keep a message alive; `touch`/`pull` still slide the hold but stay bounded by the
+ceiling. `smoke_pubsub_republish` now also asserts the upsert directly (incl. the
+postHash-absent path). Verified live on testnet: re-publish delivers once and every
+current-kernel root holds a single copy.
+
+Bumped: peer 3.46.3, relay 0.15.3, bridge 2.32.3, dht-sim vendor resync.
+
 ## v3.3.0 — re-publishing the same message upserts (replace older, deliver once) (2026-06-19)
 
-Not a wire change.
+Not a wire change. (Superseded by v3.3.1–v3.3.3 above, which make the upsert correct
+on the multi-root live mesh.)
 
-- The live publish path (`_onPublish` + `_onPublishDirect`) deduped only on the
-  random per-publish `publishId`, so re-publishing identical content (same author +
-  message ⇒ same msgId) **double-stored** the replay cache (`current_count → 2`)
-  and **double-delivered** to subscribers.
-- Now both paths **upsert by msgId**: a publish whose content hash already exists
-  in the topic's replay cache **replaces** the prior entry (always one entry per
-  msgId, the newest — which sets a fresh hold and a fresh 48h ceiling) and is
-  **delivered once** (current subscribers aren't re-notified; late subscribers get
-  it via replay-on-subscribe). Different authors of identical text keep distinct
-  msgIds and are not collapsed.
-- So re-publishing is now the way to **refresh / keep alive** a message (resets the
-  ceiling); `touch`/`pull` still slide the hold but stay bounded by the existing
-  ceiling. New regression smoke `smoke_pubsub_republish`. Programmer Guide §7.7
+- The live publish path deduped only on the random per-publish `publishId`, so
+  re-publishing identical content double-stored the replay cache and double-delivered.
+- First cut: `_onPublish` + `_onPublishDirect` upsert by msgId on the root that sees
+  both publishes. Correct in the single-root sim; incomplete on the live mesh (fixed
+  in v3.3.1+). New regression smoke `smoke_pubsub_republish`; Programmer Guide §7.7
   rewritten to match.
 - Bumped: peer 3.46.0, relay 0.15.0, bridge 2.32.0, dht-sim vendor resync.
 
