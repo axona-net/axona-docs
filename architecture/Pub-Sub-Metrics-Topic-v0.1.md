@@ -195,6 +195,21 @@ rate: the expensive part (counting) happens **once per cadence at one node**
 regardless of how many are watching, and distribution rides the normal pub/sub
 delivery path the subscribers were already paying for.
 
+**Observed on testnet (2026-06-20, single keyspace-hosting relay).** One relay
+republishing every 8 s: cycle 1 = `{rooted:535, published:299, skipped:236}`;
+cycle 2+ = `{rooted:833, published:299, skipped:534}`, `failed:0`. The recursion
+guard converges exactly as designed — the ~298 metric topics created in cycle 1
+are rooted by cycle 2 (rooted +298) and recognised + skipped (skipped +298), so
+`published` plateaus at the open-topic count. Two scale notes follow:
+
+- **Topic count roughly doubles** — each open data topic spawns one metric topic.
+  Bounded by the same replay-cache caps; the guard ensures it does not cascade.
+- **A metric topic accrues one snapshot per rooting relay per cadence** (distinct
+  `ts` ⇒ distinct `msgId` ⇒ all retained). That is the intended "multiple advisory
+  sources, sign-pinnable" history (§5), but on a large fleet it is the dominant
+  consumer of a metric topic's cache budget — a future cap (keep the freshest N
+  per signer, or per-signer quota) is the natural lever if it bites.
+
 ---
 
 ## 8. Status & scope
