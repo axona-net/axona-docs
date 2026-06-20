@@ -163,20 +163,24 @@ count it must derive it from data it can verify, not from this topic.
 
 ---
 
-## 6. `peer.metrics()` stays — as the escape hatch
+## 6. `peer.metrics()` stays — but owner-only (kernel v3.5.0)
 
-The scatter-gather `peer.metrics(topic)` is **not removed**. It remains the
-**operator/debug** path: an authoritative, on-demand, K-root probe for when you
-explicitly want a fresh fan-out reading (e.g. diagnosing whether the derived
-metric topic itself is stale, or one-off ops introspection). The change is purely
-that **apps stop calling it on a per-user timer** and subscribe to the derived
-topic instead. Rule of thumb:
+The scatter-gather `peer.metrics(topic)` is **not removed**, but it is narrowed
+to an **owner-only** reader: the root answers only the **owner of an owned**
+(`write:'owner'`) topic — the cached publisher anchor must equal the proven
+requester — and **refuses open / public / synthetic-regional topics outright**
+(an empty cache, where ownership is indeterminate, also fails closed). So a
+non-owner can no longer aim a K-root fan-out at any topic; open topics are read
+only through the published metric topic. This shrinks the on-demand amplification
+surface to owner-authenticated requests while giving an owner a private,
+immediate read of their own topic (and an operator/debug probe). Rule of thumb:
 
 | Need | Use |
 |------|-----|
-| Continuous per-user display of a topic's metrics | `sub(metricTopic(T))` |
+| Continuous per-user display of an **open** topic's metrics | `sub(metricTopic(T))` |
 | Trend / history over the last ~48 h | `sub(metricTopic(T), …, {since:'all'})` |
-| One-off authoritative fan-out probe (ops/debug) | `peer.metrics(T)` |
+| An **owner** reading their own **owned** topic, on demand | `peer.metrics(T)` |
+| Open-topic public count | `sub(metricTopic(T))` — `metrics()` refuses it |
 
 ---
 

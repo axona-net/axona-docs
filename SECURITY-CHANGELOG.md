@@ -16,6 +16,25 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v3.5.0 — 2026-06-20
+
+A behavior change on the metrics read path (wire-compatible).
+
+### `peer.metrics()` is now an owner-only reader — no arbitrary fan-out probes
+
+- **PROTECTED: a non-owner can no longer trigger a K-root fan-out by reading a
+  topic's metrics.** The `pubsub:metricsReq` scatter-gather now answers only the
+  **owner of an owned topic** (the cached publisher anchor must equal the proven
+  requester); open, public, and synthetic-regional topics are refused outright.
+  Their live state is instead read by subscribing to the topic's published
+  *metric topic* (`metricTopic(T)` — see the architecture note), which rides the
+  normal, rate-bounded pub/sub delivery path rather than an on-demand K-closest
+  amplifier. This removes the last way an arbitrary peer could aim a fan-out read
+  at a topic, and keeps owned-topic subscriber counts owner-private (an empty
+  cache, where ownership is indeterminate, now fails closed and is refused).
+  Owned-topic behavior is otherwise unchanged (it was already owner-gated under
+  the C-3 vouch check); the change is that open topics stop answering the probe.
+
 ## Kernel v3.3.0 — 2026-06-19
 
 A behavior fix on the publish path (wire-compatible).

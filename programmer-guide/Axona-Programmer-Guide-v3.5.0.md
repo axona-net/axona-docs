@@ -9,12 +9,12 @@ The guide assumes you already know JavaScript + Node + a browser. It does
 not assume any DHT / WebRTC / cryptography background -- concepts are
 introduced where they are needed.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v3.4.0)
-- **Wire version**: 3.0 (`WIRE_VERSION`); kernel version 3.4.0 (`KERNEL_VERSION`)
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v3.5.0)
+- **Wire version**: 3.0 (`WIRE_VERSION`); kernel version 3.5.0 (`KERNEL_VERSION`)
 - **Live network**: `wss://bridge.axona.net` (east) and `wss://bridge-west.axona.net` (west) -- a federated pair
 - **Companion docs**:
-  - [Quick Start](Quick-Start-v3.4.0.md) -- five minutes to a working roundtrip; send a newcomer there first.
-  - [API Reference](Axona-API-Reference-v3.4.0.md) -- every public symbol and its exact signature.
+  - [Quick Start](Quick-Start-v3.5.0.md) -- five minutes to a working roundtrip; send a newcomer there first.
+  - [API Reference](Axona-API-Reference-v3.5.0.md) -- every public symbol and its exact signature.
 
 > **What changed from the v2 line.** v3.0.0 rebuilt identity, authorship,
 > and addressing as three separate concerns (a breaking flag-day). If you
@@ -24,7 +24,7 @@ introduced where they are needed.
 > topic *modes*. All gone. The replacements are two identity factories
 > (`createNodeIdentity`, `createAuthorIdentity`), descriptor topics
 > (`{ region?, owner?, name, write? }`), and per-publish `signWith`. This
-> guide teaches only the v3.4.0 surface.
+> guide teaches only the v3.5.0 surface.
 
 ---
 
@@ -141,7 +141,7 @@ locality.
 ```
 mkdir my-axona-app && cd my-axona-app
 npm init -y
-npm install @axona/protocol@github:axona-net/axona-protocol#v3.4.0
+npm install @axona/protocol@github:axona-net/axona-protocol#v3.5.0
 ```
 
 You now have `node_modules/@axona/protocol/src/` with the full kernel.
@@ -802,15 +802,19 @@ const env    = await peer.pull(msgId, { topic: feedId, timeoutMs: 1000 });
 const latest = await peer.pull(null,  { topic: feedId });
 
 // Coarse, best-effort delivery counters, merged across the topic's axons.
-const m = await peer.metrics(feedId, { timeoutMs: 500 });
+// OWNER-ONLY (v3.5.0): metrics() answers only the owner of an OWNED topic.
+const m = await peer.metrics(myOwnedFeed, { timeoutMs: 500 });
 // { publishes, current_count, subscribers, deliveries, pulls, reshares, relayCount }
 ```
 
 `pull` queries the topic's K-closest axons and is for "did I miss this one?",
-not durable storage. `current_count` is the live retained count (drops as
-messages expire or are killed); `subscribers` is the max direct-child count
-any one axon reported -- good for "X people are in this room" UX, not for
-billing. Both `pull` and `metrics` take a descriptor or a bare Topic ID.
+not durable storage. `metrics()` is an **owner-only, on-demand** read: it
+answers only the owner of an owned (`write:'owner'`) topic — open/public topics
+are refused (a non-owner can't trigger a K-root fan-out). For a public count
+("X people are in this room"), **subscribe to `metricTopic(T)`** (next section)
+rather than calling `metrics()`. `current_count` is the live retained count;
+`subscribers` is the max direct-child count any one axon reported — for UX, not
+billing.
 
 > **Don't poll `metrics()` per user.** It's a scatter-gather to the K roots —
 > one fan-out *per call*. If your UI shows a live "N in the room", read it from
@@ -1045,7 +1049,7 @@ wss://bridge.axona.net        # east
 wss://bridge-west.axona.net    # west
 ```
 
-Both run kernel 3.4.0 with TURN. Open a WebSocket (the `webTransport` factory
+Both run kernel 3.5.0 with TURN. Open a WebSocket (the `webTransport` factory
 does the handshake for you) and you are on the network. A bridge advertises
 itself in the public bridge directory so clients can discover and fail over
 between bridges.
@@ -1486,7 +1490,7 @@ import { FilePersistence }      from '@axona/protocol/persistence/file.js';
 
 ```js
 WIRE_VERSION         // '3.0'
-KERNEL_VERSION       // '3.4.0'
+KERNEL_VERSION       // '3.5.0'
 ```
 
 ### 15.10 Error codes worth catching
@@ -1509,9 +1513,9 @@ Errors subclass `AxonaError` with a stable `.code` -- switch on `.code`, not
 
 ## Where to go next
 
-- **[Quick Start](Quick-Start-v3.4.0.md)** -- a five-minute roundtrip for
+- **[Quick Start](Quick-Start-v3.5.0.md)** -- a five-minute roundtrip for
   someone you are onboarding.
-- **[API Reference](Axona-API-Reference-v3.4.0.md)** -- the exact signature of
+- **[API Reference](Axona-API-Reference-v3.5.0.md)** -- the exact signature of
   every public symbol.
 - **[Identity & Authorship Model](../architecture/Identity-and-Authorship-Model-v0.3.md)**
   -- the design rationale behind the three-primitive model.

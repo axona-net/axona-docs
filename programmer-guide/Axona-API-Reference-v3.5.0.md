@@ -1,16 +1,16 @@
 # Axona API Reference
 
-Reference for every public symbol exported from `@axona/protocol` v3.4.0.
+Reference for every public symbol exported from `@axona/protocol` v3.5.0.
 
 Organized by what application developers reach for first (identity, peer
 lifecycle, pub/sub, direct messaging, introspection), then the
 transport/protocol surface, then low-level utilities. Every signature
-below is verified against the v3.4.0 kernel source.
+below is verified against the v3.5.0 kernel source.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v3.4.0.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v3.4.0.md) — mental model +
+- [Quick Start](Quick-Start-v3.5.0.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v3.5.0.md) — mental model +
   worked example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects.
@@ -663,9 +663,14 @@ const latest = await peer.pull(null, { topic: feedId });   // most recent on the
 - `PULL_INVALID_MSGID` — a non-null `msgId` that isn't 64-char hex.
 - `PULL_AXONS_UNREACHABLE` — the manager can't service the request.
 
-#### `peer.metrics(topic, { timeoutMs? })` → `Promise<metricsObj>`
+#### `peer.metrics(topic, { timeoutMs? })` → `Promise<metricsObj>` *(owner-only)*
 
-Aggregate counters for a topic across the K-closest root set.
+Aggregate counters for a topic across the K-closest root set, **on demand**.
+As of kernel v3.5.0 this is an **owner-only** reader: the scatter-gather answers
+only the owner of an **owned** (`write:'owner'`) topic. **Open / public topics
+are refused** (they return an empty/zero result) — read their live state by
+subscribing to `metricTopic(T)` (above) instead. Use `metrics()` for an owner's
+private, immediate read of their own topic; it is not the path for public counts.
 
 | Arg | Type | Notes |
 |---|---|---|
@@ -691,12 +696,15 @@ only rises. `subscribers` is exact for an unsplit topic, a lower bound
 once the tree splits. Use for UX, not billing.
 
 ```js
-const m = await peer.metrics({ region: 'useast', name: 'lobby' }, { timeoutMs: 500 });
-console.log(`${m.subscribers} in the room, ${m.current_count} live messages`);
+// owner reading their OWN owned topic's live state, on demand:
+const m = await peer.metrics({ region: 'useast', owner: me.authorId, name: 'inbox', write: 'owner' });
+console.log(`${m.subscribers} subscribers, ${m.current_count} live messages`);
 ```
 
-> The kernel currently enforces a publisher-only check on owned-topic
-> metrics; removing it (so any peer can audit) is a queued cleanup.
+> **Owner-only (v3.5.0).** Open/public topics no longer answer this probe — a
+> non-owner cannot trigger a K-root fan-out for any topic. For an open topic's
+> public count, subscribe to `metricTopic(T)`. `metrics()` is the owner's private,
+> immediate reader and the operator/debug escape hatch.
 
 #### `metricTopic(dataTopicId)` → `TopicDescriptor` *(subscribe to metrics — the scalable path)*
 
@@ -1255,7 +1263,7 @@ import { webTransport } from '@axona/protocol/transport/web/index.js';
 const transport = webTransport({
   bridgeUrl:   'wss://bridge.axona.net',  // required
   identity:    node,                      // from createNodeIdentity — signs the handshake
-  peerVersion: '3.4.0',                   // your app version (gated by the bridge)
+  peerVersion: '3.5.0',                   // your app version (gated by the bridge)
   reconnect:   true,
 });
 await transport.start();                  // resolves after the bridge handshake
@@ -1506,7 +1514,7 @@ introduces no keyspace skew.
 
 ```js
 WIRE_VERSION         // '3.0'      — wire format major.minor (bridges gate on this)
-KERNEL_VERSION       // '3.4.0'    — kernel semver (npm release tag)
+KERNEL_VERSION       // '3.5.0'    — kernel semver (npm release tag)
 AUTH_PROTO           // 'axona/5'  — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426       — WebSocket close code for a version mismatch
 ENVELOPE_DOMAIN      // 'axona:pubsub-envelope:v2'

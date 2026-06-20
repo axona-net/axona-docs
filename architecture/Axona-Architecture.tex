@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.8.3 \quad 2026-06-20\par}
+{\small An Axona Architecture Note \quad v0.8.4 \quad 2026-06-20\par}
 \end{center}
 \vfill
 \null
@@ -1052,7 +1052,10 @@ topics; their metrics stay behind \texttt{peer.metrics()} for the owner.
 \emph{(ii)~Advisory, not authoritative:} the metric topic is open, hence
 spoofable; the snapshot is signed so a reader may pin trust to a known relay's
 key, but the protocol cannot \emph{prove} a count. Metrics are decoration, never
-a security input. \texttt{peer.metrics()} remains the on-demand operator probe.
+a security input. \texttt{peer.metrics()} survives as an \textbf{owner-only}
+on-demand reader (v3.5.0): it answers only the owner of an owned topic and
+refuses open/public topics outright, so a non-owner can no longer aim a K-root
+fan-out at any topic --- open topics are read only through their metric topic.
 
 \marginnote{Shipped kernel v3.4.0 (\texttt{metricTopic}/\texttt{isMetricTopic},
 \texttt{rootedTopics()}) and relay v0.16.0 (the publish loop) --- a convention,
