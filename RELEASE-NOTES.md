@@ -7,6 +7,33 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v3.5.1 — kill() now reaches remote subscribers (2026-06-20)
+
+Bug fix (wire-compatible). `peer.kill(topic, msgId)` removed the message at the
+root but a **remote** subscriber's handler was never invoked with
+`{ deleted: true }` — the message just silently vanished from replays. Cause: the
+delete marker was fanned to subscriber-children over `pubsub:deliver` carrying
+`postHash = msgId`, and the receiver deduped it against the *original* message's
+delivery (same `topicId:msgId` key), dropping it. (Self/local subscribers were
+unaffected.) Fixed: a node now recognises a delete frame, purges + tombstones the
+content without caching the marker, re-fans it down the subtree, and delivers it
+to the app keyed on the kill id — so `deleted: true` reaches every subscriber.
+Regression test `smoke_kill_remote`. **Subscribers must be on kernel ≥ 3.5.1 to
+receive the callback** (the fix is on the receiving side).
+
+## v3.5.0 — `peer.metrics()` is owner-only (2026-06-20)
+
+Behavior change (wire-compatible). The metrics scatter-gather answers only the
+owner of an owned topic; open/public topics are refused — read their live state
+by subscribing to `metricTopic(T)`. Removes the last arbitrary-peer K-root
+fan-out probe. See the SECURITY-CHANGELOG.
+
+## v3.4.0 — derived metric topics (2026-06-20)
+
+Additive. `metricTopic(T)`/`isMetricTopic` + `peer.rootedTopics()` in core; a
+relay republishes signed metric snapshots to `metricTopic(T)` so clients
+subscribe instead of polling `metrics()`. See the architecture note.
+
 ## v3.3.3 — re-publish upsert made correct across the multi-root mesh (2026-06-20)
 
 Not a wire change. Three patch releases that take v3.3.0's re-publish-upsert from
