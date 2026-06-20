@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.8.2 \quad 2026-06-19\par}
+{\small An Axona Architecture Note \quad v0.8.3 \quad 2026-06-20\par}
 \end{center}
 \vfill
 \null
@@ -1008,6 +1008,57 @@ wrong. The client combines each quantity according to its nature.
 when the topic's publisher matches the requester, so today the owner alone
 gets non-empty results. \texttt{current\_count} and live \texttt{subscribers}
 were added in kernel v2.11.0.}
+
+\subsection{Subscribable Metrics: A Derived Topic}
+
+\newthought{The scatter-gather above} is right for an occasional probe and wrong
+as an app primitive: per-user polling makes cost scale with
+audience~$\times$~poll-rate, hammering the roots forever. The fix needs no new
+wire and no kernel state --- it is a \emph{convention} over the existing pub/sub:
+a topic's metrics are themselves \textbf{published}, to a second topic
+\emph{derived} from the first, which clients \texttt{sub} instead of polling.
+
+\newthought{The derivation.} For a data topic with resolved ID $T$,
+\texttt{metricTopic}$(T) = \{\,\texttt{region}=\text{the region byte of }T,\;
+\texttt{name}=\texttt{"axona:metric:"}\,\Vert\,T\,\}$ --- an open topic anyone
+who knows $T$ can recompute and subscribe. The reserved \texttt{axona:metric:}
+namespace (rather than a bare hash) is load-bearing: it makes a metric topic
+\emph{self-identifying}, so a root recognises one and refuses to compute
+metrics-of-metrics --- the recursion guard. Because clients and infrastructure
+must derive it and apply the guard \emph{identically}, both live in the kernel
+core beside \texttt{deriveTopicId}, not in the optional \texttt{std} helpers
+(relays vendor \texttt{src/} only).
+
+\newthought{The loop.} The primary root of each live \emph{open} topic recomputes
+its local snapshot --- via \texttt{peer.rootedTopics()}, the read side, which
+reads replay-cache state with \emph{no} network --- and \texttt{pub}s a
+\emph{signed} record to \texttt{metricTopic}$(T)$ on a $\sim$5-minute cadence,
+self-triggered on its own liveness for $T$. A subscriber's
+\texttt{sub(metricTopic}$(T)$\texttt{, \{since:'all'\})} then gets the latest
+snapshot via replay-on-subscribe plus every later update --- one subscription
+replacing an unbounded stream of point queries. The expensive part (counting)
+happens once per cadence at one node, no matter how many are watching, and
+distribution rides the delivery path subscribers already pay for.
+
+\newthought{History for free.} Snapshots are ordinary retained messages, so they
+accumulate in the replay cache and age out at the 48\,h hold ceiling. A
+subscriber therefore gets a \emph{rolling $\sim$48\,h trend} at no extra cost ---
+the cache TTL \emph{is} the retention window; no overwrite, no compaction.
+
+\newthought{Two deliberate limits.} \emph{(i)~Open topics only:} an owner-only
+topic's subscriber count is owner-private (the gate above), and republishing it
+to an open metric topic would leak exactly that --- so the loop skips owned
+topics; their metrics stay behind \texttt{peer.metrics()} for the owner.
+\emph{(ii)~Advisory, not authoritative:} the metric topic is open, hence
+spoofable; the snapshot is signed so a reader may pin trust to a known relay's
+key, but the protocol cannot \emph{prove} a count. Metrics are decoration, never
+a security input. \texttt{peer.metrics()} remains the on-demand operator probe.
+
+\marginnote{Shipped kernel v3.4.0 (\texttt{metricTopic}/\texttt{isMetricTopic},
+\texttt{rootedTopics()}) and relay v0.16.0 (the publish loop) --- a convention,
+no flag day. On testnet one keyspace-hosting relay republished $\sim$300 open
+topics per cycle with the recursion guard converging: metric topics rooted in
+cycle $n$ are recognised and skipped in cycle $n{+}1$.}
 
 % =====================================================================
 % XI. THE APPLICATION API

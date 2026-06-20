@@ -1,16 +1,16 @@
 # Axona API Reference
 
-Reference for every public symbol exported from `@axona/protocol` v3.2.0.
+Reference for every public symbol exported from `@axona/protocol` v3.4.0.
 
 Organized by what application developers reach for first (identity, peer
 lifecycle, pub/sub, direct messaging, introspection), then the
 transport/protocol surface, then low-level utilities. Every signature
-below is verified against the v3.2.0 kernel source.
+below is verified against the v3.4.0 kernel source.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v3.2.0.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v3.2.0.md) — mental model +
+- [Quick Start](Quick-Start-v3.4.0.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v3.4.0.md) — mental model +
   worked example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects.
@@ -698,6 +698,43 @@ console.log(`${m.subscribers} in the room, ${m.current_count} live messages`);
 > The kernel currently enforces a publisher-only check on owned-topic
 > metrics; removing it (so any peer can audit) is a queued cleanup.
 
+#### `metricTopic(dataTopicId)` → `TopicDescriptor` *(subscribe to metrics — the scalable path)*
+
+`peer.metrics()` above is a **scatter-gather**: one fan-out to the K roots per
+call. Fine for an occasional probe; **do not call it on a per-user timer** — the
+cost grows with both the audience and the poll rate. Instead **subscribe to a
+topic's metrics.** A topic's primary root publishes a signed metric snapshot to a
+*derived* topic on a ~5-min cadence; compute that topic with `metricTopic()` and
+`sub()` it. You get the latest snapshot via replay-on-subscribe plus every
+update — one subscription instead of a fan-out per poll — and, because snapshots
+are ordinary messages that age out at the 48 h hold ceiling, a **rolling ~48 h
+history for free** to plot trends.
+
+```js
+import { deriveTopicId, metricTopic } from '@axona/protocol';
+
+const id = await deriveTopicId({ region: 'useast', name: 'lobby' });
+await peer.sub(metricTopic(id), (env) => {
+  const m = JSON.parse(env.message);
+  // { topic, ts, by, current_count, subscribers, bytes }
+  render(m.subscribers, m.current_count);
+}, { since: 'all' });   // since:'all' → latest snapshot + the rolling history
+```
+
+| name | returns | notes |
+|---|---|---|
+| `metricTopic(dataTopicId)` | `TopicDescriptor` | open topic `{ region, name: 'axona:metric:' + id }`. Pass the **resolved 66-hex** id (`await deriveTopicId(desc)`), not the descriptor. Region byte is inherited from the data topic. |
+| `isMetricTopic(descriptor)` | `boolean` | true if a topic is itself a metric topic (the recursion guard a relay uses). |
+| `isMetricTopicName(name)` / `dataTopicIdOf(descriptor)` | `boolean` / `string\|null` | name-prefix test; inverse (metric topic → data id). |
+| `METRIC_NAMESPACE` | `string` | the frozen reserved prefix `'axona:metric:'`. |
+
+Trust is **advisory**: the metric topic is open (anyone may publish to it), so
+treat a snapshot as a hint — if you need to, pin trust to a known relay's
+`env.signerPubkey`. The protocol does not prove a snapshot is authoritative.
+Only **open** topics get a metric topic; owned-topic counts stay owner-only
+(read them with `peer.metrics()` as the owner). `peer.metrics()` remains the
+on-demand/operator escape hatch.
+
 ### 4.4 owner + creator ops: kill / touch / unpub
 
 These take a **descriptor** (not a bare id) and a signer via
@@ -807,6 +844,16 @@ await peer.host({ region: 'useast', name: 'pow-results' }); // host one topic
 Counterpart to `host`. `unhost()` turns off keyspace hosting;
 `unhost(topic)` drops one hosted topic. Does **not** touch your
 subscriptions. Idempotent.
+
+#### `peer.rootedTopics()` → `Array<{ topicId, descriptor, current_count, subscribers, bytes }>` *(infra)*
+
+Synchronous, local-only introspection of the topics this node currently
+**roots** — each with its signed topic descriptor (recovered from a cached
+envelope, or `null` for an empty/cold role) and a locally-computed snapshot.
+No network (unlike `metrics()`). This is the read side that powers the relay
+metric-publish loop (§4.3): walk it, skip `isMetricTopic(d)` and non-open
+descriptors, and `pub(metricTopic(topicId), …)` for the rest. Returns `[]` on a
+routing-only peer with no `AxonaManager`.
 
 ### 4.6 topic limits
 
@@ -1208,7 +1255,7 @@ import { webTransport } from '@axona/protocol/transport/web/index.js';
 const transport = webTransport({
   bridgeUrl:   'wss://bridge.axona.net',  // required
   identity:    node,                      // from createNodeIdentity — signs the handshake
-  peerVersion: '3.2.0',                   // your app version (gated by the bridge)
+  peerVersion: '3.4.0',                   // your app version (gated by the bridge)
   reconnect:   true,
 });
 await transport.start();                  // resolves after the bridge handshake
@@ -1459,7 +1506,7 @@ introduces no keyspace skew.
 
 ```js
 WIRE_VERSION         // '3.0'      — wire format major.minor (bridges gate on this)
-KERNEL_VERSION       // '3.2.0'    — kernel semver (npm release tag)
+KERNEL_VERSION       // '3.4.0'    — kernel semver (npm release tag)
 AUTH_PROTO           // 'axona/5'  — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426       — WebSocket close code for a version mismatch
 ENVELOPE_DOMAIN      // 'axona:pubsub-envelope:v2'

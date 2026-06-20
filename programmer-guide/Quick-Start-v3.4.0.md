@@ -1,14 +1,14 @@
 # Axona Quick Start
 
 Get a working pub/sub roundtrip in **under five minutes** on the current
-`@axona/protocol` **v3.2.0** API (kernel 3.2.0). One Node process connects
+`@axona/protocol` **v3.4.0** API (kernel 3.4.0). One Node process connects
 to the live public bridge, subscribes to an open topic, publishes a signed
 message, and logs what comes back.
 
 Companion documents:
 
-- [API Reference](Axona-API-Reference-v3.2.0.md) — every exported symbol.
-- [Programmer Guide](Axona-Programmer-Guide-v3.2.0.md) — mental model + worked example.
+- [API Reference](Axona-API-Reference-v3.4.0.md) — every exported symbol.
+- [Programmer Guide](Axona-Programmer-Guide-v3.4.0.md) — mental model + worked example.
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ No build step, no DB, no local bridge — the public bridge is the entry point.
 mkdir my-axona-demo && cd my-axona-demo
 npm init -y
 npm pkg set type=module
-npm install github:axona-net/axona-protocol#v3.2.0
+npm install github:axona-net/axona-protocol#v3.4.0
 ```
 
 ## 2. Two identities, one rule
@@ -82,7 +82,7 @@ import {
 } from '@axona/protocol';
 import { webTransport } from '@axona/protocol/transport/web/index.js';
 
-const BRIDGE = 'wss://bridge.axona.net';            // live public bridge (kernel 3.2.0)
+const BRIDGE = 'wss://bridge.axona.net';            // live public bridge (kernel 3.4.0)
 const HERE   = { lat: 38.0, lng: -77.0 };           // your real location (us-east here)
 const TOPIC  = { region: 'useast', name: 'quick-start-demo' };   // open topic
 
@@ -138,7 +138,7 @@ node index.js
 You should see something like:
 
 ```
-kernel v3.2.0 — connecting…
+kernel v3.4.0 — connecting…
 mesh ready (4 peers)
 topic id: 89a1b2c3…
 [pub ] msgId=8e9d4b1a30c2…
@@ -183,8 +183,8 @@ descriptor fields. That ID-matching is the rule you can't break — same
 | Own a feed only you can write | `{ region, owner: me.authorId, name: 'profile' }` (write defaults to `'owner'`) |
 | Share a read-only handle | `await deriveTopicId(descriptor)` -> hand out the 66-hex ID; `sub`/`pull`/`metrics` accept it |
 | Run against testnet | set `BRIDGE = 'wss://testnet.axona.net'` |
-| See the full mental model | [Programmer Guide](Axona-Programmer-Guide-v3.2.0.md) |
-| Look up a specific symbol | [API Reference](Axona-API-Reference-v3.2.0.md) |
+| See the full mental model | [Programmer Guide](Axona-Programmer-Guide-v3.4.0.md) |
+| Look up a specific symbol | [API Reference](Axona-API-Reference-v3.4.0.md) |
 
 ## Troubleshooting
 
@@ -209,5 +209,5 @@ seconds.
 fallback to a local process; the demo needs the bridge to find peers.
 
 **`UPGRADE_REQUIRED` close code (4426)** — your peer is older than the
-bridge's `MIN_PEER_VERSION`. The bridge runs kernel 3.2.0; install
-`github:axona-net/axona-protocol#v3.2.0`.
+bridge's `MIN_PEER_VERSION`. The bridge runs kernel 3.4.0; install
+`github:axona-net/axona-protocol#v3.4.0`.
