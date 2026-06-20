@@ -7,6 +7,17 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v3.6.0 — std/chunk: reliable publish (fix reload-reassembly timeout) (2026-06-20)
+
+Bug fix + small behavior change in `std/chunk`. `publishChunkedBytes` defaulted
+`throttleMs: 0`; since `peer.pub` is fire-and-forget into the transport buffer, a
+fast burst of chunks dropped some before they reached the topic's replay cache —
+so a **reload** subscriber (relying on `since:'all'` replay) got an incomplete set
+and `receiveChunkedBytes` timed out, with no throttle value an author could
+reliably pick. Now it paces by a sensible default **and** verifies what the mesh
+cached, re-publishing any gaps (best-effort; never throws). Reaches apps that use
+`@axona/protocol/std/chunk` — re-vendor/redeploy the app to pick it up.
+
 ## v3.5.1 — kill() now reaches remote subscribers (2026-06-20)
 
 Bug fix (wire-compatible). `peer.kill(topic, msgId)` removed the message at the
