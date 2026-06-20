@@ -9,12 +9,12 @@ The guide assumes you already know JavaScript + Node + a browser. It does
 not assume any DHT / WebRTC / cryptography background -- concepts are
 introduced where they are needed.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v3.5.0)
-- **Wire version**: 3.0 (`WIRE_VERSION`); kernel version 3.5.0 (`KERNEL_VERSION`)
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v3.6.0)
+- **Wire version**: 3.0 (`WIRE_VERSION`); kernel version 3.6.0 (`KERNEL_VERSION`)
 - **Live network**: `wss://bridge.axona.net` (east) and `wss://bridge-west.axona.net` (west) -- a federated pair
 - **Companion docs**:
-  - [Quick Start](Quick-Start-v3.5.0.md) -- five minutes to a working roundtrip; send a newcomer there first.
-  - [API Reference](Axona-API-Reference-v3.5.0.md) -- every public symbol and its exact signature.
+  - [Quick Start](Quick-Start-v3.6.0.md) -- five minutes to a working roundtrip; send a newcomer there first.
+  - [API Reference](Axona-API-Reference-v3.6.0.md) -- every public symbol and its exact signature.
 
 > **What changed from the v2 line.** v3.0.0 rebuilt identity, authorship,
 > and addressing as three separate concerns (a breaking flag-day). If you
@@ -24,7 +24,7 @@ introduced where they are needed.
 > topic *modes*. All gone. The replacements are two identity factories
 > (`createNodeIdentity`, `createAuthorIdentity`), descriptor topics
 > (`{ region?, owner?, name, write? }`), and per-publish `signWith`. This
-> guide teaches only the v3.5.0 surface.
+> guide teaches only the v3.6.0 surface.
 
 ---
 
@@ -141,7 +141,7 @@ locality.
 ```
 mkdir my-axona-app && cd my-axona-app
 npm init -y
-npm install @axona/protocol@github:axona-net/axona-protocol#v3.5.0
+npm install @axona/protocol@github:axona-net/axona-protocol#v3.6.0
 ```
 
 You now have `node_modules/@axona/protocol/src/` with the full kernel.
@@ -665,6 +665,14 @@ small content reference (hash + size + mime) and transfer the bytes
 out-of-band. A non-serializable message (circular ref, BigInt) throws
 `PUBLISH_INVALID_MESSAGE`.
 
+> **`std/chunk` is reliable by default (kernel ≥ 3.6.0).** `publishChunkedBytes`
+> paces the chunks and then **verifies what the mesh cached and re-publishes any
+> gaps** -- `peer.pub` is fire-and-forget into the transport buffer, so a fast
+> burst would otherwise drop chunks before they durably cache and a *reload*
+> subscriber would never reassemble. You no longer pick a throttle value. The
+> receiver (`receiveChunkedBytes`) reassembles, or rejects with the missing
+> indices on timeout -- it never hangs.
+
 ### 7.2 Subscribe
 
 ```js
@@ -802,7 +810,7 @@ const env    = await peer.pull(msgId, { topic: feedId, timeoutMs: 1000 });
 const latest = await peer.pull(null,  { topic: feedId });
 
 // Coarse, best-effort delivery counters, merged across the topic's axons.
-// OWNER-ONLY (v3.5.0): metrics() answers only the owner of an OWNED topic.
+// OWNER-ONLY (v3.6.0): metrics() answers only the owner of an OWNED topic.
 const m = await peer.metrics(myOwnedFeed, { timeoutMs: 500 });
 // { publishes, current_count, subscribers, deliveries, pulls, reshares, relayCount }
 ```
@@ -1049,7 +1057,7 @@ wss://bridge.axona.net        # east
 wss://bridge-west.axona.net    # west
 ```
 
-Both run kernel 3.5.0 with TURN. Open a WebSocket (the `webTransport` factory
+Both run kernel 3.6.0 with TURN. Open a WebSocket (the `webTransport` factory
 does the handshake for you) and you are on the network. A bridge advertises
 itself in the public bridge directory so clients can discover and fail over
 between bridges.
@@ -1490,7 +1498,7 @@ import { FilePersistence }      from '@axona/protocol/persistence/file.js';
 
 ```js
 WIRE_VERSION         // '3.0'
-KERNEL_VERSION       // '3.5.0'
+KERNEL_VERSION       // '3.6.0'
 ```
 
 ### 15.10 Error codes worth catching
@@ -1513,9 +1521,9 @@ Errors subclass `AxonaError` with a stable `.code` -- switch on `.code`, not
 
 ## Where to go next
 
-- **[Quick Start](Quick-Start-v3.5.0.md)** -- a five-minute roundtrip for
+- **[Quick Start](Quick-Start-v3.6.0.md)** -- a five-minute roundtrip for
   someone you are onboarding.
-- **[API Reference](Axona-API-Reference-v3.5.0.md)** -- the exact signature of
+- **[API Reference](Axona-API-Reference-v3.6.0.md)** -- the exact signature of
   every public symbol.
 - **[Identity & Authorship Model](../architecture/Identity-and-Authorship-Model-v0.3.md)**
   -- the design rationale behind the three-primitive model.
