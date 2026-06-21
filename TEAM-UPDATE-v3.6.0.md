@@ -1,9 +1,11 @@
 # Team Update — Axona kernel **v3.6.0**
 
 **Audience:** anyone building on `@axona/protocol` (apps, relays, bridges).
-**Status:** kernel **3.6.0** tagged; the **testnet** fleet (relays + demo-testnet)
-runs it. **Prod is gated** — `axona.net` / `demo.axona.net` / the prod bridges are
-still on the late-2.x / early-3.x line until a coordinated promotion.
+**Status:** kernel **3.6.0** is **live in prod** — `demo.axona.net`, `axona.net`,
+the demo apps (minimal, axona-share), and the testnet fleet all run it. The
+signaling **bridges** (prod east/west + testnet) are on the **wire-compatible
+3.3.3** and roll to 3.6.0 next — a point release, **no flag day** (all of 3.x is
+`WIRE_VERSION` 3.0, so 3.6.0 apps already interoperate with the 3.3.3 bridges).
 
 > This supersedes the **v2.51** update. The headline is the **v3.0.0 flag-day**,
 > which *renamed and reshaped* the identity + topic APIs that v2.51 described — so
@@ -183,12 +185,15 @@ const file = await receiveChunkedBytes(peer, topic);   // reload-safe
 | Piece | Version | Notes |
 |---|---|---|
 | Kernel `@axona/protocol` | **3.6.0** | tag `v3.6.0`; `WIRE_VERSION` 3.0 |
-| Relay `axona-relay` | **0.16.2** | keyspace hosting + metric-publish loop (`RELAY_METRICS`) |
+| `demo.axona.net` + demo apps | **3.6.0** | **live in prod** — axona-minimal v0.5.0, axona-share v0.11.1 |
+| `axona.net` reference peer | **3.6.0** | **live in prod** (peer v0.57.0) |
 | Testnet fleet + `demo-testnet.axona.net` | **3.6.0** | live |
-| `axona.net` / `demo.axona.net` / prod bridges | *pre-promotion* | gated |
+| Relay `axona-relay` | **0.16.2** | keyspace hosting + metric-publish loop (`RELAY_METRICS`) |
+| Signaling bridges (prod east/west + testnet) | **3.3.3** | wire-compatible; 3.6.0 roll pending |
 
-- **Try it:** `demo-testnet.axona.net/apps/axona-share` (image sharing over
-  chunked pub/sub) and the standalone `axona-net.github.io/axona-share`.
+- **Try it:** `demo.axona.net/apps/axona-share` (image sharing over chunked
+  pub/sub), `demo.axona.net/apps/axona-minimal` (the ~60-line build-along), and
+  the standalone `axona-net.github.io/axona-share`.
 - **Docs:** the programmer trio (Quick Start · Programmer Guide · API Reference)
   is at **v3.6.0**; the architecture note is at **v0.8.4** (incl. the derived
   metric-topic mechanism). Per-release detail is in `RELEASE-NOTES.md`; the
@@ -196,6 +201,8 @@ const file = await receiveChunkedBytes(peer, topic);   // reload-safe
 
 ---
 
-*Prod promotion (the `testnet → main` push that carries 3.x to `demo.axona.net`
-and the reference peer, plus the prod bridge upgrade) is the one outstanding,
-coordinated step — gated, not yet done.*
+*Prod apps are promoted — `demo.axona.net` and `axona.net` are on 3.6.0. The one
+remaining step is the **signaling-bridge upgrade** (3.3.3 → 3.6.0 on the prod
+east/west + testnet bridges): a wire-compatible point release that brings the
+new owner-only-metrics and kill-re-fan **enforcement** to the bridge-roots. Apps
+already run correctly against the 3.3.3 bridges in the meantime.*
