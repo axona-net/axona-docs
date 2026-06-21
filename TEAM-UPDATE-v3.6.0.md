@@ -1,11 +1,11 @@
 # Team Update — Axona kernel **v3.6.0**
 
 **Audience:** anyone building on `@axona/protocol` (apps, relays, bridges).
-**Status:** kernel **3.6.0** is **live in prod** — `demo.axona.net`, `axona.net`,
-the demo apps (minimal, axona-share), and the testnet fleet all run it. The
-signaling **bridges** (prod east/west + testnet) are on the **wire-compatible
-3.3.3** and roll to 3.6.0 next — a point release, **no flag day** (all of 3.x is
-`WIRE_VERSION` 3.0, so 3.6.0 apps already interoperate with the 3.3.3 bridges).
+**Status:** kernel **3.6.0** is **live in prod across the whole stack** —
+`demo.axona.net`, `axona.net`, the demo apps (minimal, axona-share), the testnet
+fleet, **and all three signaling bridges** (prod east + west + testnet) now run it.
+The rollout was a wire-compatible point release (all of 3.x is `WIRE_VERSION` 3.0),
+so there was no flag day and apps interoperated with the bridges throughout.
 
 > This supersedes the **v2.51** update. The headline is the **v3.0.0 flag-day**,
 > which *renamed and reshaped* the identity + topic APIs that v2.51 described — so
@@ -185,11 +185,11 @@ const file = await receiveChunkedBytes(peer, topic);   // reload-safe
 | Piece | Version | Notes |
 |---|---|---|
 | Kernel `@axona/protocol` | **3.6.0** | tag `v3.6.0`; `WIRE_VERSION` 3.0 |
-| `demo.axona.net` + demo apps | **3.6.0** | **live in prod** — axona-minimal v0.5.0, axona-share v0.11.1 |
+| `demo.axona.net` + demo apps | **3.6.0** | **live in prod** — axona-minimal v0.5.0, axona-share **v0.12.0** (now on the reliable `publishChunkedBytes` send path) |
 | `axona.net` reference peer | **3.6.0** | **live in prod** (peer v0.57.0) |
 | Testnet fleet + `demo-testnet.axona.net` | **3.6.0** | live |
 | Relay `axona-relay` | **0.16.2** | keyspace hosting + metric-publish loop (`RELAY_METRICS`) |
-| Signaling bridges (prod east/west + testnet) | **3.3.3** | wire-compatible; 3.6.0 roll pending |
+| Signaling bridges (prod east + west + testnet) | **3.6.0** | **live** (bridge v2.33.0) — owner-only-metrics + kill-re-fan now enforced at the bridge-roots |
 
 - **Try it:** `demo.axona.net/apps/axona-share` (image sharing over chunked
   pub/sub), `demo.axona.net/apps/axona-minimal` (the ~60-line build-along), and
@@ -201,8 +201,9 @@ const file = await receiveChunkedBytes(peer, topic);   // reload-safe
 
 ---
 
-*Prod apps are promoted — `demo.axona.net` and `axona.net` are on 3.6.0. The one
-remaining step is the **signaling-bridge upgrade** (3.3.3 → 3.6.0 on the prod
-east/west + testnet bridges): a wire-compatible point release that brings the
-new owner-only-metrics and kill-re-fan **enforcement** to the bridge-roots. Apps
-already run correctly against the 3.3.3 bridges in the meantime.*
+*The 3.6.0 rollout is **complete end-to-end** — `demo.axona.net`, `axona.net`, the
+demo apps, the testnet fleet, and all three signaling bridges (east + west +
+testnet, bridge v2.33.0) are on kernel 3.6.0, so owner-only-metrics and kill-re-fan
+are now **enforced at the bridge-roots**. `apps/axona-share` (v0.12.0) also moved
+to the reliable `publishChunkedBytes` send path, verified end-to-end on the live
+testnet (600 KB → 56 chunks → a fresh reload-joiner reassembled byte-exact).*
