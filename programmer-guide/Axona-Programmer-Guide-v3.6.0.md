@@ -1525,6 +1525,9 @@ Errors subclass `AxonaError` with a stable `.code` -- switch on `.code`, not
   someone you are onboarding.
 - **[API Reference](Axona-API-Reference-v3.6.0.md)** -- the exact signature of
   every public symbol.
+- **[Services Guide](Axona-Services-Guide-v0.1.md)** -- the programs you *run*
+  rather than write: the signaling bridge, the relay + its front-ends (console,
+  CLI, MCP server, desktop), directory/federation, and the PoW collector.
 - **[Identity & Authorship Model](../architecture/Identity-and-Authorship-Model-v0.3.md)**
   -- the design rationale behind the three-primitive model.
 - **Read `apps/axona-minimal/`** in the kernel repo -- a complete, runnable v3
