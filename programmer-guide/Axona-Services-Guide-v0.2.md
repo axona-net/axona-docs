@@ -56,7 +56,7 @@ browser tab is open, this is the document for you.
 | **Bridge** | `axona-bridge` (`src/server.js`) | Signaling rendezvous + STUN/TURN + a federating, directory-hosting peer | A server (Docker stack) |
 | **Relay — console/TUI** | `axona-relay` (`src/index.js`, bin `axona-relay`) | Headless node that hosts topics + publishes metrics; live dashboard | A box you keep online |
 | **Relay — CLI** | `axona-cli` (`src/cli.js`) | One-shot `pub` / `sub` / `pull` from a shell or script | Anywhere with Node |
-| **Relay — MCP server** | `axona-mcp` (`src/mcp.js`) | The same ops as native **agent tools** over MCP/stdio | Spawned by the agent host |
+| **Relay — MCP server** | `axona-mcp` (`src/mcp.js`) | A **persistent peer** with a durable identity, exposed as native **agent tools** (publish/subscribe/host) over MCP/stdio | Spawned by the agent host |
 | **Relay — desktop app** | `axona-relay/desktop` (Electron) | A GUI wrapper around the relay | A laptop/desktop |
 | **PoW collector** | `axona-relay/pow-collector.js` (`npm run collect`) | Subscribes to the PoW-bench results topic and archives them | A box you keep online |
 | **Directory / federation** | kernel `bridgeDirectory.js` | A *behavior*, not a process: bridges advertise, clients fail over | Inside bridges + clients |
@@ -212,9 +212,11 @@ Restart=always
 
 ## 4. Relay front-ends
 
-All three non-dashboard front-ends share one core module (`src/ops.js` —
-`publish` / `subscribe` / `pull`), so they behave identically; they differ only
-in how you call them.
+The relay's core pub/sub lives in `src/ops.js` (`publish` / `subscribe` /
+`pull`). The **CLI** uses it directly — one throwaway peer per call. The **MCP
+server** wraps it in a *persistent* peer (`src/mcp-session.js`) so an agent can be
+a standing participant rather than a series of one-shot connections. The
+**desktop app** is the GUI relay.
 
 ### 4a. CLI (`axona-cli`)
 
@@ -230,23 +232,51 @@ Good for cron jobs, CI checks, shell glue, and quick manual probes.
 
 ### 4b. MCP server (`axona-mcp`)
 
-`src/mcp.js` is a **Model Context Protocol** server that exposes Axona pub/sub as
+`src/mcp.js` is a **Model Context Protocol** server that exposes Axona as
 **native agent tools**, so Claude Code (and any MCP-speaking agent) gets
 first-class `axona_*` tools instead of shelling out. It speaks JSON-RPC over
-**stdio** (stdout = protocol, stderr = logs). Each call connects a *fresh
-ephemeral peer* to the live network, does one job, tears down, and returns JSON
-— it holds no persistent peer.
+**stdio** (stdout = protocol, stderr = logs).
 
-| Tool | Args | Returns |
+**It holds ONE persistent peer** (`src/mcp-session.js`), opened lazily on the
+first call and kept connected — so the agent is a continuous participant, not a
+series of one-shot connections. That peer signs with a **durable identity**
+(both the node identity and the author keypair persist to
+`~/.axona/claude-mcp-identity.json`), so the agent keeps the **same Author ID and
+nodeId across restarts** — a stable on-network identity, not a fresh persona each
+call.
+
+| Tool | Args | Purpose |
 |---|---|---|
-| `axona_publish` | `topic`, `message`, `region?` | `{ ok, msgId }` |
-| `axona_subscribe` | `topic`, `region?`, `seconds?` (1–120), `since?` (`all`\|`new`) | `{ received, messages[] }` |
-| `axona_pull` | `topic`, `region?` | `{ found, message, msgId }` |
+| `axona_publish` | `topic`, `message`, `region?` | Publish, signed by the stable author |
+| `axona_pull` | `topic`, `region?` | Fetch only the latest message |
+| `axona_watch` | `topic`, `region?`, `since?` (`all`\|`latest`\|`live`) | Open a **standing subscription**; arrivals buffer server-side |
+| `axona_poll` | `topic?`, `peek?`, `max?`, `wait?`, `timeoutSec?` | Drain the buffer (the agent's "inbox"); `wait:true` **long-polls** until a message lands |
+| `axona_unwatch` | `topic`, `region?` | Stop a watch, discard its buffer |
+| `axona_host` | `topic`, `region?` | **Root** the topic on the agent's peer (store + serve, no subscribe) |
+| `axona_unhost` | `topic`, `region?` | Stop hosting |
+| `axona_status` | — | Peer nodeId + Author ID, mesh health, per-watch + hosted lists |
+| `axona_subscribe` | `topic`, `region?`, `seconds?` (1–120), `since?` | One-shot listen window (back-compat) |
 
-Region defaults to `useast` (`0x89`); subscribers must use the **same region**
-as the publisher. It targets **production** by default and interoperates with
-the live apps — publishing to `us-east/hello-world` shows up in the
+Region defaults to `useast` (`0x89`); subscribers must use the **same region** as
+the publisher. The server targets **production** by default and interoperates
+with the live apps — publishing to `us-east/hello-world` shows up in the
 demo.axona.net feed.
+
+**Receiving — push vs. poll.** Two paths cover the same arrivals:
+- **Push** — every message on a watched topic is emitted as an MCP *logging
+  notification* (`sendLoggingMessage`) to the client. This is best-effort: it
+  reaches the MCP client, but a turn-based agent loop won't be interrupted by it.
+- **Long-poll** — `axona_poll(wait:true, timeoutSec)` blocks **server-side** until
+  a message arrives (or the timeout), returning at push latency. This is the
+  reliable pull side. The standing watch buffers anything that lands between
+  polls, so nothing is lost in the gaps.
+
+The agent becomes a **live participant** by pairing `axona_watch` with a
+`/loop` that calls `axona_poll(wait:true)` each iteration: watch once, then
+poll-act-repeat. A message that asks for work is a request to execute and reply;
+**approval for sensitive or irreversible actions stays on the authenticated
+session, never the pub/sub channel** (a signed message proves the author key, but
+the topic is still an external data channel — see the security boundary below).
 
 Register it as a project-scoped MCP server with a `.mcp.json` at your repo root:
 
@@ -258,7 +288,9 @@ Register it as a project-scoped MCP server with a `.mcp.json` at your repo root:
 }
 ```
 
-Point it at testnet (or a specific bridge) with an `env` block:
+Point it at testnet (or a specific bridge) with an `env` block — also
+`MCP_REGION` (default `useast`), `MCP_AUTHOR_PATH` (identity file), `MCP_BUFFER_CAP`
+(per-watch ring, default 1000):
 
 ```json
 {
@@ -271,6 +303,13 @@ Point it at testnet (or a specific bridge) with an `env` block:
   }
 }
 ```
+
+> **Security boundary.** The MCP peer is a full publisher/subscriber/host with a
+> durable identity — treat it as a real network participant. Requests and
+> reversible work can flow over a topic, but the agent must keep the approval
+> gate for destructive, irreversible, or outward-facing actions on its
+> authenticated session, not on an Axona message: a signed envelope authenticates
+> *who*, but an open-topic message is still untrusted external input.
 
 ### 4c. Desktop app (`axona-relay/desktop`)
 
