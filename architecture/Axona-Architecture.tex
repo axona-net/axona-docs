@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.8.4 \quad 2026-06-20\par}
+{\small An Axona Architecture Note \quad v0.8.5 \quad 2026-06-22\par}
 \end{center}
 \vfill
 \null
@@ -1909,6 +1909,91 @@ per-publisher \texttt{seq} (C-2) is per-\emph{signer}, so one author key
 used from two devices needs coordinated sequencing. Authorship trust is
 now a key-distribution question (which Author ID is whom), as for any
 pseudonymous-identity system.
+
+\item[\textbf{Governance as gradient (the \emph{Gates to Gradients}
+line).}] A companion six-note series in \texttt{axona-docs} works a
+different axis from the security hardening above --- not \emph{who may
+act} but \emph{how a network with no chokepoint shapes behaviour without
+a gate to pull}. One of the six has already shipped: \textbf{agent
+legibility}, a voluntary signed author-class attestation
+(\texttt{class:\,'agent'\,|\,'human'}) carried on the decoupled author
+key and resolvable from the Author ID alone --- it gates no one, and a
+subscriber or filter may choose to badge, throttle, or quarantine
+agent-class traffic.\sidenote{Kernel v3.7--v3.8:
+\texttt{buildAuthorClass}\,/\,\texttt{verifyAuthorClass} +
+\texttt{peer.setAuthorClass}\,/\,\texttt{getAuthorClass}, an owner-only
+profile topic the declarer \texttt{host()}s for durability, and an
+optional operator counter-signature. The reference web peer is the first
+consumer. Absence is \emph{unstated}, never silently ``human.''} The
+remaining four sit, like everything here, inside the existing seams; each
+is a \emph{gradient} (a cost or a piece of context that scales with
+reach) rather than a \emph{gate} (a binary verdict someone owns and can
+be captured).
+
+\item[\textbf{Cascade telemetry --- a ruler for the gradients.}] The
+highest-leverage, lowest-risk move, and the one to land first: every
+other gradient is shipped on faith until we can observe whether it
+actually changed how things propagate. The instrument is
+\emph{aggregate, privacy-preserving} measurement of cascade
+\emph{dynamics} --- spread velocity, fan-out shape, agent-to-human
+ratio, and how often a retraction loses its race against the bytes ---
+assembled the same way as everything else: first-party local stats,
+published to a topic, served by infra nodes that \texttt{host()} it,
+\emph{never} a central collector. The privacy bar is an engineering
+property, not a promise --- aggregation, sampling, $k$-anonymity, or
+differential-privacy noise applied \emph{above} the shipped
+derived-metric-topic path so no individual message or participant is
+reconstructable. Explicitly not content surveillance; it ships a gauge,
+not a feature. Validate the noise/utility trade-off in \texttt{dht-sim}
+before it grades anything.
+
+\item[\textbf{Soft retraction and annotation envelopes.}] The
+\emph{hard} primitive shipped --- owner-only \texttt{kill} + signed
+tombstones + \texttt{unpub} (Phase A), best-effort cooperative removal.
+The \emph{soft} gradient layers on top: a signed
+\emph{retracted-by-author} signal that removes nothing, references the
+original \texttt{msgId}, and rides the \emph{same} mesh
+\emph{alongside} the message it concerns --- and its generalization, a
+signed \emph{annotation envelope} that references a \texttt{msgId} so any
+party can attach a correction or dispute.\sidenote{Display and weight are
+the subscriber's or filter's choice. Annotations are \emph{context},
+never authorities that remove --- the move from deletion (impossible on a
+substrate where every holder keeps the bytes) to attached, signed
+context everyone can read and act on.} No wire change: both are ordinary
+signed pub/sub messages keyed to an existing \texttt{msgId}.
+
+\item[\textbf{Forkable filter sets.}] Of the four levers a platform
+moderates with --- access, distribution, retention, attribution ---
+Axona dissolves three and inverts the fourth, leaving \emph{subscription}
+as the one surface a community still owns. The direction makes that
+surface plural and machine-scale: a \textbf{filter set} becomes a signed,
+versioned, \emph{published} object --- allow/deny rules over
+\texttt{signerPubkey}, topic, or content predicate --- that anyone can
+subscribe to, compose locally, and \emph{fork} by republishing under
+their own key. No new kernel primitive: app-layer convention plus a
+reference implementation, riding the same discover/rank/compose pattern
+the bridge directory already proves. The reference peer's agent-class
+badge is the first, trivial consumer (it reads \texttt{getAuthorClass});
+a published, composable filter object is the next step.
+
+\item[\textbf{Friction scaled to reach.}] The hardest and least certain
+move: keep the one defensible lesson of the circuit-breaker era ---
+\emph{runaway amplification should cost something} --- without a
+chokepoint to enforce it. Two already-decentralized mechanisms
+approximate it as a gradient: \textbf{per-relay local damping} (a
+generalization of the bounded-queue / quota / hold-time machinery the
+kernel already ships) and \textbf{reach-graded proof-of-work} demanded by
+the K-closest roots that already see a topic's subscriber-set
+size.\sidenote{This is the \emph{demand} side of the same proof-of-work
+the decoupled-author anti-abuse thread needs on the \emph{supply} side
+(E-1): price the act of fanning out, not just the act of holding a key.}
+Each node decides only what \emph{it} forwards and how fast --- the soft
+cost curve emerges from many independent local policies, with no
+coordinator and nothing to capture. Honest scope: it prices
+\emph{casual and scaled} amplification only; a determined adversary
+evades it by fragmenting or under-declaring reach, so it is a gradient,
+never a guarantee. Simulate the honest-publisher false-positive cost in
+\texttt{dht-sim} before shipping.
 \end{description}
 
 The job of the architecture is to make these additions land
