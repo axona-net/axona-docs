@@ -198,7 +198,14 @@ The kernel does **not** call this; callers are clients/filters/telemetry.
 
 ## 6. Surface to add
 
-Small and mostly pure. Proposed homes:
+**Shipped in kernel v3.7.0** (`src/pubsub/authorClass.js`, exported from the
+barrel): `authorClassTopic`, `buildAuthorClass`, `verifyAuthorClass`, and the
+`AUTHOR_CLASS_KIND` / `AUTHOR_CLASS_NAME` / `AUTHOR_CLASS_REGION` constants — so
+the browser peer, reference apps, and relay derive + verify identically.
+`smoke_author_class.mjs` (16/16) covers it. The `peer.setAuthorClass` /
+`peer.getAuthorClass` conveniences below are **not** in the kernel yet — the relay
+implements them in `mcp-session.js` over the core helpers; lifting them onto
+`AxonaPeer` is the remaining step.
 
 | Symbol | Home | Notes |
 |---|---|---|
