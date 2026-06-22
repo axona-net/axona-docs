@@ -106,13 +106,15 @@ Two tiers, pick per §7(b):
 - **v1 — self-asserted.** `operator` is just a string/pubkey the author writes; it
   proves nothing beyond "the author claims this operator." Cheap, honest about
   being a claim.
-- **v1.1 — countersigned (stronger).** The operator key signs an
-  `OwnershipProof`-shaped countersignature over the author pubkey + `kind`, so the
-  attestation carries *bidirectional* proof: the author names the operator **and**
-  the operator vouches for the author. This reuses the `OwnershipProof` primitive
-  from the decoupled-publish-identity spec (§6) verbatim — a signature by the
-  owning key over a domain-tagged payload — and is the recommended target, since a
-  self-asserted operator is trivially spoofable.
+- **v1.1 — countersigned (stronger). SHIPPED in kernel v3.8.0.** Pass
+  `operatorSignWith` (an operator identity) to `buildAuthorClass`: it sets
+  `operator` to the operator's pubkey and attaches `operatorProof` — the operator
+  key signing over a domain-tagged `{ d:'axona:author-class-operator:v1', author,
+  operator }` payload (the `OwnershipProof` shape). So the attestation carries
+  *bidirectional* proof: the author names the operator **and** the operator
+  vouches back. `verifyAuthorClass` returns `operatorVerified:true` only for a
+  valid proof; a present-but-bad proof **rejects the whole attestation**; a
+  self-asserted operator string (no proof) returns `operatorVerified:false`.
 
 ## 4. Carrier: the author-class profile topic
 
@@ -202,10 +204,14 @@ The kernel does **not** call this; callers are clients/filters/telemetry.
 barrel): `authorClassTopic`, `buildAuthorClass`, `verifyAuthorClass`, and the
 `AUTHOR_CLASS_KIND` / `AUTHOR_CLASS_NAME` / `AUTHOR_CLASS_REGION` constants — so
 the browser peer, reference apps, and relay derive + verify identically.
-`smoke_author_class.mjs` (16/16) covers it. The `peer.setAuthorClass` /
-`peer.getAuthorClass` conveniences below are **not** in the kernel yet — the relay
-implements them in `mcp-session.js` over the core helpers; lifting them onto
-`AxonaPeer` is the remaining step.
+And **kernel v3.8.0** added the conveniences directly on `AxonaPeer` —
+`peer.setAuthorClass(class, { signWith, operator?, operatorSignWith?, label? })`
+and `peer.getAuthorClass(authorId)` (returns `{ class, operator, operatorVerified,
+label, ts }`, `'unstated'` on any failure) — plus the **operator countersignature**
+(§3.1 v1.1) via `buildAuthorClass`'s `operatorSignWith`. `smoke_author_class.mjs`
+is 22/22. So the human-facing "I am human" toggle is a single
+`peer.setAuthorClass('human', { signWith })` call. (The relay's `mcp-session.js`
+now delegates to these peer methods.)
 
 | Symbol | Home | Notes |
 |---|---|---|
