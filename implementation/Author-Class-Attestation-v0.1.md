@@ -2,7 +2,12 @@
 
 **Version:** v0.1 (design proposal) · **Date:** 2026-06-21
 **Baseline:** `@axona/protocol` kernel **v3.6.0** (v0.3 identity/topic model; `WIRE_VERSION` 3.0)
-**Status:** proposed. Realizes the mechanism sketched in
+**Status:** proposed — **prototyped + verified live** in `axona-relay` **v0.19.0**
+(the persistent MCP peer self-declares `agent` on connect; smoke
+`scripts/author-class-smoke.mjs` is 6/6 on testnet: separate-peer resolution from
+the Author ID alone, signer↔author binding, and owner-only rejection of a
+non-owner write). The relay carries app-local helpers; promoting them to kernel
+core/`std` (§6) and settling §7 remain. Realizes the mechanism sketched in
 [`../architecture/Gates-to-Gradients-5-Agent-Legibility-v0.2.md`](../architecture/Gates-to-Gradients-5-Agent-Legibility-v0.2.md);
 builds on the `OwnershipProof` seam in
 [`Decoupled-Publish-Identity-and-C3-v0.1.md`](Decoupled-Publish-Identity-and-C3-v0.1.md) §6.
@@ -34,7 +39,7 @@ Three pieces:
 
 1. **The object** — `axona:author-class:v1`, a domain-tagged payload signed by the
    author key (§3).
-2. **The canonical carrier** — each author's own **key-derived, owner-only
+2. **The canonical carrier** — each author's own **pinned-region, owner-only
    profile topic** `authorClassTopic(authorId)`, so the claim is (a) writable only
    by that author and (b) discoverable from the `signerPubkey` alone (§4). An
    optional inline echo on a publish is allowed for "the claim travels with the
@@ -111,29 +116,45 @@ Two tiers, pick per §7(b):
 
 ## 4. Carrier: the author-class profile topic
 
-### 4.1 Derivation (canonical, key-derived, owner-only)
+### 4.1 Derivation (canonical, pinned-region, owner-only)
 
-Reuse v0.3 addressing exactly:
+> **Implementation note (verified against kernel v3.6.0).** An earlier draft of
+> this section put the profile topic on a *key-derived* region (region omitted ⇒
+> `keyDerivedRegion(owner)`). **The shipped kernel deliberately does not do this.**
+> `deriveTopicId` never derives a region from the author key — its own comment:
+> *"never derived from the author key … a hashed region would dump every author's
+> topics into one arbitrary cell, creating a hotspot."* Region-omitted resolves to
+> the **publishing node's** region, which is useless for discovery (a reader
+> holding only an Author ID doesn't know where that author's node sits). So the
+> carrier **pins a fixed, well-known region** — exactly the bridge-directory
+> pattern — which is what actually makes it discoverable from the Author ID alone.
 
 ```js
+const CLASS_REGION = 'useast';   // pinned, well-known (configurable)
 function authorClassTopic(authorId) {
-  // owner present + region omitted ⇒ region = keyDerivedRegion(owner) ⇒
-  // discoverable from the Author ID alone. owner present ⇒ write:'owner' default ⇒
-  // ONLY this author may publish here. No new primitive.
-  return { owner: authorId, name: 'axona:author-class' };
+  // explicit region (discoverable) + owner present ⇒ write:'owner' default ⇒
+  // ONLY this author may publish here. No new primitive; no key-derivation.
+  return { region: CLASS_REGION, owner: authorId, name: 'axona:author-class' };
 }
 ```
 
-Two properties fall out for free:
+Two properties:
 
 - **Only the author can set their own class.** `write:'owner'` (the default when an
   `owner` is named) means root ingress rejects any publish whose `signerPubkey !==
-  owner` — the kernel's existing write-policy check (`WRITE_POLICY_VIOLATION`). No
-  one can publish a class claim *about* someone else on their profile topic.
-- **Discoverable from the key alone.** Region is `keyDerivedRegion(authorId)`, so a
-  subscriber holding only a `signerPubkey` derives the same topic ID and pulls the
-  claim — no registry, no side channel. This is the same key-derived-discovery the
-  v0.3 model already uses for author feeds.
+  owner` — the kernel's existing write-policy check (`WRITE_POLICY_VIOLATION`),
+  *verified live* (a non-owner publish to the victim's profile topic is rejected).
+  No one can publish a class claim *about* someone else.
+- **Discoverable from the key alone.** Region is a fixed constant every client
+  knows, and `owner = authorId`, so a reader holding only a `signerPubkey` derives
+  the identical topic ID and pulls the claim — no registry, no side channel.
+- **Tradeoff (be honest):** pinning one region concentrates all author-class
+  topics there — a mild hotspot, the same one the bridge directory accepts for
+  `axona:bridge-directory`. Each is one small, rarely-written, owner-only topic, so
+  the load is low; if it ever bites, shard the name across a fixed *set* of regions
+  by a prefix of the Author ID (still deterministic, still discoverable, no
+  per-author key-derivation). The alternative — carry the claim inline with
+  messages (§4.3) — avoids the topic entirely at the cost of repeating it.
 
 ### 4.2 Lifecycle
 
@@ -254,7 +275,7 @@ d. **Does an inline echo belong in `std/chunk`-style helpers or purely app code?
 - **Owner-only carrier:** a second author attempting to `pub` to
   `authorClassTopic(victim)` is rejected `WRITE_POLICY_VIOLATION` at ingress.
 - **Discovery:** holding only `signerPubkey`, derive `authorClassTopic`, pull, and
-  recover the class (key-derived-region round-trip).
+  recover the class (pinned-region discovery round-trip).
 - **Supersession + retract:** newer `ts` wins; `kill` → reader falls back to unstated.
 - **Inline echo:** `obj.author !== enclosing signerPubkey` → rejected (rule 4).
 - **Live (testnet):** MCP peer publishes `class:"agent"`; a second peer resolves it
@@ -267,7 +288,7 @@ d. **Does an inline echo belong in `std/chunk`-style helpers or purely app code?
 - Behavioral / involuntary agent detection (intentionally — it requires a
   classifier authority).
 - Any routing, placement, or address change.
-- A global class registry or directory beyond per-author key-derived topics.
+- A global class registry or directory beyond per-author owner-only topics on a pinned region.
 - Personhood proofs / "one human" attestation (a gatekeeper; different problem).
 
 ## 13. References
@@ -275,5 +296,5 @@ d. **Does an inline echo belong in `std/chunk`-style helpers or purely app code?
 - [`../architecture/Gates-to-Gradients-5-Agent-Legibility-v0.2.md`](../architecture/Gates-to-Gradients-5-Agent-Legibility-v0.2.md) — the design rationale.
 - [`Decoupled-Publish-Identity-and-C3-v0.1.md`](Decoupled-Publish-Identity-and-C3-v0.1.md) §6 — the `OwnershipProof` primitive reused for `operator` countersignature.
 - v0.3 identity/topic model: `createAuthorIdentity`, `deriveTopicId`,
-  `keyDerivedRegion`, write-policy (`WRITE_POLICY_VIOLATION`) — kernel `src/identity/`, `src/pubsub/`.
+  write-policy (`WRITE_POLICY_VIOLATION`) — kernel `src/identity/`, `src/pubsub/`.
 - `metricTopic()` — precedent for a core, key/space-derived topic-ID helper consumed app-side.
