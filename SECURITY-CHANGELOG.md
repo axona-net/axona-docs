@@ -16,6 +16,36 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v3.10.0 — 2026-06-22
+
+Pub/sub root election is now proximity-gated on every promotion path
+(wire-compatible; no flag day).
+
+### PROTECTED: only a topic's genuine K-closest nodes can become its roots
+
+- **A node can no longer self-promote to a topic *root* unless it is actually in
+  the topic's K-closest set** (`findKClosest(topicId, rootSetSize)`). Previously
+  three promotion paths created a root with no proximity check — direct
+  `subscribe-k` receipt, the routed terminal-subscribe fallback, and a recruited
+  relay (`adopt-subscribers`) that a stray `subscribe-k` later flipped to
+  in-root-set. Any node a subscriber's *approximate* K-closest estimate happened
+  to reach would therefore install a permanent root role (replay cache + feed
+  fan-out) for a topic it isn't responsible for. The same `_mayHostTopic`
+  self-proximity gate that already guarded the publish/lazy-axon path now guards
+  all of them, so a peer hosts a topic's feed only when it is legitimately one of
+  its roots. This bounds role/replay-cache allocation to the canonical root set
+  and removes a low-cost way to scatter a topic's hosting across arbitrary nodes.
+- **Recruited sub-axons are now correctly parented and classified.** The
+  batch-adoption recruit message carries the recruiter's id, so an adopted relay
+  records its parent and stays a sub-axon under its root instead of being
+  mislabeled as an independent root. The delivery tree converges to the intended
+  shape — a fixed ~`rootSetSize` root set, with overloaded roots recruiting
+  close-by sub-axons beneath them — rather than smearing subscribers across many
+  spurious roots. Verified by `smoke_pubsub_root_election` (canonical root count,
+  recruitment fires, full delivery).
+
+---
+
 ## Kernel v3.5.0 — 2026-06-20
 
 A behavior change on the metrics read path (wire-compatible).
@@ -1037,4 +1067,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-19.*
+*Last updated: 2026-06-22.*
