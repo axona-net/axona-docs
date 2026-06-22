@@ -1,13 +1,13 @@
-# From Gates to Gradients — 3. Retraction with teeth, not deletion (v0.1)
+# From Gates to Gradients — 3. Retraction with teeth, not deletion (v0.2)
 
-**Status:** design note · **Flagged:** 2026-06-15 · **Relates to:**
+**Status:** design note · **Flagged:** 2026-06-15 · **Revised:** 2026-06-21 (v0.2 — refreshed against the kernel 3.6.0 surface) · **Relates to:**
 [Pub/Sub Lifecycle & Access-Control Design v0.2](../implementation/Pubsub-Lifecycle-Design-v0.2.md) ·
 companion essay *From Gates to Gradients* · sibling notes
-[1 — Costly Identity](Gates-to-Gradients-1-Costly-Identity-v0.1.md),
-[2 — Cascade Telemetry](Gates-to-Gradients-2-Cascade-Telemetry-v0.1.md),
-[4 — Forkable Filter Sets](Gates-to-Gradients-4-Forkable-Filter-Sets-v0.1.md),
-[5 — Agent Legibility](Gates-to-Gradients-5-Agent-Legibility-v0.1.md),
-[6 — Friction Scaled to Reach](Gates-to-Gradients-6-Friction-Scaled-to-Reach-v0.1.md)
+[1 — Costly Identity](Gates-to-Gradients-1-Costly-Identity-v0.2.md),
+[2 — Cascade Telemetry](Gates-to-Gradients-2-Cascade-Telemetry-v0.2.md),
+[4 — Forkable Filter Sets](Gates-to-Gradients-4-Forkable-Filter-Sets-v0.2.md),
+[5 — Agent Legibility](Gates-to-Gradients-5-Agent-Legibility-v0.2.md),
+[6 — Friction Scaled to Reach](Gates-to-Gradients-6-Friction-Scaled-to-Reach-v0.2.md)
 
 ---
 
@@ -100,9 +100,13 @@ From the pub/sub lifecycle design (read it for the authoritative spec):
 - `peer.kill(topic, msgId)` — creator-only delete (`msgId` required, no "kill
   latest" footgun). Accepted **iff** the kill's `signerPubkey` matches the
   signer of the message identified by `msgId`. Because
-  `msgId = sha256(canonical({publisher, message}))` is **publisher-bound**, a
-  kill cannot target someone else's message (Lifecycle §3.1–3.3, kernel
-  v2.18.0).
+  `msgId = hash(signerPubkey ‖ message)` is **signer-bound**, a kill cannot
+  target someone else's message (Lifecycle §3.1–3.3). Since **kernel v3.5.1** the
+  kill's `{ deleted: true, msgId }` signal also **fans out to subscribers on
+  *remote* nodes** (previously it was deduped against the original delivery and
+  silently dropped, so only local subscribers saw it) — which tightens the
+  retraction race in [note 2](Gates-to-Gradients-2-Cascade-Telemetry-v0.2.md)
+  without changing its best-effort character.
 - **Signed tombstone** `{msgId, kill-proof}`, kept for the message's remaining
   hold window then GC'd, so a lagging or rejoining replica can't resurrect a
   killed message (Lifecycle §3.4).
@@ -138,7 +142,7 @@ Lifecycle §7 convention of a per-object-type domain tag):
 
 - **Tier 2 (soft retract)** is the case where `type = "retract"` **and** the
   kernel can check `annotation.signerPubkey === signer(ref)` — i.e. the author
-  retracting their own message. Because `msgId` is publisher-bound, this check
+  retracting their own message. Because `msgId` is signer-bound, this check
   is the same self-authenticating test `kill` already uses (Lifecycle §3.3);
   no new trust machinery. The difference from `kill`: **nothing is dropped, no
   tombstone is emitted.** The retraction is itself a message that propagates and
@@ -222,8 +226,8 @@ Lifecycle §7 convention of a per-object-type domain tag):
    gradient; a fixed set is easier to reason about.
 6. **Abuse bounds quantification.** Exactly how much do note 1 (costly identity)
    and note 4 (filter sets) need to provide before third-party annotations are
-   safe to enable on open (Model 1) topics? Owned topics (Models 2/3) inherit
-   the publish ACL and are easier; open topics are the hard case.
+   safe to enable on open topics? Owned topics (`write:'owner'`) inherit the
+   publish ACL and are easier; open topics are the hard case.
 
 ---
 

@@ -1,15 +1,15 @@
-# From Gates to Gradients — 6. Friction scaled to reach (v0.1)
+# From Gates to Gradients — 6. Friction scaled to reach (v0.2)
 
-**Status:** design note · **Flagged:** 2026-06-15 · **Relates to:**
+**Status:** design note · **Flagged:** 2026-06-15 · **Revised:** 2026-06-21 (v0.2 — refreshed against the kernel 3.6.0 surface) · **Relates to:**
 *From Gates to Gradients* (companion essay) ·
 [Pub/Sub Lifecycle Design v0.2](../implementation/Pubsub-Lifecycle-Design-v0.2.md) ·
 [Axona vs. Vivaldi v0.1](./Axona-vs-Vivaldi-v0.1.md) · red-team finding **B-4** (ingress signature verification) ·
 sibling notes:
-[1 Costly identity](Gates-to-Gradients-1-Costly-Identity-v0.1.md) ·
-[2 Cascade telemetry](Gates-to-Gradients-2-Cascade-Telemetry-v0.1.md) ·
-[3 Soft retraction annotations](Gates-to-Gradients-3-Soft-Retraction-Annotations-v0.1.md) ·
-[4 Forkable filter sets](Gates-to-Gradients-4-Forkable-Filter-Sets-v0.1.md) ·
-[5 Agent legibility](Gates-to-Gradients-5-Agent-Legibility-v0.1.md)
+[1 Costly identity](Gates-to-Gradients-1-Costly-Identity-v0.2.md) ·
+[2 Cascade telemetry](Gates-to-Gradients-2-Cascade-Telemetry-v0.2.md) ·
+[3 Soft retraction annotations](Gates-to-Gradients-3-Soft-Retraction-Annotations-v0.2.md) ·
+[4 Forkable filter sets](Gates-to-Gradients-4-Forkable-Filter-Sets-v0.2.md) ·
+[5 Agent legibility](Gates-to-Gradients-5-Agent-Legibility-v0.2.md)
 
 ---
 
@@ -86,7 +86,7 @@ gives every node, today, a set of local self-protection levers:
 - **Bounded queues** (§5) — each topic replica caps at `maxMessages ∈ [1,256]`
   with deterministic, signed-field-ordered eviction. A relay never holds unbounded
   state for one topic.
-- **Per-publisher quota** (§1.5, §5.3) — on open (Model 1) topics, one
+- **Per-publisher quota** (§1.5, §5.3) — on open (`write:'open'`) topics, one
   `signerPubkey` may occupy at most `⌈maxMessages/4⌉` of a queue, so a single
   anonymous publisher cannot flush a topic or monopolize a relay's capacity.
 - **Hold time and the absolute `maxHoldMs` ceiling** (§2.3, §6) — every message
@@ -121,7 +121,7 @@ So the roots already know, *approximately*, the fan-out a publish is asking for.
 They can therefore demand **proof-of-work proportional to that reach**: a publish
 to a topic with twelve subscribers requires trivial (or zero) PoW; a publish to a
 topic with a hundred thousand subscribers requires more. This reuses the PoW
-machinery specified in [note 1, Costly identity](Gates-to-Gradients-1-Costly-Identity-v0.1.md)
+machinery specified in [note 1, Costly identity](Gates-to-Gradients-1-Costly-Identity-v0.2.md)
 — the same `H(domain‖…‖nonce)` puzzle hash, here keyed to expected fan-out rather
 than to identity creation, and deliberately decoupled from the node address (see
 [`E-1-Placement-Defense-v0.1.md`](E-1-Placement-Defense-v0.1.md)) so it introduces
@@ -216,7 +216,7 @@ the mechanism actually *binds* is widest. Three limits, none of them small.
   amplification-resistance against delivery speed for legitimate large topics. What
   delay is imperceptible to honest use yet meaningful against flooding?
 - **Interaction with cascade telemetry (note 2).** Could the same fan-out signal
-  feed [cascade telemetry](Gates-to-Gradients-2-Cascade-Telemetry-v0.1.md) so that
+  feed [cascade telemetry](Gates-to-Gradients-2-Cascade-Telemetry-v0.2.md) so that
   *observed* runaway spread, rather than *declared* reach, is what raises cost —
   closing the under-declaration gap after the fact?
 

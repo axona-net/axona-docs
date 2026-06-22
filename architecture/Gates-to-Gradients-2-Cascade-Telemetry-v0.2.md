@@ -1,12 +1,12 @@
-# From Gates to Gradients — 2. Build the measurement (privacy-preserving cascade telemetry) (v0.1)
+# From Gates to Gradients — 2. Build the measurement (privacy-preserving cascade telemetry) (v0.2)
 
-**Status:** design note · **Flagged:** 2026-06-15 · **Relates to:** the companion
+**Status:** design note · **Flagged:** 2026-06-15 · **Revised:** 2026-06-21 (v0.2 — refreshed against the kernel 3.6.0 surface) · **Relates to:** the companion
 essay *From Gates to Gradients* (a critique-from-within of the Axona Synopsis);
-sibling notes [1 — Costly identity](Gates-to-Gradients-1-Costly-Identity-v0.1.md),
-[3 — Soft retraction annotations](Gates-to-Gradients-3-Soft-Retraction-Annotations-v0.1.md),
-[4 — Forkable filter sets](Gates-to-Gradients-4-Forkable-Filter-Sets-v0.1.md),
-[5 — Agent legibility](Gates-to-Gradients-5-Agent-Legibility-v0.1.md),
-[6 — Friction scaled to reach](Gates-to-Gradients-6-Friction-Scaled-to-Reach-v0.1.md);
+sibling notes [1 — Costly identity](Gates-to-Gradients-1-Costly-Identity-v0.2.md),
+[3 — Soft retraction annotations](Gates-to-Gradients-3-Soft-Retraction-Annotations-v0.2.md),
+[4 — Forkable filter sets](Gates-to-Gradients-4-Forkable-Filter-Sets-v0.2.md),
+[5 — Agent legibility](Gates-to-Gradients-5-Agent-Legibility-v0.2.md),
+[6 — Friction scaled to reach](Gates-to-Gradients-6-Friction-Scaled-to-Reach-v0.2.md);
 the [dht-sim](https://github.com/axona-net/dht-sim) protocol simulator; the
 existing `peer.metrics(topic)` / `peer.health()` surfaces and the `host(topic)`
 durable-root primitive.
@@ -123,27 +123,36 @@ validate locality behaviour.
 
 ### 3.2 Second home — production aggregate telemetry
 
-In production, the local half already exists: `peer.metrics(topic)` and
-`peer.health()` expose **local** stats today. The missing piece is **network-wide**
-telemetry assembled *without a central collector*. The decentralized pattern,
-consistent with the rest of Axona:
+In production, the local half exists (`peer.health()`, and `peer.metrics(topic)` —
+now **owner-only** as of kernel v3.5.0). And since this note was first drafted, the
+**network-wide-without-a-central-collector pattern it specs has actually shipped**
+— as **derived metric topics** (kernel 3.4.0 + relay v0.16.x): a topic's primary
+root publishes *signed aggregate snapshots* to a derived `metricTopic(T)`, infra
+relays **`host()`** that topic (store-and-serve, no subscribe), and clients
+`sub(metricTopic(T))` for the latest plus a rolling ~48 h trend. That is exactly
+the shape below, already live and proven for per-topic counts. **Cascade
+telemetry is therefore an *additional aggregate on a proven substrate***, not a
+new pattern to invent:
 
 - nodes compute **sampled, aggregated** propagation statistics locally (counts,
   timings, distributions — never per-message records);
-- they **publish** those aggregates to a dedicated **telemetry topic**;
+- they **publish** those aggregates to a dedicated **telemetry topic** (an open
+  `{ region, name }` descriptor, mirroring `metricTopic`);
 - **infra nodes `host()` that topic** — storing and serving it as a durable root
-  *without consuming it* (exactly the host-not-subscribe role described in the
-  bridge-directory and host-primitive work). `host()` is essential so the
+  *without consuming it* (the host-not-subscribe role proven by the relay fleet,
+  the bridge directory, and the metric-topic loop). `host()` is essential so the
   telemetry stream is durable even though the infra nodes are not the audience;
 - aggregation is **aggregation-only** plus **differential privacy / k-anonymity**,
   so individual messages and participants are never reconstructable from the
   published statistics. A report below the k-anonymity threshold is suppressed or
-  noised, not emitted.
+  noised, not emitted. *(This privacy layer is the part the shipped metric-topic
+  loop does **not** yet have — its snapshots are exact per-topic counts; cascade
+  telemetry adds the sampling/DP that population statistics require.)*
 
 This respects every protocol invariant: signed envelopes still disclose **who**
 (the reporting node's `signerPubkey`) and never **where** or **what**; the
-telemetry topic is just another public topic (`publisher:null`) whose payloads are
-aggregate counters. No new authority, no central store.
+telemetry topic is just another open topic whose payloads are aggregate counters.
+No new authority, no central store.
 
 ### 3.3 Roadmap status
 
@@ -168,7 +177,7 @@ features that demo well.
   the telemetry itself — flood the telemetry topic with fabricated aggregates to
   bias the measured picture of the network. This is the dual of every other sybil
   problem in the system. The **partial** mitigation is [note 1 — costly
-  identity](Gates-to-Gradients-1-Costly-Identity-v0.1.md): if reporting carries a
+  identity](Gates-to-Gradients-1-Costly-Identity-v0.2.md): if reporting carries a
   cost, mass-fabricated telemetry gets expensive. It is *partial*, not complete —
   costly identity raises the price of poisoning, it does not prove a report
   truthful. Cross-checking aggregates against simulation expectations and against
@@ -200,7 +209,7 @@ features that demo well.
   floor — are there cross-validation or robust-aggregation techniques (e.g.
   trimmed/median aggregates) that bound the influence of fabricated reports?
 - **Does the agent:human ratio depend entirely on note 5?** If the agent-class
-  signal in [note 5](Gates-to-Gradients-5-Agent-Legibility-v0.1.md) never lands,
+  signal in [note 5](Gates-to-Gradients-5-Agent-Legibility-v0.2.md) never lands,
   is there any privacy-safe proxy for machine-vs-human origin, or does that metric
   simply not exist until then?
 - **What is the minimum useful first deliverable?** Likely the dht-sim

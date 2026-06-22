@@ -1,15 +1,15 @@
-# From Gates to Gradients — 4. Subscription as a plural moderation surface (forkable filter sets) (v0.1)
+# From Gates to Gradients — 4. Subscription as a plural moderation surface (forkable filter sets) (v0.2)
 
-**Status:** design note · **Flagged:** 2026-06-15 ·
+**Status:** design note · **Flagged:** 2026-06-15 · **Revised:** 2026-06-21 (v0.2 — refreshed against the kernel 3.6.0 surface) ·
 **Relates to:** the companion essay *From Gates to Gradients* (governance
 unbundled from control); the bridge directory (kernel
 [`bridgeDirectory.js`](https://github.com/axona-net/axona-protocol/blob/main/src/bridgeDirectory.js))
 as the existence proof of the discover/rank/compose pattern; sibling notes
-[1 Costly Identity](Gates-to-Gradients-1-Costly-Identity-v0.1.md),
-[2 Cascade Telemetry](Gates-to-Gradients-2-Cascade-Telemetry-v0.1.md),
-[3 Soft Retraction / Annotations](Gates-to-Gradients-3-Soft-Retraction-Annotations-v0.1.md),
-[5 Agent Legibility](Gates-to-Gradients-5-Agent-Legibility-v0.1.md),
-[6 Friction Scaled to Reach](Gates-to-Gradients-6-Friction-Scaled-to-Reach-v0.1.md);
+[1 Costly Identity](Gates-to-Gradients-1-Costly-Identity-v0.2.md),
+[2 Cascade Telemetry](Gates-to-Gradients-2-Cascade-Telemetry-v0.2.md),
+[3 Soft Retraction / Annotations](Gates-to-Gradients-3-Soft-Retraction-Annotations-v0.2.md),
+[5 Agent Legibility](Gates-to-Gradients-5-Agent-Legibility-v0.2.md),
+[6 Friction Scaled to Reach](Gates-to-Gradients-6-Friction-Scaled-to-Reach-v0.2.md);
 the open-source reference app + civildefense.io as the planned worked home for
 this convention.
 
@@ -91,7 +91,8 @@ bearing for the whole network.
 
 **No new kernel primitive.** This is app-layer convention plus a reference
 implementation, built directly on the existing kernel surface
-(`peer.pub/sub/pull/host/unsub/kill/unpub/metrics/health`).
+(`peer.pub/sub/pull/host/unsub/kill/unpub/health`; `metrics()` is owner-only as
+of v3.5.0, so curators read open counts via `metricTopic` instead).
 
 **Schema (sketch).** A filter set is an ordinary signed envelope whose payload
 is a versioned object, e.g.:
@@ -114,10 +115,11 @@ is a versioned object, e.g.:
 
 **Mechanism.**
 - A curator publishes the set to *their own* topic. Two natural topic shapes,
-  both already supported: a publisher-keyed topic (one curator, one stream,
-  versions are `v`-ordered), or — for a registry of available sets — a public
-  `publisher:null` directory topic that every client derives identically and on
-  which curators advertise their sets as signed entries.
+  both already supported by the v3.0 write-policy model: an **owner-namespaced
+  topic** `{ region, owner, name }` (one curator, one stream, owner-only writes,
+  versions `v`-ordered), or — for a registry of available sets — an **open
+  `{ region, name }` directory topic** that every client derives identically and
+  on which curators advertise their sets as signed entries.
 - Clients **subscribe** to one or many filter topics, **pull** the latest
   version per curator, dedupe by `signerPubkey`, and **compose** the rules
   locally. Intersection/union/precedence ordering is the subscriber's policy,

@@ -1,15 +1,15 @@
-# From Gates to Gradients — 1. Costly identity, not gated identity (v0.1)
+# From Gates to Gradients — 1. Costly identity, not gated identity (v0.2)
 
-**Status:** design note · **Flagged:** 2026-06-15 · **Relates to:**
+**Status:** design note · **Flagged:** 2026-06-15 · **Revised:** 2026-06-21 (v0.2 — refreshed against the kernel 3.6.0 surface) · **Relates to:**
 [`E-1-Placement-Defense-v0.1.md`](E-1-Placement-Defense-v0.1.md) ·
 [`Stage4-MemoryHard-PoW-v0.1.md`](Stage4-MemoryHard-PoW-v0.1.md) ·
 [`../implementation/Decoupled-Publish-Identity-and-C3-v0.1.md`](../implementation/Decoupled-Publish-Identity-and-C3-v0.1.md) ·
 companion essay *From Gates to Gradients* · sibling notes
-[2 (cascade telemetry)](Gates-to-Gradients-2-Cascade-Telemetry-v0.1.md),
-[3 (soft retraction)](Gates-to-Gradients-3-Soft-Retraction-Annotations-v0.1.md),
-[4 (forkable filter sets)](Gates-to-Gradients-4-Forkable-Filter-Sets-v0.1.md),
-[5 (agent legibility)](Gates-to-Gradients-5-Agent-Legibility-v0.1.md),
-[6 (friction scaled to reach)](Gates-to-Gradients-6-Friction-Scaled-to-Reach-v0.1.md)
+[2 (cascade telemetry)](Gates-to-Gradients-2-Cascade-Telemetry-v0.2.md),
+[3 (soft retraction)](Gates-to-Gradients-3-Soft-Retraction-Annotations-v0.2.md),
+[4 (forkable filter sets)](Gates-to-Gradients-4-Forkable-Filter-Sets-v0.2.md),
+[5 (agent legibility)](Gates-to-Gradients-5-Agent-Legibility-v0.2.md),
+[6 (friction scaled to reach)](Gates-to-Gradients-6-Friction-Scaled-to-Reach-v0.2.md)
 
 ---
 
@@ -102,17 +102,19 @@ Four properties make this a *gradient*, not a *gate*:
    *solve*, trivially cheap to *verify* — on the principle *"memory = device
    floor, difficulty = search effort."* The memory parameter is pinned to the
    weakest honest device (~256–512 MB) so difficulty dials cost without locking
-   phones out, and a shared publishID can **split the search across a user's
+   phones out, and a shared author identity can **split the search across a user's
    devices** for a near-linear speedup. See
    [`Stage4-MemoryHard-PoW-v0.1.md`](Stage4-MemoryHard-PoW-v0.1.md).
-4. **Per-role difficulty.** Transport identities (which can be ground into a root
-   position → eclipse) carry the higher difficulty; publish identities (which can
-   only flood) carry a lower one calibrated to anti-flood. The
-   **decoupled publish identity** work
-   ([`../implementation/Decoupled-Publish-Identity-and-C3-v0.1.md`](../implementation/Decoupled-Publish-Identity-and-C3-v0.1.md))
-   is the natural carrier of this priced credential — a dedicated publish key,
-   separate from the transport/routing identity, whose PoW is the anti-flood
-   anchor that lets the per-publisher quota key on the publish key directly.
+4. **Per-role difficulty.** Node (transport) identities — which can be ground
+   into a root position → eclipse — carry the higher difficulty; author (publish)
+   identities, which can only flood, carry a lower one calibrated to anti-flood.
+   The carrier for this priced credential now **exists**: the **author/node key
+   split shipped in the v3.0 identity flag-day** (kernel 3.0.0). `createNodeIdentity`
+   mints the routing key (the geo-prefixed nodeId); `createAuthorIdentity` mints a
+   **location-free author keypair** whose pubkey is the `signerPubkey` on every
+   envelope, and per-publisher quotas already key on it. So the dedicated publish
+   key the earlier *Decoupled-Publish-Identity* note proposed is live — what
+   remains is to *price* it (attach the role-calibrated PoW), not to build it.
 
 **Why PoW and not stake or personhood.** The essay names three ways to price
 identity — a PoW mint, a small stake/burn, or non-custodial proof-of-personhood.
@@ -128,11 +130,14 @@ and adjudicated by no authority**. The alternatives re-introduce the gate:
 **Roadmap status.** Per E-1 §5: the wire fields shipped first as **no-ops at
 difficulty 0** (kernel v2.34.0 — `pow` in the handshake, `signerPow` in the
 envelope), so raising difficulty later is a parameter change, not an
-identity-format flag-day. What remains is **Stage 4**: swap the SHA-256
-scaffolding hash for the memory-hard function, run the phone-WASM go/no-go
-benchmark, and raise difficulty to calibrated values. So the honest summary is
-**design done, needs shipping** — this is the centerpiece of the existing
-security roadmap, and the essay independently re-derived it.
+identity-format flag-day. The **author/node key separation that carries the
+priced credential has since shipped** (v3.0.0 — `createAuthorIdentity` /
+`createNodeIdentity`), so the credential to price now exists as a first-class
+object. What remains is **Stage 4**: swap the SHA-256 scaffolding hash for the
+memory-hard function, run the phone-WASM go/no-go benchmark, and raise difficulty
+to calibrated values. So the honest summary is unchanged — **design done, PoW
+needs shipping** — this is the centerpiece of the existing security roadmap, and
+the essay independently re-derived it.
 
 ## 4. Honest limits
 
@@ -163,7 +168,7 @@ security roadmap, and the essay independently re-derived it.
   dent a funded eclipse is open and depends on the Stage-4 benchmark numbers — it
   may be that PoW only ever buys time for the placement layers to act.
 - **Rotating-key privacy vs. per-mint cost.** Unlinkable publishing (a fresh
-  publishID per persona) pays a puzzle per rotation. The lower publish-role
+  author identity per persona) pays a puzzle per rotation. The lower publish-role
   difficulty softens this, but the right price for "unlinkability costs a puzzle
   per persona" is unsettled, and too high a floor could price out exactly the
   privacy mode the system means to protect.
