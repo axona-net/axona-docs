@@ -53,8 +53,13 @@ peer. That is exactly the indistinguishability this note is about: today a
 subscriber cannot tell that author key from a human's. An agent operating a
 durable, persisted author identity is the **obvious first honest emitter** of a
 voluntary agent-class attestation — it has a stable key to bind the claim to and a
-cooperative incentive to be legible. This note is still *specced as a sketch*, not
-yet scheduled, but its substrate and its use case are both now live.
+cooperative incentive to be legible. The concrete wire object, carrier, and
+verification rules are now specced in
+[`../implementation/Author-Class-Attestation-v0.1.md`](../implementation/Author-Class-Attestation-v0.1.md)
+— a signed `axona:author-class:v1` claim bound to the author key, carried on a
+key-derived owner-only profile topic, with the optional `operator` field. Its
+substrate and use case are both live; what remains is to settle that spec's §7
+decisions and implement.
 
 ## 4. Honest limits
 
