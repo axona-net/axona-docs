@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.8.5 \quad 2026-06-22\par}
+{\small An Axona Architecture Note \quad v0.8.6 \quad 2026-06-22\par}
 \end{center}
 \vfill
 \null
@@ -220,14 +220,15 @@ is signed per-call with an author, never with the connection key.
 
 \newthought{The connection identity is a 264-bit identifier.} The
 top 8 bits are a Google S2 cell prefix\sidenote{S2 projects the
-sphere onto the six faces of a cube and partitions each face along
-a Hilbert curve. We bin to level 3 (8\,$\times$\,8 per face, 384
-cells globally), then truncate to 8 bits --- equivalent to taking
-the top 8 bits of Google's 64-bit level-3 cell ID. Result: 192
-valid cells, with byte values 192--255 reserved for future system
-use. The cube projection keeps cell areas within $\sim$1.4$\times$
-of each other globally --- no polar shrinkage --- and any standard
-S2 library can recompute our prefixes by truncation.} computed from
+sphere onto the six faces of a cube and partitions each face with an
+equal-area quadratic transform. We bin each face into a
+4\,$\times$\,8 grid (32 cells per face) --- ``S2 level 2.5,'' one bit
+short of level 3's 8\,$\times$\,8 --- giving $6 \times 32 = 192$
+cells, which fit in 8 bits with byte values 192--255 left reserved
+for future system use. The quadratic projection keeps cell areas
+within $\sim$1.7$\times$ of each other globally --- no polar
+shrinkage --- and any standard S2 library can recompute our
+prefixes.} computed from
 the peer's latitude and longitude; the bottom 256 bits are the
 SHA-256 of the peer's Ed25519 public key. A peer in London has an
 ID starting with \texttt{0x44}; a peer in Virginia starts with
@@ -609,11 +610,17 @@ silently dropped. Because the bridge sits in nearly every peer's
 K-closest set, that failure mode is a near-invisible delivery hole;
 the eager build is what keeps it an honest relay axon.}
 
-The bridge's embedded peer has a fixed, disk-persisted identity
-(\texttt{895bf0...} in production, anchored in us-east --- the
-\texttt{0x89} S2 cell, which is why it sits XOR-close to
-\texttt{us-east/*} topics and is so often a K-closest root). Its
-\texttt{health} surface
+The bridge's embedded peer runs an \emph{ephemeral} identity --- a
+fresh Ed25519 keypair minted on every start, never written to disk,
+so there is no keypair file to migrate across deploys.\sidenote{Since
+the v3.0 identity model the bridge nodeId is disposable: it
+authenticates the connection, not authorship, and nothing depends on
+it persisting. A restart rotates the nodeId and the mesh simply
+re-binds.} It still lands in us-east --- the \texttt{0x89} S2 cell,
+from its default us-east coordinates --- which is why it sits
+XOR-close to \texttt{us-east/*} topics and is so often a K-closest
+root; only the low 256 bits rotate per restart. Its \texttt{health}
+surface
 exposes the kernel version it's running and the synaptome it has
 built up, available at \texttt{/healthz} JSON. Operators check that
 endpoint to confirm a deploy.
@@ -769,10 +776,11 @@ Receivers verify the signature against the signer's pubkey using
 result on the delivered envelope so applications can decide whether
 to trust unsigned or unverifiable publishes.
 
-As of kernel v2.9.0 (envelope format \textbf{v2}, finding C-2) the
-signature covers a domain-separated core
-(\texttt{axona:pubsub-envelope:v2}) and includes a per-publisher
-monotonic \texttt{seq}. Two properties follow. \emph{Freshness:} a
+As of kernel v2.9.0 (envelope format \textbf{v2}) the signature
+covers a domain-separated core
+(\texttt{axona:pubsub-envelope:v2}, finding E-4) and includes a
+per-publisher monotonic \texttt{seq} with TTL freshness (finding
+C-2). Two properties follow. \emph{Freshness:} a
 topic's root axons reject a \emph{live} publish whose signed
 \texttt{ts} is outside a $\pm$5-minute window, so a captured envelope
 can't be re-injected as new once it ages out (the legitimate
@@ -1235,8 +1243,8 @@ author.
 \texttt{AxonaManager}. When omitted, one is built automatically on
 \texttt{peer.start()}.
 \item[\texttt{persist}] \emph{(optional)}\; \texttt{PersistenceAdapter}
-for synaptome / subscription / replay-cache checkpoints. Default:
-no persistence.
+for identity / synaptome / subscription checkpoints (not replay
+caches). Default: no persistence.
 \end{description}
 
 \subsection*{Lifecycle}
@@ -1493,10 +1501,14 @@ registers \texttt{(nodeId) => void} for departures.\\
 returns
 \texttt{\{ nodeId, synaptomeSize, peers, subscriptions, axonRoles, hosting, wireVersion, started, transport, meshDegraded \}}.\\
 \noindent\texttt{peer.onLog(level, handler)}\;
-\texttt{level} is \texttt{'info'}, \texttt{'warn'}, or
-\texttt{'error'}.\\
+\texttt{level} is \texttt{'debug'}, \texttt{'info'}, \texttt{'warn'},
+or \texttt{'error'}.\\
 \noindent\texttt{peer.onError(handler)}\;
-registers \texttt{(err) => void} for unhandled errors.
+registers \texttt{(err) => void} for unhandled errors.\\
+\noindent\texttt{peer.onUpgradeRequired(handler)}\;
+registers \texttt{() => void}, fired when the bridge closes the
+connection with \texttt{UPGRADE\_REQUIRED} (WS 4426) because the peer's
+wire version is below the network floor.
 
 \subsection*{Lookup}
 
@@ -1511,18 +1523,43 @@ or a node ID.
 \end{description}
 
 \noindent Returns \texttt{\{ found, path, hops, time \}}.
-\texttt{found} is the closest reachable peer; \texttt{path} is the
-list of nodes traversed; \texttt{hops} is the count; \texttt{time}
-is wall-clock ms.
+\texttt{found} is a boolean --- whether the walk reached a peer at the
+target key; \texttt{path} is the list of nodes traversed;
+\texttt{hops} is the count; \texttt{time} is wall-clock ms.
+
+\subsection*{Author class (agent legibility)}
+
+\smallskip
+\noindent\texttt{await peer.setAuthorClass(cls, \{ signWith, operator?, operatorSignWith?, label? \})}\;
+publishes a voluntary, signed \emph{author-class attestation} ---
+\texttt{cls} is \texttt{'agent'} or \texttt{'human'} --- to the
+author's own owner-only profile topic, declaring what kind of actor is
+behind the key.\sidenote{The attestation is signed by the author key
+and carried on a pinned-region, owner-only topic derived from the
+Author ID; a declaring peer should \texttt{host()} that topic so the
+claim stays resolvable after the roots evict it. An optional
+\texttt{operatorSignWith} attaches a counter-signature, letting a named
+operator vouch for the key (\texttt{operatorVerified} below).}\\
+\noindent\texttt{await peer.getAuthorClass(authorId)}\;
+resolves any author's declared class from its Author ID alone,
+returning \texttt{\{ class, operator, operatorVerified, label, ts \}}.
+\texttt{class} is \texttt{'agent'}, \texttt{'human'}, or
+\texttt{'unstated'} --- absence is \emph{unstated}, never silently
+\texttt{'human'}. It is provenance, not detection: a deceptive actor
+can decline to flag or flag falsely; what it shapes is the honest
+default (see the agent-legibility item under Future Directions).
 
 \subsection*{Snapshots}
 
 \smallskip
 \noindent\texttt{await peer.snapshot()}\;
-returns a JSON object capturing identity, synaptome, axon roles,
-subscriptions, replay caches. Symmetric with
-\texttt{AxonaPeer.fromSnapshot(snap, deps)}, which reconstructs a
-peer from one of these dumps without touching the network.
+returns a JSON object capturing identity, synaptome, and subscriptions
+(plus the wire version). Symmetric with
+\texttt{AxonaPeer.fromSnapshot(snap, deps)}, which reconstructs a peer
+from one of these dumps without touching the network.\sidenote{It is a
+routing/identity checkpoint, not a message store --- axon roles and
+replay caches are \emph{not} captured, so a restored peer rebuilds the
+topics it hosts or serves from the live mesh.}
 
 \subsection*{Helpers}
 
@@ -1672,16 +1709,29 @@ function so phone/browser minters aren't out-classed by ASIC grinders.}
 \begin{description}
 \setlength{\itemsep}{0pt}
 \item[\texttt{bridge.axona.net}.] The east (primary) bridge. Runs on a
-DigitalOcean droplet, started by systemd, kept current via
-\texttt{git pull \&\& npm ci --omit=dev \&\& systemctl restart}.
-Exposes \texttt{/healthz} for monitoring. Listens on
-\texttt{wss://} only; HTTP requests are redirected.
+DigitalOcean droplet as a \textbf{Docker Compose stack} of three
+containers: the bridge (Node), \textbf{Caddy} (automatic Let's Encrypt
+TLS plus reverse proxy), and \textbf{coturn} (a TURN relay for the
+peers that can't negotiate a direct WebRTC link). Kept current via
+\texttt{git pull \&\& docker compose build \&\& docker compose up
+-d}.\sidenote{The systemd + nginx + certbot path the bridge originally
+shipped with still exists in \texttt{deploy/} and is what
+\texttt{testnet.axona.net} runs; prod cut over to the Docker stack with
+the kernel 3.1.0 promotion.} Caddy terminates \texttt{wss://} and
+proxies to the bridge on loopback; the bridge itself binds
+\texttt{127.0.0.1} only, never world-facing. \texttt{/healthz} is
+exposed for monitoring --- an unauthenticated caller gets just
+\texttt{\{status, version, kernelVersion\}}, while the full
+synaptome/directory/uplink body and \texttt{/diag} require a
+\texttt{HEALTHZ\_TOKEN} header.
 
 \item[\texttt{bridge-west.axona.net}.] A second federated bridge in a
-western region, same deploy shape. It holds an \emph{uplink} to the east
-bridge so the two embedded peers share one connectome and the bridge
-directory federates across both --- a peer dialing either one reaches
-the same mesh.
+western region, running the same Docker stack. It holds an
+\emph{uplink} to the east bridge so the two embedded peers share one
+connectome and the bridge directory federates across both --- a peer
+dialing either one reaches the same mesh. It also advertises its own
+\texttt{coturn} credentials into the welcome frame and its directory
+entry.
 
 \item[\texttt{axona.net}.] The reference peer application, served
 via GitHub Pages from the \texttt{axona-peer} repo's main branch.
@@ -1696,20 +1746,23 @@ Same Pages deployment pattern; HTTPS-enforced because
 \texttt{crypto.subtle} requires a secure context.
 \end{description}
 
-\newthought{The line is mid-cutover.} \textbf{testnet}
-(\texttt{testnet.axona.net} + \texttt{demo-testnet.axona.net}, served
-from a droplet) runs kernel \textbf{v3.0.0} --- WIRE\_VERSION 3.0,
-AUTH\_PROTO axona/5, bridge gate \texttt{REQUIRED\_WIRE\_MAJOR=3} with
-both version floors at 3.0.0; an older client is closed with
-\texttt{UPGRADE\_REQUIRED} (WS code 4426). \textbf{Production}
-(\texttt{bridge.axona.net} / \texttt{axona.net} / \texttt{demo.axona.net},
-on GitHub Pages + the prod droplet) \emph{intentionally remains on
-kernel 2.51.0}: the v0.3 cutover is a hermetic wire flag-day (a wire-2
-and a wire-3 peer reject each other's envelopes), so prod is promoted
-only behind a gate, not dragged along by a push. The testnet static
-hosts serve their assets with \texttt{Cache-Control: no-cache} so a
-kernel module update is revalidated rather than served stale from a
-browser's ES-module cache after a deploy.
+\newthought{The v0.3 wire flag-day is complete.} The whole fleet ---
+prod \texttt{bridge.axona.net} and \texttt{bridge-west.axona.net}, plus
+\textbf{testnet} (\texttt{testnet.axona.net} +
+\texttt{demo-testnet.axona.net}, served from a droplet) --- runs the
+\textbf{3.x} kernel line: WIRE\_VERSION 3.0, AUTH\_PROTO axona/5, bridge
+gate \texttt{REQUIRED\_WIRE\_MAJOR=3} with both version floors at 3.0.0,
+so a pre-v3 client is closed with \texttt{UPGRADE\_REQUIRED} (WS code
+4426). The wire-2$\to$wire-3 cutover was a hermetic flag-day --- a
+wire-2 and a wire-3 peer reject each other's envelopes --- and was
+promoted to prod behind a gate rather than dragged along by a push;
+\emph{within} the 3.x line, additive point releases are wire-compatible
+and roll with no flag-day. As of this writing the deployed bridges
+report kernel \texttt{3.6.0} and the kernel source sits a few point
+releases ahead at \texttt{3.8.0}. The testnet static hosts serve their
+assets with \texttt{Cache-Control: no-cache} so a kernel module update
+is revalidated rather than served stale from a browser's ES-module
+cache after a deploy.
 
 A coordinated release works as follows: a fix lands in
 \texttt{axona-protocol}, bumps \texttt{KERNEL\_VERSION} and the
@@ -2011,709 +2064,194 @@ Explainer}, and the source repositories at
 % =====================================================================
 \renewcommand{\thesection}{\Alph{section}}
 \setcounter{section}{0}
-\section{Appendix: The Demo Application}
+\section{Appendix: A Minimal Example}
 
-\newthought{This is the complete source} of the minimal-pubsub demo
-deployed at \texttt{demo.axona.net}. The file lives in the kernel
-repository under
-\texttt{examples/}\linebreak\texttt{minimal-pubsub-browser/index.html}.
-Around seven hundred lines of HTML, CSS, and JavaScript, no build
-step, no dependencies outside the kernel barrel export. Open it in
-two tabs; one publishes, the other receives. The structure maps to
-the API reference in \S XI section by section: identity (the
-connection \texttt{createNodeIdentity} plus the durable
-\texttt{createAuthorIdentity}), transport, peer construction,
-lifecycle, subscribe, publish (\texttt{\{ signWith \}}), the topic
-metrics readout (\texttt{peer.metrics}), and the connection-state and
-ping-traffic hooks that drive the dot strip and survive a bridge
-restart.
+\newthought{This is the complete source} of \texttt{minimal-pubsub} ---
+the smallest end-to-end Axona program: two peers in a single Node
+process exchanging one signed message over the kernel's in-process
+simulation transport. About a hundred and sixty lines, no browser, no
+WebRTC, no bridge --- just the kernel primitives wired together so the
+moving parts stay visible.\sidenote{For the full browser wiring ---
+WebRTC mesh, bridge fallback, reconnect, the live metrics readout ---
+see \texttt{examples/minimal-pubsub-browser/} (the source behind
+\texttt{demo.axona.net}) and the reference peer at
+\texttt{github.com/axona-net/axona-peer}.}
+
+It maps onto the Application API (\S\,XI) in order: derive the two
+identities (the location-bound \texttt{createNodeIdentity} and the
+location-free \texttt{createAuthorIdentity}), open a
+\texttt{simTransport} on a shared \texttt{SimNetwork}, compose
+\texttt{AxonaPeer}~+~\texttt{AxonaManager} from the kernel primitives,
+place an open topic with a structured \texttt{\{ region, name \}}
+descriptor, then run a \texttt{sub}\,/\,\texttt{pub} roundtrip --- the
+publish signed per call with \texttt{\{ signWith: author \}}, never the
+connection key. The \texttt{SimNetwork} stands in for the real
+transports' channel-open and \texttt{axona:hello} admission, so the
+example needs no network and runs with \texttt{node index.js}.
 
 \bigskip
-\noindent\textit{\footnotesize
-\texttt{examples/minimal-pubsub-browser/index.html}}
+\noindent\textit{\footnotesize \texttt{examples/minimal-pubsub/index.js}}
 
-\begin{lstlisting}[language=HTML]
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#2d7373">
-  <title>Axona Demo</title>
+\begin{lstlisting}
+// =====================================================================
+// minimal-pubsub -- two Axona peers in one Node process, pub/sub roundtrip.
+//
+// What this demonstrates (kernel v3.0.0 / identity-authorship v0.3):
+//   * createNodeIdentity -> 264-bit Ed25519 CONNECTION identity in an S2 cell
+//   * createAuthorIdentity -> a location-free AUTHORSHIP key (Author ID)
+//   * Two SimTransports on a shared SimNetwork (kernel's in-process router)
+//   * Composing AxonaPeer + AxonaManager from the kernel primitives
+//   * Region-keyed topics via a STRUCTURED topic descriptor { region, name }
+//   * peer.pub(topic, msg, { signWith }) / peer.sub roundtrip across two peers
+//
+// Run:  node index.js
+//
+// For real-world browser/Node wiring (WebRTC + bridge fallback, etc.),
+// see https://github.com/axona-net/axona-peer/blob/main/src/client.js
+// -- this example is intentionally simpler to keep the moving parts visible.
+// =====================================================================
 
-  <style>
-    :root {
-      --bg:          #fffff8;
-      --ink:         #1a1a1a;
-      --muted:       #6b6b6b;
-      --card:        #ffffff;
-      --border:      #e2dfd6;
-      --accent:      #2d7373;
-      --accent-soft: #d4e4e1;
-      --dot-bridge:  #2d7373;
-      --dot-open:    #22c55e;
-      --dot-pending: #f59e0b;
-      --dot-dead:    #cbcbc4;
-      --tile-bg:     #f4f1e8;
-    }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
-    body {
-      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-      line-height: 1.5;
-      min-height: 100vh;
-      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-    }
-    .wrap {
-      max-width: 880px;
-      margin: 0 auto;
-      padding: 1.4rem 1.1rem 3rem;
-    }
-
-    /* ── Header ──────────────────────────────────────────────────────── */
-    header {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 1rem;
-      margin-bottom: 0.6rem;
-    }
-    h1 {
-      font-size: 1.5rem;
-      font-weight: 600;
-      letter-spacing: -0.01em;
-      margin: 0;
-      color: var(--accent);
-    }
-    .status {
-      font-size: 0.8rem;
-      color: var(--muted);
-      font-variant-numeric: tabular-nums;
-    }
-
-    /* ── Dot strip (mesh) ────────────────────────────────────────────── */
-    .dots {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      padding: 0.5rem 0 1rem;
-      min-height: 18px;
-    }
-    .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--dot-dead);
-      transition: background 0.15s, transform 0.15s, opacity 0.15s;
-      opacity: 0.55;                 /* resting (no recent traffic) */
-    }
-    .dot.bridge  { background: var(--dot-bridge); width: 9px; height: 9px; }
-    .dot.open    { background: var(--dot-open); }
-    .dot.pending { background: var(--dot-pending); }
-    .dot.dead    { background: var(--dot-dead); }
-
-    /* v2.0.2: pulse-on-ping.  The dot brightens when a ping/pong
-       frame crosses its channel.  Class added on event, removed
-       400 ms later → dot fades back to its resting opacity.  Steady
-       channels at 1 Hz visibly blink twice/second; stalled channels
-       go dim within ~1 s. */
-    .dot.pulse {
-      opacity: 1;
-      transform: scale(1.35);
-    }
-
-    /* ── Topic info row ─────────────────────────────────────────────── */
-    .topic-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-      margin-bottom: 1.2rem;
-    }
-    .tile {
-      background: var(--tile-bg);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 0.4rem 0.7rem;
-      font-size: 0.82rem;
-      color: var(--ink);
-      display: flex;
-      flex-direction: column;
-      gap: 1px;
-    }
-    .tile .k { color: var(--muted); font-size: 0.7rem; letter-spacing: 0.04em; text-transform: uppercase; }
-    .tile .v {
-      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-      font-size: 0.86rem;
-    }
-    .tile.topic   .v { color: var(--accent); font-weight: 600; }
-    .tile.prefix  .v { color: var(--accent); font-weight: 600; }
-    .tile.topicid .v { color: var(--muted); font-size: 0.74rem; word-break: break-all; }
-
-    /* ── Two-pane grid ──────────────────────────────────────────────── */
-    .panes {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-    }
-    @media (max-width: 700px) {
-      .panes { grid-template-columns: 1fr; }
-    }
-    .pane {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 1rem 1.1rem;
-    }
-    .pane h2 {
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin: 0 0 0.7rem 0;
-    }
-
-    /* ── Publish form ───────────────────────────────────────────────── */
-    label.field {
-      display: block;
-      margin-bottom: 0.7rem;
-    }
-    label.field span {
-      display: block;
-      font-size: 0.74rem;
-      color: var(--muted);
-      margin-bottom: 0.2rem;
-    }
-    input[type="text"] {
-      width: 100%;
-      padding: 0.6rem 0.7rem;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-family: inherit;
-      font-size: 1rem;
-      color: var(--ink);
-      background: white;
-      transition: border-color 0.15s, box-shadow 0.15s;
-    }
-    input[type="text"]:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-soft);
-    }
-    button.publish {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      border: none;
-      border-radius: 6px;
-      background: var(--accent);
-      color: white;
-      font-family: inherit;
-      font-size: 1rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s;
-      margin-top: 0.3rem;
-    }
-    button.publish:hover  { background: #1d5959; }
-    button.publish:active { background: #144545; }
-    button.publish:disabled { background: #9aafad; cursor: not-allowed; }
-
-    /* ── Subscribe feed ─────────────────────────────────────────────── */
-    .feed {
-      min-height: 220px;
-      max-height: 420px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-    }
-    .feed .empty {
-      color: var(--muted);
-      font-style: italic;
-      font-size: 0.92rem;
-      padding: 0.4rem 0;
-    }
-    .msg {
-      padding: 0.55rem 0.7rem;
-      background: var(--tile-bg);
-      border-radius: 6px;
-      font-size: 0.95rem;
-    }
-    .msg .meta {
-      font-size: 0.72rem;
-      color: var(--muted);
-      margin-bottom: 0.15rem;
-      display: flex;
-      gap: 0.6rem;
-      align-items: baseline;
-    }
-    .msg .name { font-weight: 600; color: var(--accent); }
-    .msg .time { font-variant-numeric: tabular-nums; }
-    .msg .body { color: var(--ink); white-space: pre-wrap; word-wrap: break-word; }
-
-    /* ── Footer ─────────────────────────────────────────────────────── */
-    footer {
-      margin-top: 1.6rem;
-      padding-top: 0.9rem;
-      border-top: 1px solid var(--border);
-      font-size: 0.74rem;
-      color: var(--muted);
-      display: flex;
-      justify-content: space-between;
-      gap: 1rem;
-      flex-wrap: wrap;
-      font-family: ui-monospace, 'SF Mono', Menlo, monospace;
-    }
-    footer a { color: var(--accent); text-decoration: none; }
-    footer a:hover { text-decoration: underline; }
-  </style>
-</head>
-<body>
-<div class="wrap">
-
-  <header>
-    <h1>Axona Demo</h1>
-    <div class="status" id="status">connecting…</div>
-  </header>
-
-  <div class="dots" id="dots" aria-label="connected peers"></div>
-
-  <div class="topic-row">
-    <div class="tile topic">
-      <span class="k">Topic</span>
-      <span class="v">hello-world</span>
-    </div>
-    <div class="tile prefix">
-      <span class="k">Region code</span>
-      <span class="v" id="prefix">—</span>
-    </div>
-    <div class="tile topicid">
-      <span class="k">Topic ID</span>
-      <span class="v" id="topicId">—</span>
-    </div>
-  </div>
-
-  <div class="topic-row">
-    <div class="tile">
-      <span class="k">Live events</span>
-      <span class="v" id="mLive">—</span>
-    </div>
-    <div class="tile">
-      <span class="k">Subscribers</span>
-      <span class="v" id="mSubs">—</span>
-    </div>
-    <div class="tile">
-      <span class="k">Publishes</span>
-      <span class="v" id="mPub">—</span>
-    </div>
-  </div>
-
-  <div class="panes">
-    <div class="pane">
-      <h2>Publish</h2>
-      <label class="field">
-        <span>Name</span>
-        <input type="text" id="nameInput" value="Alice" autocomplete="off" autocapitalize="words">
-      </label>
-      <label class="field">
-        <span>Message</span>
-        <input type="text" id="msgInput" value="Hello, world." autocomplete="off">
-      </label>
-      <button class="publish" id="pubBtn" disabled>Publish</button>
-    </div>
-
-    <div class="pane">
-      <h2>Subscribe</h2>
-      <div class="feed" id="feed">
-        <span class="empty">Waiting for messages…</span>
-      </div>
-    </div>
-  </div>
-
-  <footer>
-    <span>demo v<span id="demoVer">…</span> · kernel v<span id="kernelVer">…</span></span>
-    <a href="https://github.com/axona-net/axona-protocol">source</a>
-  </footer>
-
-</div>
-
-<script type="module">
 import {
-  AxonaPeer, AxonaDomain, NeuronNode,
-  createNodeIdentity, createAuthorIdentity, deriveTopicId, geoCellId,
-  regionNameForLatLng,
-} from '/src/index.js';
-import { webTransport } from '/src/transport/web/index.js';
+  AxonaPeer, AxonaDomain, NeuronNode, AxonaManager, Synapse,
+  SimNetwork, simTransport,
+  createNodeIdentity, createAuthorIdentity,
+  regionNameForLatLng, clz264,
+} from '@axona/protocol';
 
-// ─── Constants ────────────────────────────────────────────────────────
-// Bump the middle digit on every code change to this file so the
-// footer reflects what's actually running and stale browser tabs are
-// distinguishable.
-const DEMO_VERSION = '1.18.0';
-const BRIDGE_URL   = new URLSearchParams(window.location.search).get('bridge')
-                  // Served from a testnet host (e.g. demo-testnet.axona.net) →
-                  // default to the testnet bridge (3.0.0 / axona/5 / wire-3),
-                  // which also hands back the testnet TURN. Production hosts →
-                  // the prod introducer. ?bridge= still overrides either way.
-                  || (location.hostname.includes('testnet') ? 'wss://testnet.axona.net'
-                                                             : 'wss://bridge.axona.net');
-const VIRGINIA     = { lat: 38.0, lng: -77.0 };
-// v0.3: a topic is a structured descriptor { region, name }. The region is
-// a first-class field (the kernel region NAME carrying the S2 cell) — no
-// synthetic publisher. axona-peer composes the same open topic for us-east
-// as { region: regionNameForLatLng(38,-77), name: 'hello-world' } (see
-// axona-peer/src/client.js openTopicDesc), so the demo and axona.net
-// subscribers converge on the EXACT same topic id. EVENT is shown in the UI
-// tile; TOPIC (the descriptor) is what crosses the wire.
-const REGION_NAME = regionNameForLatLng(VIRGINIA.lat, VIRGINIA.lng);   // e.g. 'useast'
-const EVENT       = 'hello-world';
-const TOPIC       = { region: REGION_NAME, name: EVENT };
-const MAX_DOTS    = 100;
+// -- 1. Region --------------------------------------------------------
+// us-east (Virginia).  Both peers connect from this cell, and the topic
+// is placed in the matching kernel region.  v0.3 region is a first-class
+// field of the topic descriptor -- no synthetic publisher needed.
+const US_EAST     = { lat: 38.0, lng: -77.0 };
+const REGION_NAME = regionNameForLatLng(US_EAST.lat, US_EAST.lng);   // e.g. 'useast'
 
-// ─── DOM ─────────────────────────────────────────────────────────────
-const $dots    = document.getElementById('dots');
-const $status  = document.getElementById('status');
-const $prefix  = document.getElementById('prefix');
-const $topicId = document.getElementById('topicId');
-const $kernel  = document.getElementById('kernelVer');
-const $name    = document.getElementById('nameInput');
-const $msg     = document.getElementById('msgInput');
-const $pubBtn  = document.getElementById('pubBtn');
-const $feed    = document.getElementById('feed');
-const $mLive   = document.getElementById('mLive');
-const $mSubs   = document.getElementById('mSubs');
-const $mPub    = document.getElementById('mPub');
+// -- 2. Build a peer --------------------------------------------------
+// One function, called twice -- once for alice, once for bob -- wires
+// identity + transport + node + AxonaPeer + AxonaManager together.
 
-// ─── Footer versions ─────────────────────────────────────────────────
-document.getElementById('demoVer').textContent = DEMO_VERSION;
-try {
-  const pkg = await fetch('/package.json').then(r => r.json());
-  $kernel.textContent = pkg.version;
-} catch { $kernel.textContent = '?'; }
+async function makePeer({ network, region }) {
+  // 2a. Derive a 264-bit Ed25519 CONNECTION identity in this region's S2 cell,
+  //     plus a separate, location-free AUTHORSHIP key used to sign publishes.
+  const identity = await createNodeIdentity(region);
+  const author   = await createAuthorIdentity();
 
-// ─── Topic info (Virginia-anchored) ──────────────────────────────────
-// The "region code" shown in the UI is the 8-bit S2 cell of the region —
-// a short geographic prefix (like a phone area code) that anchors the
-// topic to a place. Virginia → 0x89.
-const virginiaPrefix = geoCellId(VIRGINIA.lat, VIRGINIA.lng, 8);
-$prefix.textContent  = '0x' + virginiaPrefix.toString(16).padStart(2, '0').toUpperCase();
-
-// The topic id is derived from the descriptor { region, name }: the region
-// byte anchors it at Virginia (0x89) regardless of where the subscribing
-// peer lives, so every demo user worldwide computes the same topicId.
-const topicId   = await deriveTopicId(TOPIC);
-$topicId.textContent = topicId.slice(0, 12) + '…' + topicId.slice(-6);
-
-// ─── Geolocation (for our own identity only) ─────────────────────────
-async function getLocation() {
-  // Even if denied, identity falls back to (0, 0) → cell 0x10 (Gulf
-  // of Guinea).  We never end up with a 0x00 identity prefix unless
-  // the user is at the South Pole.  The topic anchor above is
-  // independent of this — it always stays at Virginia (0x89).
-  const FALLBACK = { lat: 0, lng: 0 };
-  if (!navigator.geolocation) return FALLBACK;
-  return new Promise(resolve => {
-    navigator.geolocation.getCurrentPosition(
-      pos  => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      ()   => resolve(FALLBACK),
-      { enableHighAccuracy: false, timeout: 6000, maximumAge: 600_000 },
-    );
-  });
-}
-const geo = await getLocation();
-
-// ─── Identity + transport + peer ─────────────────────────────────────
-// Connection identity (ephemeral, location-anchored) + a separate, location-free
-// authorship key. The connection key never signs content; publishes use signWith.
-const identity = await createNodeIdentity({ lat: geo.lat, lng: geo.lng });
-const author   = await createAuthorIdentity();
-const transport = webTransport({ bridgeUrl: BRIDGE_URL, identity });
-const node     = new NeuronNode({ id: BigInt('0x' + identity.id), lat: geo.lat, lng: geo.lng });
-node.transport = transport;
-const domain   = new AxonaDomain({ k: 20 });
-const peer     = new AxonaPeer({ domain, node, nodeIdentity: identity, transport });
-
-// DEBUG (opt-in via ?debug) — surface a mesh-health readout so the
-// auth-bound set (boundPeers) can be compared against the raw WebRTC
-// DC-level rows (mesh.getPeers) and the synaptome.  This is what exposed
-// the mesh-auth CBV bug: many DCs `open` + pinging, but boundCount stuck
-// at 1.  Gated and identity-free (no key material on window) so it's safe
-// to ship.  Read `window.__demo.report()` in the console.
-if (new URLSearchParams(location.search).has('debug')) {
-  window.__demo = {
-    report() {
-      const mp = (transport.mesh?.getPeers?.() || [])
-        .map(p => ({ state: p.state, pongs: p.pongs }));
-      return {
-        boundCount:    (transport.boundPeers?.() || []).length,
-        meshDataChans: mp.length,
-        meshOpen:      mp.filter(p => p.state === 'open').length,
-        synaptomeSize: node.synaptome?.size ?? null,
-      };
-    },
-  };
-}
-
-// ─── Peer-state tracking for the dot strip ───────────────────────────
-//
-// We render one dot per known peer.  Bridge is always the first
-// (larger, accent-colored) dot, drawn whenever the bridge connection
-// is alive.  Each subsequent dot is a WebRTC peer.
-//
-//   open     — green   (bound peer, isConnected = true)
-//   pending  — amber   (in synaptome but not yet bound — fresh signal)
-//   dead     — grey    (was bound, transport reported death)
-//
-// Cap at MAX_DOTS; if more peers, we just truncate (rare in a single
-// browser tab — typically 5–20 connections).
-// Render the dot strip directly from transport.boundPeers() — the
-// transport's own ground truth.  This matches axona-peer's pattern
-// (client.js:455 — for each render tick it diffs mesh.peers()
-// against the existing rows and DOM-removes anything no longer
-// present).  There's no separate death-tracking map: a peer that
-// dies just stops appearing.  No grey-dot accumulation.
-let bridgeUp = false;
-
-// Transport callbacks deliver peerIds as BigInts (kernel canonical
-// form).  Normalise to lowercase 66-char hex for the dot's tooltip.
-function asHex(peerId) {
-  if (typeof peerId === 'bigint') return peerId.toString(16).padStart(66, '0');
-  if (typeof peerId === 'string') return peerId.toLowerCase();
-  return String(peerId);
-}
-
-// Map peerHex → its current dot DOM node, so onPingTraffic can flash
-// the right dot without re-walking the children every event.  Cleared
-// on each renderDots(); rebuilt as we create children.
-const dotByPeer = new Map();
-let   bridgeDot = null;
-
-function renderDots() {
-  $dots.innerHTML = '';
-  dotByPeer.clear();
-  // Bridge dot first
-  bridgeDot = document.createElement('div');
-  bridgeDot.className = 'dot bridge' + (bridgeUp ? ' open' : ' pending');
-  bridgeDot.title = 'bridge';
-  $dots.appendChild(bridgeDot);
-  // Currently-bound peers (kernel reports only live channels)
-  const peers = [...(transport.boundPeers?.() || [])].slice(0, MAX_DOTS - 1);
-  for (const peerId of peers) {
-    const hex = asHex(peerId);
-    const d = document.createElement('div');
-    d.className = 'dot open';
-    d.title = hex.slice(0, 12) + '…';
-    $dots.appendChild(d);
-    dotByPeer.set(hex, d);
-  }
-}
-renderDots();
-
-// v2.0.2: pulse a dot on every ping-sent / pong-received frame on
-// that peer's channel.  Class is removed 400 ms later so a steady
-// 1 Hz traffic looks like a soft, regular blink and a stalled
-// channel goes dim within a second.
-function pulse(dot) {
-  if (!dot) return;
-  dot.classList.add('pulse');
-  // clearTimeout existing handle if any, to avoid premature class removal
-  // when two events arrive in quick succession.
-  if (dot._pulseTimer) clearTimeout(dot._pulseTimer);
-  dot._pulseTimer = setTimeout(() => dot.classList.remove('pulse'), 400);
-}
-
-transport.onPingTraffic?.((peerId /*, kind */) => {
-  const hex = asHex(peerId);
-  // Bridge ping/pong attributes to the bridge's nodeId — the same
-  // hex appears in boundPeers() as the bridge connection.  If the
-  // hex matches the bridge's nodeId, pulse the bridge dot; otherwise
-  // look up the per-peer dot.
-  const bridgeHex = transport.bridgeNodeId ? asHex(transport.bridgeNodeId) : null;
-  if (bridgeHex && hex === bridgeHex) pulse(bridgeDot);
-  else                                pulse(dotByPeer.get(hex));
-});
-
-// onPeerBound / onPeerDied are just render triggers — boundPeers()
-// is the source of truth, so we re-read it on every event.
-transport.onPeerBound?.(() => renderDots());
-transport.onPeerDied?.(() => renderDots());
-
-// ─── Connect ─────────────────────────────────────────────────────────
-//
-// Two-phase: transport+peer start first (handshake with the bridge),
-// then wait for the mesh to fill in before subscribing.  Subscribing
-// while synaptome.size === 1 (just the bridge) registers our
-// subscription at the bridge only.  When other peers come online and
-// other publishers route their `pubsub:publish-k` through a fuller
-// K-closest set, those publishes can miss us because our subscription
-// is anchored at the wrong axon.  Gating the subscribe behind a
-// stable synaptome matches axona-peer's manual "Add subscription"
-// pattern and what dht-sim does after warm-up.
-//
-// READY_SYNAPSE_COUNT = bridge + ~3 WebRTC peers; READY_TIMEOUT_MS
-// puts a ceiling on solo-tab runs (when there's no one else to find).
-const READY_SYNAPSE_COUNT = 4;
-const READY_TIMEOUT_MS    = 10_000;
-
-async function waitForMeshReady() {
-  const t0 = Date.now();
-  while (Date.now() - t0 < READY_TIMEOUT_MS) {
-    if (node.synaptome.size >= READY_SYNAPSE_COUNT) return node.synaptome.size;
-    await new Promise(r => setTimeout(r, 200));
-  }
-  return node.synaptome.size;
-}
-
-try {
+  // 2b. Open a SimTransport on the shared SimNetwork.
+  const transport = simTransport({ network, identity, heartbeatMs: 0 });
   await transport.start(identity.id);
+
+  // 2c. Build the local DHT node.  NeuronNode holds the synaptome and
+  //     routing state; AxonaDomain holds parameters shared across peers.
+  //     NeuronNode XORs ids as BigInts internally, so convert from
+  //     identity.id (hex string) to BigInt at construction time.
+  const node     = new NeuronNode({
+    id:  BigInt('0x' + identity.id),
+    lat: region.lat, lng: region.lng,
+  });
+  node.transport = transport;
+  const domain   = new AxonaDomain({ k: 20 });
+
+  // 2d. AxonaPeer is the per-node DHT contract implementation. The
+  //     connection key is the `nodeIdentity`; authorship is supplied
+  //     per-publish via `signWith`, never by the constructor.
+  const peer = new AxonaPeer({ domain, node, nodeIdentity: identity, transport });
   await peer.start();
-  bridgeUp = true;
-  $status.textContent = 'stabilising mesh…';
-  renderDots();    // bridge dot + any peers already bound
 
-  await waitForMeshReady();
-  // Subscription happens just below (top-level await) — gate the
-  // button on success after sub resolves.
-} catch (err) {
-  $status.textContent = 'connection failed';
-  console.error('[demo] connect failed', err);
+  // 2e. AxonaManager handles pub/sub.  It needs a `dht` adapter that
+  //     forwards K-closest, sendDirect, routeMessage, and handler
+  //     registration to our AxonaPeer.  Most of these are 1-line
+  //     delegations; sendDirect special-cases self-target for local
+  //     dispatch.
+  const dht = {
+    getSelfId:       () => peer.getNodeId(),
+    findKClosest:    (...args) => peer.findKClosest(...args),
+    routeMessage:    (...args) => peer.routeMessage(...args),
+    sendDirect:      async (peerId, type, payload) => {
+      if (peerId === peer.getNodeId()) {
+        // Local-loopback: dispatch into our own direct handler table.
+        const h = peer._directHandlers?.get(type);
+        if (!h) return false;
+        try { await h(payload, { fromId: peer.getNodeId(), type }); return true; }
+        catch (err) { console.error('self-sendDirect threw:', err); return false; }
+      }
+      return peer.sendDirect(peerId, type, payload);
+    },
+    onRoutedMessage: (type, h) => peer.onRoutedMessage(type, h),
+    onDirectMessage: (type, h) => peer.onDirectMessage(type, h),
+  };
+  const axonaManager = new AxonaManager({ dht });
+  peer._axonaManager = axonaManager;       // hand the AM directly to the peer
+  return { peer, identity, author };
 }
 
-// ─── Subscribe ───────────────────────────────────────────────────────
-let messageCount = 0;
-function appendMessage(name, body, when) {
-  if (messageCount === 0) $feed.innerHTML = '';
-  messageCount++;
-  const msg = document.createElement('div');
-  msg.className = 'msg';
-  const meta = document.createElement('div');
-  meta.className = 'meta';
-  const nameEl = document.createElement('span');
-  nameEl.className = 'name';
-  nameEl.textContent = name;
-  const timeEl = document.createElement('span');
-  timeEl.className = 'time';
-  timeEl.textContent = when.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  meta.appendChild(nameEl);
-  meta.appendChild(timeEl);
-  const bodyEl = document.createElement('div');
-  bodyEl.className = 'body';
-  bodyEl.textContent = body;
-  msg.appendChild(meta);
-  msg.appendChild(bodyEl);
-  $feed.appendChild(msg);
-  // Auto-scroll to the newest message
-  $feed.scrollTop = $feed.scrollHeight;
-}
+// -- 3. Wire two peers + connect them ---------------------------------
 
-const sub = await peer.sub(TOPIC, (envelope) => {
-  // Envelopes from the wire are "Name: Body" strings.
-  const wire = envelope.message || '';
-  const colonAt = wire.indexOf(':');
-  const name = colonAt > 0 ? wire.slice(0, colonAt).trim() : '(unknown)';
-  const body = colonAt > 0 ? wire.slice(colonAt + 1).trim() : wire;
-  appendMessage(name, body, new Date());
+const network = new SimNetwork();
+
+const { peer: alice, identity: aliceId, author: aliceAuthor } = await makePeer({ network, region: US_EAST });
+const { peer: bob,   identity: bobId   } = await makePeer({ network, region: US_EAST });
+
+// Open a SimNetwork channel between alice and bob so they're directly
+// reachable, then admit each other to their synaptomes.  Real transports
+// (WebRTC mesh, WebSocket bridge) do this admission via the axona:hello
+// / hello-ack handshake at channel-open time -- see axona-peer's
+// axona_node.js for the production wiring.
+await alice._transport.openConnection(bobId.id);
+
+function admitSynapse(localPeer, remoteBigInt) {
+  const localId = localPeer._node.id;
+  const stratum = clz264(localId ^ remoteBigInt);
+  const syn = new Synapse({ peerId: remoteBigInt, latencyMs: 1, stratum });
+  syn.weight   = 0.5;
+  syn.inertia  = 0;
+  syn._addedBy = 'demo';
+  localPeer._node.synaptome.set(remoteBigInt, syn);
+}
+admitSynapse(alice, BigInt('0x' + bobId.id));
+admitSynapse(bob,   BigInt('0x' + aliceId.id));
+
+console.log('[alice] nodeId:', aliceId.id);
+console.log('[bob]   nodeId:', bobId.id);
+
+// Give the kernel a tick to admit each other to their synaptomes.
+await new Promise(r => setTimeout(r, 50));
+
+// -- 4. Pub/sub roundtrip ---------------------------------------------
+
+// v0.3: a topic is a structured descriptor. An open lobby in a real region
+// is just { region, name } -- anyone may publish (self-signed); the region
+// places it in the keyspace. No synthetic publisher.
+const TOPIC = { region: REGION_NAME, name: 'hello-world' };
+
+const received = [];
+const sub = await bob.sub(TOPIC, (envelope) => {
+  received.push(envelope);
+  console.log('[bob]   received:', {
+    msgId:        envelope.msgId,
+    message:      envelope.message,
+    signerPubkey: envelope.signerPubkey?.slice(0, 16) + '...',
+  });
 }, { since: 'all' });
 
-// Arm the kernel's AxonaManager periodic refresh timer.  By default
-// AxonaPeer._buildDefaultAxonaManager() does NOT call am.start() (the
-// comment in AxonaPeer.js:1820 says "applications call peer.sub after
-// the mesh has stabilised, so the initial K-closest is already wide
-// and refresh isn't needed").  That assumption holds for the dht-sim
-// simulator's steady-state runs but NOT for a browser mesh, where
-// WebRTC peers come and go on every page reload.  Without this, a
-// subscription registered at the initial K-closest set becomes stale
-// as the mesh churns, and publishes routed through a new K-closest
-// set miss the stale subscribers.  Arming refreshTick at the 10 s
-// default keeps the subscription pinned to whoever is K-closest
-// right now.
-peer._axonaManager?.start?.();
+console.log('[bob]   subscribed:', sub.topicId);
 
-// Backstop re-render every 2 s.  onPeerBound / onPeerDied catch
-// most transitions, but some peers die silently (network drop, page
-// suspended, browser throttled tab).  A periodic re-read of
-// transport.boundPeers() keeps the strip honest without a
-// state-tracking map.
-setInterval(renderDots, 2000);
+// Wait for the subscribe-k frame to reach alice's role.
+await new Promise(r => setTimeout(r, 100));
 
-// ─── Topic metrics (peer.metrics) ────────────────────────────────────
-// This is an OPEN topic (write policy 'open', no owner), so its metrics are
-// readable by anyone.  We poll the axon tree:
-//   current_count — events retained in the tree right now (≤ queue cap / TTL)
-//   subscribers   — max direct subscribers at a responding relay
-//   publishes     — distinct messages the relays have seen
-// Best-effort: whatever relays answer within the timeout.
-async function pollMetrics() {
-  try {
-    const m = await peer.metrics(TOPIC);
-    $mLive.textContent = String(m.current_count ?? 0);
-    $mSubs.textContent = String(m.subscribers   ?? 0);
-    $mPub.textContent  = String(m.publishes     ?? 0);
-  } catch { /* best-effort — keep last-known values */ }
-}
-pollMetrics();
-setInterval(pollMetrics, 4000);
+// Alice signs the publish with her AUTHOR key (signWith) -- the connection
+// key never signs content.
+const msgId = await alice.pub(TOPIC, 'hello from alice', { signWith: aliceAuthor });
+console.log('[alice] published msgId=' + msgId);
 
-// ─── Resume recovery (laptop sleep / tab background) ─────────────────
-// The kernel transport already self-heals after a connection freeze:
-// dead WebRTC channels are evicted on heartbeat timeout (mesh v2.1.1)
-// and the bridge socket auto-reconnects with backoff.  This is the
-// optional *application-layer* accelerator the peer at axona.net also
-// uses — on a genuine resume event, tear the mesh down at once
-// (mesh.reset() fires onPeerLost so the synaptome clears too) and force
-// an immediate bridge reconnect, so recovery is snappy rather than
-// waiting out the per-peer timeouts.  A macOS screensaver may fire NONE
-// of these events (the tab never goes hidden); that's exactly the case
-// the kernel-side eviction backstops.
-function onResume(reason) {
-  // After a sleep/background, the WebRTC channels and bridge socket are
-  // zombie. The browser logs its own "Error sending string through
-  // RTCDataChannel" / "WebSocket connection lost" errors when sends hit
-  // those dead channels — those come from WebKit itself (the kernel already
-  // catches and treats them as expected), and self-heal once we reset the
-  // mesh and reconnect below. This note explains the red lines above.
-  console.info(`[demo] resume (${reason}) — re-establishing mesh + bridge; ` +
-    `any RTCDataChannel/WebSocket errors just above are expected and self-heal.`);
-  try { transport.mesh?.reset?.(); } catch { /* mesh may already be gone */ }
-  transport.reconnectNow?.();
-}
-let hiddenAt = 0;
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
-  if (hiddenAt && Date.now() - hiddenAt >= 5000) onResume('visible');
-  hiddenAt = 0;
-});
-window.addEventListener('online',   () => onResume('online'));
-window.addEventListener('pageshow', (e) => { if (e.persisted) onResume('bfcache'); });
+// Let the publish-k -> cache -> fan-out cycle complete.
+await new Promise(r => setTimeout(r, 200));
 
-// Subscription is registered — safe to publish now.
-$status.textContent = 'connected';
-$pubBtn.disabled    = false;
+console.log();
+console.log(received.length === 1
+  ? '[OK] roundtrip ok -- bob received alice\'s envelope'
+  : `[X] roundtrip failed -- expected 1 envelope, got ${received.length}`);
 
-// ─── Publish ─────────────────────────────────────────────────────────
-async function publish() {
-  const name = ($name.value || 'Alice').trim();
-  const msg  = ($msg.value  || 'Hello, world.').trim();
-  if (!msg) return;
-  $pubBtn.disabled = true;
-  try {
-    await peer.pub(TOPIC, name + ': ' + msg, { signWith: author });
-  } catch (err) {
-    console.error('[demo] publish failed', err);
-  } finally {
-    $pubBtn.disabled = false;
-    $msg.focus();
-    $msg.select();
-  }
-}
-$pubBtn.addEventListener('click', publish);
-$msg.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !$pubBtn.disabled) publish();
-});
-</script>
-
-</body>
-</html>
+await sub.stop();
+process.exit(received.length === 1 ? 0 : 1);
 \end{lstlisting}
 
 \end{document}
