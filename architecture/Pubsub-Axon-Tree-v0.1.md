@@ -297,17 +297,30 @@ Let `N` = subscribers to a topic, `f` = `MAX_DIRECT` (default 20).
      dropping the cache before a late joiner arrived → backlog/gap recovery 0 %.
      A root now persists while it holds non-expired cache (the cache ages out via
      the 48h TTL); regression in `smoke_pubsub_durability`.
-   - **Convergence at scale on an imperfect mesh (OPEN).** At ~10 subscribers over
-     real WebRTC, ~2 consistently stranded (delivery ~80 %), and a renewal cycle
-     did not heal them. Root cause: a single greedy `routeMessage` walk can
-     terminate at a *near*-closest node (a transient spurious root), and the
-     stranded subscriber's renewal retraces the same greedy path. The old
-     K-closest manager used an *iterative* lookup (alpha-parallel, dead-peer
-     aware) which converges more robustly. Planned fix: a **lookup-assisted
-     subscribe** — use `peer.lookup()` to find the true closest, then route the
-     subscribe to that node id — restoring iterative-lookup convergence while
-     keeping the single-root model. (Synaptome learning also improves this over
-     minutes, but that is too slow for an app.)
+   - **Convergence at scale on an imperfect mesh (FIXED, v3.15.x).** At ~10
+     subscribers over real WebRTC, ~2 consistently stranded (delivery ~80 %), and a
+     renewal cycle did not heal them. Root cause: a single greedy `routeMessage`
+     walk can terminate at a *near*-closest node (a transient spurious root), and
+     the stranded subscriber's renewal retraces the same greedy path. The old
+     K-closest manager used an *iterative* lookup (alpha-parallel, dead-peer aware)
+     which converges more robustly. Fix: a **non-blocking lookup-assisted
+     subscribe/publish**. The subscribe/publish is sent immediately (greedy, or via
+     a warm cached hint); in parallel `_rootHint_` refreshes the true-closest via
+     `peer.findKClosest` in the **background** and, when a fresh hint lands and we
+     are an unpinned, not-yet-adopted subscriber, re-subscribes toward it — healing
+     a greedy strand within one lookup latency. Blocking the subscribe on the
+     iterative lookup (the first cut, v3.15.0) was wrong: that lookup is fast
+     in-sim but slow over real WebRTC, so it never completed inside the join window
+     and delivery went to **0 %**; non-blocking restored 100 % live (v3.15.1).
+   - **`since:'all'` replayed nothing (FIXED, v3.15.2).** Backlog and gap recovery
+     were 0 % live even after the cache-GC fix. `pubsubResetTopicConsumption`
+     (driven by `peer.sub(..., {since:'all'})`) *deleted* the per-topic since-floor;
+     `pubsubSubscribe` then read the missing floor and fell back to `since = now()`,
+     so the SUB silently asked for the live tail and the root replayed nothing. The
+     durability smoke missed it by seeding the floor to 0 directly instead of
+     driving the reset path. Fix: reset *sets* the floor to 0 ("consumed nothing" →
+     replay from the start); regression in `smoke_pubsub_durability` exercises the
+     real reset→subscribe path and asserts `since=0` on the wire.
 
 6. **Anti-replay is freshness + msgId, not per-publisher seq (Phase 1 reduction).** The
    clean break dropped the old K-closest manager's per-publisher `seq` high-water gate.
