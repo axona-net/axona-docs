@@ -331,9 +331,17 @@ v3.10.0 root-election gate as moot.
     into a near-linear chain (the old depth-~21 failure). A promote must actually free a
     slot (≥2 leaves to offload) — "promoting" the sole leaf frees nothing and lets the
     relay creep over `MAX_DIRECT`.
-- **Phase 3 — migration + durability.** Loss-free migration handoff (§6) and
-  stamped-replay-up. **Gate:** kill the root mid-stream → history survives, order stays
-  monotone (skew-bounded).
+- **Phase 3 — migration + durability. ✅ DONE (kernel v3.14.0).** Stamped-replay-up: a
+  `SUBSCRIBE` advertises the sender's cache high-water; a relay/root that is *behind* a
+  reattaching subscriber sends `PULLUP`, the subscriber replays its stamped cache delta
+  *up* (`REPLAYUP`), and the parent adopts those messages **without re-stamping** (the §5
+  "timestamp present → keep it" rule), advances `lastTs`, drops any absurd-future stamp
+  (§5 bad-clock rule), and propagates them down. Same handshake covers graceful migration
+  and abrupt root death. **Gate met:** `smoke_pubsub_durability` — build a tree, publish
+  M, **kill the root abruptly**, heal: the fresh root recovers the **full** pre-death
+  history from a surviving cache-bearing relay, a brand-new late subscriber gets all M
+  (0 = lost), delivery is monotone, and a post-recovery publish stamps **strictly above**
+  the recovered history. Stable across random topologies.
 - **Phase 4 — integration.** Re-vendor into dht-sim; wire the browser `axona` engine onto
   it (makes the green-tree visualisation faithful and the soak's multi-subscriber
   delivery-rate scenario pin to 100 %); update the soak; then the gated
@@ -347,10 +355,12 @@ is functional, per the standing decision.
 ## Appendix — message shapes (informative)
 
 ```
-SUBSCRIBE  { topicId, via:[NodeId], subscriberId, since? }
-PUBLISH    { topicId, via:[NodeId], message }          // no ts — root stamps
-DELIVER    { message, ts, from:NodeId }                 // routed to subscriberId
-RENEW-ACK  { hostedHighWaterTs }                        // enables stamped-replay-up
+SUBSCRIBE  { topicId, via:[NodeId], subscriberId, since?, hw }  // hw = my cache high-water
+PUBLISH    { topicId, via:[NodeId], json }              // no ts — root stamps
+DELIVER    { topicId, from:NodeId, msgs:[{json,publishTs,msgId}] }  // routed to subscriberId
+ADOPT      { topicId, parent:NodeId, subs:[{subscriberId,since}] }  // delegation (§4)
+PULLUP     { topicId, sinceHw, parentId:NodeId }        // "replay your history up to me" (§6)
+REPLAYUP   { topicId, msgs:[{json,publishTs,msgId}] }   // stamped history, routed UP
 ```
 
 Constants (all tunable): `RENEW_MS=60000`, `DROP_MS=180000`, `CACHE_MAX=1024`,
