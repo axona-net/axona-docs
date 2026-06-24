@@ -295,8 +295,9 @@ Let `N` = subscribers to a topic, `f` = `MAX_DIRECT` (default 20).
    idempotency** (a duplicate is neither re-stamped nor re-fanned). This rejects a
    captured envelope outside the window and any exact re-injection inside it, but does
    **not** detect a same-publisher reorder/replay that is still time-fresh and not
-   already cached. Restoring per-publisher monotonic seq detection is a **Phase 2**
-   hardening item; its parked smoke lives in the `test:legacy-pubsub` set.
+   already cached. Restoring per-publisher monotonic seq detection is a **later
+   hardening item** (not addressed in Phase 1/2); its parked smoke lives in the
+   `test:legacy-pubsub` set.
 
 ---
 
@@ -305,15 +306,31 @@ Let `N` = subscribers to a topic, `f` = `MAX_DIRECT` (default 20).
 Replaces the K-closest / `sendDirect` core in `AxonaManager` wholesale; deletes the
 v3.10.0 root-election gate as moot.
 
-- **Phase 1 — routed core (single root, no tree).** The four operations on `route(…)`
-  with the `via` list and the §5 stamping rule. Renewal loop, `since` gap-recovery,
-  `DROP_MS` eviction. **Gate:** the fundamental case — five subscribers, one root,
-  publish reaches all five — at **100 %, repeatable** (the case that was `[4,4,2]/5` on
-  `sendDirect` and `[5,5,5]/5` routed).
-- **Phase 2 — the tree.** Overload delegation (§4) with `via` pinning and dead-waypoint
-  fallthrough. **Gate:** the full nodes × subscribers × churn sweep — *including the
-  sparse case that exposed the v3.10.0 regression* — at ~100 %, **stable across runs**,
-  bounded fan-out.
+- **Phase 1 — routed core (single root, no tree). ✅ DONE (kernel v3.12.0).** The four
+  operations on `route(…)` with the `via` list and the §5 stamping rule. Renewal loop,
+  `since` gap-recovery, `DROP_MS` eviction. **Gate met:** `smoke_pubsub_fundamental` —
+  five subscribers, one root, publish reaches all five — **5/5 across 25 configs**, plus
+  late-replay, no-reflood, write-policy enforcement, via self-heal (the case that was
+  `[4,4,2]/5` on `sendDirect`).
+- **Phase 2 — the tree. ✅ DONE (kernel v3.13.0).** Overload delegation (§4) with `via`
+  pinning and dead-waypoint fallthrough; non-root relays cache + re-fan down the tree;
+  the root migrates/re-roots on death. **Gate met:** `smoke_pubsub_sweep` — nodes ×
+  subscribers × churn (S = 5…160, incl. the sparse case that exposed the v3.10.0
+  regression) — **100 % delivery** (pre- and post-churn), **exactly one root**, **fan-out
+  ≤ MAX_DIRECT**, depth ~`log_MAX_DIRECT(S)` (1–2 at these sizes), **stable across random
+  topologies**. Two invariants the sweep forced out and that any reimplementation must
+  keep:
+  - **Root-ness = routing terminus, not "I host it."** A node is the root iff a
+    bare-topic message (`via` empty) terminates on it (it is the closest). A relay that
+    *hosts* a topic but is no longer closest must NOT intercept bare-topic traffic — and
+    a non-root relay that *becomes* the closest after the old root dies must be promoted,
+    or it reroutes publishes to itself forever.
+  - **Widen before deepen.** On overload a relay promotes a *new* sibling child
+    (offloading a batch) before forwarding newcomers down into an existing child;
+    deepen only when every direct is already a child. Deepen-first degenerates the tree
+    into a near-linear chain (the old depth-~21 failure). A promote must actually free a
+    slot (≥2 leaves to offload) — "promoting" the sole leaf frees nothing and lets the
+    relay creep over `MAX_DIRECT`.
 - **Phase 3 — migration + durability.** Loss-free migration handoff (§6) and
   stamped-replay-up. **Gate:** kill the root mid-stream → history survives, order stays
   monotone (skew-bounded).
