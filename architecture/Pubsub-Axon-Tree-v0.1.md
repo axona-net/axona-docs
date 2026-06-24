@@ -288,6 +288,27 @@ Let `N` = subscribers to a topic, `f` = `MAX_DIRECT` (default 20).
    the true closest node; harmless, deduped by `msgId`, converged by renewal. Relies on
    routing quality, which we keep measuring at scale.
 5. **`via` ≠ anonymity** — §7.
+6a. **Live-mesh findings (soak-axon vs the idealised dht-sim).** The dht-sim
+   SimNetwork has near-perfect routing → 100 % at N=1000. The live testnet soak
+   (`axona-stress/soak-axon`) over real WebRTC surfaced two things the sim could
+   not:
+   - **Empty-root cache GC (FIXED, v3.14.1).** A root caching messages with zero
+     subscribers was torn down by `refreshTick` the instant subscribers hit 0,
+     dropping the cache before a late joiner arrived → backlog/gap recovery 0 %.
+     A root now persists while it holds non-expired cache (the cache ages out via
+     the 48h TTL); regression in `smoke_pubsub_durability`.
+   - **Convergence at scale on an imperfect mesh (OPEN).** At ~10 subscribers over
+     real WebRTC, ~2 consistently stranded (delivery ~80 %), and a renewal cycle
+     did not heal them. Root cause: a single greedy `routeMessage` walk can
+     terminate at a *near*-closest node (a transient spurious root), and the
+     stranded subscriber's renewal retraces the same greedy path. The old
+     K-closest manager used an *iterative* lookup (alpha-parallel, dead-peer
+     aware) which converges more robustly. Planned fix: a **lookup-assisted
+     subscribe** — use `peer.lookup()` to find the true closest, then route the
+     subscribe to that node id — restoring iterative-lookup convergence while
+     keeping the single-root model. (Synaptome learning also improves this over
+     minutes, but that is too slow for an app.)
+
 6. **Anti-replay is freshness + msgId, not per-publisher seq (Phase 1 reduction).** The
    clean break dropped the old K-closest manager's per-publisher `seq` high-water gate.
    The routing-only root currently gates a live publish by absolute-time **freshness**
