@@ -288,6 +288,15 @@ Let `N` = subscribers to a topic, `f` = `MAX_DIRECT` (default 20).
    the true closest node; harmless, deduped by `msgId`, converged by renewal. Relies on
    routing quality, which we keep measuring at scale.
 5. **`via` ≠ anonymity** — §7.
+6. **Anti-replay is freshness + msgId, not per-publisher seq (Phase 1 reduction).** The
+   clean break dropped the old K-closest manager's per-publisher `seq` high-water gate.
+   The routing-only root currently gates a live publish by absolute-time **freshness**
+   (`checkFreshness`, ±5 min on the signed `ts`) plus content-addressed **`msgId`
+   idempotency** (a duplicate is neither re-stamped nor re-fanned). This rejects a
+   captured envelope outside the window and any exact re-injection inside it, but does
+   **not** detect a same-publisher reorder/replay that is still time-fresh and not
+   already cached. Restoring per-publisher monotonic seq detection is a **Phase 2**
+   hardening item; its parked smoke lives in the `test:legacy-pubsub` set.
 
 ---
 
