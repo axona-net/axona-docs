@@ -7,6 +7,26 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.0.0 — routing-only pub/sub + hermetic wire-4.0 partition (2026-06-24)
+
+Major, breaking, flag-day release. The pub/sub layer is now the **routing-only
+axonic tree** (the v3.14 clean-break `AxonaManager` rewrite): every operation is
+a single DHT `routeMessage` toward the topic id, delivered to the emergent root
+(the closest live node), which assigns the one monotonic timestamp; overload
+delegates to child relays (depth ~log₂₀N, fan-out ≤20); durability via
+stamped-replay-up. The v3.15 line added **non-blocking lookup-assisted
+subscribe/publish** (escapes greedy local-minima on a sparse mesh without
+blocking on the iterative lookup) and fixed **`since:'all'` replay** (backlog +
+gap recovery).
+
+`WIRE_VERSION` is promoted **3.0 → 4.0**: these behavioral changes mean a pre-4.0
+peer on the same wire 3.0 cannot safely interoperate, so the wire major now
+reflects it. wire-3.x and wire-4.x reject each other at the bridge gate
+(`REQUIRED_WIRE_MAJOR='4'`) and the peer↔peer handshake — a hermetic partition.
+Whole-fleet flag-day: kernel v4.0.0, bridge v2.36.0, peer v4.0.0, relay v0.21.0,
+dht-sim vendor v0.104.0. Deployed to **testnet only**; production stays on its
+current stable kernel.
+
 ## v3.6.0 — std/chunk: reliable publish (fix reload-reassembly timeout) (2026-06-20)
 
 Bug fix + small behavior change in `std/chunk`. `publishChunkedBytes` defaulted

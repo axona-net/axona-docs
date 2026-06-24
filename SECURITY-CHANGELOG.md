@@ -16,6 +16,20 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.0.0 — 2026-06-24
+
+**Wire-version partition (`WIRE_VERSION` 3.0 → 4.0).** The routing-only
+axonic-tree pub/sub is now isolated from earlier builds by the wire major. A
+peer or bridge speaking wire 3.x and one speaking wire 4.x refuse each other at
+**both** layers that matter: the signaling bridge rejects a mismatched
+`wireVersion` major at the client-hello (close code 4426, before any frame is
+relayed), and two peers reject each other in the `wireCompatible()` handshake
+that gates the authenticated channel. The refusal is **hermetic** — there is no
+version-floor heuristic to slip past, so a build on an incompatible protocol is
+cleanly excluded rather than admitted and then failing silently mid-session.
+This protects message integrity: peers on divergent pub/sub semantics can never
+partially interoperate and corrupt a topic's delivery or ordering.
+
 ## Kernel v3.10.0 — 2026-06-22
 
 Pub/sub root election is now proximity-gated on every promotion path
