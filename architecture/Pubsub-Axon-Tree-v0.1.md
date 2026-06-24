@@ -342,13 +342,20 @@ v3.10.0 root-election gate as moot.
   history from a surviving cache-bearing relay, a brand-new late subscriber gets all M
   (0 = lost), delivery is monotone, and a post-recovery publish stamps **strictly above**
   the recovered history. Stable across random topologies.
-- **Phase 4 — integration.** Re-vendor into dht-sim; wire the browser `axona` engine onto
-  it (makes the green-tree visualisation faithful and the soak's multi-subscriber
-  delivery-rate scenario pin to 100 %); update the soak; then the gated
-  re-vendor/deploy to peer / relay / bridge.
+- **Phase 4 — integration. ◑ IN PROGRESS (kernel v3.14.0).** Done: re-vendored the
+  browser kernel into dht-sim; wired the `axona` engine + green-tree viz +
+  real-kernel harness onto the new manager's tree shape (`role.subscribers` = the
+  full delivery tree, `role.children` = the backbone). **Validated over the REAL
+  kernel SimNetwork routing** (not the idealised fabric): **100 % delivery at
+  N = 120 / 300 / 600 / 1000**, exactly one true root, 0 spurious roots, fan-out ≤
+  `MAX_DIRECT`, depth ~2 — confirming the routing-only manager holds up on the
+  kernel's greedy + 2-hop routing at scale. Remaining (gated): a multi-subscriber
+  delivery-rate scenario in the soak, then the re-vendor/deploy to peer / relay /
+  bridge (a coordinated kernel flag-day — needs explicit go-ahead).
 
-Metrics and other side functions change with this and are addressed **after** the core
-is functional, per the standing decision.
+Metrics and other side functions (kill/unpub/touch/metrics, and the per-publisher seq
+anti-replay reduction noted in §9) change with this and are addressed **after** the core
+is functional + deployed, per the standing decision.
 
 ---
 
