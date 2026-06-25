@@ -242,11 +242,20 @@ routing — never authoritative, never required for correctness.
 
 ## 13. Wire messages (all routed)
 
-`sub, unsub, pub, deliver, adopt, pullup, replayup, kill, unpub, touch, pull,
+`sub, unsub, pub, deliver, adopt, pullup, replayup, kill, pull,
 pullresp, rootbeacon` — see the `T` table in `AxonaManager.js`. `pub` carries **no**
 timestamp (the root stamps); `deliver` carries the stamped messages + the relay's id
 (`from`, used for pinning); `adopt` carries the parent id + the handed-off subscriber
 batch.
+
+> **v4.3.0:** `unpub` is **removed** (no sender/handler; the `T.UNPUB` wire
+> string is reserved so legacy frames are ignored, not misrouted) and `touch` is
+> a **no-op** (handler retained for wire compat). `kill` is the sole retraction.
+> Metrics are no longer a routed request (`metricsReq` is gone) — a root
+> publishes a signed snapshot to `metricTopic(T)` every ~20 s for **every** topic
+> it roots (open and owned), and `peer.metrics()` reads that via a brief
+> subscribe. Owned-topic activity counts are public by this design; only the
+> topic's messages/write capability stay owner-gated.
 
 ## 14. Tunable constants (current)
 
@@ -313,7 +322,7 @@ captures its root; beacon verify-don't-trust does NOT stop a genuinely-closer Sy
 **[architectural]** Intermediary relays cache + re-fan plaintext envelopes (content +
 metadata transit untrusted peers; mitigated only by app-layer encryption). **[open —
 Phase A #4]** Root DoS via publish flood (no per-publisher quota). **[untested]**
-kill/unpub/touch are thin stubs; abuse surface unexamined.
+kill is the sole retraction (unpub removed, touch no-op as of v4.3.0); abuse surface unexamined.
 
 ## 18. Robustness
 
@@ -362,7 +371,7 @@ load-bearing claims unmeasured (large-scale live delivery; root-change load).
 |---|---|
 | **Known / measured** | 60s renewal-gated orphan window dominates churn loss (41→91% with re-seat) · single greedy walk strands on sparse mesh (~80% scale) · per-topic single-root throughput ceiling (architectural) |
 | **Speculative** | Root capture via closer-Sybil → censorship + subscriber-set metadata leak (ties to open E-1) · intermediary relays see plaintext · root DoS via publish flood (Phase A #4) · split-root reconciliation latency |
-| **Untested** | Root-change re-subscribe load at thousands of subs · live scale beyond ~1000 · stamped-replay-up under lost/adversarial history · tree balance under skewed ids · beacon traffic at high topic density · kill/unpub correctness |
+| **Untested** | Root-change re-subscribe load at thousands of subs · live scale beyond ~1000 · stamped-replay-up under lost/adversarial history · tree balance under skewed ids · beacon traffic at high topic density · kill correctness |
 
 **Center of gravity:** excellent at low churn + bounded fan-out, with total order +
 exactly-once as real strengths; the weakness center is **churn behavior in the

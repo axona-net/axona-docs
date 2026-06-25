@@ -62,7 +62,7 @@ are migrating, the load-bearing differences are:
    - [4.1 Topic addressing](#41-topic-addressing)
    - [4.2 publish / subscribe](#42-publish--subscribe)
    - [4.3 pull / metrics](#43-pull--metrics)
-   - [4.4 owner + creator ops: kill / touch / unpub](#44-owner--creator-ops-kill--touch--unpub)
+   - [4.4 owner + creator ops: kill](#44-owner--creator-ops-kill)
    - [4.5 hosting: host / unhost](#45-hosting-host--unhost)
    - [4.6 topic limits](#46-topic-limits)
 5. [Direct messaging](#5-direct-messaging)
@@ -140,7 +140,7 @@ region** (authorship is not a place). Its public key is the Author ID.
 ```
 
 You pass an `AuthorIdentity` (or `ANONYMOUS`) as `{ signWith }` to
-`peer.pub` / `kill` / `touch` / `unpub`.
+`peer.pub` / `kill`.
 
 ### `TopicDescriptor` (type) {#topic-descriptor-type}
 
@@ -487,7 +487,7 @@ forgetting `write` can never silently make an owned feed world-writable).
 
 **Share the ID for reading; share the descriptor for writing.** `sub`,
 `pull`, and `metrics` accept the 66-hex ID or a descriptor. `pub` (and
-owner ops `kill`/`unpub`) require the descriptor — a bare ID is rejected,
+the owner op `kill`) requires the descriptor — a bare ID is rejected,
 because a hash can't reveal its `owner`, so the ID alone can't prove
 write authorization.
 
@@ -675,60 +675,58 @@ const latest = await peer.pull(null, { topic: feedId });   // most recent on the
 - `PULL_INVALID_MSGID` — a non-null `msgId` that isn't 64-char hex.
 - `PULL_AXONS_UNREACHABLE` — the manager can't service the request.
 
-#### `peer.metrics(topic, { timeoutMs? })` → `Promise<metricsObj>` *(owner-only)*
+#### `peer.metrics(topic, { timeoutMs? })` → `Promise<metricsObj>`
 
-Aggregate counters for a topic across the K-closest root set, **on demand**.
-As of kernel v3.6.0 this is an **owner-only** reader: the scatter-gather answers
-only the owner of an **owned** (`write:'owner'`) topic. **Open / public topics
-are refused** (they return an empty/zero result) — read their live state by
-subscribing to `metricTopic(T)` (above) instead. Use `metrics()` for an owner's
-private, immediate read of their own topic; it is not the path for public counts.
+A one-shot read of a topic's latest published metric snapshot — for **any**
+topic, open or owned. As of kernel **v4.3.0** metrics are no longer scatter-
+gathered: a topic's root publishes a signed snapshot to `metricTopic(T)` every
+~20 s (the relay fleet runs this), and `metrics()` simply subscribes to that
+*open* metric topic briefly and returns the freshest snapshot via replay-on-
+subscribe. Owned topics' metrics are **public too** — anyone who can derive the
+id can read them — so there is no owner gate.
 
 | Arg | Type | Notes |
 |---|---|---|
-| `topic` | `TopicDescriptor \| string` | descriptor **or** 66-hex id. |
-| `opts.timeoutMs` | `number` | default `500`. |
+| `topic` | `TopicDescriptor \| string` | the **data** topic — descriptor **or** 66-hex id. |
+| `opts.timeoutMs` | `number` | how long to wait for a snapshot; default `1500`. |
 
 **Returns:**
 
 ```ts
 {
-  publishes:     number;   // distinct post hashes seen (cumulative; only rises)
-  current_count: number;   // live (non-expired, non-killed) messages retained right now
-  subscribers:   number;   // max direct-child count at any single responding relay
-  deliveries:    number;   // total fan-out deliveries
-  pulls:         number;    // total pull() hits
-  reshares:      number;   // total reshare bumps
-  relayCount:    number;   // distinct relays that replied (coverage sanity-check)
+  current_count: number;       // live (non-expired, non-killed) messages retained now
+  subscribers:   number;       // the publishing root's direct-child count (lower bound once split)
+  bytes:         number;       // live cached envelope bytes
+  publishes:     number;       // present only if the publisher tracks it; else 0
+  ts:            number|null;  // snapshot timestamp
+  signer:        string|null;  // the snapshot envelope's signerPubkey (provenance)
+  stale:         boolean;      // true ⇒ no snapshot seen (no metrics publisher roots this topic)
 }
 ```
 
-`current_count` falls as messages are killed or age out; `publishes`
-only rises. `subscribers` is exact for an unsplit topic, a lower bound
-once the tree splits. Use for UX, not billing.
+`current_count` falls as messages are killed or age out. `subscribers` is exact
+for an unsplit topic, a lower bound once the tree splits. Use for UX, not billing.
 
 ```js
-// owner reading their OWN owned topic's live state, on demand:
-const m = await peer.metrics({ region: 'useast', owner: me.authorId, name: 'inbox', write: 'owner' });
-console.log(`${m.subscribers} subscribers, ${m.current_count} live messages`);
+const m = await peer.metrics({ region: 'useast', name: 'lobby' });
+if (!m.stale) console.log(`${m.subscribers} subscribers, ${m.current_count} live messages`);
 ```
 
-> **Owner-only (v3.6.0).** Open/public topics no longer answer this probe — a
-> non-owner cannot trigger a K-root fan-out for any topic. For an open topic's
-> public count, subscribe to `metricTopic(T)`. `metrics()` is the owner's private,
-> immediate reader and the operator/debug escape hatch.
+> **For a live dashboard, prefer `sub(metricTopic(T), …)` directly** (below) —
+> one standing subscription gives you the latest snapshot plus a rolling history.
+> `metrics()` is the convenience one-shot. Trust is **advisory**: the metric topic
+> is open, so check `signer` if you need provenance (pin to a known relay key).
 
-#### `metricTopic(dataTopicId)` → `TopicDescriptor` *(subscribe to metrics — the scalable path)*
+#### `metricTopic(dataTopicId)` → `TopicDescriptor` *(subscribe to metrics — the live path)*
 
-`peer.metrics()` above is a **scatter-gather**: one fan-out to the K roots per
-call. Fine for an occasional probe; **do not call it on a per-user timer** — the
-cost grows with both the audience and the poll rate. Instead **subscribe to a
-topic's metrics.** A topic's primary root publishes a signed metric snapshot to a
-*derived* topic on a ~5-min cadence; compute that topic with `metricTopic()` and
-`sub()` it. You get the latest snapshot via replay-on-subscribe plus every
-update — one subscription instead of a fan-out per poll — and, because snapshots
-are ordinary messages that age out at the 48 h hold ceiling, a **rolling ~48 h
-history for free** to plot trends.
+The producer side of the convention. A topic's primary root publishes a signed
+metric snapshot to a *derived, open* topic every ~20 s — for **both open and
+owned** data topics (v4.3.0). Compute that topic with `metricTopic()` and `sub()`
+it: you get the latest snapshot via replay-on-subscribe plus every update — one
+subscription instead of a poll — and, because snapshots are ordinary messages
+that age out at the 48 h hold ceiling, a **rolling ~48 h history for free** to
+plot trends. This is also how you subscribe to an **owned** topic's metrics
+without owning it.
 
 ```js
 import { deriveTopicId, metricTopic } from '@axona/protocol';
@@ -736,7 +734,7 @@ import { deriveTopicId, metricTopic } from '@axona/protocol';
 const id = await deriveTopicId({ region: 'useast', name: 'lobby' });
 await peer.sub(metricTopic(id), (env) => {
   const m = JSON.parse(env.message);
-  // { topic, ts, by, current_count, subscribers, bytes }
+  // { topic, ts, by, signer, current_count, subscribers, bytes }
   render(m.subscribers, m.current_count);
 }, { since: 'all' });   // since:'all' → latest snapshot + the rolling history
 ```
@@ -751,11 +749,8 @@ await peer.sub(metricTopic(id), (env) => {
 Trust is **advisory**: the metric topic is open (anyone may publish to it), so
 treat a snapshot as a hint — if you need to, pin trust to a known relay's
 `env.signerPubkey`. The protocol does not prove a snapshot is authoritative.
-Only **open** topics get a metric topic; owned-topic counts stay owner-only
-(read them with `peer.metrics()` as the owner). `peer.metrics()` remains the
-on-demand/operator escape hatch.
 
-### 4.4 owner + creator ops: kill / touch / unpub
+### 4.4 owner + creator ops: kill
 
 These take a **descriptor** (not a bare id) and a signer via
 `{ signWith }`.
@@ -789,51 +784,13 @@ await peer.kill({ region: 'useast', name: 'lobby' }, id, { signWith: me });
 A network that can't authorize the kill is **not** an error — it just
 won't take effect.
 
-#### `peer.touch(topic, msgId, { signWith })` → `Promise<{ ok }>`
-
-Keep-alive. A signed touch routed to the roots resets the message's
-hold-time expiry to `now + hold` (bounded by the 48 h ceiling), moves it
-to the head of the queue, and makes it the last entry evicted. Use it to
-keep a still-relevant message alive past its default hold without
-re-publishing.
-
-Authority is **by topic**, not by message authorship: on an **open**
-topic anyone may touch; on an **owned** topic only the owner may
-(verified at the root).
-
-| Arg | Type | Notes |
-|---|---|---|
-| `topic` | `TopicDescriptor` | the topic. |
-| `msgId` | `string` | **required** 64-char hex. |
-| `opts.signWith` | `AuthorIdentity` | signs for freshness; on an owned topic must be the owner. |
-
-```js
-await peer.touch({ region: 'useast', name: 'status', owner: me.authorId }, id, { signWith: me });
-```
-
-**Throws** `TouchError`: `TOUCH_INVALID_MSGID`, `TOUCH_SIGN_FAILED`.
-
-#### `peer.unpub(topic, { signWith, destroy? })` → `Promise<{ ok }>`
-
-Remove an **owned** topic's message queue — owner-only. The roots verify
-ownership self-authenticatingly (`signer.pubkey === owner`).
-
-| Arg | Type | Notes |
-|---|---|---|
-| `topic` | `TopicDescriptor` | must be an owned topic (`{ owner, write: 'owner' }`). |
-| `opts.signWith` | `AuthorIdentity` | must be the owner key. |
-| `opts.destroy` | `boolean` | `false` (default) drops messages, keeps config/ACL so the owner can keep publishing; `true` is total removal (messages + config/ACL + hosting role state). |
-
-```js
-const feed = { region: 'useast', owner: me.authorId, name: 'profile' };
-await peer.unpub(feed, { signWith: me });                  // clear the queue
-await peer.unpub(feed, { signWith: me, destroy: true });   // remove entirely
-```
-
-Ownerless (open) topics have no owner key and **cannot** be unpubbed.
-
-**Throws** `UnpubError`: `UNPUB_PUBLIC_TOPIC` (open topic),
-`UNPUB_SIGN_FAILED` (no/invalid `signWith`, or signer isn't the owner).
+> **Removed in v4.3.0: `peer.unpub()` and `peer.touch()`.** `kill(topic, msgId)`
+> is now the single retraction primitive — retract individual messages you
+> signed. (`unpub` cleared a whole owned-topic queue; `touch` was a hold-time
+> keep-alive. Both are gone — a topic's queue empties naturally as messages age
+> out at the 48 h hold ceiling, and a still-relevant message is kept current by
+> re-publishing.) `touch()` remains callable as a no-op for source compatibility
+> but does nothing; do not use it.
 
 ### 4.5 hosting: host / unhost
 
@@ -1359,23 +1316,18 @@ await peer.pub({ name: BRIDGE_DIRECTORY_TOPIC, region: 'useast' }, entry, { sign
 
 ## 16. Low-level pub/sub builders
 
-The signed wire records behind `peer.kill` / `touch` / `unpub`. Apps use
-the `peer.*` methods; these are for protocol implementors and custom
-roots.
+The signed wire record behind `peer.kill`. Apps use `peer.kill`; this is
+for protocol implementors and custom roots.
 
 ```js
 buildKill({ topicId, msgId, ts?, seq?, identity })                       // → signed kill
 verifyKill(kill)                                                          // → verification result
 KILL_DOMAIN     // 'axona:pubsub-kill:v1'
-
-buildTouch({ topicId, msgId, ts?, seq?, identity })                      // → signed touch
-verifyTouch(touch)
-TOUCH_DOMAIN    // 'axona:pubsub-touch:v1'
-
-buildUnpub({ topicId, topicName, ownerNodeId, destroy?, ts?, seq?, identity }) // → signed unpub
-verifyUnpub(unpub)
-UNPUB_DOMAIN    // 'axona:pubsub-unpub:v1'
 ```
+
+> The `unpub` wire record was **removed in v4.3.0** (kill is the single
+> retraction primitive). `touch` is **deprecated** — its handler is a no-op;
+> the `buildTouch`/`verifyTouch` helpers remain only for wire back-compat.
 
 `AxonaManager` (the pub/sub state machine), `AxonaDomain`, `NeuronNode`,
 `Synapse`, `Subscription`, `DHTNode`, and `GEO_CELL_BITS` (= 8) are also

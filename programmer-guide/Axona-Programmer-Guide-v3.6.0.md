@@ -396,7 +396,7 @@ await createAuthorIdentity({ persistAs: 'me', store }); // durable: custom { get
   for genuinely throwaway posting.
 - **Durable** (`persistAs`) -- on first call it mints and saves; on later
   calls it loads the saved key. The same Author ID survives reloads, so
-  readers recognize you across sessions and you can `kill`/`unpub` your own
+  readers recognize you across sessions and you can `kill` your own
   content later. `persistAs` is a *local storage label*, not a network name.
 
 In the browser `persistAs` uses `localStorage` by default; pass `store` (any
@@ -422,7 +422,7 @@ await peer.pub({ name: 'lobby' }, 'beep boop',     { signWith: bot });
 
 ### 5.4 Every publish names its signer -- there is no default
 
-This is a hard rule. Each `peer.pub` (and `kill`, `touch`, `unpub`) takes a
+This is a hard rule. Each `peer.pub` (and `kill`) takes a
 `signWith`:
 
 ```js
@@ -603,7 +603,7 @@ await peer.metrics(feedId);                          // metrics by ID
 
 ### 6.6 Publishing needs the descriptor, not the ID
 
-`pub` (and the owner ops `kill` / `unpub`) require the **descriptor** --
+`pub` (and the owner op `kill`) requires the **descriptor** --
 passing a bare ID throws `PUBLISH_INVALID_TOPIC`. This is by design:
 
 - The storing node must recompute the ID from `{ region, owner, name, write }`
@@ -698,7 +698,7 @@ await sub.stop();
 |---|---|
 | omitted | Live tail only -- no cached messages. |
 | `'all'` | Replay everything in the axons' caches, then live tail. |
-| `'latest'` | Replay roughly the most recent second of cache, then live tail. |
+| `'latest'` | Replay the single newest retained message (the current value, regardless of age), then live tail. |
 | `<number>` | Replay messages newer than this ms-epoch timestamp, then live tail. |
 
 For chat / feed UX you almost always want `since: 'all'` -- new subscribers
@@ -735,11 +735,10 @@ backfilling anything still in the hold window).
 **For your application: nothing to manage.** You never renew subscriptions
 yourself.
 
-### 7.6 Lifecycle: unsub, kill, touch, unpub
+### 7.6 Lifecycle: unsub, kill
 
-All four are self-authenticating -- authority is proven by the same author
-key, no gatekeeper. Each names its author via `signWith` where it acts on
-authored content.
+Both are self-authenticating -- authority is proven by the same author key,
+no gatekeeper. `kill` names its author via `signWith`.
 
 ```js
 // Leave a topic (stops all your local subs for it; sends the network unsub).
@@ -748,23 +747,18 @@ await peer.unsub({ region: 'useast', name: 'lobby' });
 // Retract a message YOU authored ("unsend"). Accepted only if signed by the
 // SAME author key that signed the original.
 await peer.kill({ region: 'useast', name: 'lobby' }, msgId, { signWith: me });
-
-// Keep a message alive past its hold without re-publishing. Open topic ->
-// anyone may; owned topic -> owner-only. Moves it to the head of the queue.
-await peer.touch({ region: 'useast', name: 'lobby' }, msgId, { signWith: me });
-
-// Remove an owned topic's queue. OWNER-only; { destroy: true } removes the
-// topic's config/state entirely (open topics cannot be unpubbed).
-await peer.unpub({ region: 'useast', owner: me.authorId, name: 'profile' },
-                 { signWith: me, destroy: true });
 ```
 
-Two honesty notes:
+> **Removed in v4.3.0: `touch` and `unpub`.** `kill` is now the single
+> retraction primitive. `unpub` (clearing a whole owned-topic queue) is gone —
+> a queue empties naturally as messages age out at the 48 h ceiling. `touch`
+> (a hold-time keep-alive) is gone too — keep a still-relevant message current
+> by **re-publishing** it (an upsert that resets the hold *and* the ceiling; see
+> §7.7). `peer.touch()` remains callable as a no-op for source compatibility.
 
-- `kill` is **best-effort redaction, not a cryptographic un-send** -- a
-  subscriber that already has the plaintext can keep it, and an offline one
-  may never see the purge. An anonymous message cannot be killed.
-- `unpub` is owner-only and unavailable on open (ownerless) topics.
+Honesty note: `kill` is **best-effort redaction, not a cryptographic un-send**
+-- a subscriber that already has the plaintext can keep it, and an offline one
+may never see the purge. An anonymous message cannot be killed.
 
 ### 7.7 Message hold time: re-publish refresh, touch, and the ceiling
 
@@ -783,17 +777,16 @@ replay-on-subscribe. (Different authors of identical text have **different**
 msgIds and are not collapsed; add a nonce to `message` for an
 independently-addressable copy by the same author.)
 
-**`touch` (or `pull`) also refreshes, but cannot reset the ceiling.**
-`peer.touch(topic, msgId, { signWith })` resets the hold to `now + hold`; a `pull`
-slides it the same way as a side effect of the read (locally, on the serving
-replica). Both are clamped to the entry's **current** `ceilingAt`. So: use
-`touch` to extend a message *without re-publishing or re-notifying* (bounded by
-the existing ceiling); re-publish when you also want a fresh ceiling and to
-re-establish the content as the newest entry.
+**`pull` also refreshes, but cannot reset the ceiling.** A `pull` slides the
+hold forward as a side effect of the read (locally, on the serving replica),
+clamped to the entry's **current** `ceilingAt`. So a pulled message lives a
+little longer without re-notifying; re-publish when you want a fresh ceiling and
+to re-establish the content as the newest entry. (Pre-v4.3.0 `touch` did this
+deliberately; it's removed — re-publish instead.)
 
 **The ceiling.** An entry can never outlive its `ceilingAt = ts + 48h` via
-`touch`/`pull`. A re-publish sets a new `ts`, hence a new ceiling -- which is why
-re-publishing can extend indefinitely while touching cannot.
+`pull`. A re-publish sets a new `ts`, hence a new ceiling -- which is why
+re-publishing can extend indefinitely while a pull-refresh cannot.
 
 With `kill`: because there is one entry per msgId, a single
 `kill(topic, msgId, { signWith })` retracts it -- no stale copy is left behind.
@@ -809,57 +802,55 @@ killed in each.
 const env    = await peer.pull(msgId, { topic: feedId, timeoutMs: 1000 });
 const latest = await peer.pull(null,  { topic: feedId });
 
-// Coarse, best-effort delivery counters, merged across the topic's axons.
-// OWNER-ONLY (v3.6.0): metrics() answers only the owner of an OWNED topic.
-const m = await peer.metrics(myOwnedFeed, { timeoutMs: 500 });
-// { publishes, current_count, subscribers, deliveries, pulls, reshares, relayCount }
+// Coarse, best-effort topic state. Works for ANY topic — open or owned.
+const m = await peer.metrics(feedId, { timeoutMs: 1500 });
+// { current_count, subscribers, bytes, publishes, ts, signer, stale }
 ```
 
 `pull` queries the topic's K-closest axons and is for "did I miss this one?",
-not durable storage. `metrics()` is an **owner-only, on-demand** read: it
-answers only the owner of an owned (`write:'owner'`) topic — open/public topics
-are refused (a non-owner can't trigger a K-root fan-out). For a public count
-("X people are in this room"), **subscribe to `metricTopic(T)`** (next section)
-rather than calling `metrics()`. `current_count` is the live retained count;
-`subscribers` is the max direct-child count any one axon reported — for UX, not
-billing.
+not durable storage. `metrics()` (v4.3.0) is a one-shot read of the latest
+**published** metric snapshot — a topic's root publishes a signed snapshot to
+`metricTopic(T)` every ~20 s, and `metrics()` just subscribes to it briefly and
+returns the freshest one (`stale:true` if no publisher roots the topic yet). It
+works for **any** topic, open or owned — an owned topic's metrics are public
+too. `current_count` is the live retained count; `subscribers` is the publishing
+root's direct-child count — for UX, not billing.
 
-> **Don't poll `metrics()` per user.** It's a scatter-gather to the K roots —
-> one fan-out *per call*. If your UI shows a live "N in the room", read it from
-> the topic's **metric topic** instead (next section): one subscription, updated
-> for you, with a rolling history thrown in.
+> **For a live count, prefer `sub(metricTopic(T), …)` directly** (next section):
+> one standing subscription, every update pushed to you, plus a rolling history.
+> `metrics()` is the convenience one-shot.
 
-### 7.8b Watching metrics at scale (`metricTopic`)
+### 7.8b Watching metrics live (`metricTopic`)
 
-For a continuously-displayed count, don't call `metrics()` on a timer — its cost
-grows with both your audience and your poll rate. Instead **subscribe to the
-topic's metrics.** A topic's primary root republishes a signed snapshot to a
-*derived* topic every ~5 minutes; you compute that topic with `metricTopic()`
-and `sub()` it like any other:
+For a continuously-displayed count, **subscribe to the topic's metrics.** A
+topic's primary root publishes a signed snapshot to a *derived, open* topic every
+~20 s — for **both open and owned** data topics; you compute that topic with
+`metricTopic()` and `sub()` it like any other:
 
 ```js
 import { deriveTopicId, metricTopic } from '@axona/protocol';
 
 const lobbyId = await deriveTopicId({ region: 'useast', name: 'lobby' });
 await peer.sub(metricTopic(lobbyId), (env) => {
-  const m = JSON.parse(env.message);   // { topic, ts, by, current_count, subscribers, bytes }
+  const m = JSON.parse(env.message);   // { topic, ts, by, signer, current_count, subscribers, bytes }
   showRoomCount(m.subscribers, m.current_count);
 }, { since: 'all' });                  // latest snapshot + a rolling ~48 h trend
 ```
 
-You pay one subscription instead of a fan-out per poll, you get every update
-pushed to you, and because each 5-minute snapshot is an ordinary retained
-message that ages out at the 48 h hold ceiling, `since:'all'` hands you a
-**rolling ~48 h history** — enough to plot a trend line, free.
+You pay one subscription instead of a poll, you get every update pushed to you,
+and because each snapshot is an ordinary retained message that ages out at the
+48 h hold ceiling, `since:'all'` hands you a **rolling ~48 h history** — enough
+to plot a trend line, free.
 
 Three things to keep in mind:
 
 - **Advisory, not authoritative.** The metric topic is *open* (anyone can
   publish to it), so treat a snapshot as a hint. If you only trust your own
   relays, check `env.signerPubkey` against their keys.
-- **Open topics only.** A `write: 'owner'` topic's counts stay owner-only by
-  design — there's no public metric topic for it; read those with `metrics()`
-  as the owner.
+- **Owned topics included (v4.3.0).** An owned (`write:'owner'`) topic's metrics
+  are published to its (open) metric topic too — so anyone can subscribe to an
+  owned topic's activity metrics without owning it. The *messages* stay write-
+  gated; only the activity counts are public.
 - **You don't publish these — relays do.** As an app you only ever *read* metric
   topics. The publish side runs on infrastructure (see §7.9 / the relay).
 
@@ -972,7 +963,7 @@ peer.onUpgradeRequired((err) => { /* show an upgrade banner */ });
 
 `onLog` takes the **level first**, then the handler, and returns an
 unsubscribe. The kernel forwards its security drop-path logs (bad signature,
-stale, oversize, write-policy violation, unauthorized kill/unpub, ...) to
+stale, oversize, write-policy violation, unauthorized kill, ...) to
 `onLog` so you can surface them.
 
 ---
@@ -1306,7 +1297,7 @@ key signed by default.)
 
 ### 13.2 Publishing with a Topic ID
 
-`pub`, `kill`, and `unpub` need the **descriptor** -- a bare 66-hex Topic ID
+`pub` and `kill` need the **descriptor** -- a bare 66-hex Topic ID
 throws `PUBLISH_INVALID_TOPIC`. Only `sub`, `pull`, and `metrics` accept an
 ID. Share the ID for reading; share the descriptor (`{ region, name }` or the
 full owned descriptor) for writing (6.6).
@@ -1449,11 +1440,9 @@ deriveTopicId({ region?, owner?, name, write? })   // -> 66-hex read handle
 peer.pub(descriptor, message, { signWith })        // -> msgId   (signWith REQUIRED)
 peer.sub(descriptor | topicId, handler, { since? }) // -> Subscription; handler gets envelope or { msgId, deleted:true }
 peer.unsub(descriptor)                              // -> { ok, removed }
-peer.kill(descriptor, msgId, { signWith })          // author-only retract
-peer.touch(descriptor, msgId, { signWith })         // keep-alive (open: anyone; owned: owner)
-peer.unpub(descriptor, { signWith, destroy? })      // owner-only queue removal
+peer.kill(descriptor, msgId, { signWith })          // author-only retract (sole retraction primitive; touch/unpub removed v4.3.0)
 peer.pull(msgId | null, { topic, timeoutMs? })      // topic = descriptor | id; null -> latest
-peer.metrics(descriptor | topicId, { timeoutMs? })  // on-demand scatter-gather (don't poll it)
+peer.metrics(descriptor | topicId, { timeoutMs? })  // one-shot read of the published snapshot (open + owned)
 metricTopic(dataTopicId)                            // -> metric topic descriptor; sub() it for live + trend
 peer.sub(metricTopic(await deriveTopicId(desc)), cb, { since:'all' })   // scalable metrics
 peer.host(descriptor?)  / peer.unhost(descriptor?)  // host()/unhost() = keyspace
@@ -1513,7 +1502,6 @@ Errors subclass `AxonaError` with a stable `.code` -- switch on `.code`, not
 | `WRITE_POLICY_VIOLATION` | non-owner publishing to an owned topic (13.5) |
 | `PUBLISH_PAYLOAD_TOO_LARGE` | enveloped message over the 16 KiB floor (13.7) |
 | `PUBLISH_INVALID_MESSAGE` | message not JSON-serializable |
-| `UNPUB_PUBLIC_TOPIC` | `unpub` on an open (ownerless) topic |
 | `TOPIC_REGION_REQUIRED` | region omitted and no node region available |
 | `UPGRADE_REQUIRED` | peer below the bridge's minimum wire version (13.10) |
 

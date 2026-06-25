@@ -1,5 +1,23 @@
 # Pub/Sub Metrics as a Derived Topic — subscribe, don't scatter-gather (v0.1)
 
+> **Updated for kernel v4.3.0 (2026-06-25).** Three policy points below were
+> superseded; the core idea (metrics as a derived, subscribable topic) is now
+> the *only* path:
+> - **`peer.metrics()` is no longer a scatter-gather.** It does a one-shot read
+>   of the latest *published* snapshot from `metricTopic(T)` (briefly subscribing,
+>   returning the freshest replayed snapshot). The on-demand `pubsub:metricsReq`
+>   fan-out is gone. §1/§6 below describe the retired mechanism.
+> - **Owned topics publish metrics too.** The "owner-only / open-topics-only"
+>   privacy carve-out (§6 and the relay-skip in §8) is **reversed**: an owned
+>   topic's activity counts are published to its (open) metric topic, so anyone
+>   can subscribe. Only the topic's *messages* and *write* capability stay
+>   owner-gated. The relay loop now skips **only** metric topics (recursion).
+> - **Cadence is ~20 s**, not ~5 min (`DEFAULT_METRICS_INTERVAL_MS`). The 48 h
+>   hold ceiling still bounds the rolling history (≈ shorter window at 20 s).
+>
+> Also in v4.3.0: `peer.unpub()` was removed and `peer.touch()` deprecated —
+> unrelated to this note but part of the same release.
+
 **Status:** architecture note / design rationale · **Flagged:** 2026-06-20 ·
 **Relates to:** the pub/sub Application API (`peer.metrics(topic)`), the replay
 cache + hold-time model (`MAX_HOLD_MS = 48 h`), and `host()`-based relays. This

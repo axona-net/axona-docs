@@ -7,6 +7,41 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.3.0 — metrics-via-publish (open + owned); `kill` is the only retraction (2026-06-25)
+
+**Metrics are now a regular publish event.** A topic's root publishes a signed
+metric snapshot to its derived metric topic (`metricTopic(T)`) every ~20 s — for
+**both open and owned** data topics. `peer.metrics(topic)` no longer scatter-
+gathers the K roots; it does a one-shot read of the latest published snapshot
+(returns `{ current_count, subscribers, bytes, publishes, ts, signer, stale }`).
+For a live dashboard, `sub(metricTopic(T), …, { since:'all' })` directly — one
+subscription, latest snapshot + a rolling ~48 h trend.
+
+**Owned-topic metrics are public.** Anyone who can derive an owned topic's id can
+now subscribe to its activity metrics (subscriber/message/byte counts) without
+holding the owner key. The topic's *messages* and *write* capability stay
+owner-gated; only the activity counts are public.
+
+**`unpub` removed, `touch` deprecated.** `peer.kill(topic, msgId)` is now the
+single retraction primitive. `peer.unpub()` (bulk owned-topic queue removal) is
+gone; `peer.touch()` (hold-time keep-alive) is a no-op kept for source compat —
+keep a message current by re-publishing it (an upsert that resets the hold and
+the 48 h ceiling).
+
+**`since:'latest'` now returns the current value regardless of age.** It was
+implemented as a ~1-second cache window (`now - 1000`), so a `since:'latest'`
+subscriber got **no callback** when the topic's last message was published (by
+another client) more than ~1 s earlier — the common retained/last-value case.
+(`since:'all'` and any publish *after* subscribe both worked, masking it.) Now
+the root replays its single newest cache entry regardless of age (a `latest`
+flag on the SUB), then live-tails. Wire-additive; covered by `smoke_since_latest`.
+
+Relay metric-publish loop → 20 s cadence, owned topics included (axona-relay
+v0.22.0). Re-vendored into axona-peer (v4.3.0). Testnet only; production
+untouched.
+
+---
+
 ## v4.2.2 — keyspace hosting actually anchors topics (2026-06-24)
 
 `peer.host()` with no topic ("host whatever lands near me" — the relay fleet's

@@ -16,6 +16,42 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.3.0 — 2026-06-25
+
+**Metrics moved entirely onto signed, published snapshots; `unpub` removed;
+`touch` deprecated.** Two surface changes, both narrowing what the network does
+on a peer's behalf:
+
+- **`peer.metrics()` no longer triggers an on-demand fan-out.** Previously it
+  scatter-gathered the K closest roots per call — an amplification an attacker
+  could drive by polling. Now a topic's root publishes a **signed** metric
+  snapshot to a derived, open metric topic on a fixed ~20 s cadence, and
+  `metrics()` simply reads the latest published snapshot. There is no caller-
+  triggered fan-out to amplify, and every snapshot carries the publisher's
+  `signerPubkey` so a consumer can pin trust to a known relay key. Snapshots
+  remain **advisory** (the metric topic is open by construction); the protocol
+  does not claim a snapshot is authoritative.
+
+- **Intentional disclosure: owned-topic activity metrics are now public.** An
+  owned (`write:'owner'`) topic's *messages* stay write-gated — only the owner
+  key may publish, enforced at the root — but its **activity counts**
+  (subscriber count, retained-message count, bytes) are now published to an open
+  metric topic, so anyone who can derive the topic id can read them. This is a
+  deliberate design decision (parity with open topics; lets anyone watch an
+  owned topic's reach without holding the owner key). The message **contents**
+  and the **write** capability are unchanged and remain owner-gated.
+
+- **Retraction surface narrowed to `kill` only.** `peer.unpub()` (owner-only
+  bulk queue removal) is **removed** — its wire record is no longer sent or
+  handled. `peer.kill(topic, msgId)` — authorship-gated, single-message,
+  tombstoned — is the sole retraction primitive. `peer.touch()` (hold-time
+  keep-alive) is **deprecated to a no-op**. Fewer signed mutation verbs reach a
+  root, each still self-authenticating.
+
+Testnet only (wire-4 partition); production untouched.
+
+---
+
 ## Kernel v4.0.0 — 2026-06-24
 
 **Wire-version partition (`WIRE_VERSION` 3.0 → 4.0).** The routing-only
@@ -1081,4 +1117,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-22.*
+*Last updated: 2026-06-25.*
