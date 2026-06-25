@@ -66,11 +66,27 @@ display, never as `[object Object]`. New code should still **publish**
 | `readSender(env, len = 8)` | Short sender label: authenticated `signerPubkey`, else a body `node`/`from` hint, else `(unknown)`. |
 | `MESSAGE_FORMAT` | Current body format version (`1`). |
 
-## Scope
+## Scope — two complementary `std` conventions
 
-Applies to **text/message** apps. A non-message app with its own framing is exempt
-— e.g. `axona-share` transfers binary files as `std/chunk` chunk-messages, not text
-bodies. Such apps document their own body format.
+An app picks the `std` convention that matches its **payload**, and uses it the same
+way every other app does:
+
+| Payload | Convention | Helpers |
+|---|---|---|
+| Human-readable **text** messages | **`std/message`** | `makeMessage` / `readMessage` / `readSender` |
+| **Binary / large** data (files, images, streams) | **`std/chunk`** | `publishChunkedBytes` / `createReassembler` |
+
+`std/chunk` is the binary sibling of `std/message`: it frames a payload as a stream of
+self-describing **object** chunk-messages on a `{ region, name }` topic, signed by the
+publishing author — the same envelope model, just a different body. `axona-share` is
+the reference exemplar — it transfers images via `std/chunk` directly off the raw
+`peer` + `author` + topic descriptor (no per-app JSON-string wrapper). A text app and
+a chunk app therefore never need to parse each other's bodies; they live on different
+topics by construction.
+
+What is **not** allowed in either case: a per-app hand-rolled body shape
+(`name + ': ' + msg`, ad-hoc `JSON.stringify`, `textContent = env.message`). That is
+exactly what produced the `[object Object]` interop break above.
 
 ## Reference exemplars (all use this convention)
 
