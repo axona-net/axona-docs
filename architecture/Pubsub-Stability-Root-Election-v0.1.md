@@ -1,7 +1,10 @@
 # Stability-Weighted Root Election — design model (v0.1)
 
-**Status:** design. The LEVER is sim-validated (a durable root fixes churn loss);
-the ELECTION MECHANISM is not yet built. Not in the kernel.
+**Status:** design / under measurement. A single run suggested a durable root
+helps (protect 50→77%) but it **did not replicate** (next run: protect 53% ≈
+baseline 59%) — single-seed delivery% is dominated by subscriber-churn-in noise.
+Conclusion PENDING a replicated (REPS≥5, mean±sd) measurement. The election
+mechanism is not built and not in the kernel. Do not cite a number from one run.
 **Motivation:** make the routing-only pub/sub root survive a high-churn,
 relay-poor (mobile-majority) network — the regime where most users can't host
 relays and stable infrastructure is a small minority.
@@ -126,15 +129,21 @@ K-closest replication); stability picks good replicas.
   root; it just adds a popped hop. **There is no oracle shortcut** — testing
   stability-election faithfully requires the real mechanism (a node accepting an
   *advertised* root over the closest, §3–4).
-  - **Lever sanity check (`MODE=protect`) — VALIDATED.** Exempt the
-    *naturally-elected* (XOR-closest) root from churn (real routing, no hint hacks),
-    simulating "the root happens to be durable." Relay-poor, 30% Lindy churn:
-    **baseline 50% (min 0%, 4 roots, 5 changes) → protect 77% (min 47%, 2 roots,
-    1 change).** Root-thrash is the dominant loss and a durable root is the cure →
-    the election mechanism is worth building. The residual 23% gap is subscriber
-    **churn-in** (fresh subscribers missing messages published before they
-    converge) — a separate, smaller problem (faster re-attach / replay-on-join),
-    NOT root election.
+  - **Lever check (`MODE=protect`) — NOT YET CONCLUSIVE.** Exempt the
+    *naturally-elected* root from churn (real routing) to isolate the value of a
+    durable root. Two single-seed runs disagreed sharply: run A baseline 50 → protect
+    **77**; run B baseline 59 → protect **53**. Delivery% has very high run-to-run
+    variance (subscriber churn-in). The one signal that's consistent across runs is
+    **root-changes**: protect reliably 0–1, baseline 3–5 — i.e. protect genuinely
+    stabilises the root, but whether that *translates to a delivery gain* needs a
+    replicated mean±sd (REPS≥5) to see past the noise. **In progress.**
+  - **Mechanism check (`MODE=stablehost`) — NEGATIVE so far.** Make the stable node
+    `host(topic)` (so it holds a role → a hint to it `handle`s as root, per the
+    diagnosis) AND hint everyone to it. Result: it *thrashed* (7 root-changes) —
+    re-electing/re-hosting a new node each round (the "oldest sub" moves as subs
+    churn) churns the role worse than leaving it alone. Lesson: the election must be
+    **sticky** (don't re-home for a marginally-older node) and the chosen node must
+    be genuinely durable — naive per-round re-election is counterproductive.
 - **Phase 1 — kernel, observed stability + sticky election.** Per-neighbour
   observed-age tracking; incumbent advertises stability in the beacon; challenger
   displaces only if in-band AND more-stable-by-margin (L1+L2). Re-measure in
