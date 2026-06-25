@@ -1,10 +1,15 @@
 # Stability-Weighted Root Election — design model (v0.1)
 
-**Status:** design / under measurement. A single run suggested a durable root
-helps (protect 50→77%) but it **did not replicate** (next run: protect 53% ≈
-baseline 59%) — single-seed delivery% is dominated by subscriber-churn-in noise.
-Conclusion PENDING a replicated (REPS≥5, mean±sd) measurement. The election
-mechanism is not built and not in the kernel. Do not cite a number from one run.
+**Status: NO-GO (do not build), 2026-06-25.** Replicated measurement (5 reps,
+relay-poor, 30% Lindy churn) shows a *perfectly* durable root barely moves average
+delivery — **baseline 48±8% vs protect 52±7%, within the error bars** — even though
+it does stabilise the root (root-changes 3.8→1.4) and lift the worst-case floor
+(4→17%). The mechanism prototype (`stablehost`) was *worse* (44±1%, 6.0 root-changes).
+**Conclusion: root-thrash is NOT the dominant delivery loss — subscriber churn-in
+is** (see §9). Stability-weighted root election is an eclipse-sensitive change to a
+load-bearing invariant for ~4 points of delivery inside the noise: **not worth it.**
+This doc is retained as the analysis + the design (still correct *if* root-thrash
+ever becomes the bottleneck, e.g. at lower churn) — but the work pivots to §9.
 **Motivation:** make the routing-only pub/sub root survive a high-churn,
 relay-poor (mobile-majority) network — the regime where most users can't host
 relays and stable infrastructure is a small minority.
@@ -152,6 +157,31 @@ K-closest replication); stability picks good replicas.
 - **Phase 2 — consistent (re)election + eclipse hardening.** In-band age gossip,
   neighbour-attested age, deterministic winner.
 - **Phase 3 — replica set + warm failover.**
+
+## 9. Pivot — the real lever is subscriber churn-in (where the work goes)
+
+The replicated data says the dominant loss in a high-churn relay-poor mesh is **not**
+the root churning — it's that a **freshly (re)subscribed peer misses messages
+published before its subscription converges/attaches** (and the mesh around a just-
+joined node is still forming). A stable root can't fix that. Lower-risk, higher-
+payoff directions, in order:
+
+1. **Replay-on-join (reliable).** On every (re)subscribe, the subscriber should
+   immediately pull the root's recent retained history (the `since:'all'` / stamped-
+   replay path already exists — make it *fire reliably and fast* on attach, not only
+   via the live tail). This directly recovers the churn-in misses. Lowest risk —
+   reuses existing durability machinery, no election/invariant change.
+2. **Faster, event-driven re-attach.** Cut convergence latency for a fresh node
+   (renew/heal is `renewMs=60s` ≫ mobile churn); attach + replay should complete in
+   seconds, not a renewal cycle.
+3. **Replica set (durability, bigger lift).** k-closest replicas + warm successor —
+   helps the worst-case floor and root-death recovery (the part protect *did* help),
+   but secondary to replay-on-join for average delivery.
+
+Recommended next experiment: instrument the harness to **classify each missed
+message** as root-related (no reachable root at publish) vs join-related (subscriber
+younger than its convergence time), to quantify the split and size the replay-on-join
+win before building it.
 
 ## 8. Open questions
 
