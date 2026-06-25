@@ -325,7 +325,8 @@ exactly-once app delivery.
 
 **Cons.** **[measured]** Renewal-gated re-homing → ~60s orphan window is the dominant
 churn loss (relay-poor + 30%/round Lindy → ~46–56% delivery; 93% of misses = subscribers
-not seated at the current root; forcing immediate re-seat → 91%). Fix in §21, not built.
+not seated at the current root; forcing immediate re-seat → 91%). **Addressed by
+adaptive renewal in v4.2.3 (§21): 43% → 75%.**
 **[measured]** Convergence-sensitivity — a single greedy walk strands on sparse/gappy
 meshes (~80% at scale historically; cold-topic discovery 0% pre-beacon, 75–100% variable
 with it). **[speculative]** Split-root during convergence until beacon + strictly-closer
@@ -371,7 +372,7 @@ throughput/centralization axis from the total-order choice.
 
 ---
 
-# PART III — THE CHURN RE-HOMING FIX (proposed, §21)
+# PART III — THE CHURN RE-HOMING FIX (§21; adaptive renewal IMPLEMENTED in kernel v4.2.3)
 
 ## 21.1 Problem
 
@@ -381,19 +382,33 @@ falls through to the topic id and re-seats — a ~60s **orphan window** during w
 publishes miss it. **[measured]** This is the dominant churn loss: 93% of misses are
 subscribers not seated at the current root.
 
-## 21.2 The fix — two complementary parts
+## 21.2 The fix — adaptive renewal (IMPLEMENTED, kernel v4.2.3)
 
-1. **Event-driven re-home (subscriber-side, primary).** Re-subscribe the instant the
-   subscriber learns the root changed, not at the next tick. The **root beacon** already
-   names the current root; when a fresh beacon names a root ≠ the subscriber's pinned
-   `_upstream` (or a renewal/delivery to that upstream fails), re-issue the SUB toward the
-   new root now and re-pin. Orphan window: ~60s → beacon-propagation + one route (sub-second
-   to a few seconds). Cheaper than brute-force low `renewMs` (only re-subscribes on change).
-2. **Root-side subscriber handoff (push, complementary).** On a graceful root change, the
-   old root transfers its subscriber/child table to the successor (mirrors stamped-replay-up
-   transferring history) → the new root fans out immediately: zero gap, no re-subscribe herd.
-   Hard crashes fall back to (1), staggered by per-node beacon-receipt timing. Renewal stays
-   the slow backstop.
+**Correction to an earlier idea:** "event-driven re-home via a root beacon" does NOT
+work — beacons reach the topic's basin (the root's XOR-closest neighbors), but the
+tree's sub-axons and leaves are promoted from *subscribers* with **random ids**,
+scattered across the keyspace and not in the basin. An already-attached subscriber
+almost never receives the beacon. The lever that reaches **every** subscriber is the
+one it already owns: its **renewal timer**.
+
+**Shipped mechanism — adaptive subscriber renewal** (`AxonaManager`, v4.2.3):
+- A subscription renews at an **adaptive interval**, not a flat 60s. It starts at a
+  **fast floor `renewFastMs = 5s`** on subscribe, and **backs off ×1.5 toward the
+  `renewMs = 60s` ceiling** on each *stable* renewal.
+- A **re-pin** — a `DELIVER` whose `from` differs from the current `_upstream`, i.e. a
+  relay change after a churn (`_onDeliver`) — **snaps the interval back to the fast
+  floor**. So a subscriber that just re-homed monitors its new attachment closely and
+  re-homes quickly again if it too churns.
+- The refresh tick was lowered to 5s so the fast floor can actually fire.
+- Net: **sustained churn keeps re-pinning → subscribers stay near 5s → fast re-home;
+  calm → they back off to 60s → cheap.** Self-tuning: fast exactly when (and where)
+  churn is happening; no extra steady-state traffic when stable. Wire-compatible (local
+  timing only — no flag day). `DROP_MS=180s` (≥3× ceiling) unchanged.
+
+**Still future (not built):** root-side subscriber-set handoff on graceful promotion
+(the new root inherits the table, zero gap + no herd). Lower priority — mobile churn is
+mostly *hard* (background/kill/signal-loss), where adaptive renewal already carries the
+win, and handoff only helps the graceful case.
 
 ## 21.3 Why it helps mobile
 
@@ -404,16 +419,22 @@ re-attachment track the **churn timescale (seconds)** not the **renewal timescal
 minute)** — the tree heals faster than it breaks. Handoff makes the common graceful case
 (a closer node joins) free.
 
-## 21.4 Evidence status (honest)
+## 21.4 Evidence status
 
-- **[measured] The lever works.** `REHOME` proxy (re-seat all live subscribers each round)
-  → delivery **41% → 91%** under relay-poor 30%/round Lindy churn, root-thrash unchanged →
-  the gain is subscription continuity, not root stabilization.
-- **[not built]** The actual mechanism (beacon-triggered re-home + handoff) — `REHOME` is a
-  blunt proxy; we've validated the *direction*, not the *implementation*.
-- **[unmeasured]** New-root re-subscribe load at thousands (the herd); handoff is the intended
-  mitigation but is unbuilt/unmeasured. Beacons are basin-scoped, so event-driven re-home
-  reaches the backbone directly; far leaves rely on their sub-axon or the renewal backstop —
-  sufficiency at scale untested.
-- **Gate before shipping:** a kernel smoke that asserts, by construction, bounded re-home
-  load AND delivery recovery after a root change — then a live test.
+- **[measured] The lever (`renewMs` sweep).** Relay-poor, 30%/round Lindy churn, real
+  kernel: delivery **60s → 43%, 12s → 58%, 5s → 82%** (monotonic) — renewal cadence is
+  the lever, and it reproduces the `REHOME` proxy's ~91% via the *real* mechanism.
+- **[measured] The shipped fix (adaptive renewal, v4.2.3).** Same scenario, no override:
+  **43% → 75% ± 18** (matches the flat-5s point, since sustained churn keeps subscribers
+  near the fast floor). Unit-pinned by `smoke_adaptive_renewal` (backoff sequence +
+  re-pin reset); full kernel suite green; wire-compatible.
+- **[measured caveat]** High variance (±18) — this is the harsh stress case; the residual
+  gap to 100% is inherent convergence/transient loss plus the *first-hit-after-calm*
+  window (a long-stable subscriber backed off to the 60s ceiling whose root suddenly dies
+  still waits up to 60s — rare under sustained churn, which keeps it fast).
+- **[unmeasured]** New-root re-subscribe load at thousands (the herd) — adaptive renewal
+  does not *worsen* it (re-subscribes are spread over each node's own timer, not
+  synchronized), but the absolute load is still unmeasured. Root-side handoff (the herd
+  mitigation for graceful changes) is not built.
+- **[not deployed]** v4.2.3 is committed + tagged but not yet re-vendored to the fleet /
+  re-validated live — gated on the deploy decision.
