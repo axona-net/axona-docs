@@ -1,9 +1,23 @@
-# Axona Pub/Sub — Routing-Only Axon Tree: complete reference (v1.0)
+# Axona Pub/Sub — Routing-Only Axon Tree: reference & analysis (v1.0)
 
 Reconstruction-grade description of the **shipped** pub/sub (kernel v4.2.x;
-`src/pubsub/AxonaManager.js` + the routing layer in `src/dht/AxonaPeer.js`).
-Sufficient to rebuild the system and to analyse it independently. Original design
-intent: `Pubsub-Axon-Tree-v0.1.md`; this documents what the code actually does.
+`src/pubsub/AxonaManager.js` + the routing layer in `src/dht/AxonaPeer.js`),
+**plus** an evidence-labeled analysis (pros/cons, weakness ledger) and the proposed
+churn re-homing fix. Sufficient to rebuild the system and to analyse it
+independently. Original design intent: `Pubsub-Axon-Tree-v0.1.md`; this documents
+what the code actually does.
+
+**Contents.** Part I — Architecture (§0–§15, reconstruction reference). Part II —
+Analysis (§16 performance · §17 security · §18 robustness · §19 scalability · §20
+overall + weakness ledger). Part III — §21 the churn re-homing fix.
+
+Evidence labels used in Part II: **[measured]** = data from this codebase's sims this
+cycle; **[architectural]** = follows necessarily from the design; **[speculative]** =
+reasoned from the code, not tested; **[untested]** = no data either way.
+
+---
+
+# PART I — ARCHITECTURE (reference)
 
 ---
 
@@ -262,3 +276,144 @@ batch.
   that tends to win the closest-position and (optionally) `host()`s. Stability-weighted
   root election was investigated and rejected (it doesn't move delivery; see
   `Pubsub-Stability-Root-Election-v0.1.md`).
+
+---
+
+# PART II — ANALYSIS
+
+## 16. Performance
+
+**Pros.** Total order is free — one root stamp per topic gives a serialization point
++ exactly-once app delivery with no consensus round. Bounded fan-out tree
+(`MAX_DIRECT=20`, depth ≈ log₂₀N) → few hops/delivery, no flooding, no node buried by
+fan-out. Steady state is cheap (pinned subscribers renew via their relay, not the root).
+
+**Cons.** **[architectural]** The root is a per-topic serialization bottleneck —
+every publish funnels through one node (verify Ed25519 + freshness + stamp + fan-out);
+a hot topic's throughput is one node's CPU, with no horizontal scaling.
+**[measured-ish]** Publish latency = route-to-root + tree depth, and route-to-root is
+variable on a sparse mesh (greedy convergence). **[architectural]** Replay-on-join cost
+scales with the relay's cache (≤24h / 1024 msgs).
+
+## 17. Security
+
+**Pros (tested by smokes).** Layered ingest gates: B-4 publisher signature +
+content-hash `msgId`; C-2 freshness (anti-replay); write-policy (owner-only topics
+reject non-owner publishes); topic-id recomputation (no misrouting to another topic);
+B-1 subscriber-origin; D-1 size/count caps. Beacon **verify-don't-trust** (a hint is
+accepted only if it names a root at least as close → can never divert to a *farther*
+node). Dual-key identity: envelope discloses **who**, never **where**.
+
+**Cons / risk surface.** **[speculative]** The root is a powerful, capturable position
+— it sees the entire subscriber set (metadata/social-graph) and can **censor** by
+dropping a publish or omitting subscribers from fan-out (capability is real in code; no
+adversarial test). **[speculative, ties to open E-1]** Closer-Sybil capture — root-ness
+is pure XOR-closeness, so grinding a key to land nearest a topic id legitimately
+captures its root; beacon verify-don't-trust does NOT stop a genuinely-closer Sybil.
+**[architectural]** Intermediary relays cache + re-fan plaintext envelopes (content +
+metadata transit untrusted peers; mitigated only by app-layer encryption). **[open —
+Phase A #4]** Root DoS via publish flood (no per-publisher quota). **[untested]**
+kill/unpub/touch are thin stubs; abuse surface unexamined.
+
+## 18. Robustness
+
+**Pros.** Self-healing with no explicit failure detector — a dead upstream falls
+through to the topic id and re-seats; "who delivers to you" *is* "who you renew
+toward," so a relay change re-pins on the next delivery. Durability across root death
+via stamped-replay-up; 24h hold + replay-on-join for late/reload subscribers;
+exactly-once app delivery.
+
+**Cons.** **[measured]** Renewal-gated re-homing → ~60s orphan window is the dominant
+churn loss (relay-poor + 30%/round Lindy → ~46–56% delivery; 93% of misses = subscribers
+not seated at the current root; forcing immediate re-seat → 91%). Fix in §21, not built.
+**[measured]** Convergence-sensitivity — a single greedy walk strands on sparse/gappy
+meshes (~80% at scale historically; cold-topic discovery 0% pre-beacon, 75–100% variable
+with it). **[speculative]** Split-root during convergence until beacon + strictly-closer
+correction reconcile (coded; worst-case duration uncharacterized). **[untested]**
+History-loss window — if the only cache-bearing node holding recent history churns before
+reattaching, stamped-replay-up has nothing to recover from.
+
+## 19. Scalability
+
+**Pros.** Per-node fan-out bounded (20); beacon reach basin-scoped (tens of nodes near
+the topic, not global) → scales with topic count, not network size; no global state.
+**[measured]** Validated to ~1000 peers in dht-sim (real kernel, idealized mesh): 100%
+delivery, depth ~2–4, fan-out ≤20.
+
+**Cons.** **[architectural]** Single root = per-topic throughput ceiling (no horizontal
+scaling of a hot topic). **[untested — the open scaling question]** Root re-subscribe
+load during a root change at thousands of subs — argued bounded by tree fan-out (only the
+backbone re-homes; leaves under surviving sub-axons don't), but the harness could NOT
+cleanly measure it; **no trustworthy number exists**. **[untested]** Live scale beyond
+~1000 / small testnet. **[speculative]** Tree balance under skewed subscriber-id
+distributions; beacon traffic at high per-node topic density (cap 256 topics/beacon).
+
+## 20. Overall quality + weakness ledger
+
+**Pros.** Conceptual economy — one invariant, ~960 lines, no separate membership
+protocol to desync → genuinely analyzable. Clean layered security with tests; honest,
+documented limits; total-order + exactly-once first-class. **Cons.** The churn
+re-homing fix (§21) is designed but unbuilt; side functions are stubs; a structural
+tension (renewal cadence trades background traffic against orphan window); two
+load-bearing claims unmeasured (large-scale live delivery; root-change load).
+
+| Tier | Weakness |
+|---|---|
+| **Known / measured** | 60s renewal-gated orphan window dominates churn loss (41→91% with re-seat) · single greedy walk strands on sparse mesh (~80% scale) · per-topic single-root throughput ceiling (architectural) |
+| **Speculative** | Root capture via closer-Sybil → censorship + subscriber-set metadata leak (ties to open E-1) · intermediary relays see plaintext · root DoS via publish flood (Phase A #4) · split-root reconciliation latency |
+| **Untested** | Root-change re-subscribe load at thousands of subs · live scale beyond ~1000 · stamped-replay-up under lost/adversarial history · tree balance under skewed ids · beacon traffic at high topic density · kill/unpub correctness |
+
+**Center of gravity:** excellent at low churn + bounded fan-out, with total order +
+exactly-once as real strengths; the weakness center is **churn behavior in the
+relay-poor (mobile) regime**, where the measured problem is **subscription re-homing
+latency** (§21), not root election or routing — plus an inherent single-root
+throughput/centralization axis from the total-order choice.
+
+---
+
+# PART III — THE CHURN RE-HOMING FIX (proposed, §21)
+
+## 21.1 Problem
+
+A subscriber renews toward its pinned `_upstream` every `RENEW_MS = 60 s`. When its
+relay/root churns out, it stays seated at the dead position until that next renewal
+falls through to the topic id and re-seats — a ~60s **orphan window** during which
+publishes miss it. **[measured]** This is the dominant churn loss: 93% of misses are
+subscribers not seated at the current root.
+
+## 21.2 The fix — two complementary parts
+
+1. **Event-driven re-home (subscriber-side, primary).** Re-subscribe the instant the
+   subscriber learns the root changed, not at the next tick. The **root beacon** already
+   names the current root; when a fresh beacon names a root ≠ the subscriber's pinned
+   `_upstream` (or a renewal/delivery to that upstream fails), re-issue the SUB toward the
+   new root now and re-pin. Orphan window: ~60s → beacon-propagation + one route (sub-second
+   to a few seconds). Cheaper than brute-force low `renewMs` (only re-subscribes on change).
+2. **Root-side subscriber handoff (push, complementary).** On a graceful root change, the
+   old root transfers its subscriber/child table to the successor (mirrors stamped-replay-up
+   transferring history) → the new root fans out immediately: zero gap, no re-subscribe herd.
+   Hard crashes fall back to (1), staggered by per-node beacon-receipt timing. Renewal stays
+   the slow backstop.
+
+## 21.3 Why it helps mobile
+
+Mobile = constant session turnover (2–3 min visits, backgrounding, signal loss). At that
+churn rate some relay in your path is almost always freshly-churned, so 60s re-homing keeps
+you chronically partially-orphaned → the ~50% collapse. Event-driven re-home makes
+re-attachment track the **churn timescale (seconds)** not the **renewal timescale (a
+minute)** — the tree heals faster than it breaks. Handoff makes the common graceful case
+(a closer node joins) free.
+
+## 21.4 Evidence status (honest)
+
+- **[measured] The lever works.** `REHOME` proxy (re-seat all live subscribers each round)
+  → delivery **41% → 91%** under relay-poor 30%/round Lindy churn, root-thrash unchanged →
+  the gain is subscription continuity, not root stabilization.
+- **[not built]** The actual mechanism (beacon-triggered re-home + handoff) — `REHOME` is a
+  blunt proxy; we've validated the *direction*, not the *implementation*.
+- **[unmeasured]** New-root re-subscribe load at thousands (the herd); handoff is the intended
+  mitigation but is unbuilt/unmeasured. Beacons are basin-scoped, so event-driven re-home
+  reaches the backbone directly; far leaves rely on their sub-axon or the renewal backstop —
+  sufficiency at scale untested.
+- **Gate before shipping:** a kernel smoke that asserts, by construction, bounded re-home
+  load AND delivery recovery after a root change — then a live test.
