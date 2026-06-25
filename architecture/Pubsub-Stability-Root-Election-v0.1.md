@@ -1,15 +1,16 @@
 # Stability-Weighted Root Election — design model (v0.1)
 
-**Status: NO-GO (do not build), 2026-06-25.** Replicated measurement (5 reps,
-relay-poor, 30% Lindy churn) shows a *perfectly* durable root barely moves average
-delivery — **baseline 48±8% vs protect 52±7%, within the error bars** — even though
-it does stabilise the root (root-changes 3.8→1.4) and lift the worst-case floor
-(4→17%). The mechanism prototype (`stablehost`) was *worse* (44±1%, 6.0 root-changes).
-**Conclusion: root-thrash is NOT the dominant delivery loss — subscriber churn-in
-is** (see §9). Stability-weighted root election is an eclipse-sensitive change to a
-load-bearing invariant for ~4 points of delivery inside the noise: **not worth it.**
-This doc is retained as the analysis + the design (still correct *if* root-thrash
-ever becomes the bottleneck, e.g. at lower churn) — but the work pivots to §9.
+**Status: root election is NO-GO; the real fix is SUBSCRIPTION CONTINUITY (§9),
+validated 2026-06-25.** Stability-weighted root election does not help (a perfectly
+durable root moves delivery only 48→52%, within noise; the mechanism prototype was
+worse). The actual loss is **subscription orphaning** — 93% of missed messages go to
+subscribers no longer seated at the current root after it changed. Re-seating
+subscribers each round lifts delivery **41% → 91%** at the same churn. So: do NOT
+build stability-weighted root election (eclipse-sensitive invariant change for ~0
+gain); DO build fast/​event-driven subscription re-homing + root-side subscriber
+handoff (§9 — low-risk, no eclipse surface). This doc is retained as the full
+analysis trail; the design in §3–6 stays valid only if root-thrash ever becomes the
+bottleneck (it isn't here).
 **Motivation:** make the routing-only pub/sub root survive a high-churn,
 relay-poor (mobile-majority) network — the regime where most users can't host
 relays and stable infrastructure is a small minority.
@@ -158,13 +159,40 @@ K-closest replication); stability picks good replicas.
   neighbour-attested age, deterministic winner.
 - **Phase 3 — replica set + warm failover.**
 
-## 9. Pivot — the real lever is subscriber churn-in (where the work goes)
+## 9. ROOT CAUSE + VALIDATED FIX — subscription continuity across root change
 
-The replicated data says the dominant loss in a high-churn relay-poor mesh is **not**
-the root churning — it's that a **freshly (re)subscribed peer misses messages
-published before its subscription converges/attaches** (and the mesh around a just-
-joined node is still forming). A stable root can't fix that. Lower-risk, higher-
-payoff directions, in order:
+Direct instrumentation (relay-poor, 30% Lindy churn, real kernel; routing-table
+maintenance on, to remove a frozen-table confound that fixing did NOT help):
+
+- **93% of missed messages are ORPHANED** — the subscriber is not in the current
+  root's subscriber set at publish time. Only 7% are seated-but-undelivered (true
+  routing). Missers are the *tenured* subscribers (28s vs 8s received).
+- **Mechanism:** on a root change (or a renewal lapse) existing subscribers remain
+  seated at the OLD root; the NEW root doesn't know them until they re-home. Fresh
+  (re)subscribers always seat at the current root, so they receive — hence tenured
+  peers miss, fresh peers don't (the opposite of "churn-in").
+- **FIX VALIDATED:** re-seat every live subscriber at the current root each round
+  (`REHOME`) → **delivery 41% → 91%±7**, misses 726→107, with root-thrash *unchanged
+  or higher*. The gain is entirely subscription continuity, not root stabilization.
+
+So neither earlier hypothesis (root election / churn-in) was right; the lever is
+**keeping subscribers seated across a root change.** Kernel directions — all
+LOW-RISK (no eclipse surface, no routing-invariant change):
+
+1. **Event-driven re-home (primary).** A subscriber re-subscribes to the current
+   root the instant it learns the root changed — the v4.1 root beacon already names
+   the current root, so a subscriber whose `_upstream` differs from a fresh beacon
+   re-issues subscribe-k immediately, instead of waiting for the `renewMs=60s` tick
+   (≫ mobile churn → a 60s orphaning window today).
+2. **Root-side subscriber handoff on promotion.** When a root hands off / a new root
+   forms, transfer the subscriber set to the successor (mirrors stamped-replay-up,
+   which already transfers history) so subscribers are never dropped.
+3. **Shorter renewMs** — crude but immediate; trades traffic for a smaller orphan window.
+
+Earlier framing (kept for context): the replicated data first looked like subscriber
+*churn-in* (fresh peers missing); the seated/orphan probe disproved that too — fresh
+peers receive, tenured peers orphan. Other lower-priority durability ideas: lower-
+priority directions below.
 
 1. **Replay-on-join (reliable).** On every (re)subscribe, the subscriber should
    immediately pull the root's recent retained history (the `since:'all'` / stamped-
