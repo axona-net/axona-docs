@@ -7,6 +7,32 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.2.2 — keyspace hosting actually anchors topics (2026-06-24)
+
+`peer.host()` with no topic ("host whatever lands near me" — the relay fleet's
+default mode) set an internal `_hostKeyspace` flag that was **read nowhere** in
+the routing-only kernel, so it volunteered nothing: a root role with no
+subscribers and an empty cache was torn down on the next refresh, so a relay
+never became a durable home for the topics in its keyspace neighborhood. Now a
+keyspace host **retains any topic it has become root for**, staying an always-on
+convergence anchor + replay store. Root-ness is still decided by routing (this
+only protects roles the node legitimately won as terminus); non-root child roles
+still tear down. Pinned by `smoke_keyspace_hosting`. This is why a cold channel
+(e.g. axona-share's `public-images`) could fail to converge with the relay fleet
+up — fixed. Wire-compatible point release (WIRE 4.0).
+
+## v4.2.1 — std/chunk verify must not tear down a caller's subscription (2026-06-24)
+
+`publishChunkedBytes`' verify+repair pass (and `receiveChunkedBytes`) called
+`peer.unsub(topic)`, which stops **every** subscription on the topic — nuking a
+caller's pre-existing persistent subscription. An app that keeps a live
+subscription on the same topic it publishes to (axona-share's channel
+reassembler) destroyed its own subscription the moment it posted, silently
+(pub/sub are fire-and-forget). Fix: the verify/receive pass stops **only its own
+`Subscription` handle** (`sub.stop()`), never the whole topic — a persistent app
+subscription now survives untouched. Pinned by `smoke_std_chunk` case 11.
+axona-share → v0.14.0. Wire-compatible point release.
+
 ## v4.2.0 — std/message: canonical pub/sub message convention (2026-06-24)
 
 New `@axona/protocol/std/message` (`makeMessage` / `readMessage` / `readSender`):
