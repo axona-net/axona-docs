@@ -7,6 +7,19 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.2.0 — std/message: canonical pub/sub message convention (2026-06-24)
+
+New `@axona/protocol/std/message` (`makeMessage` / `readMessage` / `readSender`):
+the one body shape every Axona app publishes and renders, so any app displays any
+app's messages. Fixes the cross-app `[object Object]` / non-display the reference
+apps hit when each invented its own body shape (object vs string). Canonical body
+`{ v, text, …extra }`; `readMessage` is tolerant (string | `{text}` | `{message}` |
+any object → JSON), never `[object Object]`. **Standard for all apps** — see
+[Message-Convention-v0.1](programmer-guide/Message-Convention-v0.1.md). All reference
+exemplars converted (axona-minimal, the demo, the node example, axona-peer); pinned
+by `smoke_std_message`. Additive std module — wire unchanged, no flag day. (v4.1.x
+between 4.0.0 and here: root beacon + emit-on-promote + 24h default hold.)
+
 ## v4.0.0 — routing-only pub/sub + hermetic wire-4.0 partition (2026-06-24)
 
 Major, breaking, flag-day release. The pub/sub layer is now the **routing-only
