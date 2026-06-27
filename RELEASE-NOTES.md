@@ -7,6 +7,26 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.8.0 — hosted-topic cache migrates to a new root (durability fix) (2026-06-27)
+
+**`host()` durability fix.** A node that `host()`s a topic is a durable
+cache-bearer that holds the feed without being an app subscriber. When the
+topic's emergent root departed and a *different* node was promoted to the fresh
+(empty) root, the host's cache **stayed stranded below the new root** — new
+subscribers attached to the empty root and a `since:'all'` replay returned
+nothing, even though the bytes were still alive on the host. Root cause: the
+hosted-topic re-announce in `refreshTick` used a raw `subscribe-k` that omitted
+the `hw` high-water field, so the new root never learned the host held history
+and never issued the `PULLUP` that pulls a behind root's cache up. Hosted topics
+now re-announce through the same `_sendSubscribe` path as ordinary relays, which
+advertises high-water — so the host's history **migrates up to whichever node is
+the current root**, following the root as it moves under churn. This makes
+`host()` an effective opt-in durability mechanism: a stable node hosting a topic
+keeps its history recoverable across the churn of volatile (browser) roots.
+Validated end-to-end against a real WebRTC bridge (backlog + live fan-out both
+recover after the original root leaves) and guarded by
+`smoke_pubsub_host_durability.mjs`. Wire-compatible; no flag day.
+
 ## v4.7.1 — fix flaky cross-peer delivery (one-sided beacon re-home) (2026-06-27)
 
 **Pub/sub delivery fix.** When a topic's tree formed a chain (subscriber → relay
