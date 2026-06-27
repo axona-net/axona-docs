@@ -7,6 +7,19 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.7.1 — fix flaky cross-peer delivery (one-sided beacon re-home) (2026-06-27)
+
+**Pub/sub delivery fix.** When a topic's tree formed a chain (subscriber → relay
+→ root) and the relay demoted itself toward a closer root it learned from a root
+beacon, it pinned its `upstream` to the new root but never sent the confirming
+`subscribe-k`. The new root therefore never registered it as a downstream child,
+so deliveries fanned out over the root's subscribers and **silently skipped the
+relay's entire subtree** — the root cached the message while everyone below it
+received nothing. This was the dominant cause of intermittent "subscriber never
+gets the callback" hangs (reproduced ~50% of runs in an isolated 3-node test;
+0% after the fix). The beacon-demotion path now emits the subscribe-k so the new
+root seats the node and its subtree. Wire-compatible; no flag day.
+
 ## v4.7.0 — join-time self-integration + sim-configurable keyspace (2026-06-27)
 
 **Self-integration on join (churn-recovery fix).** A freshly-joined node now
