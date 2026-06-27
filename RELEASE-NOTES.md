@@ -7,6 +7,30 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.8.1 — bridge excluded from topic-root candidacy + STRICT_VERSION (2026-06-27)
+
+**Live cross-peer flakiness fix (partial — see note).** Diagnosed via hop-trace on
+the live testnet: the signaling bridge is in every peer's synaptome and is
+XOR-near same-region topics, so `findKClosest`/`_rootHint_` and the greedy hop
+selectors picked the **bridge** as a topic's root. The bridge can't serve as a
+pub/sub root, so the routed subscribe-k funneled to it and the tree never formed
+(`role=—` everywhere, 0 delivery). `findKClosest`, `_greedyNextHopToward`, and the
+`route_msg` forward loop now skip `transport.bridgeNodeIdBig` — the bridge brokers
+connections, it is never a topic root.
+
+**Note:** this is necessary but not alone sufficient on a *contended* region —
+where many foreign nodes share the region's keyspace prefix, the closest node can
+still be a non-cooperating foreign peer. Empirically, an uncontended region is
+100% reliable; a contended one improves but remains flaky until the foreign nodes
+are isolated (see STRICT_VERSION) or a liveness-based root fallback lands.
+
+**STRICT_VERSION island.** The client-hello now carries `kernelVersion`, and the
+bridge gained an optional `MIN_KERNEL_VERSION` env: when set, it rejects (close
+4426) any client whose kernel is missing or below the floor. This lets an operator
+isolate a single-kernel island (testnet now floors at **4.8.1**), excluding older
+4.x nodes that can't serve as roots. Default unset — no gate. Wire-compatible
+(additive hello field; no flag day).
+
 ## v4.8.0 — hosted-topic cache migrates to a new root (durability fix) (2026-06-27)
 
 **`host()` durability fix.** A node that `host()`s a topic is a durable
