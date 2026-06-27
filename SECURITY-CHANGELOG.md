@@ -16,6 +16,75 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.7.0 — 2026-06-27
+
+**Join-time self-integration — built only on authenticated first-party links, so
+it does not weaken the eclipse defense.** A node joining via a single sponsor used
+to sit reachable-from-almost-nobody until background annealing slowly wove it in:
+a node is reachable only once the peers in *its own keyspace neighbourhood* hold a
+synapse to it, and a sponsor-only join populates no such synapses. `join()` now
+calls `peer.integrate()` — it runs `findKClosest(ownId)` (a read-only lookup that
+needs only the node's *own* id, no global directory) and opens **authenticated**
+channels to the neighbours it discovers. Each side adopts the other only on a
+verified bilateral bind (axona/4 + DTLS-fingerprint), via the same `onPeerBound`
+admission path an inbound mesh peer already uses. This is the **opposite** of the
+attack the B-3 admission rules block: a node still cannot write itself into a
+stranger's table by unauthenticated gossip — it can only earn a synapse through a
+mutually-authenticated connection it actually opened. No new trust surface; a peer
+simply integrates *itself* faster instead of waiting on ambient discovery.
+
+(Also: the in-process simulator transport now fires the same `onPeerBound`
+admission event the web/node transports do — closing a fidelity gap where
+simulated meshes never exercised adopt-on-bind. Test-surface only; no protocol
+change.)
+
+---
+
+## Kernel v4.5.0 — 2026-06-26
+
+**Fast (keypair-free) node identity — sim-only, refused on the production
+keyspace.** `createNodeIdentity({ fast: true })` mints a routable node identity
+from random bytes with **no Ed25519 keypair**, so large in-simulator meshes build
+without per-node keygen. A node identity is never signature-verified by the
+protocol (the sim transport doesn't sign; web-mesh binding is a browser-only DTLS
+concern), so this changes nothing a peer can verify — but to guarantee an
+unverifiable identity can never reach the live network, `fast` is **refused
+unless the keyspace has been shrunk below production width** (`configureKeyspace`
+must have been called first; the default 264-bit profile throws). Production
+identities are unaffected: the default path still does a full Ed25519 keygen.
+
+## Kernel v4.4.0 — 2026-06-26
+
+**Sim-configurable keyspace — production verification is unchanged; a shrunk
+profile (simulator only) trades crypto verification for routing-scale.** The
+kernel can now run at a smaller ID width so churn/scale tests fit far more nodes,
+while **production keeps the full 264-bit keyspace and full signature
+verification**. The security-relevant facts:
+
+- **Production is the default and is byte-for-byte unchanged.** The keyspace
+  profile defaults to region 8 ‖ SHA-256 256 (264-bit node/topic ids, 256-bit
+  author ids). `verifyEnvelope` performs the full Ed25519 check exactly as before.
+  A node only leaves this profile if it explicitly calls `configureKeyspace(...)`
+  with a sub-256-bit hash — which the live network, the bridge, axona.net, and the
+  demo never do. A startup guard logs loudly to stderr whenever a non-default
+  profile is configured, and a kernel test asserts the default profile is 264-bit,
+  so a sim build can't silently ship as production.
+
+- **The relaxation is confined to the shrunk profile and is structurally
+  unavoidable there.** When the author id is shrunk below the 256-bit Ed25519
+  width (e.g. a 64-bit sim author id), the carried `signerPubkey` is a truncated
+  routing id, not a verifiable public key — so `verifyEnvelope` skips the Ed25519
+  signature check (gated on `AUTH_VERIFY_RELAXED = hashBits < 256`). It still
+  enforces envelope **structure**, the **msgId content-address recompute** (a
+  tampered message is rejected with `bad_msgid`), and **owner-only write policy**
+  at the root (`signerPubkey === owner`). The simulator measures routing
+  convergence and delivery, not auth; auth-path testing stays on the 256-bit
+  profile.
+
+- **No production attack surface is added.** Because the relaxation cannot engage
+  unless a peer reconfigures its own keyspace below 256 bits, there is no input an
+  attacker can send a production peer to disable its signature verification.
+
 ## Kernel v4.3.0 — 2026-06-25
 
 **Metrics moved entirely onto signed, published snapshots; `unpub` removed;
@@ -1117,4 +1186,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-25.*
+*Last updated: 2026-06-26.*

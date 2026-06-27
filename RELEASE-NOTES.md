@@ -7,6 +7,23 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.7.0 — join-time self-integration + sim-configurable keyspace (2026-06-27)
+
+**Self-integration on join (churn-recovery fix).** A freshly-joined node now
+weaves *itself* into the mesh instead of waiting on background annealing:
+`join()` calls the new `peer.integrate()`, which discovers the node's own
+neighbourhood via `findKClosest(ownId)` and opens authenticated channels to it,
+so the neighbours adopt it and it becomes reachable immediately. In simulation a
+fresh node's reachability rises from a single-digit floor to ~90%+ in one pass
+instead of leaning on slow ambient discovery — the substrate half of the churn
+recovery gap (#259). Consumers call `peer.integrate()` non-blocking after start
+(and on reconnect). Wire-compatible; no flag day.
+
+**Sim-configurable keyspace (v4.4–4.6, folded into this cut).** `configureKeyspace`
+shrinks IDs for large in-simulator meshes (production stays full 264-bit by
+default); fast keypair-free sim node identity; a sub-quadratic `geo.js` routing-
+table build (50k-node meshes build in ~seconds). All default-264/production-safe.
+
 ## v4.3.0 — metrics-via-publish (open + owned); `kill` is the only retraction (2026-06-25)
 
 **Metrics are now a regular publish event.** A topic's root publishes a signed
