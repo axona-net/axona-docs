@@ -7,6 +7,33 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.8.2 — `peer.ready()` mesh-readiness signal (2026-06-27)
+
+**New API: `await peer.ready()`.** Subscribing the instant after `join()` — when
+the synaptome is still just the bridge — strands the SUB in a not-yet-formed mesh,
+which then heals only over slow renewal cycles (observed: 16–36 s first delivery,
+or hangs past a test's timeout). `peer.ready()` lets an app await convergence
+before its first `sub`/`pub`:
+
+```js
+await peer.join();
+await peer.ready({ minPeers: 4, timeoutMs: 8000 });   // then sub/pub
+```
+
+It resolves as soon as **either** `synaptome.size >= minPeers` (a healthy mesh
+formed — typically <1 s on a populated bridge), **or** the synaptome stops
+growing for `stableMs` (a small/relay-poor mesh converged to whatever is
+available — so a 3-node mesh resolves at 2, never hangs waiting for an
+unreachable count), **or** `timeoutMs` elapses (`ready:false`, never throws).
+Returns `{ ready, peers, ms, reason }`.
+
+This is the kernel-owned replacement for a hand-rolled "wait for N synapses"
+loop. Validated against the civildefense Jasmine suite: with `ready()` gating the
+subscribe, initial-phase delivery dropped from 16–36 s to **5–18 ms** and the
+full suite went from ~0 to passing reliably (the residual restart-phase flake is
+the separate convergence-after-churn item). Additive API; wire-compatible.
+Guarded by `test/smoke_mesh_ready.mjs`.
+
 ## v4.8.1 — bridge excluded from topic-root candidacy + STRICT_VERSION (2026-06-27)
 
 **Live cross-peer flakiness fix (partial — see note).** Diagnosed via hop-trace on

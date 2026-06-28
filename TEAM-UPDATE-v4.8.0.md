@@ -1,5 +1,14 @@
 # Team Update — Axona kernel **v4.8.0**
 
+> ⚠️ **CORRECTION (see the v4.8.2 update).** Two claims in this document were
+> wrong: (1) §2's "the 10–30 s connect is a benign red herring" — that was an
+> artifact of one 3-node test config, not a general truth; the real cause is
+> subscribing before the mesh forms, fixed by `peer.ready()` in v4.8.2. (2) Any
+> "verified live" delivery claim here was based on a useast topic + a single
+> sample; live cross-peer delivery was still flaky and was fixed across v4.8.1
+> (bridge-root exclusion + STRICT_VERSION) and v4.8.2. Read the **v4.8.2** update
+> for the corrected picture.
+
 **Audience:** anyone building on `@axona/protocol` (apps, relays, bridges).
 **Status:** the **4.x line runs on testnet** — `testnet.axona.net` (bridge + peer
 app), `demo-testnet.axona.net` (incl. Axona Minimal), and the testnet relay fleet.
