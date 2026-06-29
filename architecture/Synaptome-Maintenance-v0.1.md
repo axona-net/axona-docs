@@ -104,6 +104,23 @@ defenses:
   the existing value-based eviction (`DHTNode._chooseVictim`), with the near quota
   and per-stratum survival rule as protected floors.
 
+**Eclipse-test result (`test/smoke_synaptome_eclipse.mjs`, 5/5).** Verified the loop
+adds **no eclipse leverage beyond raw keyspace proximity**: (1) a phantom/unbindable
+"near" id is never admitted (first-party verify on the refill path); (2) maintenance
+fills the *genuinely* nearest-K and never displaces a nearer honest peer for a farther
+attacker — capture is bounded by the attacker's true share of the victim's nearest
+keyspace; (3) one pass dials ≤ maxPerTick under a sybil flood. **The load-bearing
+caveat:** in the no-PoW regime the harness modeled (attacker freely grinds the nearest
+ids) capture reached **4/5** — i.e. whoever *owns* the near keyspace owns the near
+clique. Making that ownership costly is **E-1 (pubkey-derived id + memory-hard PoW)**,
+currently at difficulty 0 on testnet. **Therefore: do NOT enable near-quota maintenance
+until E-1 PoW is live at a real difficulty.** Mitigating factor: long-range "fingers"
+are maintained by the (honest, traffic-driven) anneal, so even a captured near clique
+only exposes routing toward the victim's *own* id-neighborhood — far-topic routing
+still flows over honest fingers. Eclipse is partial, not total. (The introducer-
+diversity cap from earlier drafts applies only to a future 2-hop *gossip* candidate
+source; the v1 `findKClosest` source has no introducer to diversify.)
+
 ## 4. Algorithm (concrete sketch — AxonaPeer)
 
 ```js
