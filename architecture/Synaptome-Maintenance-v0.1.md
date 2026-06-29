@@ -1,6 +1,14 @@
 # Synaptome Maintenance — near-quota + per-stratum refill (v0.1 draft)
 
-**Status:** DRAFT design. Not implemented/shipped. Motivated by the convergence
+**Status:** Near-quota half IMPLEMENTED behind an opt-in flag in kernel **v4.9.0**
+(`new AxonaPeer({ synaptomeMaintain: true | { kNear, intervalMs, maxPerTick } })`;
+default off → inert, behavior identical). `AxonaPeer._maintainSynaptome()` +
+`MAINTAIN` tick + debounced `onPeerDied` trigger; refill routes through
+`_considerCandidate` (B-3 first-party verify, eclipse-safe). Gated by
+`test/smoke_synaptome_maintain.mjs` (7/7) + full kernel suite (1319 ✓).
+**NOT enabled/deployed** — pending the adversarial eclipse test + a live-enable
+decision. Long-range/stratum half still relies on existing anneal (see §1/§8).
+Motivated by the convergence
 investigation (2026-06-29): live cross-peer pub/sub delivery is *probabilistically
 convergent* (~50–85%) because greedy routing strands in **local minima** of the
 keyspace-distance landscape over an *incomplete* neighbor graph. Two sim results
