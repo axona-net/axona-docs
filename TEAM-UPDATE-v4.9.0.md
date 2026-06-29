@@ -8,8 +8,27 @@ still on 3.x.** Wire-compatible point release (WIRE 4.0, no flag day).
 > Supersedes the **v4.8.8** update (verified + durable kills). This one is about
 > **why pub/sub convergence is flaky and what actually fixes it** — a sustained
 > investigation that ruled out the intuitive fix and landed on the real one:
-> **routing-table completeness.** The fix shipped in v4.9.0 and is now **enabled
-> on testnet**.
+> **routing-table completeness.** The fix shipped in v4.9.0; it was enabled on
+> testnet, **then reverted the same day** — see the update directly below.
+
+---
+
+## ⚠️ Update (2026-06-29, later) — maintenance enabled, then reverted
+
+We turned on the new near-quota synaptome maintenance on the testnet backbone and
+bridge to start measuring the convergence fix live. Running Howard's regression
+suite afterward showed it made pub/sub convergence **worse, not better**: the
+clean-pass rate fell from ~100% (warm) to ~33%, because the always-on relays
+aggressively dialing their nearest peers churned the small testnet mesh (per-node
+connection counts jumped ~30→46) and wedged subscriber convergence. We reverted the
+enablement across relay/peer/bridge, restarted the fleet maintenance-off, and
+confirmed Howard's suite recovered (6/6 clean). The kernel capability stays in
+v4.9.0 but is now **default-off**, and remains disabled until we root-cause why
+near-quota dialing helps in simulation yet hurts on the live WebRTC mesh. Two
+takeaways: run Howard's suite **before** enabling a feature, not after — and treat
+simulation wins as hypotheses until confirmed live. (The two user-facing apps —
+Axona Minimal and the browser peer — never ran maintenance-on; only the backbone
+and bridge were exposed.)
 
 ---
 
@@ -26,7 +45,8 @@ still on 3.x.** Wire-compatible point release (WIRE 4.0, no flag day).
    beacon stays as a minor last-mile aid, not the convergence mechanism.)
 4. **The fix: synaptome near-quota maintenance (v4.9.0).** Each peer continuously
    refills its 5 nearest successors via a cheap **local** repair; long-range
-   fingers stay with the existing anneal. **Now enabled on testnet.**
+   fingers stay with the existing anneal. **Enabled on testnet, then reverted
+   the same day — see the update at the top.**
 5. **No API change, no wire change.** Apps need nothing.
 6. **Eclipse note:** near-quota maintenance is eclipse-safe *by construction*
    (first-party verify, no amplification, budget-bounded), but its ultimate
