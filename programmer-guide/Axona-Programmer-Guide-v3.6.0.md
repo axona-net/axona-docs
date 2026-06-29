@@ -218,6 +218,15 @@ Peers form a **mesh** -- a graph of bidirectional channels. The mesh is
 *not* a global broadcast topology. Each peer directly knows only a handful
 of others; everything else is reached by routed forwarding.
 
+The mesh is **self-healing**, and you don't manage it. A peer continuously
+keeps its routing table *complete* in two ways: it holds its few
+XOR-nearest "successor" peers (so routed delivery's last hop always lands on
+the right node) and a spread of longer-range links (so any target is
+reachable). When a neighbour drops, the replacement is almost always a
+peer it already knows of -- so repair is a cheap local step, not a global
+search. As an app author there is nothing to configure: subscribe, publish,
+and let the mesh maintain itself underneath you.
+
 ### 3.2 Topics, axons, and replication
 
 A **topic** is a small descriptor that hashes to a 264-bit Topic ID (section

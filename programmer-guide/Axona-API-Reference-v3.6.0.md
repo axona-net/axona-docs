@@ -328,6 +328,7 @@ per running node.
 | `axonaManager` | `AxonaManager` | pre-built pub/sub manager; if omitted, resolved on first `pub`/`sub`. |
 | `persist` | `PersistenceAdapter` | enables auto-checkpointing of identity, subscriptions, synaptome, and hosting state. |
 | `maxPublishBytes` | `number` | per-publish cap; clamped to the WebRTC-interop floor (16 KiB) and never above the absolute ingress cap. Override only for known-homogeneous fleets. |
+| `synaptomeMaintain` | `boolean \| { kNear?, intervalMs?, maxPerTick? }` | *(advanced; v4.9.0)* opt into continuous **near-quota maintenance** — the peer keeps its `kNear` (≈5) XOR-nearest "successor" links filled through churn so greedy routing's last mile stays complete. `true` uses the defaults `{ kNear: 5, intervalMs: 15000, maxPerTick: 3 }`. Off by default; the standard `axona-peer`/relay builds set it. Long-range "fingers" are handled separately by the routing anneal. |
 
 The production path is `{ nodeIdentity, domain, transport }`. The
 `{ engine }` / `{ axonaManager }` forms are for the simulator and tests.

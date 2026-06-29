@@ -73,7 +73,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.8.6 \quad 2026-06-22\par}
+{\small An Axona Architecture Note \quad v0.8.7 \quad 2026-06-29\par}
 \end{center}
 \vfill
 \null
@@ -871,6 +871,51 @@ synaptome's admission rule (\texttt{\_addByVitality}).
 mostly from latency-weighted hop selection. The figure is documented
 in the companion paper \emph{Axona: A Learning-Adaptive Distributed
 Hash Table and Axonal Publish/Subscribe} (v0.4.01, 2026-05-23).}
+
+\subsection{Synaptome Maintenance: Keeping the Near Neighborhood Complete}
+
+\newthought{Greedy routing is only as good as the table is complete.}
+A greedy walk toward a target descends in XOR distance until no neighbor
+is closer --- a \emph{local minimum}. On a complete graph that minimum is
+always the global one (the true target). On a real, \emph{incomplete}
+synaptome (each peer holds $\sim$20 of $N$), a walk can dead-end at a
+near-miss node instead. When a publisher and its subscribers dead-end at
+\emph{different} near-miss nodes, they elect different pub/sub roots and
+never rendezvous --- the all-or-nothing delivery failure that dominates
+under churn. The cure is table \emph{completeness}, in two co-equal parts
+(classic Chord successors $+$ fingers, Kademlia closest-bucket $+$
+distant-buckets):
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[Successors (near quota).] Hold the $K_{\text{near}}{\approx}5$
+XOR-closest peers. This clique completes the \emph{last mile}: the final
+descent always lands on the true root. (Simulation: 4--6 is the knee;
+more adds nothing.)
+\item[Fingers (long range).] Hold $\sim$$\log(N)$ distant links --- one
+per populated stratum --- so a walk can \emph{reach} the target's
+neighborhood at all. These are maintained by the existing anneal and the
+Structural Survival Rule (\S\ref{...}); the simulation shows a perfect
+successor set still fails to deliver if the long-range half is starved.
+\end{description}
+
+\newthought{Repair is local and cheap.} When a near-neighbor churns out,
+its replacement is almost always a \emph{neighbor-of-neighbor} (the
+``successor's successor''), found in a 1--2 hop local query --- never a
+global lookup. The kernel runs a deterministic maintenance tick plus an
+immediate pass on peer loss (\texttt{onPeerDied}); below quota it refills
+from the nearest verified peer through the \emph{same} first-party
+verification (\texttt{\_considerCandidate}) as any other synapse, bounded
+to a few dials per pass. In sustained-churn simulation, an unmaintained
+near-stratum erodes and delivery drifts down, while local refill holds it.
+
+\marginnote{\emph{Eclipse note.} Dialing one's nearest peers is an
+eclipse-sensitive surface, so refill admits \emph{only} first-party-verified
+peers, never displaces a nearer honest peer for a farther attacker, and is
+budget-bounded --- it adds no leverage beyond raw keyspace proximity. Making
+that proximity costly to acquire is the job of costly identity (E-1,
+memory-hard PoW), a \emph{pre-production} requirement; on a development
+network with no adversary it is an accepted risk.}
 
 % =====================================================================
 % X. PUB/SUB: K-CLOSEST
