@@ -1,6 +1,15 @@
 # Synaptome Maintenance — near-quota + per-stratum refill (v0.1 draft)
 
-**Status:** Near-quota half IMPLEMENTED behind an opt-in flag in kernel **v4.9.0**
+**Status (2026-06-29): ENABLED on testnet.** The opt-in flag is now ON in
+axona-relay **v0.32.0** (backbone + soak peers), axona-peer **app 0.72.0** (browser),
+and axona-bridge **v2.48.0** (embedded peer) — `{ kNear:5, intervalMs:15000, maxPerTick:3 }`.
+Confirmed live (`synaptome-refill` log on the backbone). **Decision:** E-1 (costly identity)
+is reclassified as **pre-production hardening, NOT a development gate** — the network is under
+active development with no live adversary, so the eclipse surface (capture bounded by attacker
+keyspace share; see below) is an accepted dev-time risk. E-1 must be live before any prod
+promotion. Prod stays on 3.x regardless.
+
+**Implementation:** near-quota half landed behind an opt-in flag in kernel **v4.9.0**
 (`new AxonaPeer({ synaptomeMaintain: true | { kNear, intervalMs, maxPerTick } })`;
 default off → inert, behavior identical). `AxonaPeer._maintainSynaptome()` +
 `MAINTAIN` tick + debounced `onPeerDied` trigger; refill routes through
