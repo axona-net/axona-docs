@@ -38,15 +38,23 @@ For every live peer, maintain (within the `_maxSynaptome` budget, ~20):
 Steady state, both invariants are already satisfied → maintenance is a cheap no-op.
 The work only happens when churn breaks an invariant.
 
-Parameters (sim-informed starting points; tune under sustained-churn soak before lock):
+Parameters (validated in `test/churn_sustained.mjs` — sustained multi-round churn):
 
 | param | default | meaning |
 |-------|---------|---------|
 | `K_NEAR` | 5 | near-stratum quota (4–6 was the sim sweet spot; >6 added nothing) |
-| `STRATUM_MIN` | 1 | live synapses required per populated stratum |
+| `LONG_TARGET` | ~log₂(N) (≈6) | long-range "finger" links — **co-equal with K_NEAR**; near-only refill HELD occupancy at 100% but delivery still collapsed (→38%) when long-range was starved |
+| `STRATUM_MIN` | 1 | live synapses required per populated stratum (how LONG_TARGET is realized) |
 | `MAINTAIN_MS` | 15000 | maintenance-tick cadence (≈ pub/sub renew floor) |
 | `REFILL_CONCURRENCY` | 4 | max parallel `openConnection` per maintenance pass |
 | `REFILL_MAX_PER_TICK` | 3 | cap new connections per tick (avoid churn-storm dialing) |
+
+**Regression evidence (churn_sustained.mjs):** over 6 rounds at 20–35% churn/round,
+no-repair near-occupancy drifts 100%→~90% and delivery sags (to ~37–48% in the harsh
+regime); near+long refill HOLDS occupancy at 100% and roughly doubles delivery under
+heavy churn — at a cost of ~40 candidates examined per refill, **100% found within 2
+hops, ~0 global-lookup fallbacks.** This locks: cheapest-first 2-hop refill is
+sufficient, and BOTH invariants are required.
 
 ## 2. Candidate sources, cheapest-first
 
