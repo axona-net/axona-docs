@@ -16,6 +16,28 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.8.7 — 2026-06-28
+
+**A message can only be retracted by its own author — kills are now verified at
+the root.** A `kill` (retraction) is a signed statement; the kernel now verifies
+that signature at the topic root and accepts the kill **only if its signer is the
+same author key that published the target message**. A kill signed by anyone else
+is dropped. If a kill arrives before the root holds the target (it raced ahead of
+the message, or the root just took over), it is held *provisionally* and enforced
+when the message arrives: the message stays retracted only if its author matches
+the kill's signer — otherwise the unauthorized kill is discarded and the message
+is delivered normally. This closes a gap where a retraction was applied by target
+id without checking who signed it. The authorization is purely cryptographic
+(author keypair → signature); no moderator, owner-registry, or trust server is
+involved, and the kill still discloses only *who* signed it, never *where* the
+publisher is.
+
+**Retractions are now as durable as publishes.** A kill rides the same protected,
+replayed history as a normal message, so a subscriber that was briefly unreachable
+when a message was retracted still learns of the retraction when it re-syncs —
+a retraction can no longer be silently missed, leaving deleted content visible to
+a straggler.
+
 ## Kernel v4.7.0 — 2026-06-27
 
 **Join-time self-integration — built only on authenticated first-party links, so
@@ -1186,4 +1208,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-26.*
+*Last updated: 2026-06-28.*
