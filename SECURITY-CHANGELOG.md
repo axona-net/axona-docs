@@ -16,6 +16,20 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.8.8 — 2026-06-29
+
+**A retraction can no longer be silently missed by a subscriber that kept reading.**
+v4.8.7 made kills ride replayed history, but replay only re-sent a retraction to a
+subscriber whose sync cursor was still *behind* the kill. A subscriber that missed
+the kill itself yet kept receiving newer messages had a cursor *ahead* of the kill,
+so the retraction was never re-sent to it — it could hold the deleted content
+indefinitely and serve it on to late subscribers. The root now re-offers **every
+active (un-expired) retraction on each renewal, independent of the sync cursor**, so
+any subscriber converges on all live retractions regardless of how far its reading
+has advanced. Delivery stays exactly-once (the receiver deduplicates idempotently),
+and the set is bounded by the existing retraction time-to-live. Deleted content can
+no longer outlive its retraction on a straggler replica.
+
 ## Kernel v4.8.7 — 2026-06-28
 
 **A message can only be retracted by its own author — kills are now verified at
@@ -1208,4 +1222,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-28.*
+*Last updated: 2026-06-29.*
