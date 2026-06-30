@@ -16,6 +16,28 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.9.1 — 2026-06-29
+
+**The signaling bridge can never be selected as a topic's root or relay — closing a
+black-hole path.** The bridge is connection infrastructure, not a routable
+participant: it cannot serve a topic's history. Several routing paths already
+excluded it, but two did not — the local nearest-node lookup that seeds a
+subscriber's root hint, and the relay-recruitment step that hands a sub-tree to a
+child. Because the bridge sits in every peer's connection table and is often
+numerically close to a topic's address, those gaps let a topic's traffic home on
+the bridge, where it would strand (no delivery). The bridge is now excluded
+consistently across **all** root- and relay-selection paths, so a topic always
+elects a real, serving node.
+
+**Message ordering no longer trusts publisher clocks.** Subscribers now order every
+message — and every retraction — by the **root's** monotonic stamp (the single
+serialization point), not the publisher's self-declared timestamp. A publisher
+cannot mis-order a topic (intentionally or via a skewed clock) by back- or
+post-dating its own messages; the publisher's timestamp still gates envelope
+freshness at ingress but is not what consumers rank by. Each message and kill also
+carries a **dense per-topic sequence number** assigned by the root, so a subscriber
+can detect a missed message (a gap in the sequence) rather than silently losing it.
+
 ## Kernel v4.8.8 — 2026-06-29
 
 **A retraction can no longer be silently missed by a subscriber that kept reading.**
