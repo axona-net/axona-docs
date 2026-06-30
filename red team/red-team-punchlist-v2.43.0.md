@@ -22,7 +22,13 @@ blast-radius**, then effort:
 Effort: **S** ≤ ½-day · **M** 1–2 days · **L** multi-day / architectural.
 Closed since v2.32.0: **C-3, SP-10, SP-11** (v2.33.0), PoW format scaffolding at
 difficulty 0 (v2.34.0), publisher-location-privacy / region-not-in-envelope
-(v2.41.1, partially closes F-3).
+(v2.41.1, partially closes F-3). **v4.9.1** (2026-06-30, testnet) partially closes
+the **Omission / black-hole** item — see #23: the *accidental* black-hole vectors
+are eliminated (bridge excluded from every root/relay selection path; a subscriber
+no longer abdicates to an unreachable closer node) and silence is now **observable**
+(dense per-topic root sequence ⇒ a subscriber detects a dropped message as a gap).
+Also hardened message ordering: subscribers rank by the **root's** monotonic stamp,
+not a publisher's self-declared (skewable) timestamp.
 
 ---
 
@@ -52,7 +58,7 @@ difficulty 0 (v2.34.0), publisher-location-privacy / region-not-in-envelope
 | 20 | **F-3 / F-5** | 🟢 Low | Cross-topic linkage (partly closed v2.41.1); enumerable connIds | S / M | v2 sweep |
 | 21 | **D-3 / E-3** | 🟢 Low | Dedup-TTL nit; bridge-link CBV is server-nonce only | S | v2.6.0 |
 | 22 | **G-10** | ⚪ Info | Operator legal / jurisdictional exposure (undocumented) | S (doc) | Bridge assessment |
-| 23 | **Omission** | — research | Black-hole K-closest root drops a targeted topic silently | L | god's-eye |
+| 23 | **Omission** | — research (partial) | Black-hole root drops a topic silently — *accidental* vectors closed + now detectable (v4.9.1); **adversarial** route-around still open | L | god's-eye |
 | 24 | **Anonymity tiers** | — research | Location / IP / interest / linkability anonymity, opt-in | L | god's-eye |
 | 25 | **Wave F hygiene** | — | Bounded-map sweeps, dead code, dht-sim binding-model | S each | v2 sweep |
 
@@ -177,6 +183,19 @@ difficulty as a coordinated cutover. Records:
 - **Omission detection.** A malicious K-closest root can silently drop a targeted
   topic; signatures stop forgery, not silence. Behavioral forwarding-vitality
   probes feeding a route-around decision. [`black-hole-nodes-v0.1.md`](black-hole-nodes-v0.1.md). (L)
+  **Partially addressed (v4.9.1, 2026-06-30):** the *accidental* black-hole — the
+  dominant real failure to date — is closed. The bridge (signaling infra that
+  cannot serve a topic) is now excluded from **all** root/relay-selection paths,
+  and a stranded subscriber claims a reachable root rather than abdicating to a
+  closer node the data path can't reach (was: topic never roots → silent 0%
+  delivery). And silence is now **observable** at the subscriber: every message and
+  kill carries a dense per-topic root sequence, so a missed message shows as a gap
+  (`env.seq` jump) instead of vanishing — the kernel-level half of "make silence
+  observable." Measured: live cold-convergence strands gone (Howard 23/24); 12 h
+  soak churn delivery 25–36% → 82%. **Still open (the adversarial core):** a node
+  that *is* the legitimate XOR-closest root and chooses to drop — detection exists
+  now (the gap), but automatic **forwarding-vitality probes + route-around** are
+  not built. That remains the (L) item.
 - **Anonymity tiers.** Opt-in: (1) separate/ring-signature publish key + E2E
   group-encrypted topics + **TURN-only ICE candidates**; (2) onion-routed circuits
   on the mesh-relay primitive + a `geoBits` privacy dial. Default stays fast /
