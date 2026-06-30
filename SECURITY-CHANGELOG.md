@@ -16,6 +16,39 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.10.0 — 2026-06-30
+
+**A retracted (killed) message can no longer resurface to a subscriber that joins
+after the kill.** A topic's history is held by the cohort of nodes closest to its
+address; under churn a late subscriber may attach to any of them. Previously a
+retraction reached only the one node a kill happened to route to, while another
+cohort member — or a node that *inherited* the cached history through a hand-off or
+catch-up transfer — could still hold the un-retracted copy and serve it onward. Now
+**every cohort member converges on the same history *and* the same set of
+retractions**: a retraction is distributed to the closest-K nodes the instant it is
+applied, and every internal history transfer (catch-up, hand-off, backup
+replication) carries its retractions alongside the messages, applied first. A killed
+message stays killed everywhere it could be read — including for subscribers that
+arrive later and attach to a different holder.
+
+**A retraction is only delivered to apps that actually received the message.** A
+subscriber requesting full history that joined *after* a message was both posted and
+killed never sees that message at all — and now receives no spurious "deleted"
+event for content it never held. Retraction notifications are scoped to consumers
+that received the original, so an app can't be told to retract something it never
+displayed.
+
+**The same hardening makes ordinary messages reliably reach every subscriber under
+churn.** A retraction is just a publish with a side effect: the distribution fix
+that keeps kills consistent is the same one that stops a post-churn *publish* from
+being silently lost to a subscriber that homed on a different cohort member. Message
+ordering remains anchored to the root's single monotonic stamp (v4.9.1); cohort
+members adopt that stamp rather than re-stamping, so convergence never reorders a
+topic.
+
+These changes ship on **testnet** (kernel v4.10.0); production remains on the 3.x
+line. Wire-compatible point release (WIRE 4.0, no flag day).
+
 ## Kernel v4.9.1 — 2026-06-29
 
 **The signaling bridge can never be selected as a topic's root or relay — closing a

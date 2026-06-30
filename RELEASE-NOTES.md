@@ -7,6 +7,35 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.10.0 — K-closest cohort distribution: reliable delivery + consistent kills under churn (2026-06-30)
+
+**Testnet only; production stays on 3.x. Wire-compatible (WIRE 4.0, no flag day).**
+
+A message — publish *or* kill — issued just after churn used to reach only the single
+closest root, so a subscriber that joined and homed on a *different* co-hosting node
+could silently miss it. A kill made that loss conspicuous (a deleted message
+reappearing); a plain publish lost it silently. The fix generalises distribution:
+
+- **Eager K-closest cohort distribution.** The instant a root stamps a publish or
+  applies a kill, it pushes the stamped delta to the topic's `findKClosest`
+  cohort — the true closest-K, the exact set a subscriber can attach to — not just
+  its direct mesh neighbours. Cohort members union-merge what they receive
+  (anti-entropy), so they converge on the same history *and* the same retractions.
+- **Single-stamp ordering preserved.** Only the root stamps (root-time, v4.9.1);
+  cohort members adopt the stamp, never re-stamp — convergence never reorders a topic.
+- **Warm backup roots.** A singleton root replicates its cache to its `rootReplicas`
+  (default 2) nearest nodes; on churn a backup already holds everything and promotes.
+- **Migration carries retractions.** Catch-up (replay-up), graceful hand-off, and
+  backup replication now carry tombstones alongside messages, applied first — a
+  killed message can't resurface when history moves to a new holder.
+- **Retraction delivery scoped to holders.** A `since:'all'` joiner that never
+  received a message (posted then killed before it joined) gets no spurious
+  `{deleted}` event for content it never held.
+
+**Results:** Howard's CivilDefense regression suite **16/16 warm** (was 7/12); the
+restart-under-churn harness recovers **16/16** no-kill and **10/10** with-kill, no
+leaks. New option `new AxonaPeer({ rootReplicas })` (0 disables cohort replication).
+
 ## v4.8.2 — `peer.ready()` mesh-readiness signal (2026-06-27)
 
 **New API: `await peer.ready()`.** Subscribing the instant after `join()` — when
