@@ -110,13 +110,12 @@ const peer = new AxonaPeer({
 await transport.start(node$identity.id);
 await peer.start();
 
-// 3. Wait for the synaptome (routing mesh) to warm up before pub/sub.
+// 3. Wait for the routing mesh to warm up before pub/sub. peer.ready() does this
+//    for you — it resolves once enough peers are in the synaptome (or a stable
+//    non-zero plateau), bounded by timeoutMs. No hand-rolled polling loop needed.
 console.log('kernel v' + KERNEL_VERSION + ' — connecting…');
-const until = Date.now() + 30000;
-while (Date.now() < until && (node.synaptome?.size ?? 0) < 3) {
-  await new Promise((r) => setTimeout(r, 600));
-}
-console.log('mesh ready (' + (node.synaptome?.size ?? 0) + ' peers)');
+const status = await peer.ready();               // { ready, peers, ms, reason }
+console.log('mesh ' + (status.ready ? 'ready' : 'not ready') + ' (' + status.peers + ' peers, ' + status.ms + 'ms)');
 console.log('topic id:', await deriveTopicId(TOPIC));
 
 // 4. Subscribe. The handler gets an envelope: { msgId, seq, ts, topic, message, signerPubkey? }.
@@ -206,9 +205,8 @@ default signer.
 
 **Connects but nothing arrives** — you almost certainly published before the
 mesh warmed up. Subscribing/publishing on a cold synaptome routes to too few
-root axons. Wait for `node.synaptome.size` to reach a few peers (the warm-up
-loop above) before calling `pub`/`sub`. On the public bridge this takes a few
-seconds.
+root axons. `await peer.ready()` (step 3) before calling `pub`/`sub` — it resolves
+once the routing mesh is warm. On the public bridge this takes a few seconds.
 
 **Can't reach the bridge / connection hangs** — confirm outbound `wss://`
 (TLS WebSocket) to `testnet.axona.net` is allowed by your network. There is no
