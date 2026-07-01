@@ -7,6 +7,30 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.10.1 — metrics rebuilt (+ message counter) & cohort-aware read/host paths (2026-06-30)
+
+**Testnet only; production stays on 3.x. Wire-compatible (WIRE 4.0, no flag day).**
+
+A post-v4.10.0 API audit against the cohort invariant found three paths that still
+assumed a single deterministic root:
+
+- **Metrics were dead on 4.x.** `AxonaManager.rootedTopics()` — the producer the relay
+  metrics-loop walks — was dropped in the v3.12 routing-only clean break, so
+  `peer.rootedTopics()` returned `[]`, no snapshots were published, and `peer.metrics()`
+  returned stale/zeros for every topic since the v3.14 flag day. Rebuilt, and each
+  snapshot now carries **`current_count`** (messages in cache) and **`seq`** (the root's
+  dense message counter — a monotonic high-water of total events emitted) alongside
+  `subscribers`/`bytes`/`descriptor`.
+- **`peer.metrics()` is cohort-aware.** It collects every co-hosting root's snapshot and
+  aggregates: **sum** `subscribers` (topic-wide total), **max** `current_count`/`seq`/
+  `bytes` (they converge via anti-entropy), plus a new `cohortSize`.
+- **`pull` and `host`** now route via the lookup-assist hint (like publish/kill) instead
+  of a bare greedy walk that stranded — `pull` no longer returns a false "no message" and
+  a `host`'s initial announce no longer waits a tick to heal.
+
+New smokes: `smoke_rooted_topics` (12/12), `smoke_read_routing` (6/6). Full kernel suite
+green; Howard 12/12 warm.
+
 ## v4.10.0 — K-closest cohort distribution: reliable delivery + consistent kills under churn (2026-06-30)
 
 **Testnet only; production stays on 3.x. Wire-compatible (WIRE 4.0, no flag day).**
