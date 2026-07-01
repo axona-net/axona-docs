@@ -28,8 +28,25 @@ or momentarily stranded, and it completes in fewer hops. This is safe because th
 id is the hash of its own content: a replica either holds that exact message or it
 doesn't, so a nearer answer is the *same* answer. A message still in a node's cache has
 not been retracted there (a retraction drops it), so this cannot resurface a killed
-message. Reads for "the latest" message still resolve at the authoritative closest node,
-where recency is guaranteed.
+message. (Reads for "the latest" resolved at the authoritative closest node in v4.11.1;
+v4.11.2 below broadens this.)
+
+---
+
+## Kernel v4.11.2 — 2026-07-01
+
+**A "give me the latest" read is no longer a single-node bottleneck.** Building on the
+v4.11.1 read change, a read for the *latest* message on a topic (a `pull` with no message
+id) is now also answered by the **nearest replica that holds the topic**, returning
+whatever most-recent message that node has, rather than routing every such read to the one
+node closest to the topic's address. This removes that node as a read throughput
+bottleneck and single point of failure for hot polling paths, and makes reads survive a
+degraded route to it. The trade is explicit and bounded: a "latest" answer may be a beat
+behind the newest publish until the replicas converge (they continuously reconcile), so it
+is *recent* rather than *strictly newest* — appropriate for state-polling, while a reader
+that needs an exact, specific message still asks for it by id and gets that exact message.
+A replica with nothing cached does not answer — the read continues until a node with data
+(or the closest node) responds — so this never manufactures a false "no message."
 
 ---
 
