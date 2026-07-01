@@ -119,19 +119,28 @@ console.log('mesh ' + (status.ready ? 'ready' : 'not ready') + ' (' + status.pee
 console.log('topic id:', await deriveTopicId(TOPIC));
 
 // 4. Subscribe. The handler gets an envelope: { msgId, seq, ts, topic, message, signerPubkey? }.
+//    It fires for every delivery — including the ones we publish below — so you
+//    watch the counter climb live in the console.
 const sub = await peer.sub(TOPIC, (env) => {
   console.log('[recv]', env.message, 'from', (env.signerPubkey || 'anon').slice(0, 12));
 }, { since: 'all' });
 
-// 5. Publish, naming the signer. signWith is REQUIRED.
-const msgId = await peer.pub(TOPIC, 'hello from the quick start', { signWith: author });
-console.log('[pub ] msgId=' + msgId.slice(0, 12) + '…');
+// 5. Publish on a loop: one signed message per second, each carrying an
+//    incrementing counter, so the system is visibly, continuously running.
+let n = 0;
+const timer = setInterval(async () => {
+  const msg = `tick #${++n}`;
+  const msgId = await peer.pub(TOPIC, msg, { signWith: author });
+  console.log('[pub ]', msg, '(msgId ' + msgId.slice(0, 12) + '…)');
+}, 1000);
 
-// 6. Give fan-out a moment, then leave cleanly.
-await new Promise((r) => setTimeout(r, 2000));
-await sub.stop();
-await peer.leave();
-process.exit(0);
+// 6. Keep running until Ctrl+C, then leave cleanly.
+process.on('SIGINT', async () => {
+  clearInterval(timer);
+  await sub.stop();
+  await peer.leave();
+  process.exit(0);
+});
 ```
 
 ## 5. Run
@@ -140,14 +149,20 @@ process.exit(0);
 node index.js
 ```
 
-You should see something like:
+You should see the counter climb, one tick per second, until you stop it with
+**Ctrl+C**:
 
 ```
 kernel v4.11.2 — connecting…
-mesh ready (4 peers)
+mesh ready (4 peers, 1200ms)
 topic id: 89a1b2c3…
-[pub ] msgId=8e9d4b1a30c2…
-[recv] hello from the quick start from 4f2a9b0c1d3e
+[pub ] tick #1 (msgId 8e9d4b1a30c2…)
+[recv] tick #1 from 4f2a9b0c1d3e
+[pub ] tick #2 (msgId 2c7f0a9b41d3…)
+[recv] tick #2 from 4f2a9b0c1d3e
+[pub ] tick #3 (msgId 91b3e5c8007a…)
+[recv] tick #3 from 4f2a9b0c1d3e
+…
 ```
 
 **That's it.** You just:
