@@ -387,6 +387,33 @@ Bring the peer up — installs wire-level routing handlers, the delivery
 hook, the peer-bound/peer-died eviction handlers, and (if `persist` is
 wired) hydrates persisted state. Idempotent.
 
+### `peer.ready({ minPeers?, timeoutMs?, stableMs?, pollMs? })` → `Promise<{ ready, peers, ms, reason }>`
+
+Wait for the routing mesh to warm up before you `pub`/`sub`. `start()` returns
+as soon as local state is set up, but mesh handshakes complete asynchronously
+over the next few seconds; publishing/subscribing on a cold synaptome routes to
+too few root axons. `ready()` resolves once the synaptome reaches `minPeers`, or —
+failing that — settles at a **stable non-zero plateau** (unchanged for `stableMs`),
+or the `timeoutMs` budget elapses. Use it instead of hand-rolling a
+`peer.peers().length` / `node.synaptome.size` poll.
+
+| Param | Type | Default | Notes |
+|---|---|---|---|
+| `minPeers` | `number` | `4` | Resolve `ready:true` as soon as the synaptome reaches this size. |
+| `timeoutMs` | `number` | `10000` | Upper bound; on expiry resolves with `ready` = (peers > 0). |
+| `stableMs` | `number` | `1500` | If below `minPeers` but non-zero and unchanged this long, resolve `ready:true` (`reason:'stable'`). |
+| `pollMs` | `number` | `150` | Synaptome poll interval. |
+
+Returns `{ ready:boolean, peers:number, ms:number, reason:'minPeers'|'stable'|'timeout' }`.
+Never rejects — a cold/isolated start resolves `{ ready:false, …, reason:'timeout' }`
+so you can surface "still connecting" rather than throw.
+
+```js
+await peer.start();
+const status = await peer.ready();          // defaults: 4 peers or a stable plateau, ≤10s
+if (!status.ready) console.warn('mesh still warming — publishes may be thin');
+```
+
 ### `peer.stop()` → `Promise<void>`
 
 Tear down: release event listeners and the peer-lifecycle hooks.

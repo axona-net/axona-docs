@@ -1,0 +1,44 @@
+% =====================================================================
+% axona-doc-preamble.tex — shared LaTeX preamble for the programmer-guide
+% quartet (Quick-Start, Programmer Guide, API Reference, Services Guide).
+%
+% These docs are markdown-native; the PDF is built by converting the .md to
+% a tufte-handout .tex with pandoc (-H this file) and compiling with tectonic.
+% See render.sh. Modeled on explainer/Axona-Explainer.tex (the flat-essay
+% original); the tweaks below make tufte-handout work for code/table-heavy
+% reference material.
+% =====================================================================
+
+\definecolor{rust}{RGB}{185,78,54}
+\definecolor{inkmuted}{RGB}{102,102,102}
+\usepackage{microtype}
+
+% XeTeX (tectonic) unicode monospace: renders … → and the box-drawing ASCII
+% diagrams that the default CM/LM mono cannot. Menlo ships with macOS.
+\setmonofont{Menlo}[Scale=0.78]
+
+% tufte-handout ships \subsubsection as an error stub (it wants flat essays).
+% A run-in fallback lets nested reference headings (§4.2, §12.3, …) compile.
+\renewcommand{\subsubsection}[1]{\medskip\par\noindent{\normalsize\bfseries #1}\par\nobreak\smallskip}
+
+% These docs use no margin notes, so reclaim tufte's wide right margin: widen
+% the text block so code blocks and API tables don't overflow it.
+\usepackage{geometry}
+\geometry{left=1in, textwidth=6.1in, marginparsep=0.2in, marginparwidth=0.9in,
+          top=1in, headsep=0.4in}
+
+% Wrap long code lines (cheat-sheet comments run to ~130 chars) with a ↪ marker
+% instead of overflowing. Applies to pandoc's fancyvrb Highlighting/Verbatim.
+\usepackage{fvextra}
+\fvset{breaklines=true, breakanywhere=true}
+
+% A few technical symbols appear in prose / inline code that Latin Modern and
+% Menlo don't cover; map them to math equivalents so they render (rather than
+% dropping to tofu). Only maps chars actually used — leaves → alone (it renders).
+\usepackage{newunicodechar}
+\newunicodechar{≈}{\ensuremath{\approx}}
+\newunicodechar{≥}{\ensuremath{\geq}}
+\newunicodechar{≤}{\ensuremath{\leq}}
+\newunicodechar{×}{\ensuremath{\times}}
+\newunicodechar{·}{\ensuremath{\cdot}}
+\newunicodechar{‖}{\ensuremath{\|}}

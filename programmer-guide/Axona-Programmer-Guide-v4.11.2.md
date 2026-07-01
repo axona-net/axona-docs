@@ -1227,12 +1227,12 @@ async function connect() {
   await transport.start(nodeIdentity.id);
   await peer.start();
 
-  // Wait for the mesh to form before publishing (see pitfall 13.3).
-  const until = Date.now() + 30_000;
-  while (Date.now() < until && (node.synaptome?.size ?? 0) < 3) {
-    await new Promise((r) => setTimeout(r, 600));
-  }
-  console.log(`AxonaTalk on kernel ${KERNEL_VERSION}; you are ${idLabel(nodeIdentity.id)}`);
+  // Wait for the mesh to form before publishing (see pitfall 13.3). peer.ready()
+  // does this for you -- it resolves once enough peers are in the synaptome (or a
+  // stable non-zero plateau), bounded by timeoutMs. No hand-rolled polling loop.
+  const status = await peer.ready();   // { ready, peers, ms, reason }
+  console.log(`AxonaTalk on kernel ${KERNEL_VERSION}; you are ${idLabel(nodeIdentity.id)} ` +
+              `(mesh ${status.ready ? 'ready' : 'not ready'}, ${status.peers} peers, ${status.ms}ms)`);
   return { peer, author, nodeIdentity };
 }
 
@@ -1350,9 +1350,11 @@ complete asynchronously over the next few seconds. Publish too early and your
 K-closest set is just yourself + the bridge, so the axon set is incomplete.
 The 4.x **cold-publish burst** (§7.1) now re-sends a freshly-joined node's first
 publishes over the first second, so an early publish usually still lands — this is
-a soft edge, not the hard 0% it once was. Still, for predictable UX, wait for
-`node.synaptome.size` (or `peer.peers().length`) to reach a small threshold before
-letting the user publish -- the worked example polls for 3.
+a soft edge, not the hard 0% it once was. Still, for predictable UX, `await
+peer.ready()` before letting the user publish — it resolves once the synaptome
+reaches a small threshold (or a stable non-zero plateau), bounded by `timeoutMs`,
+and hands back `{ ready, peers, ms, reason }`. The worked example (12.3) uses it;
+prefer it over hand-rolling a `node.synaptome.size` / `peer.peers().length` poll.
 
 ### 13.4 Mismatched descriptors give no delivery, silently
 
