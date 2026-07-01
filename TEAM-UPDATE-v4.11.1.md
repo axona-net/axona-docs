@@ -85,11 +85,15 @@ announce lands at the true root instead of stranding until the next heal tick.
 - **The publisher still gets no delivery ack** and learns nothing about where any
   subscriber is; transport identity stays unlinked from author identity throughout.
 
-## Still open
+## Considered and dismissed
 
-- **Cold *kill* symmetry.** A retraction (`kill`) is a publish-with-a-side-effect, so a
-  cold kill can strand like a cold publish did; today it relies on the slower background
-  retry. Extending the cold-publish burst to `kill` is the natural next step.
+- **Cold *kill* symmetry.** We looked at extending the cold-publish burst to `kill` and
+  decided against it. A kill is intrinsically a *follow-up* — it names the message id of
+  something published earlier — so by the time an app retracts, its node is warm; a kill
+  is essentially never in the cold-start window a first publish is. And a kill already
+  registers in the pending-retry set (`refreshTick` re-sends it up to 6× over 30 s until
+  the tombstone lands), so even a contrived cold kill heals on the ~5 s tick rather than
+  being lost. Not worth a second burst path.
 
 ---
 
