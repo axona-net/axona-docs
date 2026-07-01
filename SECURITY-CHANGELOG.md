@@ -16,6 +16,23 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.11.1 — 2026-07-01
+
+**Reading a specific message no longer depends on reaching one particular node.** A
+message's authoritative copy is held by the node closest to the topic's address, but
+under the cohort model the same message is replicated across the closest-K nodes and any
+children/hosts carrying the topic. A read for a specific message (`pull` by message id)
+now returns from the **first replica the request reaches**, rather than insisting on the
+single closest node — so a read succeeds even when the route toward that node is degraded
+or momentarily stranded, and it completes in fewer hops. This is safe because the message
+id is the hash of its own content: a replica either holds that exact message or it
+doesn't, so a nearer answer is the *same* answer. A message still in a node's cache has
+not been retracted there (a retraction drops it), so this cannot resurface a killed
+message. Reads for "the latest" message still resolve at the authoritative closest node,
+where recency is guaranteed.
+
+---
+
 ## Kernel v4.11.0 — 2026-07-01
 
 **A message published in the first seconds after a node joins is now delivered
