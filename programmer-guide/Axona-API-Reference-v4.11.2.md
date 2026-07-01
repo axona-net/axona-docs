@@ -1,16 +1,23 @@
 # Axona API Reference
 
-Reference for every public symbol exported from `@axona/protocol` v3.6.0.
+Reference for every public symbol exported from `@axona/protocol` v4.11.2.
 
 Organized by what application developers reach for first (identity, peer
 lifecycle, pub/sub, direct messaging, introspection), then the
 transport/protocol surface, then low-level utilities. Every signature
-below is verified against the v3.6.0 kernel source.
+below is verified against the v4.11.2 kernel source.
+
+> **Which network?** The 4.x line runs on **testnet** (`wss://testnet.axona.net`)
+> during the current phase; the **production** bridges (`wss://bridge.axona.net`)
+> are still on the 3.x line. The wire major partitions them (wire 3.0 vs 4.0), so a
+> v4.x peer talks to testnet, a v3.x peer talks to prod — they do not interoperate.
+> Install `github:axona-net/axona-protocol#v4.11.2` and point at testnet to use this
+> API surface.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v3.6.0.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v3.6.0.md) — mental model +
+- [Quick Start](Quick-Start-v4.11.2.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v4.11.2.md) — mental model +
   worked example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects.
@@ -26,6 +33,32 @@ Sub-path imports (e.g. `@axona/protocol/contracts/Transport.js`,
 but most apps only need the main barrel.
 
 ---
+
+## What changed in the 4.x line (since v3.6.0)
+
+The **public API surface is unchanged** from v3.6.0 — same identity factories,
+topic descriptors, and `pub`/`sub`/`pull`/`kill`/`host` signatures. The 4.x work
+is a routing-and-reliability rewrite *under* that surface, so existing code keeps
+working while delivery gets more robust:
+
+- **Routing-only axonic-tree pub/sub (v3.14, clean break).** Topics route to an
+  emergent root (the live node XOR-closest to the topic id) with no separate
+  overlay to maintain. Behavioral only — no call changed.
+- **K-closest cohort distribution (v4.10.0).** A topic's authoritative state
+  (messages *and* retractions) is replicated across the closest-K nodes, not one
+  root. A `kill` reaches the whole cohort and internal transfers carry their
+  tombstones, so a killed message can't resurface to a late subscriber, and a
+  publish survives the root churning out.
+- **Metrics rebuilt (v4.10.1).** `rootedTopics()`/`peer.metrics()` were silently
+  dead across early 4.x; rebuilt with two new fields — **`seq`** (dense message
+  counter) and **`cohortSize`** — and cohort-aware aggregation (see §4.3).
+- **Cold-publish burst (v4.11.0).** A freshly-joined node's first publishes are
+  automatically re-sent a few times over the first second, so a cold-start publish
+  isn't lost while the routing table warms. No app action — `pub` is unchanged.
+- **Nearest-replica reads (v4.11.1–v4.11.2).** `pull` is answered by the first
+  replica the request reaches instead of always the root: exact for `pull(msgId)`,
+  and *recent* (eventually-consistent) for pull-latest, which spreads a hot read
+  path off the root (see §4.3).
 
 ## What changed since v2.x
 
@@ -582,6 +615,16 @@ bytes out-of-band.
 > on timeout — it never hangs. Files are capped to the per-topic replay-cache
 > ceiling so you never create a transfer a reload joiner can't complete.
 
+> **Delivery (4.x).** A publish routes to the topic's K-closest **cohort** and is
+> replicated across it (not a single root), so it survives the closest node churning
+> out. A publish is still one-shot fire-and-forget — there is **no delivery ack to
+> the publisher** (the transport identity is deliberately unlinked from the author
+> identity) — but two automatic mechanisms cover the gaps: a freshly-joined ("cold")
+> node re-sends its first publishes a few times over ~1 s (v4.11.0) so a not-yet-warm
+> routing table doesn't strand them, and a background retry re-sends a recent publish
+> toward the true root until the publisher observes its own `msgId` land. You do not
+> tune any of this.
+
 **Throws** `PublishError`:
 
 - `PUBLISH_INVALID_TOPIC` — a bare id was passed, or the topic isn't a
@@ -653,9 +696,9 @@ const { removed } = await peer.unsub({ region: 'useast', name: 'lobby' });
 
 #### `peer.pull(msgId, { topic, timeoutMs? })` → `Promise<Envelope | null>`
 
-Fetch one message by content hash from the topic's K-closest replay
-cache. Returns `null` on a cache miss (including a message that aged out
-of the hold window) — that's expected, not an error.
+Fetch one message from the topic's replay cache. Returns `null` on a cache
+miss (including a message that aged out of the hold window) — that's
+expected, not an error.
 
 | Arg | Type | Notes |
 |---|---|---|
@@ -663,8 +706,23 @@ of the hold window) — that's expected, not an error.
 | `opts.topic` | `TopicDescriptor \| string` | descriptor **or** 66-hex id. |
 | `opts.timeoutMs` | `number` | default `1000`. |
 
-A successful pull slides the message's hold time forward (bounded by the
-48 h ceiling).
+**Nearest-replica reads (v4.11.1–v4.11.2).** A pull is answered by the
+**first replica the request reaches** — a cohort member, a child relay, or a
+`host()` node — not necessarily the topic's root. This lowers latency, spreads
+reads off the root, and lets a pull that would otherwise strand toward the root
+be served by any cache-holder it passes. Two consistency tiers:
+
+- **`pull(msgId)`** — *exact*. `msgId = H(publisher‖message)`, so a nearer copy
+  **is** the copy; you always get that specific immutable message (or `null`).
+- **pull-latest** (`msgId` null) — *recent, eventually-consistent*. You get
+  whatever newest that first replica holds, which may be a beat behind the root's
+  very newest until the cohort converges. This is deliberate: it keeps a
+  heavily-polled "current value" read from making the root a throughput bottleneck.
+  If you need the linearizable newest, pull a specific `msgId`.
+
+A cache-holding replica has not tombstoned the message (a `kill` drops it from
+cache), so a pull never returns a killed message. A successful pull slides the
+message's hold time forward (bounded by the 48 h ceiling).
 
 ```js
 const env    = await peer.pull(msgId, { topic: feedId });
@@ -681,36 +739,48 @@ const latest = await peer.pull(null, { topic: feedId });   // most recent on the
 A one-shot read of a topic's latest published metric snapshot — for **any**
 topic, open or owned. As of kernel **v4.3.0** metrics are no longer scatter-
 gathered: a topic's root publishes a signed snapshot to `metricTopic(T)` every
-~20 s (the relay fleet runs this), and `metrics()` simply subscribes to that
-*open* metric topic briefly and returns the freshest snapshot via replay-on-
-subscribe. Owned topics' metrics are **public too** — anyone who can derive the
-id can read them — so there is no owner gate.
+~20 s (the relay fleet runs this), and `metrics()` subscribes to that *open*
+metric topic briefly and returns the freshest snapshot via replay-on-subscribe.
+Owned topics' metrics are **public too** — anyone who can derive the id can read
+them — so there is no owner gate.
+
+**Cohort-aware (v4.10.1).** Under the K-closest cohort model every co-hosting root
+publishes its own snapshot, so `metrics()` collects them over the window and
+**aggregates**: `subscribers` is **summed** (each root reports only its own
+subscriber subset, so the sum is the topic-wide total), while `current_count`,
+`seq`, and `bytes` are **maxed** (they converge across the cohort via
+anti-entropy; max tolerates a lagging member). `cohortSize` tells you how many
+roots reported.
 
 | Arg | Type | Notes |
 |---|---|---|
 | `topic` | `TopicDescriptor \| string` | the **data** topic — descriptor **or** 66-hex id. |
-| `opts.timeoutMs` | `number` | how long to wait for a snapshot; default `1500`. |
+| `opts.timeoutMs` | `number` | how long to collect cohort snapshots; default `1500`. |
 
 **Returns:**
 
 ```ts
 {
-  current_count: number;       // live (non-expired, non-killed) messages retained now
-  subscribers:   number;       // the publishing root's direct-child count (lower bound once split)
-  bytes:         number;       // live cached envelope bytes
+  current_count: number;       // live (non-expired, non-killed) messages retained now — max across cohort
+  seq:           number;       // dense message counter: monotonic high-water of total events ever
+                               //   emitted on the topic (kills included) — max across cohort
+  subscribers:   number;       // topic-wide subscriber total — summed across the cohort
+  bytes:         number;       // live cached envelope bytes — max across cohort
   publishes:     number;       // present only if the publisher tracks it; else 0
-  ts:            number|null;  // snapshot timestamp
-  signer:        string|null;  // the snapshot envelope's signerPubkey (provenance)
+  ts:            number|null;  // freshest snapshot timestamp
+  signer:        string|null;  // the freshest snapshot envelope's signerPubkey (provenance)
+  cohortSize:    number;       // # of distinct roots that reported a snapshot
   stale:         boolean;      // true ⇒ no snapshot seen (no metrics publisher roots this topic)
 }
 ```
 
-`current_count` falls as messages are killed or age out. `subscribers` is exact
-for an unsplit topic, a lower bound once the tree splits. Use for UX, not billing.
+Use `seq` for total-ever (published + killed), `current_count` for currently-live,
+and their gap to spot churn. `subscribers` is a topic-wide count for UX, not
+billing. All values are advisory.
 
 ```js
 const m = await peer.metrics({ region: 'useast', name: 'lobby' });
-if (!m.stale) console.log(`${m.subscribers} subscribers, ${m.current_count} live messages`);
+if (!m.stale) console.log(`${m.subscribers} subscribers, ${m.current_count} live (${m.seq} total), ${m.cohortSize} roots`);
 ```
 
 > **For a live dashboard, prefer `sub(metricTopic(T), …)` directly** (below) —
@@ -735,7 +805,7 @@ import { deriveTopicId, metricTopic } from '@axona/protocol';
 const id = await deriveTopicId({ region: 'useast', name: 'lobby' });
 await peer.sub(metricTopic(id), (env) => {
   const m = JSON.parse(env.message);
-  // { topic, ts, by, signer, current_count, subscribers, bytes }
+  // { topic, ts, by, signer, current_count, seq, subscribers, bytes }
   render(m.subscribers, m.current_count);
 }, { since: 'all' });   // since:'all' → latest snapshot + the rolling history
 ```
@@ -760,10 +830,12 @@ These take a **descriptor** (not a bare id) and a signer via
 
 Retract a message you published — "unsend". Authorized by **authorship**:
 the roots accept the kill only if its signer matches the signer of the
-cached message, so you can only kill messages **you** signed. The roots
-drop it from their replay cache, tombstone the `msgId` so a lagging
-replica can't resurrect it, and forward a delete marker to subscribers
-(`{ deleted: true, msgId, topic }`).
+cached message, so you can only kill messages **you** signed. The kill is
+distributed to the topic's **K-closest cohort** (v4.10.0), not one root: every
+cohort member drops it from its replay cache, tombstones the `msgId`, and every
+internal history transfer (hand-off, catch-up, backup replication) carries that
+tombstone — so a late subscriber attaching to any cohort member can't be served
+the killed copy. Subscribers get a delete marker (`{ deleted: true, msgId, topic }`).
 
 | Arg | Type | Notes |
 |---|---|---|
@@ -823,11 +895,12 @@ Counterpart to `host`. `unhost()` turns off keyspace hosting;
 `unhost(topic)` drops one hosted topic. Does **not** touch your
 subscriptions. Idempotent.
 
-#### `peer.rootedTopics()` → `Array<{ topicId, descriptor, current_count, subscribers, bytes }>` *(infra)*
+#### `peer.rootedTopics()` → `Array<{ topicId, descriptor, current_count, seq, subscribers, bytes }>` *(infra)*
 
 Synchronous, local-only introspection of the topics this node currently
 **roots** — each with its signed topic descriptor (recovered from a cached
-envelope, or `null` for an empty/cold role) and a locally-computed snapshot.
+envelope, or `null` for an empty/cold role) and a locally-computed snapshot
+(`current_count`, `seq`, this member's `subscribers` subset, `bytes`).
 No network (unlike `metrics()`). This is the read side that powers the relay
 metric-publish loop (§4.3): walk it, skip `isMetricTopic(d)` and non-open
 descriptors, and `pub(metricTopic(topicId), …)` for the rest. Returns `[]` on a
@@ -1231,9 +1304,9 @@ bootstrap + signaling, plus a WebRTC mesh). Sub-path import:
 import { webTransport } from '@axona/protocol/transport/web/index.js';
 
 const transport = webTransport({
-  bridgeUrl:   'wss://bridge.axona.net',  // required
-  identity:    node,                      // from createNodeIdentity — signs the handshake
-  peerVersion: '3.6.0',                   // your app version (gated by the bridge)
+  bridgeUrl:   'wss://testnet.axona.net',  // the 4.x line runs on testnet (prod is 3.x)
+  identity:    node,                       // from createNodeIdentity — signs the handshake
+  peerVersion: '4.11.2',                   // your app version (gated by the bridge)
   reconnect:   true,
 });
 await transport.start();                  // resolves after the bridge handshake
@@ -1478,8 +1551,8 @@ introduces no keyspace skew.
 ## 23. Constants
 
 ```js
-WIRE_VERSION         // '3.0'      — wire format major.minor (bridges gate on this)
-KERNEL_VERSION       // '3.6.0'    — kernel semver (npm release tag)
+WIRE_VERSION         // '4.0'      — wire format major.minor (bridges gate on this)
+KERNEL_VERSION       // '4.11.2'   — kernel semver (npm release tag)
 AUTH_PROTO           // 'axona/5'  — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426       — WebSocket close code for a version mismatch
 ENVELOPE_DOMAIN      // 'axona:pubsub-envelope:v2'

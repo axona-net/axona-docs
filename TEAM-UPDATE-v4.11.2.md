@@ -1,7 +1,7 @@
-# Team Update — Axona kernel **v4.10.1 → v4.11.1**
+# Team Update — Axona kernel **v4.10.1 → v4.11.2**
 
 **Audience:** anyone building on `@axona/protocol` (apps, relays, bridges).
-**Status:** live on **testnet** — bridge v2.53.0, relay v0.38.0, peer v0.72.0.
+**Status:** live on **testnet** — bridge v2.54.0, relay v0.39.0, peer v0.73.0.
 **Production is untouched and still on 3.x.** Wire-compatible across this whole range
 (WIRE 4.0, no flag day).
 
@@ -57,21 +57,27 @@ the instant the node is warm (a warm publish is a single send). The existing slo
 still backstops afterward. Live cross-peer delivery went from ~85% to **95.5%**, with node
 setup staying fast.
 
-## 3 · Reads now answer from the nearest replica — pull cache-hit early-answer (v4.11.1)
+## 3 · Reads now answer from the nearest replica — pull cache-hit early-answer (v4.11.1–v4.11.2)
 
 `peer.pull` routes toward the topic like a publish (this replaced the old bare greedy walk
-that could strand at a local minimum and return a false "no message"). v4.11.1 sharpens
-it: a pull for a **specific message** (`pull(msgId)`) is a read of *immutable, replicated*
-state — `msgId = H(publisher‖message)` — so **any node en route that already holds it can
-answer, without reaching the root.** The routed PULL now short-circuits at the first
-replica it crosses (a cohort member, a child relay, or a `host()` node), which lowers
-latency and lets a pull that would otherwise strand toward the root be served by any
-cache-holder it passes. A cached message is by definition not tombstoned at that node (a
-kill drops it from cache), so this can't resurrect a killed message.
+that could strand at a local minimum and return a false "no message"). v4.11.1–v4.11.2
+sharpen it: a pull is a read of *replicated* state, so the routed PULL now short-circuits
+at the **first replica it crosses** (a cohort member, a child relay, or a `host()` node)
+instead of always driving to the single root — lower latency, and a pull that would
+otherwise strand toward the root is served by any cache-holder it passes.
 
-**Scope:** by-msgId only. A **pull-latest** (no msgId → "give me the newest") still
-resolves at the topic root/terminus, because a lagging replica's newest could be older
-than the root's — latest needs the authoritative answer.
+- **`pull(msgId)`** (v4.11.1) — exact. `msgId = H(publisher‖message)`, so a nearer copy
+  *is* the copy.
+- **pull-latest** (v4.11.2) — served with whatever **newest** the first replica holds.
+  This is deliberately eventually-consistent: a heavily-used pull-latest path (polling
+  "current state") would otherwise make the root a read **throughput bottleneck and a
+  single point of failure**, so we spread it across the cohort/children and accept that a
+  replica may be a beat behind the root until anti-entropy converges. A caller that needs
+  the linearizable newest should pull a specific `msgId`.
+
+A cached message is by definition not tombstoned at that node (a kill drops it from
+cache), so neither path can resurrect a killed message. A replica with an **empty** cache
+does not early-answer — it forwards, so a populated node or the root responds.
 
 `host` also routes lookup-assisted now (v4.10.1), so an infra node's first keyspace
 announce lands at the true root instead of stranding until the next heal tick.
@@ -97,4 +103,4 @@ announce lands at the true root instead of stranding until the next heal tick.
 
 ---
 
-*Deployed 2026-07-01. Verify at `testnet.axona.net/healthz` (`kernelVersion: 4.11.1`).*
+*Deployed 2026-07-01. Verify at `testnet.axona.net/healthz` (`kernelVersion: 4.11.2`).*

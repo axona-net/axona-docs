@@ -1,21 +1,27 @@
 # Axona Quick Start
 
 Get a working pub/sub roundtrip in **under five minutes** on the current
-`@axona/protocol` **v3.6.0** API (kernel 3.6.0). One Node process connects
-to the live public bridge, subscribes to an open topic, publishes a signed
+`@axona/protocol` **v4.11.2** API (kernel 4.11.2). One Node process connects
+to the live **testnet** bridge, subscribes to an open topic, publishes a signed
 message, and logs what comes back.
+
+> **Testnet, for now.** The 4.x line runs on **testnet** (`wss://testnet.axona.net`).
+> The production bridges (`wss://bridge.axona.net`) are still on the 3.x line, and the
+> two don't interoperate (the wire major partitions them). So this Quick Start uses
+> testnet + the `#v4.11.2` pin. To target production instead, install a `3.x` tag and
+> point at `wss://bridge.axona.net`.
 
 Companion documents:
 
-- [API Reference](Axona-API-Reference-v3.6.0.md) — every exported symbol.
-- [Programmer Guide](Axona-Programmer-Guide-v3.6.0.md) — mental model + worked example.
+- [API Reference](Axona-API-Reference-v4.11.2.md) — every exported symbol.
+- [Programmer Guide](Axona-Programmer-Guide-v4.11.2.md) — mental model + worked example.
 
 ## Prerequisites
 
 - **Node.js 20+** (for built-in Web Crypto Ed25519)
-- A terminal with network access (we connect to `wss://bridge.axona.net`)
+- A terminal with network access (we connect to `wss://testnet.axona.net`)
 
-No build step, no DB, no local bridge — the public bridge is the entry point.
+No build step, no DB, no local bridge — the testnet bridge is the entry point.
 
 ## 1. Install (30 seconds)
 
@@ -23,7 +29,7 @@ No build step, no DB, no local bridge — the public bridge is the entry point.
 mkdir my-axona-demo && cd my-axona-demo
 npm init -y
 npm pkg set type=module
-npm install github:axona-net/axona-protocol#v3.6.0
+npm install github:axona-net/axona-protocol#v4.11.2
 ```
 
 ## 2. Two identities, one rule
@@ -82,7 +88,7 @@ import {
 } from '@axona/protocol';
 import { webTransport } from '@axona/protocol/transport/web/index.js';
 
-const BRIDGE = 'wss://bridge.axona.net';            // live public bridge (kernel 3.6.0)
+const BRIDGE = 'wss://testnet.axona.net';           // live testnet bridge (kernel 4.11.2)
 const HERE   = { lat: 38.0, lng: -77.0 };           // your real location (us-east here)
 const TOPIC  = { region: 'useast', name: 'quick-start-demo' };   // open topic
 
@@ -138,7 +144,7 @@ node index.js
 You should see something like:
 
 ```
-kernel v3.6.0 — connecting…
+kernel v4.11.2 — connecting…
 mesh ready (4 peers)
 topic id: 89a1b2c3…
 [pub ] msgId=8e9d4b1a30c2…
@@ -182,9 +188,9 @@ descriptor fields. That ID-matching is the rule you can't break — same
 | Publish anonymously | `peer.pub(topic, msg, { signWith: ANONYMOUS })` (import `ANONYMOUS`) |
 | Own a feed only you can write | `{ region, owner: me.authorId, name: 'profile' }` (write defaults to `'owner'`) |
 | Share a read-only handle | `await deriveTopicId(descriptor)` -> hand out the 66-hex ID; `sub`/`pull`/`metrics` accept it |
-| Run against testnet | set `BRIDGE = 'wss://testnet.axona.net'` |
-| See the full mental model | [Programmer Guide](Axona-Programmer-Guide-v3.6.0.md) |
-| Look up a specific symbol | [API Reference](Axona-API-Reference-v3.6.0.md) |
+| Run against production (3.x) | install a `3.x` tag and set `BRIDGE = 'wss://bridge.axona.net'` (prod is a separate, non-interoperating line) |
+| See the full mental model | [Programmer Guide](Axona-Programmer-Guide-v4.11.2.md) |
+| Look up a specific symbol | [API Reference](Axona-API-Reference-v4.11.2.md) |
 
 ## Troubleshooting
 
@@ -205,9 +211,11 @@ loop above) before calling `pub`/`sub`. On the public bridge this takes a few
 seconds.
 
 **Can't reach the bridge / connection hangs** — confirm outbound `wss://`
-(TLS WebSocket) to `bridge.axona.net` is allowed by your network. There is no
+(TLS WebSocket) to `testnet.axona.net` is allowed by your network. There is no
 fallback to a local process; the demo needs the bridge to find peers.
 
-**`UPGRADE_REQUIRED` close code (4426)** — your peer is older than the
-bridge's `MIN_PEER_VERSION`. The bridge runs kernel 3.6.0; install
-`github:axona-net/axona-protocol#v3.6.0`.
+**`UPGRADE_REQUIRED` close code (4426)** — a wire/version mismatch. The testnet
+bridge runs kernel 4.11.2 (wire 4.0); install
+`github:axona-net/axona-protocol#v4.11.2`. Note this also fires if you point a
+4.x peer at a **production** (3.x) bridge — they're a hermetic wire partition, so
+match the pin to the network.

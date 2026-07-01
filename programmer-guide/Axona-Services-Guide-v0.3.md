@@ -9,11 +9,15 @@ together, and the **PoW collector**. If you are operating an Axona deployment,
 wiring an agent into the network, or just want a topic to stay alive when no
 browser tab is open, this is the document for you.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v3.6.0)
-- **Wire version**: 3.0 (`WIRE_VERSION`); kernel version 3.6.0 (`KERNEL_VERSION`)
-- **Live network**: `wss://bridge.axona.net` (east) + `wss://bridge-west.axona.net` (west) — a federated pair
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v4.11.2)
+- **Wire version**: 4.0 (`WIRE_VERSION`); kernel version 4.11.2 (`KERNEL_VERSION`)
+- **Live network**: the 4.x line runs on **testnet** — `wss://testnet.axona.net`. The
+  **production** federated pair (`wss://bridge.axona.net` east + `wss://bridge-west.axona.net`
+  west) is still on the 3.x line; the two don't interoperate (the wire major partitions
+  them). Run 4.x services against testnet — point relays/MCP at it explicitly (their
+  code default still targets prod/3.x; see §3).
 - **Companion docs**:
-  - [Quick Start](Quick-Start-v3.6.0.md) · [Programmer Guide](Axona-Programmer-Guide-v3.6.0.md) · [API Reference](Axona-API-Reference-v3.6.0.md) — the library.
+  - [Quick Start](Quick-Start-v4.11.2.md) · [Programmer Guide](Axona-Programmer-Guide-v4.11.2.md) · [API Reference](Axona-API-Reference-v4.11.2.md) — the library.
   - [Architecture](../architecture/Axona-Architecture.tex) — how the bridge + transport work under the hood.
 
 > **Library vs. services.** A *peer* is the unit the library gives you: an
@@ -110,7 +114,7 @@ or, with the repo checked out:
 cd /opt/axona-bridge
 docker compose build        # builds first; the old container keeps serving
 docker compose up -d        # fast swap; Caddy keeps its certificate
-curl https://bridge.example.net/healthz     # → {"status":"ok","version":…,"kernelVersion":"3.6.0"}
+curl https://bridge.example.net/healthz     # → {"status":"ok","version":…,"kernelVersion":"4.11.2"}
 ```
 
 Full provisioning options (the installer, the Docker bundle, and a manual
@@ -152,12 +156,18 @@ durable, well-placed members. Two jobs:
    for named topics) *without subscribing*, so it stores-and-serves a topic's
    messages even when it doesn't consume them. This is what keeps a topic's
    backlog answerable after every author closes their tab. By default a relay
-   hosts its region's keyspace (`0x89` for `useast`).
-2. **Metrics** — every ~5 minutes the relay walks its rooted **open** topics and
-   publishes a signed snapshot (`{current_count, subscribers, bytes}`) to the
-   derived `metricTopic(T)`, so clients can `sub()` for live counts + a rolling
-   ~48 h trend instead of polling. (Owned topics are skipped — their counts are
-   owner-private.)
+   hosts its region's keyspace (`0x89` for `useast`). Under the 4.x **cohort**
+   model a topic is replicated across the K-closest nodes, so durability no
+   longer rests on one relay — several co-hosting relays converge on the same
+   history via anti-entropy, and any of them can answer a read.
+2. **Metrics** — every ~20 s the relay walks its rooted topics and publishes a
+   signed snapshot (`{current_count, seq, subscribers, bytes}`) to the derived
+   `metricTopic(T)`, so clients can `sub()` for live counts + a rolling ~48 h
+   trend instead of polling. As of v4.3.0 **both open and owned** topics publish
+   metrics (owned-topic activity counts are public too); `seq` is the dense
+   message counter (total events ever, kills included). Because every co-hosting
+   root publishes its own snapshot, the reader-side `peer.metrics()` aggregates
+   across the cohort (sums subscribers, maxes the rest — see the API Reference).
 
 ### Running one
 
@@ -177,7 +187,7 @@ you get one well-known node plus as many throwaway nodes as you want.
 
 | Var | Default | Meaning |
 |---|---|---|
-| `RELAY_NETWORK` | `prod` | Bootstrap network: `prod` (`bridge.axona.net`) or `testnet` |
+| `RELAY_NETWORK` | `prod` | Bootstrap network: `prod` (`bridge.axona.net`, **3.x**) or `testnet` (`testnet.axona.net`, **4.x**). A v4.11.2 relay must use `testnet` — the code default `prod` is the 3.x line and rejects a 4.x peer at the handshake. |
 | `BRIDGE_URL` | — | Explicit bridge URL; **overrides** `RELAY_NETWORK` |
 | `RELAY_REGION` | — | `auto` (detect), a region name (`useast`), or code (`0x89`) — sets the nodeId geo prefix |
 | `RELAY_LAT` / `RELAY_LNG` | `37.77`/`-122.42` | Geo prefix by coordinate (if `RELAY_REGION` unset). Default = SF (`uswest`) |
@@ -185,7 +195,7 @@ you get one well-known node plus as many throwaway nodes as you want.
 | `RELAY_HOST_KEYSPACE` | `1` | Host the region's whole keyspace (set `0` to host only `RELAY_TOPICS`) |
 | `RELAY_TOPICS` | — | Comma-separated topic names to host explicitly |
 | `RELAY_METRICS` | `1` | Publish metric snapshots (`0` to disable) |
-| `RELAY_METRICS_INTERVAL_MS` | ~300000 | Metric publish cadence |
+| `RELAY_METRICS_INTERVAL_MS` | ~20000 | Metric publish cadence (~20 s) |
 | `RELAY_TUI` | auto | `1` force dashboard, `0` force plain log |
 
 Bridge precedence: `BRIDGE_URL` › `RELAY_NETWORK` › `prod`. Region precedence:
@@ -258,9 +268,10 @@ call.
 | `axona_subscribe` | `topic`, `region?`, `seconds?` (1–120), `since?` | One-shot listen window (back-compat) |
 
 Region defaults to `useast` (`0x89`); subscribers must use the **same region** as
-the publisher. The server targets **production** by default and interoperates
-with the live apps — publishing to `us-east/hello-world` shows up in the
-demo.axona.net feed.
+the publisher. The server's code default targets **production** (the 3.x line); a
+v4.11.2 MCP peer must set `RELAY_NETWORK=testnet` to join the 4.x line (the two
+don't interoperate). Within a line, publishing interoperates with the live apps on
+that line.
 
 **Receiving — push vs. poll.** Two paths cover the same arrivals:
 - **Push** — every message on a watched topic is emitted as an MCP *logging
@@ -360,7 +371,7 @@ backlog.)
 
 | You want to… | Run |
 |---|---|
-| Let strangers connect to your app's network | A **bridge** (or use the live `bridge.axona.net`) |
+| Let strangers connect to your app's network | A **bridge** (or use the live one for your line — `testnet.axona.net` for 4.x, `bridge.axona.net` for 3.x) |
 | Keep a topic's messages alive when no author is online | A **relay** that `host()`s it |
 | Publish live subscriber counts for a topic | A **relay** (metrics on — the default) |
 | Publish/subscribe from a shell, cron, or CI | The **CLI** (`axona-cli`) |
@@ -396,9 +407,9 @@ any other peer that takes on the same role.
 
 ## Where to go next
 
-- **[Programmer Guide](Axona-Programmer-Guide-v3.6.0.md)** — build the peer that
+- **[Programmer Guide](Axona-Programmer-Guide-v4.11.2.md)** — build the peer that
   talks to these services.
-- **[API Reference](Axona-API-Reference-v3.6.0.md)** — `host()` / `unhost()`,
+- **[API Reference](Axona-API-Reference-v4.11.2.md)** — `host()` / `unhost()`,
   `metricTopic()`, and the rest of the public surface.
 - **`axona-bridge/deploy/INSTALL.md`** — provision a bridge (installer, Docker,
   or manual).

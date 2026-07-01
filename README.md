@@ -61,14 +61,15 @@ Start with the **[Programmer Introduction](programmer-intro/Axona%20Programmer%2
 
 | Doc | Read when | Length |
 |---|---|---|
-| **[Quick Start](programmer-guide/Quick-Start-v3.6.0.md)** · [PDF](programmer-guide/Quick-Start-v3.6.0.pdf) | You want a working pub/sub roundtrip in 5 minutes. Mint two identities, build a peer on the live bridge, publish + subscribe to an open topic. | ~210 lines |
-| **[Axona API Reference](programmer-guide/Axona-API-Reference-v3.6.0.md)** · [PDF](programmer-guide/Axona-API-Reference-v3.6.0.pdf) | You're building and need to look up a specific call: signature, params, returns, errors, example for every public export — including topic addressing (descriptors, `deriveTopicId`, the read-handle vs descriptor split). | ~1500 lines |
-| **[Programmer Guide](programmer-guide/Axona-Programmer-Guide-v3.6.0.md)** · [PDF](programmer-guide/Axona-Programmer-Guide-v3.6.0.pdf) | You're starting a new application against Axona. Mental model, node + author identity, **topics & addressing** (descriptors, write policy, region, sharing topic IDs), pub/sub semantics + lifecycle, the bridge, a worked chat-app example, pitfalls, production checklist. | ~1450 lines |
-| **[Services Guide](programmer-guide/Axona-Services-Guide-v0.2.md)** · [PDF](programmer-guide/Axona-Services-Guide-v0.2.pdf) | You're **operating** Axona, not just building on it: the signaling **bridge**, the **relay** + its four front-ends (console, CLI, **MCP server**, desktop app), directory/federation, and the PoW collector — the programs you *run* rather than write. | ~420 lines |
+| **[Quick Start](programmer-guide/Quick-Start-v4.11.2.md)** · [PDF](programmer-guide/Quick-Start-v4.11.2.pdf) | You want a working pub/sub roundtrip in 5 minutes. Mint two identities, build a peer on the live testnet bridge, publish + subscribe to an open topic. | ~220 lines |
+| **[Axona API Reference](programmer-guide/Axona-API-Reference-v4.11.2.md)** · [PDF](programmer-guide/Axona-API-Reference-v4.11.2.pdf) | You're building and need to look up a specific call: signature, params, returns, errors, example for every public export — including topic addressing (descriptors, `deriveTopicId`, the read-handle vs descriptor split) and the 4.x pub/sub reliability behavior. | ~1550 lines |
+| **[Programmer Guide](programmer-guide/Axona-Programmer-Guide-v4.11.2.md)** · [PDF](programmer-guide/Axona-Programmer-Guide-v4.11.2.pdf) | You're starting a new application against Axona. Mental model, node + author identity, **topics & addressing** (descriptors, write policy, region, sharing topic IDs), pub/sub semantics + lifecycle, the bridge, a worked chat-app example, pitfalls, production checklist. | ~1470 lines |
+| **[Services Guide](programmer-guide/Axona-Services-Guide-v0.3.md)** · [PDF](programmer-guide/Axona-Services-Guide-v0.3.pdf) | You're **operating** Axona, not just building on it: the signaling **bridge**, the **relay** + its four front-ends (console, CLI, **MCP server**, desktop app), directory/federation, and the PoW collector — the programs you *run* rather than write. | ~420 lines |
 
-All three track `@axona/protocol` **v3.2.0** (the version is in each filename;
-the kernel currently deployed is at each app's version row and the bridge's
-`/healthz`). The topic-addressing reference (formerly a standalone Topic-IDs
+The trio tracks `@axona/protocol` **v4.11.2** (Services Guide at v0.3); the version
+is in each filename. The 4.x line runs on **testnet** (`wss://testnet.axona.net`);
+production is still on the 3.x line. The kernel currently deployed is at each app's
+version row and the bridge's `/healthz`. The topic-addressing reference (formerly a standalone Topic-IDs
 note) is now folded into the Programmer Guide (Topics & Addressing) and the API
 Reference (Pub/sub → Topic addressing).
 

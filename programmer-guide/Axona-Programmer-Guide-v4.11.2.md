@@ -9,12 +9,15 @@ The guide assumes you already know JavaScript + Node + a browser. It does
 not assume any DHT / WebRTC / cryptography background -- concepts are
 introduced where they are needed.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v3.6.0)
-- **Wire version**: 3.0 (`WIRE_VERSION`); kernel version 3.6.0 (`KERNEL_VERSION`)
-- **Live network**: `wss://bridge.axona.net` (east) and `wss://bridge-west.axona.net` (west) -- a federated pair
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v4.11.2)
+- **Wire version**: 4.0 (`WIRE_VERSION`); kernel version 4.11.2 (`KERNEL_VERSION`)
+- **Live network**: the 4.x line runs on **testnet** — `wss://testnet.axona.net`. The
+  **production** bridges (`wss://bridge.axona.net` east, `wss://bridge-west.axona.net`
+  west — a federated pair) are still on the 3.x line and do **not** interoperate with
+  4.x (the wire major partitions them). Build against testnet to use this surface.
 - **Companion docs**:
-  - [Quick Start](Quick-Start-v3.6.0.md) -- five minutes to a working roundtrip; send a newcomer there first.
-  - [API Reference](Axona-API-Reference-v3.6.0.md) -- every public symbol and its exact signature.
+  - [Quick Start](Quick-Start-v4.11.2.md) -- five minutes to a working roundtrip; send a newcomer there first.
+  - [API Reference](Axona-API-Reference-v4.11.2.md) -- every public symbol and its exact signature.
 
 > **What changed from the v2 line.** v3.0.0 rebuilt identity, authorship,
 > and addressing as three separate concerns (a breaking flag-day). If you
@@ -23,8 +26,16 @@ introduced where they are needed.
 > bare string topics, and the "region-keyed / publisher-keyed / public"
 > topic *modes*. All gone. The replacements are two identity factories
 > (`createNodeIdentity`, `createAuthorIdentity`), descriptor topics
-> (`{ region?, owner?, name, write? }`), and per-publish `signWith`. This
-> guide teaches only the v3.6.0 surface.
+> (`{ region?, owner?, name, write? }`), and per-publish `signWith`.
+>
+> **What changed in the 4.x line.** The application API above is **unchanged** —
+> the 4.x work is a routing/reliability rewrite underneath it: routing-only
+> axonic-tree pub/sub, K-closest **cohort** replication (a killed message can't
+> resurface and a publish survives the root churning out), a **cold-publish burst**
+> so a freshly-joined node's first publish isn't lost, **nearest-replica reads**
+> (`pull` answers from the closest replica holding the message), and a rebuilt
+> **metrics** path. All transparent to your code; the reliability notes appear in
+> §7 where they matter.
 
 ---
 
@@ -141,7 +152,7 @@ locality.
 ```
 mkdir my-axona-app && cd my-axona-app
 npm init -y
-npm install @axona/protocol@github:axona-net/axona-protocol#v3.6.0
+npm install @axona/protocol@github:axona-net/axona-protocol#v4.11.2
 ```
 
 You now have `node_modules/@axona/protocol/src/` with the full kernel.
@@ -163,8 +174,8 @@ const nodeIdentity = await createNodeIdentity({ lat: 38.0, lng: -77.0 });
 
 // 2. A transport. In the browser, webTransport speaks WebRTC + a WS bridge.
 const transport = webTransport({
-  bridgeUrl: 'wss://bridge.axona.net',
-  identity:  nodeIdentity,            // the factory option is named `identity:`
+  bridgeUrl: 'wss://testnet.axona.net',  // the 4.x line runs on testnet (prod is 3.x)
+  identity:  nodeIdentity,               // the factory option is named `identity:`
 });
 
 // 3. The local routing state.
@@ -682,6 +693,17 @@ out-of-band. A non-serializable message (circular ref, BigInt) throws
 > receiver (`receiveChunkedBytes`) reassembles, or rejects with the missing
 > indices on timeout -- it never hangs.
 
+> **Delivery, and why you don't ack (4.x).** A publish routes to the topic's
+> K-closest **cohort** and is replicated across it, so it survives the closest node
+> churning out. There is deliberately **no delivery ack to the publisher** — the
+> transport identity is unlinked from the author identity, so the network can't (and
+> won't) tell you "who received it where." Two automatic mechanisms cover the gaps so
+> you don't hand-roll retries: a freshly-joined ("cold") node re-sends its first
+> publishes a few times over ~1 s (the **cold-publish burst**, v4.11.0) so a
+> not-yet-warm routing table doesn't strand them, and a background retry re-sends a
+> recent publish until the publisher sees its own `msgId` land as a root. This is why
+> §13.3's "publish before the mesh forms" pitfall is now a soft edge, not a cliff.
+
 ### 7.2 Subscribe
 
 ```js
@@ -813,17 +835,25 @@ const latest = await peer.pull(null,  { topic: feedId });
 
 // Coarse, best-effort topic state. Works for ANY topic — open or owned.
 const m = await peer.metrics(feedId, { timeoutMs: 1500 });
-// { current_count, subscribers, bytes, publishes, ts, signer, stale }
+// { current_count, seq, subscribers, bytes, publishes, ts, signer, cohortSize, stale }
 ```
 
-`pull` queries the topic's K-closest axons and is for "did I miss this one?",
-not durable storage. `metrics()` (v4.3.0) is a one-shot read of the latest
-**published** metric snapshot — a topic's root publishes a signed snapshot to
-`metricTopic(T)` every ~20 s, and `metrics()` just subscribes to it briefly and
-returns the freshest one (`stale:true` if no publisher roots the topic yet). It
-works for **any** topic, open or owned — an owned topic's metrics are public
-too. `current_count` is the live retained count; `subscribers` is the publishing
-root's direct-child count — for UX, not billing.
+`pull` is for "did I miss this one?", not durable storage. **Nearest-replica reads
+(v4.11.1–v4.11.2):** a pull is answered by the first replica it reaches — a cohort
+member, a child relay, or a `host()` node — not necessarily the root. `pull(msgId)`
+is *exact* (the content hash pins the message); **pull-latest** (`null` msgId) gives
+whatever newest that replica holds — *recent, eventually-consistent* — which keeps a
+heavily-polled "current value" read from hammering the root. Need the strict newest?
+Pull a specific `msgId`.
+
+`metrics()` (v4.3.0) is a one-shot read of the latest **published** metric snapshot —
+a topic's roots publish a signed snapshot to `metricTopic(T)` every ~20 s, and
+`metrics()` subscribes to it briefly and aggregates across the cohort (`stale:true`
+if no publisher roots the topic yet). It works for **any** topic, open or owned — an
+owned topic's metrics are public too. `current_count` is the live retained count;
+`seq` is the dense message counter (total events ever, kills included); `subscribers`
+is the topic-wide total (summed across the cohort); `cohortSize` is how many roots
+reported. For UX, not billing.
 
 > **For a live count, prefer `sub(metricTopic(T), …)` directly** (next section):
 > one standing subscription, every update pushed to you, plus a rolling history.
@@ -841,7 +871,7 @@ import { deriveTopicId, metricTopic } from '@axona/protocol';
 
 const lobbyId = await deriveTopicId({ region: 'useast', name: 'lobby' });
 await peer.sub(metricTopic(lobbyId), (env) => {
-  const m = JSON.parse(env.message);   // { topic, ts, by, signer, current_count, subscribers, bytes }
+  const m = JSON.parse(env.message);   // { topic, ts, by, signer, current_count, seq, subscribers, bytes }
   showRoomCount(m.subscribers, m.current_count);
 }, { since: 'all' });                  // latest snapshot + a rolling ~48 h trend
 ```
@@ -1050,17 +1080,19 @@ The bridge does three things:
 
 ### 11.1 Using the public bridges
 
-Most apps just point at the live federated pair:
+Point at the network for the line you're building on:
 
 ```
-wss://bridge.axona.net        # east
-wss://bridge-west.axona.net    # west
+wss://testnet.axona.net        # the 4.x line (this guide) — kernel 4.11.2
+wss://bridge.axona.net         # production east — still the 3.x line
+wss://bridge-west.axona.net    # production west — still the 3.x line
 ```
 
-Both run kernel 3.6.0 with TURN. Open a WebSocket (the `webTransport` factory
-does the handshake for you) and you are on the network. A bridge advertises
-itself in the public bridge directory so clients can discover and fail over
-between bridges.
+The 4.x line runs on **testnet**; the production federated pair is still on 3.x,
+and the wire major partitions them (a 4.x peer and a 3.x bridge reject each other
+at the handshake). Open a WebSocket (the `webTransport` factory does the handshake
+for you) and you are on the network. A bridge advertises itself in the public
+bridge directory so clients can discover and fail over between bridges.
 
 ### 11.2 Running your own bridge (Docker stack)
 
@@ -1161,8 +1193,8 @@ import {
 } from '@axona/protocol';
 import { webTransport } from '@axona/protocol/transport/web/index.js';
 
-const BRIDGE       = 'wss://bridge.axona.net';
-const TOPIC_REGION = 'useast';                 // rooms are pinned here for everyone
+const BRIDGE       = 'wss://testnet.axona.net';  // the 4.x line runs on testnet (prod is 3.x)
+const TOPIC_REGION = 'useast';                   // rooms are pinned here for everyone
 
 let peer, nodeIdentity, author;
 
@@ -1316,8 +1348,11 @@ full owned descriptor) for writing (6.6).
 `peer.start()` returns as soon as local state is set up; mesh handshakes
 complete asynchronously over the next few seconds. Publish too early and your
 K-closest set is just yourself + the bridge, so the axon set is incomplete.
-Wait for `node.synaptome.size` (or `peer.peers().length`) to reach a small
-threshold before letting the user publish -- the worked example polls for 3.
+The 4.x **cold-publish burst** (§7.1) now re-sends a freshly-joined node's first
+publishes over the first second, so an early publish usually still lands — this is
+a soft edge, not the hard 0% it once was. Still, for predictable UX, wait for
+`node.synaptome.size` (or `peer.peers().length`) to reach a small threshold before
+letting the user publish -- the worked example polls for 3.
 
 ### 13.4 Mismatched descriptors give no delivery, silently
 
@@ -1495,8 +1530,8 @@ import { FilePersistence }      from '@axona/protocol/persistence/file.js';
 ### 15.9 Version constants
 
 ```js
-WIRE_VERSION         // '3.0'
-KERNEL_VERSION       // '3.6.0'
+WIRE_VERSION         // '4.0'
+KERNEL_VERSION       // '4.11.2'
 ```
 
 ### 15.10 Error codes worth catching
@@ -1518,11 +1553,11 @@ Errors subclass `AxonaError` with a stable `.code` -- switch on `.code`, not
 
 ## Where to go next
 
-- **[Quick Start](Quick-Start-v3.6.0.md)** -- a five-minute roundtrip for
+- **[Quick Start](Quick-Start-v4.11.2.md)** -- a five-minute roundtrip for
   someone you are onboarding.
-- **[API Reference](Axona-API-Reference-v3.6.0.md)** -- the exact signature of
+- **[API Reference](Axona-API-Reference-v4.11.2.md)** -- the exact signature of
   every public symbol.
-- **[Services Guide](Axona-Services-Guide-v0.2.md)** -- the programs you *run*
+- **[Services Guide](Axona-Services-Guide-v0.3.md)** -- the programs you *run*
   rather than write: the signaling bridge, the relay + its front-ends (console,
   CLI, MCP server, desktop), directory/federation, and the PoW collector.
 - **[Identity & Authorship Model](../architecture/Identity-and-Authorship-Model-v0.3.md)**
