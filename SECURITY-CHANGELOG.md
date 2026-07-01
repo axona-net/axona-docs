@@ -16,6 +16,26 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.11.0 — 2026-07-01
+
+**A message published in the first seconds after a node joins is now delivered
+reliably, not silently dropped.** A publish is routed toward the topic's address
+and held by the node closest to it. A brand-new node hasn't yet learned enough of
+the network to route accurately, so its very first publish could take a wrong turn
+and land nowhere any subscriber looks — and because a publish is one-shot (a
+subscriber renews, a publish does not), that message was simply lost, with no error
+to the sender. Now, while a node is still integrating (few peers), it re-sends the
+**same** message a handful of times over the first second. This is safe and
+self-limiting: every copy carries the same content-addressed message id, so the
+holding node keeps exactly one (no duplicates reach subscribers); the extra sends
+also accelerate the new node's own integration; and the burst switches off the
+moment the node is connected enough to route on its own. The result closes a
+cold-start message-loss window without weakening any delivery or authorship
+guarantee — the publisher still learns nothing about *where* any subscriber is, and
+the transport identity remains unlinked to the author identity.
+
+---
+
 ## Kernel v4.10.0 — 2026-06-30
 
 **A retracted (killed) message can no longer resurface to a subscriber that joins
@@ -1277,4 +1297,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-06-29.*
+*Last updated: 2026-07-01.*
