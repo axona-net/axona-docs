@@ -16,6 +16,34 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.13.0–v4.16.0 — 2026-07-02 (testnet)
+
+**Message ingress hardened by a single validated ID gate.** Every address
+crossing from the wire into the routing core (node, topic, subscriber, and
+target IDs) now passes one canonical coercion gate that validates format and
+range before any routing state is touched, and routing objects can no longer
+be constructed holding an unvalidated identifier. Malformed or out-of-range
+IDs are rejected at the boundary with a stable, classifiable error rather than
+reaching keyspace math. (v4.14.0)
+
+**Region-occupancy discipline implemented, staged behind a switch.** The
+kernel now enforces — when enabled — that a topic's serving infrastructure
+(root, child relays, hosts) consists only of nodes in the topic's own region,
+and refuses pub/sub into a region with no operational node. This protects a
+region's nodes from absorbing a neighboring region's traffic (cross-region
+hotspot/amplification). It ships **disabled** while the network is below the
+regional coverage needed to enforce it without refusing legitimate traffic;
+enabling it network-wide is a configuration change, not a release. (v4.13.0,
+gated in v4.15.0)
+
+**Metrics measured only on demand.** Topic activity snapshots are now
+published only while a subscriber holds a renewable, self-expiring lease —
+removing the standing background publish load and ensuring no orphan
+measurement continues after interest lapses. Snapshot counts remain advisory
+and are never a security input. (v4.12.0)
+
+---
+
 ## Kernel v4.11.2 — 2026-07-01
 
 **A "give me the latest" read is no longer a single-node bottleneck.** Building on the
@@ -1331,4 +1359,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-07-01.*
+*Last updated: 2026-07-02.*

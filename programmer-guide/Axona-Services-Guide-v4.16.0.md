@@ -1,6 +1,6 @@
 # Axona Services Guide
 
-*(kernel 4.11.2 · testnet — versioned with the protocol it describes)*
+*(kernel 4.16.0 · testnet — versioned with the protocol it describes)*
 
 The other programmer-guide documents teach the **library** — how to build your
 own peer with `@axona/protocol` and speak pub/sub. This guide covers the
@@ -11,16 +11,16 @@ together, and the **PoW collector**. If you are operating an Axona deployment,
 wiring an agent into the network, or just want a topic to stay alive when no
 browser tab is open, this is the document for you.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v4.11.2)
-- **Wire version**: 4.0 (`WIRE_VERSION`); kernel version 4.11.2 (`KERNEL_VERSION`)
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v4.16.0)
+- **Wire version**: 4.0 (`WIRE_VERSION`); kernel version 4.16.0 (`KERNEL_VERSION`)
 - **Live network**: the 4.x line runs on **testnet** — `wss://testnet.axona.net`. The
   **production** federated pair (`wss://bridge.axona.net` east + `wss://bridge-west.axona.net`
   west) is still on the 3.x line; the two don't interoperate (the wire major partitions
   them). Run 4.x services against testnet — point relays/MCP at it explicitly (their
   code default still targets prod/3.x; see §3).
 - **Companion docs**:
-  - [Quick Start](Quick-Start-v4.11.2.md) · [Programmer Guide](Axona-Programmer-Guide-v4.11.2.md) · [API Reference](Axona-API-Reference-v4.11.2.md) — the library.
-  - [AI Grounding](Axona-AI-Grounding-v4.11.2.md) — building with an AI assistant.
+  - [Quick Start](Quick-Start-v4.16.0.md) · [Programmer Guide](Axona-Programmer-Guide-v4.16.0.md) · [API Reference](Axona-API-Reference-v4.16.0.md) — the library.
+  - [AI Grounding](Axona-AI-Grounding-v4.16.0.md) — building with an AI assistant.
   - [Architecture](../architecture/Axona-Architecture.tex) — how the bridge + transport work under the hood.
 
 > **Library vs. services.** A *peer* is the unit the library gives you: an
@@ -117,7 +117,7 @@ or, with the repo checked out:
 cd /opt/axona-bridge
 docker compose build        # builds first; the old container keeps serving
 docker compose up -d        # fast swap; Caddy keeps its certificate
-curl https://bridge.example.net/healthz     # → {"status":"ok","version":…,"kernelVersion":"4.11.2"}
+curl https://bridge.example.net/healthz     # → {"status":"ok","version":…,"kernelVersion":"4.16.0"}
 ```
 
 Full provisioning options (the installer, the Docker bundle, and a manual
@@ -190,7 +190,7 @@ you get one well-known node plus as many throwaway nodes as you want.
 
 | Var | Default | Meaning |
 |---|---|---|
-| `RELAY_NETWORK` | `prod` | Bootstrap network: `prod` (`bridge.axona.net`, **3.x**) or `testnet` (`testnet.axona.net`, **4.x**). A v4.11.2 relay must use `testnet` — the code default `prod` is the 3.x line and rejects a 4.x peer at the handshake. |
+| `RELAY_NETWORK` | `prod` | Bootstrap network: `prod` (`bridge.axona.net`, **3.x**) or `testnet` (`testnet.axona.net`, **4.x**). A v4.16.0 relay must use `testnet` — the code default `prod` is the 3.x line and rejects a 4.x peer at the handshake. |
 | `BRIDGE_URL` | — | Explicit bridge URL; **overrides** `RELAY_NETWORK` |
 | `RELAY_REGION` | — | `auto` (detect), a region name (`useast`), or code (`0x89`) — sets the nodeId geo prefix |
 | `RELAY_LAT` / `RELAY_LNG` | `37.77`/`-122.42` | Geo prefix by coordinate (if `RELAY_REGION` unset). Default = SF (`uswest`) |
@@ -272,7 +272,7 @@ call.
 
 Region defaults to `useast` (`0x89`); subscribers must use the **same region** as
 the publisher. The server's code default targets **production** (the 3.x line); a
-v4.11.2 MCP peer must set `RELAY_NETWORK=testnet` to join the 4.x line (the two
+v4.16.0 MCP peer must set `RELAY_NETWORK=testnet` to join the 4.x line (the two
 don't interoperate). Within a line, publishing interoperates with the live apps on
 that line.
 
@@ -410,9 +410,9 @@ any other peer that takes on the same role.
 
 ## Where to go next
 
-- **[Programmer Guide](Axona-Programmer-Guide-v4.11.2.md)** — build the peer that
+- **[Programmer Guide](Axona-Programmer-Guide-v4.16.0.md)** — build the peer that
   talks to these services.
-- **[API Reference](Axona-API-Reference-v4.11.2.md)** — `host()` / `unhost()`,
+- **[API Reference](Axona-API-Reference-v4.16.0.md)** — `host()` / `unhost()`,
   `metricTopic()`, and the rest of the public surface.
 - **`axona-bridge/deploy/INSTALL.md`** — provision a bridge (installer, Docker,
   or manual).

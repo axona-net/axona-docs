@@ -147,7 +147,7 @@
 \section{Axona Quick Start}\label{axona-quick-start}
 
 Get a working pub/sub roundtrip in \textbf{under five minutes} on the
-current \texttt{@axona/protocol} \textbf{v4.11.2} API (kernel 4.11.2).
+current \texttt{@axona/protocol} \textbf{v4.16.0} API (kernel 4.16.0).
 One Node process connects to the live \textbf{testnet} bridge,
 subscribes to an open topic, publishes a signed message, and logs what
 comes back.
@@ -157,7 +157,7 @@ comes back.
 (\texttt{wss://testnet.axona.net}). The production bridges
 (\texttt{wss://bridge.axona.net}) are still on the 3.x line, and the two
 don't interoperate (the wire major partitions them). So this Quick Start
-uses testnet + the \texttt{\#v4.11.2} pin. To target production instead,
+uses testnet + the \texttt{\#v4.16.0} pin. To target production instead,
 install a \texttt{3.x} tag and point at \texttt{wss://bridge.axona.net}.
 \end{quote}
 
@@ -166,13 +166,13 @@ Companion documents:
 \begin{itemize}
 \tightlist
 \item
-  \href{Axona-Programmer-Guide-v4.11.2.md}{Programmer Guide} --- the
+  \href{Axona-Programmer-Guide-v4.16.0.md}{Programmer Guide} --- the
   five ideas + recipes for real apps.
 \item
-  \href{Axona-API-Reference-v4.11.2.md}{API Reference} --- every
+  \href{Axona-API-Reference-v4.16.0.md}{API Reference} --- every
   exported symbol.
 \item
-  \href{Axona-AI-Grounding-v4.11.2.md}{AI Grounding} --- building with
+  \href{Axona-AI-Grounding-v4.16.0.md}{AI Grounding} --- building with
   an AI assistant? Hand it this file.
 \end{itemize}
 
@@ -197,7 +197,7 @@ entry point.
 \FunctionTok{mkdir}\NormalTok{ my{-}axona{-}demo }\KeywordTok{\&\&} \BuiltInTok{cd}\NormalTok{ my{-}axona{-}demo}
 \ExtensionTok{npm}\NormalTok{ init }\AttributeTok{{-}y}
 \ExtensionTok{npm}\NormalTok{ pkg set type=module}
-\ExtensionTok{npm}\NormalTok{ install github:axona{-}net/axona{-}protocol\#v4.11.2}
+\ExtensionTok{npm}\NormalTok{ install github:axona{-}net/axona{-}protocol\#v4.16.0}
 \end{Highlighting}
 \end{Shaded}
 
@@ -226,6 +226,12 @@ as}:
 \texttt{\{\ signWith\ \}} --- an author identity, or the
 \texttt{ANONYMOUS} sentinel for a deliberately unsigned post. There is
 no default signer, and the node key never signs publishes.
+
+\texttt{connect()} (below) mints both identities for you. To make the
+author \emph{durable} across runs, pass
+\texttt{author:\ \textquotesingle{}myapp:author\textquotesingle{}} --- a
+\texttt{persistAs} key --- instead of the ephemeral default. The
+underlying factories stay available for custom wiring.
 
 \subsection{3. Topics are descriptors, not
 strings}\label{topics-are-descriptors-not-strings}
@@ -280,42 +286,20 @@ Save this as \texttt{index.js} --- it mirrors how
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\ImportTok{import}\NormalTok{ \{}
-\NormalTok{  AxonaPeer}\OperatorTok{,}\NormalTok{ AxonaDomain}\OperatorTok{,}\NormalTok{ NeuronNode}\OperatorTok{,}
-\NormalTok{  createNodeIdentity}\OperatorTok{,}\NormalTok{ createAuthorIdentity}\OperatorTok{,}
-\NormalTok{  deriveTopicId}\OperatorTok{,}\NormalTok{ KERNEL\_VERSION}\OperatorTok{,}
-\NormalTok{\} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
-\ImportTok{import}\NormalTok{ \{ webTransport \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol/transport/web/index.js\textquotesingle{}}\OperatorTok{;}
+\ImportTok{import}\NormalTok{ \{ deriveTopicId}\OperatorTok{,}\NormalTok{ KERNEL\_VERSION \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+\ImportTok{import}\NormalTok{ \{ connect \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol/connect.js\textquotesingle{}}\OperatorTok{;}
 
-\KeywordTok{const}\NormalTok{ BRIDGE }\OperatorTok{=} \StringTok{\textquotesingle{}wss://testnet.axona.net\textquotesingle{}}\OperatorTok{;}           \CommentTok{// live testnet bridge (kernel 4.11.2)}
+\KeywordTok{const}\NormalTok{ BRIDGE }\OperatorTok{=} \StringTok{\textquotesingle{}wss://testnet.axona.net\textquotesingle{}}\OperatorTok{;}           \CommentTok{// live testnet bridge (kernel 4.16.0)}
 \KeywordTok{const}\NormalTok{ HERE   }\OperatorTok{=}\NormalTok{ \{ }\DataTypeTok{lat}\OperatorTok{:} \FloatTok{38.0}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:} \OperatorTok{{-}}\FloatTok{77.0}\NormalTok{ \}}\OperatorTok{;}           \CommentTok{// your real location (us{-}east here)}
 \KeywordTok{const}\NormalTok{ TOPIC  }\OperatorTok{=}\NormalTok{ \{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}quick{-}start{-}demo\textquotesingle{}}\NormalTok{ \}}\OperatorTok{;}   \CommentTok{// open topic}
 
-\CommentTok{// 1. Two identities: connection (node) + authorship (author).}
-\KeywordTok{const}\NormalTok{ node$identity }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{createNodeIdentity}\NormalTok{(HERE)}\OperatorTok{;}            \CommentTok{// ephemeral connection key}
-\KeywordTok{const}\NormalTok{ author        }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{createAuthorIdentity}\NormalTok{()}\OperatorTok{;}             \CommentTok{// ephemeral author key}
-
-\CommentTok{// 2. Build the peer on the web transport pointed at the bridge.}
-\KeywordTok{const}\NormalTok{ transport }\OperatorTok{=} \FunctionTok{webTransport}\NormalTok{(\{ }\DataTypeTok{bridgeUrl}\OperatorTok{:}\NormalTok{ BRIDGE}\OperatorTok{,} \DataTypeTok{identity}\OperatorTok{:}\NormalTok{ node$identity \})}\OperatorTok{;}
-\KeywordTok{const}\NormalTok{ node      }\OperatorTok{=} \KeywordTok{new} \FunctionTok{NeuronNode}\NormalTok{(\{ }\DataTypeTok{id}\OperatorTok{:} \BuiltInTok{BigInt}\NormalTok{(}\StringTok{\textquotesingle{}0x\textquotesingle{}} \OperatorTok{+}\NormalTok{ node$identity}\OperatorTok{.}\AttributeTok{id}\NormalTok{)}\OperatorTok{,} \DataTypeTok{lat}\OperatorTok{:}\NormalTok{ HERE}\OperatorTok{.}\AttributeTok{lat}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:}\NormalTok{ HERE}\OperatorTok{.}\AttributeTok{lng}\NormalTok{ \})}\OperatorTok{;}
-\NormalTok{node}\OperatorTok{.}\AttributeTok{transport}  \OperatorTok{=}\NormalTok{ transport}\OperatorTok{;}
-\KeywordTok{const}\NormalTok{ peer }\OperatorTok{=} \KeywordTok{new} \FunctionTok{AxonaPeer}\NormalTok{(\{}
-  \DataTypeTok{domain}\OperatorTok{:} \KeywordTok{new} \FunctionTok{AxonaDomain}\NormalTok{(\{ }\DataTypeTok{k}\OperatorTok{:} \DecValTok{20}\NormalTok{ \})}\OperatorTok{,}
-\NormalTok{  node}\OperatorTok{,}
-  \DataTypeTok{nodeIdentity}\OperatorTok{:}\NormalTok{ node$identity}\OperatorTok{,}
-\NormalTok{  transport}\OperatorTok{,}
-\NormalTok{\})}\OperatorTok{;}
-
-\ControlFlowTok{await}\NormalTok{ transport}\OperatorTok{.}\FunctionTok{start}\NormalTok{(node$identity}\OperatorTok{.}\AttributeTok{id}\NormalTok{)}\OperatorTok{;}
-\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{start}\NormalTok{()}\OperatorTok{;}
-\CommentTok{// (A one{-}call version of everything above — \textasciigrave{}connect(\{ bridge, location \})\textasciigrave{} —}
-\CommentTok{//  ships in the next kernel release; this is the 4.11.2 way.)}
-
-\CommentTok{// 3. Wait for the routing mesh to warm up before pub/sub. peer.ready() does this}
-\CommentTok{//    for you — it resolves once enough peers are in the synaptome (or a stable}
-\CommentTok{//    non{-}zero plateau), bounded by timeoutMs. No hand{-}rolled polling loop needed.}
+\CommentTok{// 1–3. One call: mints both identities (connection + author), builds the}
+\CommentTok{//      peer on the web transport, starts it, and waits for the mesh to warm.}
 \BuiltInTok{console}\OperatorTok{.}\FunctionTok{log}\NormalTok{(}\StringTok{\textquotesingle{}kernel v\textquotesingle{}} \OperatorTok{+}\NormalTok{ KERNEL\_VERSION }\OperatorTok{+} \StringTok{\textquotesingle{} — connecting…\textquotesingle{}}\NormalTok{)}\OperatorTok{;}
-\KeywordTok{const}\NormalTok{ status }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{ready}\NormalTok{()}\OperatorTok{;}               \CommentTok{// \{ ready, peers, ms, reason \}}
+\KeywordTok{const}\NormalTok{ \{ peer}\OperatorTok{,}\NormalTok{ author}\OperatorTok{,}\NormalTok{ status}\OperatorTok{,}\NormalTok{ disconnect \} }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{connect}\NormalTok{(\{}
+  \DataTypeTok{bridge}\OperatorTok{:}\NormalTok{   BRIDGE}\OperatorTok{,}
+  \DataTypeTok{location}\OperatorTok{:}\NormalTok{ HERE}\OperatorTok{,}
+\NormalTok{\})}\OperatorTok{;}
 \BuiltInTok{console}\OperatorTok{.}\FunctionTok{log}\NormalTok{(}\StringTok{\textquotesingle{}mesh \textquotesingle{}} \OperatorTok{+}\NormalTok{ (status}\OperatorTok{.}\AttributeTok{ready} \OperatorTok{?} \StringTok{\textquotesingle{}ready\textquotesingle{}} \OperatorTok{:} \StringTok{\textquotesingle{}not ready\textquotesingle{}}\NormalTok{) }\OperatorTok{+} \StringTok{\textquotesingle{} (\textquotesingle{}} \OperatorTok{+}\NormalTok{ status}\OperatorTok{.}\AttributeTok{peers} \OperatorTok{+} \StringTok{\textquotesingle{} peers, \textquotesingle{}} \OperatorTok{+}\NormalTok{ status}\OperatorTok{.}\AttributeTok{ms} \OperatorTok{+} \StringTok{\textquotesingle{}ms)\textquotesingle{}}\NormalTok{)}\OperatorTok{;}
 \BuiltInTok{console}\OperatorTok{.}\FunctionTok{log}\NormalTok{(}\StringTok{\textquotesingle{}topic id:\textquotesingle{}}\OperatorTok{,} \ControlFlowTok{await} \FunctionTok{deriveTopicId}\NormalTok{(TOPIC))}\OperatorTok{;}
 
@@ -339,7 +323,7 @@ Save this as \texttt{index.js} --- it mirrors how
 \BuiltInTok{process}\OperatorTok{.}\FunctionTok{on}\NormalTok{(}\StringTok{\textquotesingle{}SIGINT\textquotesingle{}}\OperatorTok{,} \KeywordTok{async}\NormalTok{ () }\KeywordTok{=\textgreater{}}\NormalTok{ \{}
   \PreprocessorTok{clearInterval}\NormalTok{(timer)}\OperatorTok{;}
   \ControlFlowTok{await}\NormalTok{ sub}\OperatorTok{.}\FunctionTok{stop}\NormalTok{()}\OperatorTok{;}
-  \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{leave}\NormalTok{()}\OperatorTok{;}
+  \ControlFlowTok{await} \FunctionTok{disconnect}\NormalTok{()}\OperatorTok{;}          \CommentTok{// leave + stop, gracefully}
   \BuiltInTok{process}\OperatorTok{.}\FunctionTok{exit}\NormalTok{(}\DecValTok{0}\NormalTok{)}\OperatorTok{;}
 \NormalTok{\})}\OperatorTok{;}
 \end{Highlighting}
@@ -357,7 +341,7 @@ You should see the counter climb, one tick per second, until you stop it
 with \textbf{Ctrl+C}:
 
 \begin{verbatim}
-kernel v4.11.2 — connecting…
+kernel v4.16.0 — connecting…
 mesh ready (4 peers, 1200ms)
 topic id: 89a1b2c3…
 [pub ] tick #1 (msgId 8e9d4b1a30c2…)
@@ -439,8 +423,8 @@ Run against production (3.x) & install a \texttt{3.x} tag and set
 \texttt{BRIDGE\ =\ \textquotesingle{}wss://bridge.axona.net\textquotesingle{}}
 (prod is a separate, non-interoperating line) \\
 See the full mental model &
-\href{Axona-Programmer-Guide-v4.11.2.md}{Programmer Guide} \\
-Look up a specific symbol & \href{Axona-API-Reference-v4.11.2.md}{API
+\href{Axona-Programmer-Guide-v4.16.0.md}{Programmer Guide} \\
+Look up a specific symbol & \href{Axona-API-Reference-v4.16.0.md}{API
 Reference} \\
 \end{longtable}
 }
@@ -451,10 +435,10 @@ Reference} \\
 --- make sure \texttt{package.json} has \texttt{"type":\ "module"} and
 the install completed. Re-run \texttt{npm\ install}.
 
-\textbf{\texttt{Cannot\ mix\ BigInt\ and\ other\ types}} ---
-\texttt{NeuronNode} XORs node IDs as BigInts. Pass
-\texttt{BigInt(\textquotesingle{}0x\textquotesingle{}\ +\ node\$identity.id)},
-not the raw hex string.
+\textbf{\texttt{Cannot\ mix\ BigInt\ and\ other\ types}} --- only
+applies to \emph{manual} peer assembly on kernels before 4.14;
+\texttt{connect()} never hits it, and since 4.14 \texttt{NeuronNode}
+accepts the hex id directly.
 
 \textbf{\texttt{peer.pub:\ name\ a\ signer…}} --- \texttt{signWith} is
 required. Pass an author identity, or
@@ -473,8 +457,8 @@ by your network. There is no fallback to a local process; the demo needs
 the bridge to find peers.
 
 \textbf{\texttt{UPGRADE\_REQUIRED} close code (4426)} --- a wire/version
-mismatch. The testnet bridge runs kernel 4.11.2 (wire 4.0); install
-\texttt{github:axona-net/axona-protocol\#v4.11.2}. Note this also fires
+mismatch. The testnet bridge runs kernel 4.16.0 (wire 4.0); install
+\texttt{github:axona-net/axona-protocol\#v4.16.0}. Note this also fires
 if you point a 4.x peer at a \textbf{production} (3.x) bridge ---
 they're a hermetic wire partition, so match the pin to the network.
 

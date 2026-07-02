@@ -1,8 +1,8 @@
-# Axona AI Grounding — kernel 4.11.2
+# Axona AI Grounding — kernel 4.16.0
 
 This file is the complete, self-contained grounding for an AI system building
 an application on the Axona protocol. It matches the network it targets:
-**kernel 4.11.2 / wire 4.0, deployed on testnet (`wss://testnet.axona.net`)**.
+**kernel 4.16.0 / wire 4.0, deployed on testnet (`wss://testnet.axona.net`)**.
 Everything below is exact and current; nothing outside this file is required.
 If this version does not match the bridge you are connecting to, request the
 matching grounding file.
@@ -58,12 +58,13 @@ central server, message broker, or database.
 ## Install
 
 ```bash
-npm install github:axona-net/axona-protocol#v4.11.2
+npm install github:axona-net/axona-protocol#v4.16.0
 ```
 
 `package.json` must contain `"type": "module"`.
 
 ```js
+import { connect } from '@axona/protocol/connect.js';   // the one-call bootstrap
 import {
   AxonaPeer, AxonaDomain, NeuronNode, ANONYMOUS,
   createNodeIdentity, createAuthorIdentity,
@@ -74,34 +75,37 @@ import { makeMessage, readMessage } from '@axona/protocol/std/message.js';
 import { publishChunkedBytes, receiveChunkedBytes } from '@axona/protocol/std/chunk.js';
 ```
 
-## Canonical peer assembly (copy exactly)
+## Canonical peer bootstrap (copy exactly)
 
 ```js
-const BRIDGE = 'wss://testnet.axona.net';
-const HERE   = { lat: 38.0, lng: -77.0 };          // the user's real location
+const { peer, author, status, disconnect } = await connect({
+  bridge:   'wss://testnet.axona.net',
+  location: { lat: 38.0, lng: -77.0 },   // the user's real location
+  author:   'myapp:author',              // string = durable (persistAs); true = ephemeral; false = none
+});
+// status: { ready, peers, ms, reason } — never rejects; ready:false on timeout
+```
 
-const nodeIdentity = await createNodeIdentity(HERE);              // connection key
-const author = await createAuthorIdentity({ persistAs: 'myapp:author' }); // durable author
+Teardown: `await disconnect();`
 
-const transport = webTransport({ bridgeUrl: BRIDGE, identity: nodeIdentity });
-const node = new NeuronNode({ id: BigInt('0x' + nodeIdentity.id),
-                              lat: HERE.lat, lng: HERE.lng });
+Options: `k` (routing set size, default 20), `ready` (forwarded to
+`peer.ready()`; `false` skips the wait), `transport`/`nodeIdentity`
+(injection for tests or custom stacks), `web` (extra webTransport options).
+
+### Alternative: manual assembly (custom transports / multiple peers)
+
+```js
+const nodeIdentity = await createNodeIdentity({ lat: 38.0, lng: -77.0 });
+const author = await createAuthorIdentity({ persistAs: 'myapp:author' });
+const transport = webTransport({ bridgeUrl: 'wss://testnet.axona.net', identity: nodeIdentity });
+const node = new NeuronNode({ id: nodeIdentity.id, lat: 38.0, lng: -77.0 }); // hex id accepted (4.14+)
 node.transport = transport;
 const peer = new AxonaPeer({ domain: new AxonaDomain({ k: 20 }),
                              node, nodeIdentity, transport });
-
 await transport.start(nodeIdentity.id);
 await peer.start();
-const status = await peer.ready();   // { ready, peers, ms, reason }
+const status = await peer.ready();
 ```
-
-Teardown: `await peer.leave(); await peer.stop?.(); await transport.stop?.();`
-
-Notes:
-- `new NeuronNode({ id })` requires `BigInt('0x' + nodeIdentity.id)` — the
-  identity's `.id` is hex; the node holds BigInt.
-- `ready()` options: `{ minPeers = 4, timeoutMs = 10000, stableMs = 1500 }`.
-  It never rejects; on timeout it resolves `{ ready: false, ... }`.
 
 ---
 
@@ -305,8 +309,9 @@ outcomes (missing/expired message; nothing to retract) — not errors.
 - **Connected but nothing arrives** → publisher and subscriber derived
   different topic IDs. Diff the descriptors field-by-field (including an
   omitted vs named `region`), or → published before `ready()`.
-- **`Cannot mix BigInt and other types`** → you passed the hex id to
-  `NeuronNode` without `BigInt('0x' + ...)`.
+- **`Cannot mix BigInt and other types`** → pre-4.14 kernel with a hex id
+  passed to `NeuronNode`; on this version the hex id is accepted directly
+  (and `connect()` avoids the question entirely).
 - **Works on localhost, fails deployed** → page not HTTPS (`crypto.subtle`
   unavailable).
 - **Large message silently missing for some receivers** → over the 15 KB
@@ -320,7 +325,7 @@ outcomes (missing/expired message; nothing to retract) — not errors.
 - Browser: HTTPS only. Node: v20+; the same `webTransport` connects to the
   bridge over WSS (the WebRTC mesh is browser-side; Node peers converse via
   the bridge and routing).
-- The testnet bridge is `wss://testnet.axona.net` (kernel 4.11.2, wire 4.0).
+- The testnet bridge is `wss://testnet.axona.net` (kernel 4.16.0, wire 4.0).
   Production (`wss://bridge.axona.net`) runs the older 3.x line and does NOT
   interoperate with 4.x code.
 - Multiple tabs = independent peers (fine, but each is a separate node).

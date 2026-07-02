@@ -1,21 +1,21 @@
 # Axona Quick Start
 
 Get a working pub/sub roundtrip in **under five minutes** on the current
-`@axona/protocol` **v4.11.2** API (kernel 4.11.2). One Node process connects
+`@axona/protocol` **v4.16.0** API (kernel 4.16.0). One Node process connects
 to the live **testnet** bridge, subscribes to an open topic, publishes a signed
 message, and logs what comes back.
 
 > **Testnet, for now.** The 4.x line runs on **testnet** (`wss://testnet.axona.net`).
 > The production bridges (`wss://bridge.axona.net`) are still on the 3.x line, and the
 > two don't interoperate (the wire major partitions them). So this Quick Start uses
-> testnet + the `#v4.11.2` pin. To target production instead, install a `3.x` tag and
+> testnet + the `#v4.16.0` pin. To target production instead, install a `3.x` tag and
 > point at `wss://bridge.axona.net`.
 
 Companion documents:
 
-- [Programmer Guide](Axona-Programmer-Guide-v4.11.2.md) — the five ideas + recipes for real apps.
-- [API Reference](Axona-API-Reference-v4.11.2.md) — every exported symbol.
-- [AI Grounding](Axona-AI-Grounding-v4.11.2.md) — building with an AI assistant? Hand it this file.
+- [Programmer Guide](Axona-Programmer-Guide-v4.16.0.md) — the five ideas + recipes for real apps.
+- [API Reference](Axona-API-Reference-v4.16.0.md) — every exported symbol.
+- [AI Grounding](Axona-AI-Grounding-v4.16.0.md) — building with an AI assistant? Hand it this file.
 
 ## Prerequisites
 
@@ -30,7 +30,7 @@ No build step, no DB, no local bridge — the testnet bridge is the entry point.
 mkdir my-axona-demo && cd my-axona-demo
 npm init -y
 npm pkg set type=module
-npm install github:axona-net/axona-protocol#v4.11.2
+npm install github:axona-net/axona-protocol#v4.16.0
 ```
 
 ## 2. Two identities, one rule
@@ -49,6 +49,11 @@ Axona separates **who you connect as** from **who you publish as**:
 **The one rule:** every publish names its signer via `{ signWith }` — an
 author identity, or the `ANONYMOUS` sentinel for a deliberately unsigned
 post. There is no default signer, and the node key never signs publishes.
+
+`connect()` (below) mints both identities for you. To make the author
+*durable* across runs, pass `author: 'myapp:author'` — a `persistAs` key —
+instead of the ephemeral default. The underlying factories stay available
+for custom wiring.
 
 ## 3. Topics are descriptors, not strings
 
@@ -82,42 +87,20 @@ descriptor (the storing node recomputes the ID to enforce the write policy).
 Save this as `index.js` — it mirrors how `apps/axona-minimal` wires a peer:
 
 ```js
-import {
-  AxonaPeer, AxonaDomain, NeuronNode,
-  createNodeIdentity, createAuthorIdentity,
-  deriveTopicId, KERNEL_VERSION,
-} from '@axona/protocol';
-import { webTransport } from '@axona/protocol/transport/web/index.js';
+import { deriveTopicId, KERNEL_VERSION } from '@axona/protocol';
+import { connect } from '@axona/protocol/connect.js';
 
-const BRIDGE = 'wss://testnet.axona.net';           // live testnet bridge (kernel 4.11.2)
+const BRIDGE = 'wss://testnet.axona.net';           // live testnet bridge (kernel 4.16.0)
 const HERE   = { lat: 38.0, lng: -77.0 };           // your real location (us-east here)
 const TOPIC  = { region: 'useast', name: 'quick-start-demo' };   // open topic
 
-// 1. Two identities: connection (node) + authorship (author).
-const node$identity = await createNodeIdentity(HERE);            // ephemeral connection key
-const author        = await createAuthorIdentity();             // ephemeral author key
-
-// 2. Build the peer on the web transport pointed at the bridge.
-const transport = webTransport({ bridgeUrl: BRIDGE, identity: node$identity });
-const node      = new NeuronNode({ id: BigInt('0x' + node$identity.id), lat: HERE.lat, lng: HERE.lng });
-node.transport  = transport;
-const peer = new AxonaPeer({
-  domain: new AxonaDomain({ k: 20 }),
-  node,
-  nodeIdentity: node$identity,
-  transport,
-});
-
-await transport.start(node$identity.id);
-await peer.start();
-// (A one-call version of everything above — `connect({ bridge, location })` —
-//  ships in the next kernel release; this is the 4.11.2 way.)
-
-// 3. Wait for the routing mesh to warm up before pub/sub. peer.ready() does this
-//    for you — it resolves once enough peers are in the synaptome (or a stable
-//    non-zero plateau), bounded by timeoutMs. No hand-rolled polling loop needed.
+// 1–3. One call: mints both identities (connection + author), builds the
+//      peer on the web transport, starts it, and waits for the mesh to warm.
 console.log('kernel v' + KERNEL_VERSION + ' — connecting…');
-const status = await peer.ready();               // { ready, peers, ms, reason }
+const { peer, author, status, disconnect } = await connect({
+  bridge:   BRIDGE,
+  location: HERE,
+});
 console.log('mesh ' + (status.ready ? 'ready' : 'not ready') + ' (' + status.peers + ' peers, ' + status.ms + 'ms)');
 console.log('topic id:', await deriveTopicId(TOPIC));
 
@@ -141,7 +124,7 @@ const timer = setInterval(async () => {
 process.on('SIGINT', async () => {
   clearInterval(timer);
   await sub.stop();
-  await peer.leave();
+  await disconnect();          // leave + stop, gracefully
   process.exit(0);
 });
 ```
@@ -156,7 +139,7 @@ You should see the counter climb, one tick per second, until you stop it with
 **Ctrl+C**:
 
 ```
-kernel v4.11.2 — connecting…
+kernel v4.16.0 — connecting…
 mesh ready (4 peers, 1200ms)
 topic id: 89a1b2c3…
 [pub ] tick #1 (msgId 8e9d4b1a30c2…)
@@ -206,16 +189,17 @@ descriptor fields. That ID-matching is the rule you can't break — same
 | Own a feed only you can write | `{ region, owner: me.authorId, name: 'profile' }` (write defaults to `'owner'`) |
 | Share a read-only handle | `await deriveTopicId(descriptor)` -> hand out the 66-hex ID; `sub`/`pull`/`metrics` accept it |
 | Run against production (3.x) | install a `3.x` tag and set `BRIDGE = 'wss://bridge.axona.net'` (prod is a separate, non-interoperating line) |
-| See the full mental model | [Programmer Guide](Axona-Programmer-Guide-v4.11.2.md) |
-| Look up a specific symbol | [API Reference](Axona-API-Reference-v4.11.2.md) |
+| See the full mental model | [Programmer Guide](Axona-Programmer-Guide-v4.16.0.md) |
+| Look up a specific symbol | [API Reference](Axona-API-Reference-v4.16.0.md) |
 
 ## Troubleshooting
 
 **`Cannot find module '@axona/protocol'`** — make sure `package.json` has
 `"type": "module"` and the install completed. Re-run `npm install`.
 
-**`Cannot mix BigInt and other types`** — `NeuronNode` XORs node IDs as
-BigInts. Pass `BigInt('0x' + node$identity.id)`, not the raw hex string.
+**`Cannot mix BigInt and other types`** — only applies to *manual* peer
+assembly on kernels before 4.14; `connect()` never hits it, and since 4.14
+`NeuronNode` accepts the hex id directly.
 
 **`peer.pub: name a signer…`** — `signWith` is required. Pass an author
 identity, or `{ signWith: ANONYMOUS }` for an unsigned publish. There is no
@@ -231,7 +215,7 @@ once the routing mesh is warm. On the public bridge this takes a few seconds.
 fallback to a local process; the demo needs the bridge to find peers.
 
 **`UPGRADE_REQUIRED` close code (4426)** — a wire/version mismatch. The testnet
-bridge runs kernel 4.11.2 (wire 4.0); install
-`github:axona-net/axona-protocol#v4.11.2`. Note this also fires if you point a
+bridge runs kernel 4.16.0 (wire 4.0); install
+`github:axona-net/axona-protocol#v4.16.0`. Note this also fires if you point a
 4.x peer at a **production** (3.x) bridge — they're a hermetic wire partition, so
 match the pin to the network.

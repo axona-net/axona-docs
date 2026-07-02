@@ -146,7 +146,7 @@
 
 \section{The Axona Programmer Guide}\label{the-axona-programmer-guide}
 
-\textbf{Build apps that have no server.} \emph{(kernel 4.11.2 ·
+\textbf{Build apps that have no server.} \emph{(kernel 4.16.0 ·
 testnet)}
 
 You're about to build something unusual: an application with no backend.
@@ -166,22 +166,22 @@ strictly optional.)
 \begin{itemize}
 \tightlist
 \item
-  \href{Quick-Start-v4.11.2.md}{Quick Start} --- a working roundtrip in
+  \href{Quick-Start-v4.16.0.md}{Quick Start} --- a working roundtrip in
   5 minutes. Do it first.
 \item
-  \href{Axona-API-Reference-v4.11.2.md}{API Reference} --- every
+  \href{Axona-API-Reference-v4.16.0.md}{API Reference} --- every
   signature, exactly.
 \item
-  \href{Axona-AI-Grounding-v4.11.2.md}{AI Grounding} --- building with
+  \href{Axona-AI-Grounding-v4.16.0.md}{AI Grounding} --- building with
   an AI assistant? Hand it this file.
 \item
-  \href{Axona-Services-Guide-v4.11.2.md}{Services Guide} --- running
+  \href{Axona-Services-Guide-v4.16.0.md}{Services Guide} --- running
   bridges and relays (you can skip this for a long time).
 \end{itemize}
 
 \begin{quote}
 \textbf{Building with an AI?} Most Axona apps are. Paste
-\url{Axona-AI-Grounding-v4.11.2.md} into your assistant's context and it
+\url{Axona-AI-Grounding-v4.16.0.md} into your assistant's context and it
 will know every rule in this guide. Keep this guide for \emph{you} ---
 it explains the why.
 \end{quote}
@@ -254,14 +254,13 @@ five.
 
 \subsection{2. First contact}\label{first-contact}
 
-If you haven't run the \href{Quick-Start-v4.11.2.md}{Quick Start}, do it
+If you haven't run the \href{Quick-Start-v4.16.0.md}{Quick Start}, do it
 now --- five minutes, a real message through the real network. The heart
 of it:
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\CommentTok{// after the peer assembly (Quick Start step 4, reproduced in §3.1 below)}
-\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{ready}\NormalTok{()}\OperatorTok{;}                                     \CommentTok{// wait for the mesh}
+\CommentTok{// after connect() (Quick Start step 4; one call — see §3.1)}
 
 \KeywordTok{const}\NormalTok{ TOPIC }\OperatorTok{=}\NormalTok{ \{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}quick{-}start{-}demo\textquotesingle{}}\NormalTok{ \}}\OperatorTok{;}
 
@@ -282,10 +281,31 @@ and you'll learn to love it (§5, ``There is no ack'').
 \subsubsection{3.1 The peer --- your seat at the
 table}\label{the-peer-your-seat-at-the-table}
 
-A peer is assembled from a few kernel pieces and pointed at a
-\emph{bridge} --- the meeting point where peers first find each other
-(after that, they talk directly). This is the one ceremonial block in
-every Axona app; paste it and move on:
+A peer is created in one call, pointed at a \emph{bridge} --- the
+meeting point where peers first find each other (after that, they talk
+directly):
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ connect \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol/connect.js\textquotesingle{}}\OperatorTok{;}
+
+\KeywordTok{const}\NormalTok{ \{ peer}\OperatorTok{,}\NormalTok{ author}\OperatorTok{,}\NormalTok{ status}\OperatorTok{,}\NormalTok{ disconnect \} }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{connect}\NormalTok{(\{}
+  \DataTypeTok{bridge}\OperatorTok{:}   \StringTok{\textquotesingle{}wss://testnet.axona.net\textquotesingle{}}\OperatorTok{,}
+  \DataTypeTok{location}\OperatorTok{:}\NormalTok{ \{ }\DataTypeTok{lat}\OperatorTok{:} \FloatTok{38.0}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:} \OperatorTok{{-}}\FloatTok{77.0}\NormalTok{ \}}\OperatorTok{,}   \CommentTok{// the user\textquotesingle{}s real location}
+  \DataTypeTok{author}\OperatorTok{:}   \StringTok{\textquotesingle{}myapp:author\textquotesingle{}}\OperatorTok{,}             \CommentTok{// persist the author key under this name}
+\NormalTok{\})}\OperatorTok{;}
+\CommentTok{// status: \{ ready: true, peers: 13, ms: 452, reason: \textquotesingle{}minPeers\textquotesingle{} \}}
+\end{Highlighting}
+\end{Shaded}
+
+That's it --- identities minted, transport connected, mesh warmed. When
+your app closes, \texttt{await\ disconnect()} leaves gracefully.
+
+Under the sugar --- the primitives, if you need custom wiring
+
+\texttt{connect()} composes public kernel pieces you can always use
+directly (a custom transport, several peers on one page, a persistence
+adapter):
 
 \begin{Shaded}
 \begin{Highlighting}[]
@@ -295,31 +315,19 @@ every Axona app; paste it and move on:
 \NormalTok{\} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
 \ImportTok{import}\NormalTok{ \{ webTransport \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol/transport/web/index.js\textquotesingle{}}\OperatorTok{;}
 
-\KeywordTok{const}\NormalTok{ BRIDGE }\OperatorTok{=} \StringTok{\textquotesingle{}wss://testnet.axona.net\textquotesingle{}}\OperatorTok{;}
-\KeywordTok{const}\NormalTok{ HERE   }\OperatorTok{=}\NormalTok{ \{ }\DataTypeTok{lat}\OperatorTok{:} \FloatTok{38.0}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:} \OperatorTok{{-}}\FloatTok{77.0}\NormalTok{ \}}\OperatorTok{;}   \CommentTok{// the user\textquotesingle{}s real location}
-
-\KeywordTok{const}\NormalTok{ nodeIdentity }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{createNodeIdentity}\NormalTok{(HERE)}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ nodeIdentity }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{createNodeIdentity}\NormalTok{(\{ }\DataTypeTok{lat}\OperatorTok{:} \FloatTok{38.0}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:} \OperatorTok{{-}}\FloatTok{77.0}\NormalTok{ \})}\OperatorTok{;}
 \KeywordTok{const}\NormalTok{ author       }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{createAuthorIdentity}\NormalTok{(\{ }\DataTypeTok{persistAs}\OperatorTok{:} \StringTok{\textquotesingle{}myapp:author\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;}
-
-\KeywordTok{const}\NormalTok{ transport }\OperatorTok{=} \FunctionTok{webTransport}\NormalTok{(\{ }\DataTypeTok{bridgeUrl}\OperatorTok{:}\NormalTok{ BRIDGE}\OperatorTok{,} \DataTypeTok{identity}\OperatorTok{:}\NormalTok{ nodeIdentity \})}\OperatorTok{;}
-\KeywordTok{const}\NormalTok{ node      }\OperatorTok{=} \KeywordTok{new} \FunctionTok{NeuronNode}\NormalTok{(\{ }\DataTypeTok{id}\OperatorTok{:} \BuiltInTok{BigInt}\NormalTok{(}\StringTok{\textquotesingle{}0x\textquotesingle{}} \OperatorTok{+}\NormalTok{ nodeIdentity}\OperatorTok{.}\AttributeTok{id}\NormalTok{)}\OperatorTok{,}
-                                   \DataTypeTok{lat}\OperatorTok{:}\NormalTok{ HERE}\OperatorTok{.}\AttributeTok{lat}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:}\NormalTok{ HERE}\OperatorTok{.}\AttributeTok{lng}\NormalTok{ \})}\OperatorTok{;}
-\NormalTok{node}\OperatorTok{.}\AttributeTok{transport}  \OperatorTok{=}\NormalTok{ transport}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ transport    }\OperatorTok{=} \FunctionTok{webTransport}\NormalTok{(\{ }\DataTypeTok{bridgeUrl}\OperatorTok{:} \StringTok{\textquotesingle{}wss://testnet.axona.net\textquotesingle{}}\OperatorTok{,}
+                                    \DataTypeTok{identity}\OperatorTok{:}\NormalTok{ nodeIdentity \})}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ node }\OperatorTok{=} \KeywordTok{new} \FunctionTok{NeuronNode}\NormalTok{(\{ }\DataTypeTok{id}\OperatorTok{:}\NormalTok{ nodeIdentity}\OperatorTok{.}\AttributeTok{id}\OperatorTok{,} \DataTypeTok{lat}\OperatorTok{:} \FloatTok{38.0}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:} \OperatorTok{{-}}\FloatTok{77.0}\NormalTok{ \})}\OperatorTok{;}
+\NormalTok{node}\OperatorTok{.}\AttributeTok{transport} \OperatorTok{=}\NormalTok{ transport}\OperatorTok{;}
 \KeywordTok{const}\NormalTok{ peer }\OperatorTok{=} \KeywordTok{new} \FunctionTok{AxonaPeer}\NormalTok{(\{ }\DataTypeTok{domain}\OperatorTok{:} \KeywordTok{new} \FunctionTok{AxonaDomain}\NormalTok{(\{ }\DataTypeTok{k}\OperatorTok{:} \DecValTok{20}\NormalTok{ \})}\OperatorTok{,}
 \NormalTok{                             node}\OperatorTok{,}\NormalTok{ nodeIdentity}\OperatorTok{,}\NormalTok{ transport \})}\OperatorTok{;}
-
 \ControlFlowTok{await}\NormalTok{ transport}\OperatorTok{.}\FunctionTok{start}\NormalTok{(nodeIdentity}\OperatorTok{.}\AttributeTok{id}\NormalTok{)}\OperatorTok{;}
 \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{start}\NormalTok{()}\OperatorTok{;}
-\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{ready}\NormalTok{()}\OperatorTok{;}          \CommentTok{// resolves when the mesh is warm (\textasciitilde{}a few seconds)}
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{ready}\NormalTok{()}\OperatorTok{;}
 \end{Highlighting}
 \end{Shaded}
-
-\begin{quote}
-\textbf{Getting shorter soon.} The next kernel release collapses this
-whole block into one call ---
-\texttt{const\ \{\ peer,\ author\ \}\ =\ await\ connect(\{\ bridge,\ location\ \})}.
-Until it reaches testnet, the block above is the way.
-\end{quote}
 
 Why the location? Axona is geographic: the first byte of every address
 is a region of the Earth, and traffic for a region's topics stays among
@@ -796,7 +804,7 @@ sane) \\
   when no user is online wants a small always-on peer that
   \texttt{host()}s them --- that's a \emph{relay}, a five-minute Node
   deployment. When you reach that point, the
-  \href{Axona-Services-Guide-v4.11.2.md}{Services Guide} is yours; not
+  \href{Axona-Services-Guide-v4.16.0.md}{Services Guide} is yours; not
   before.
 \end{itemize}
 
@@ -839,16 +847,6 @@ The full story --- with diagrams --- is the
 
 \subsection{10. Appendix}\label{appendix}
 
-\subsubsection{Coming soon}\label{coming-soon}
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{\texttt{connect()}} --- the §3.1 assembly block as one call.
-  Already in the kernel's next release; this guide switches to it the
-  moment it reaches testnet.
-\end{itemize}
-
 \subsubsection{Migrating from the v2/v3
 lines}\label{migrating-from-the-v2v3-lines}
 
@@ -860,11 +858,11 @@ reliability underneath (single-root axon trees, cohort replication,
 cold-publish burst, nearest-replica reads). \texttt{unpub} was removed
 and \texttt{touch} retired (re-publish to refresh a message instead). If
 a symbol you remember is missing from the
-\href{Axona-API-Reference-v4.11.2.md}{API Reference}, it didn't survive
+\href{Axona-API-Reference-v4.16.0.md}{API Reference}, it didn't survive
 v3 --- the reference is the source of truth.
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
-\emph{Axona Programmer Guide · kernel 4.11.2 · testnet · 2026-07-02}
+\emph{Axona Programmer Guide · kernel 4.16.0 · testnet · 2026-07-02}
 
 \end{document}

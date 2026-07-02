@@ -1,6 +1,6 @@
 # The Axona Programmer Guide
 
-**Build apps that have no server.** *(kernel 4.11.2 · testnet)*
+**Build apps that have no server.** *(kernel 4.16.0 · testnet)*
 
 You're about to build something unusual: an application with no backend. No
 database to stand up, no message broker to rent, no API keys, nothing to
@@ -16,13 +16,13 @@ optional.)
 
 **Companions:**
 
-- [Quick Start](Quick-Start-v4.11.2.md) — a working roundtrip in 5 minutes. Do it first.
-- [API Reference](Axona-API-Reference-v4.11.2.md) — every signature, exactly.
-- [AI Grounding](Axona-AI-Grounding-v4.11.2.md) — building with an AI assistant? Hand it this file.
-- [Services Guide](Axona-Services-Guide-v4.11.2.md) — running bridges and relays (you can skip this for a long time).
+- [Quick Start](Quick-Start-v4.16.0.md) — a working roundtrip in 5 minutes. Do it first.
+- [API Reference](Axona-API-Reference-v4.16.0.md) — every signature, exactly.
+- [AI Grounding](Axona-AI-Grounding-v4.16.0.md) — building with an AI assistant? Hand it this file.
+- [Services Guide](Axona-Services-Guide-v4.16.0.md) — running bridges and relays (you can skip this for a long time).
 
 > **Building with an AI?** Most Axona apps are. Paste
-> [Axona-AI-Grounding-v4.11.2.md](Axona-AI-Grounding-v4.11.2.md) into your
+> [Axona-AI-Grounding-v4.16.0.md](Axona-AI-Grounding-v4.16.0.md) into your
 > assistant's context and it will know every rule in this guide. Keep this
 > guide for *you* — it explains the why.
 
@@ -70,12 +70,11 @@ state, agent-to-agent traffic — they're all arrangements of these five.
 
 ## 2. First contact
 
-If you haven't run the [Quick Start](Quick-Start-v4.11.2.md), do it now —
+If you haven't run the [Quick Start](Quick-Start-v4.16.0.md), do it now —
 five minutes, a real message through the real network. The heart of it:
 
 ```js
-// after the peer assembly (Quick Start step 4, reproduced in §3.1 below)
-await peer.ready();                                     // wait for the mesh
+// after connect() (Quick Start step 4; one call — see §3.1)
 
 const TOPIC = { region: 'useast', name: 'quick-start-demo' };
 
@@ -94,10 +93,28 @@ learn to love it (§5, "There is no ack").
 
 ### 3.1 The peer — your seat at the table
 
-A peer is assembled from a few kernel pieces and pointed at a *bridge* —
-the meeting point where peers first find each other (after that, they talk
-directly). This is the one ceremonial block in every Axona app; paste it
-and move on:
+A peer is created in one call, pointed at a *bridge* — the meeting point
+where peers first find each other (after that, they talk directly):
+
+```js
+import { connect } from '@axona/protocol/connect.js';
+
+const { peer, author, status, disconnect } = await connect({
+  bridge:   'wss://testnet.axona.net',
+  location: { lat: 38.0, lng: -77.0 },   // the user's real location
+  author:   'myapp:author',             // persist the author key under this name
+});
+// status: { ready: true, peers: 13, ms: 452, reason: 'minPeers' }
+```
+
+That's it — identities minted, transport connected, mesh warmed. When your
+app closes, `await disconnect()` leaves gracefully.
+
+<details>
+<summary><em>Under the sugar</em> — the primitives, if you need custom wiring</summary>
+
+`connect()` composes public kernel pieces you can always use directly (a
+custom transport, several peers on one page, a persistence adapter):
 
 ```js
 import {
@@ -106,28 +123,19 @@ import {
 } from '@axona/protocol';
 import { webTransport } from '@axona/protocol/transport/web/index.js';
 
-const BRIDGE = 'wss://testnet.axona.net';
-const HERE   = { lat: 38.0, lng: -77.0 };   // the user's real location
-
-const nodeIdentity = await createNodeIdentity(HERE);
+const nodeIdentity = await createNodeIdentity({ lat: 38.0, lng: -77.0 });
 const author       = await createAuthorIdentity({ persistAs: 'myapp:author' });
-
-const transport = webTransport({ bridgeUrl: BRIDGE, identity: nodeIdentity });
-const node      = new NeuronNode({ id: BigInt('0x' + nodeIdentity.id),
-                                   lat: HERE.lat, lng: HERE.lng });
-node.transport  = transport;
+const transport    = webTransport({ bridgeUrl: 'wss://testnet.axona.net',
+                                    identity: nodeIdentity });
+const node = new NeuronNode({ id: nodeIdentity.id, lat: 38.0, lng: -77.0 });
+node.transport = transport;
 const peer = new AxonaPeer({ domain: new AxonaDomain({ k: 20 }),
                              node, nodeIdentity, transport });
-
 await transport.start(nodeIdentity.id);
 await peer.start();
-await peer.ready();          // resolves when the mesh is warm (~a few seconds)
+await peer.ready();
 ```
-
-> **Getting shorter soon.** The next kernel release collapses this whole
-> block into one call —
-> `const { peer, author } = await connect({ bridge, location })`. Until it
-> reaches testnet, the block above is the way.
+</details>
 
 Why the location? Axona is geographic: the first byte of every address is
 a region of the Earth, and traffic for a region's topics stays among that
@@ -477,7 +485,7 @@ and `kill()` resolving `{ ok: false }` (nothing to retract).
 - **Durability beyond browser tabs.** An app whose topics matter when no
   user is online wants a small always-on peer that `host()`s them — that's
   a *relay*, a five-minute Node deployment. When you reach that point,
-  the [Services Guide](Axona-Services-Guide-v4.11.2.md) is yours; not
+  the [Services Guide](Axona-Services-Guide-v4.16.0.md) is yours; not
   before.
 
 ## 9. Under the hood — *optional*
@@ -517,12 +525,6 @@ The full story — with diagrams — is the
 
 ## 10. Appendix
 
-### Coming soon
-
-- **`connect()`** — the §3.1 assembly block as one call. Already in the
-  kernel's next release; this guide switches to it the moment it reaches
-  testnet.
-
 ### Migrating from the v2/v3 lines
 
 Only relevant if you have code from early 2026. The v3 flag-day replaced
@@ -532,9 +534,9 @@ nothing in the app API — it rebuilt reliability underneath (single-root
 axon trees, cohort replication, cold-publish burst, nearest-replica
 reads). `unpub` was removed and `touch` retired (re-publish to refresh a
 message instead). If a symbol you remember is missing from the
-[API Reference](Axona-API-Reference-v4.11.2.md), it didn't survive v3 —
+[API Reference](Axona-API-Reference-v4.16.0.md), it didn't survive v3 —
 the reference is the source of truth.
 
 ---
 
-*Axona Programmer Guide · kernel 4.11.2 · testnet · 2026-07-02*
+*Axona Programmer Guide · kernel 4.16.0 · testnet · 2026-07-02*

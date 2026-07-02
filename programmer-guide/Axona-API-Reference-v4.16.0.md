@@ -1,23 +1,23 @@
 # Axona API Reference
 
-Reference for every public symbol exported from `@axona/protocol` v4.11.2.
+Reference for every public symbol exported from `@axona/protocol` v4.16.0.
 
 Organized by what application developers reach for first (identity, peer
 lifecycle, pub/sub, direct messaging, introspection), then the
 transport/protocol surface, then low-level utilities. Every signature
-below is verified against the v4.11.2 kernel source.
+below is verified against the v4.16.0 kernel source.
 
 > **Which network?** The 4.x line runs on **testnet** (`wss://testnet.axona.net`)
 > during the current phase; the **production** bridges (`wss://bridge.axona.net`)
 > are still on the 3.x line. The wire major partitions them (wire 3.0 vs 4.0), so a
 > v4.x peer talks to testnet, a v3.x peer talks to prod — they do not interoperate.
-> Install `github:axona-net/axona-protocol#v4.11.2` and point at testnet to use this
+> Install `github:axona-net/axona-protocol#v4.16.0` and point at testnet to use this
 > API surface.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v4.11.2.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v4.11.2.md) — mental model +
+- [Quick Start](Quick-Start-v4.16.0.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v4.16.0.md) — mental model +
   worked example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects.
@@ -38,7 +38,7 @@ but most apps only need the main barrel.
 > surface** (§§10–16) and **Low-level utilities** (§§17–23) exist for
 > transport authors, tooling, and the curious. Building with an AI
 > assistant? Hand it the
-> [AI Grounding](Axona-AI-Grounding-v4.11.2.md) file — the application
+> [AI Grounding](Axona-AI-Grounding-v4.16.0.md) file — the application
 > surface distilled to rules and patterns.
 
 ---
@@ -313,6 +313,36 @@ console.log(id === node.id);   // true
 ---
 
 ## 3. AxonaPeer construction + lifecycle
+
+### `connect({ bridge, location, author?, k?, ready?, transport?, nodeIdentity?, web? })` → `Promise<{ peer, author, nodeIdentity, transport, status, disconnect }>` *(kernel 4.16.0)*
+
+The one-call bootstrap — import from the `connect.js` subpath:
+
+```js
+import { connect } from '@axona/protocol/connect.js';
+const { peer, author, status, disconnect } = await connect({
+  bridge: 'wss://testnet.axona.net', location: { lat: 38, lng: -77 } });
+```
+
+Mints the connection identity (and, by default, an ephemeral author),
+builds the web transport + `NeuronNode` + `AxonaDomain` + `AxonaPeer`,
+starts everything, and awaits `peer.ready()`. Pure sugar over the
+constructors below — use them directly for custom wiring.
+
+| Param | Type | Notes |
+|---|---|---|
+| `bridge` | string | `wss://` bridge URL. Required unless `transport` injected. |
+| `location` | `{ lat, lng }` | The node's real location. Required unless `nodeIdentity` injected. |
+| `author` | `true` \| string \| identity \| `false` | `true` (default) ephemeral author; a string → durable via `persistAs`; an author identity → used as-is; `false` → none. |
+| `k` | number (20) | Routing closest-set size. |
+| `ready` | object \| `false` | Forwarded to `peer.ready()`; `false` skips the wait (`status` is `null`). |
+| `transport` / `nodeIdentity` | — | Injection for tests, sim, custom stacks; the web transport is only loaded when no `transport` is given. |
+| `web` | object | Extra options forwarded to the `webTransport` factory. |
+
+`disconnect()` performs `peer.leave()` + `peer.stop()` + `transport.stop()`,
+best-effort. `connect` lives outside the main barrel (the barrel stays
+environment-neutral); the import path is `@axona/protocol/connect.js`.
+
 
 `AxonaPeer` is the per-node DHT contract implementation — one instance
 per running node.
@@ -701,7 +731,7 @@ expected, not an error.
 | `opts.topic` | `TopicDescriptor \| string` | descriptor **or** 66-hex id. |
 | `opts.timeoutMs` | `number` | default `1000`. |
 
-**Nearest-replica reads (v4.11.1–v4.11.2).** A pull is answered by the
+**Nearest-replica reads (v4.11.1–v4.16.0).** A pull is answered by the
 **first replica the request reaches** — a cohort member, a child relay, or a
 `host()` node — not necessarily the topic's root. This lowers latency, spreads
 reads off the root, and lets a pull that would otherwise strand toward the root
@@ -1307,7 +1337,7 @@ import { webTransport } from '@axona/protocol/transport/web/index.js';
 const transport = webTransport({
   bridgeUrl:   'wss://testnet.axona.net',  // the 4.x line runs on testnet (prod is 3.x)
   identity:    node,                       // from createNodeIdentity — signs the handshake
-  peerVersion: '4.11.2',                   // your app version (gated by the bridge)
+  peerVersion: '4.16.0',                   // your app version (gated by the bridge)
   reconnect:   true,
 });
 await transport.start();                  // resolves after the bridge handshake
@@ -1558,7 +1588,7 @@ introduces no keyspace skew.
 
 ```js
 WIRE_VERSION         // '4.0'      — wire format major.minor (bridges gate on this)
-KERNEL_VERSION       // '4.11.2'   — kernel semver (npm release tag)
+KERNEL_VERSION       // '4.16.0'   — kernel semver (npm release tag)
 AUTH_PROTO           // 'axona/5'  — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426       — WebSocket close code for a version mismatch
 ENVELOPE_DOMAIN      // 'axona:pubsub-envelope:v2'
@@ -1587,6 +1617,18 @@ await peer.pub({ region: 'useast', name: 'lobby' }, msg, { signWith: ANONYMOUS }
 *(Only relevant if you have code from an earlier kernel line. New
 readers: skip.)*
 
+### What changed in v4.12.0–v4.16.0 (2026-07-02 testnet roll)
+
+- **`connect()` (v4.16.0)** — the one-call bootstrap above; no other API change.
+- **Demand-driven metrics (v4.12.0)** — snapshots publish to `metricTopic(T)`
+  only while a subscriber's lease is fresh; `peer.metrics()` unchanged. The
+  relay's old push-metrics loop is retired.
+- **Region-occupancy rule (v4.13.0, gated OFF in v4.15.0)** — the kernel can
+  enforce region-homogeneous topic service (`configureRegionLock({ enforce })`);
+  disabled by default until regional coverage justifies it.
+- **BigInt id invariant (v4.14.0)** — internal ids validated at one gate
+  (`asId`); `NeuronNode`/`Synapse` now accept hex ids directly. `asId` exported.
+
 ### What changed in the 4.x line (since v3.6.0)
 
 The **public API surface is unchanged** from v3.6.0 — same identity factories,
@@ -1608,7 +1650,7 @@ working while delivery gets more robust:
 - **Cold-publish burst (v4.11.0).** A freshly-joined node's first publishes are
   automatically re-sent a few times over the first second, so a cold-start publish
   isn't lost while the routing table warms. No app action — `pub` is unchanged.
-- **Nearest-replica reads (v4.11.1–v4.11.2).** `pull` is answered by the first
+- **Nearest-replica reads (v4.11.1–v4.16.0).** `pull` is answered by the first
   replica the request reaches instead of always the root: exact for `pull(msgId)`,
   and *recent* (eventually-consistent) for pull-latest, which spreads a hot read
   path off the root (see §4.3).

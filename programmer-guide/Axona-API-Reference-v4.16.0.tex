@@ -147,12 +147,12 @@
 \section{Axona API Reference}\label{axona-api-reference}
 
 Reference for every public symbol exported from \texttt{@axona/protocol}
-v4.11.2.
+v4.16.0.
 
 Organized by what application developers reach for first (identity, peer
 lifecycle, pub/sub, direct messaging, introspection), then the
 transport/protocol surface, then low-level utilities. Every signature
-below is verified against the v4.11.2 kernel source.
+below is verified against the v4.16.0 kernel source.
 
 \begin{quote}
 \textbf{Which network?} The 4.x line runs on \textbf{testnet}
@@ -160,7 +160,7 @@ below is verified against the v4.11.2 kernel source.
 \textbf{production} bridges (\texttt{wss://bridge.axona.net}) are still
 on the 3.x line. The wire major partitions them (wire 3.0 vs 4.0), so a
 v4.x peer talks to testnet, a v3.x peer talks to prod --- they do not
-interoperate. Install \texttt{github:axona-net/axona-protocol\#v4.11.2}
+interoperate. Install \texttt{github:axona-net/axona-protocol\#v4.16.0}
 and point at testnet to use this API surface.
 \end{quote}
 
@@ -169,10 +169,10 @@ Companion documents:
 \begin{itemize}
 \tightlist
 \item
-  \href{Quick-Start-v4.11.2.md}{Quick Start} --- 5-minute working
+  \href{Quick-Start-v4.16.0.md}{Quick Start} --- 5-minute working
   roundtrip.
 \item
-  \href{Axona-Programmer-Guide-v4.11.2.md}{Programmer Guide} --- mental
+  \href{Axona-Programmer-Guide-v4.16.0.md}{Programmer Guide} --- mental
   model + worked example + pitfalls.
 \item
   \href{../SECURITY-CHANGELOG.md}{Security changelog} --- what each
@@ -197,7 +197,7 @@ them, but most apps only need the main barrel.
 readers never need anything else. The \textbf{Transport + protocol
 surface} (§§10--16) and \textbf{Low-level utilities} (§§17--23) exist
 for transport authors, tooling, and the curious. Building with an AI
-assistant? Hand it the \href{Axona-AI-Grounding-v4.11.2.md}{AI
+assistant? Hand it the \href{Axona-AI-Grounding-v4.16.0.md}{AI
 Grounding} file --- the application surface distilled to rules and
 patterns.
 \end{quote}
@@ -635,6 +635,71 @@ identity.
 
 \subsection{3. AxonaPeer construction +
 lifecycle}\label{axonapeer-construction-lifecycle}
+
+\subsubsection{\texorpdfstring{\texttt{connect(\{\ bridge,\ location,\ author?,\ k?,\ ready?,\ transport?,\ nodeIdentity?,\ web?\ \})}
+→
+\texttt{Promise\textless{}\{\ peer,\ author,\ nodeIdentity,\ transport,\ status,\ disconnect\ \}\textgreater{}}
+\emph{(kernel
+4.16.0)}}{connect(\{ bridge, location, author?, k?, ready?, transport?, nodeIdentity?, web? \}) → Promise\textless\{ peer, author, nodeIdentity, transport, status, disconnect \}\textgreater{} (kernel 4.16.0)}}\label{connect-bridge-location-author-k-ready-transport-nodeidentity-web-promise-peer-author-nodeidentity-transport-status-disconnect-kernel-4.16.0}
+
+The one-call bootstrap --- import from the \texttt{connect.js} subpath:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ connect \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol/connect.js\textquotesingle{}}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ \{ peer}\OperatorTok{,}\NormalTok{ author}\OperatorTok{,}\NormalTok{ status}\OperatorTok{,}\NormalTok{ disconnect \} }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{connect}\NormalTok{(\{}
+  \DataTypeTok{bridge}\OperatorTok{:} \StringTok{\textquotesingle{}wss://testnet.axona.net\textquotesingle{}}\OperatorTok{,} \DataTypeTok{location}\OperatorTok{:}\NormalTok{ \{ }\DataTypeTok{lat}\OperatorTok{:} \DecValTok{38}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:} \OperatorTok{{-}}\DecValTok{77}\NormalTok{ \} \})}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+Mints the connection identity (and, by default, an ephemeral author),
+builds the web transport + \texttt{NeuronNode} + \texttt{AxonaDomain} +
+\texttt{AxonaPeer}, starts everything, and awaits \texttt{peer.ready()}.
+Pure sugar over the constructors below --- use them directly for custom
+wiring.
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Param
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{bridge} & string & \texttt{wss://} bridge URL. Required unless
+\texttt{transport} injected. \\
+\texttt{location} & \texttt{\{\ lat,\ lng\ \}} & The node's real
+location. Required unless \texttt{nodeIdentity} injected. \\
+\texttt{author} & \texttt{true} \textbar{} string \textbar{} identity
+\textbar{} \texttt{false} & \texttt{true} (default) ephemeral author; a
+string → durable via \texttt{persistAs}; an author identity → used
+as-is; \texttt{false} → none. \\
+\texttt{k} & number (20) & Routing closest-set size. \\
+\texttt{ready} & object \textbar{} \texttt{false} & Forwarded to
+\texttt{peer.ready()}; \texttt{false} skips the wait (\texttt{status} is
+\texttt{null}). \\
+\texttt{transport} / \texttt{nodeIdentity} & --- & Injection for tests,
+sim, custom stacks; the web transport is only loaded when no
+\texttt{transport} is given. \\
+\texttt{web} & object & Extra options forwarded to the
+\texttt{webTransport} factory. \\
+\end{longtable}
+}
+
+\texttt{disconnect()} performs \texttt{peer.leave()} +
+\texttt{peer.stop()} + \texttt{transport.stop()}, best-effort.
+\texttt{connect} lives outside the main barrel (the barrel stays
+environment-neutral); the import path is
+\texttt{@axona/protocol/connect.js}.
 
 \texttt{AxonaPeer} is the per-node DHT contract implementation --- one
 instance per running node.
@@ -1368,7 +1433,7 @@ descriptor \textbf{or} 66-hex id. \\
 \end{longtable}
 }
 
-\textbf{Nearest-replica reads (v4.11.1--v4.11.2).} A pull is answered by
+\textbf{Nearest-replica reads (v4.11.1--v4.16.0).} A pull is answered by
 the \textbf{first replica the request reaches} --- a cohort member, a
 child relay, or a \texttt{host()} node --- not necessarily the topic's
 root. This lowers latency, spreads reads off the root, and lets a pull
@@ -2278,7 +2343,7 @@ bootstrap + signaling, plus a WebRTC mesh). Sub-path import:
 \KeywordTok{const}\NormalTok{ transport }\OperatorTok{=} \FunctionTok{webTransport}\NormalTok{(\{}
   \DataTypeTok{bridgeUrl}\OperatorTok{:}   \StringTok{\textquotesingle{}wss://testnet.axona.net\textquotesingle{}}\OperatorTok{,}  \CommentTok{// the 4.x line runs on testnet (prod is 3.x)}
   \DataTypeTok{identity}\OperatorTok{:}\NormalTok{    node}\OperatorTok{,}                       \CommentTok{// from createNodeIdentity — signs the handshake}
-  \DataTypeTok{peerVersion}\OperatorTok{:} \StringTok{\textquotesingle{}4.11.2\textquotesingle{}}\OperatorTok{,}                   \CommentTok{// your app version (gated by the bridge)}
+  \DataTypeTok{peerVersion}\OperatorTok{:} \StringTok{\textquotesingle{}4.16.0\textquotesingle{}}\OperatorTok{,}                   \CommentTok{// your app version (gated by the bridge)}
   \DataTypeTok{reconnect}\OperatorTok{:}   \KeywordTok{true}\OperatorTok{,}
 \NormalTok{\})}\OperatorTok{;}
 \ControlFlowTok{await}\NormalTok{ transport}\OperatorTok{.}\FunctionTok{start}\NormalTok{()}\OperatorTok{;}                  \CommentTok{// resolves after the bridge handshake}
@@ -2571,7 +2636,7 @@ address}, so raising it introduces no keyspace skew.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{WIRE\_VERSION         }\CommentTok{// \textquotesingle{}4.0\textquotesingle{}      — wire format major.minor (bridges gate on this)}
-\NormalTok{KERNEL\_VERSION       }\CommentTok{// \textquotesingle{}4.11.2\textquotesingle{}   — kernel semver (npm release tag)}
+\NormalTok{KERNEL\_VERSION       }\CommentTok{// \textquotesingle{}4.16.0\textquotesingle{}   — kernel semver (npm release tag)}
 \NormalTok{AUTH\_PROTO           }\CommentTok{// \textquotesingle{}axona/5\textquotesingle{}  — authenticated{-}identity handshake tag}
 \NormalTok{UPGRADE\_CLOSE\_CODE   }\CommentTok{// 4426       — WebSocket close code for a version mismatch}
 \NormalTok{ENVELOPE\_DOMAIN      }\CommentTok{// \textquotesingle{}axona:pubsub{-}envelope:v2\textquotesingle{}}
@@ -2604,6 +2669,30 @@ migrators}\label{appendix-version-history-for-migrators}
 
 \emph{(Only relevant if you have code from an earlier kernel line. New
 readers: skip.)}
+
+\subsubsection{What changed in v4.12.0--v4.16.0 (2026-07-02 testnet
+roll)}\label{what-changed-in-v4.12.0v4.16.0-2026-07-02-testnet-roll}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{\texttt{connect()} (v4.16.0)} --- the one-call bootstrap
+  above; no other API change.
+\item
+  \textbf{Demand-driven metrics (v4.12.0)} --- snapshots publish to
+  \texttt{metricTopic(T)} only while a subscriber's lease is fresh;
+  \texttt{peer.metrics()} unchanged. The relay's old push-metrics loop
+  is retired.
+\item
+  \textbf{Region-occupancy rule (v4.13.0, gated OFF in v4.15.0)} --- the
+  kernel can enforce region-homogeneous topic service
+  (\texttt{configureRegionLock(\{\ enforce\ \})}); disabled by default
+  until regional coverage justifies it.
+\item
+  \textbf{BigInt id invariant (v4.14.0)} --- internal ids validated at
+  one gate (\texttt{asId}); \texttt{NeuronNode}/\texttt{Synapse} now
+  accept hex ids directly. \texttt{asId} exported.
+\end{itemize}
 
 \subsubsection{What changed in the 4.x line (since
 v3.6.0)}\label{what-changed-in-the-4.x-line-since-v3.6.0}
@@ -2642,7 +2731,7 @@ gets more robust:
   so a cold-start publish isn't lost while the routing table warms. No
   app action --- \texttt{pub} is unchanged.
 \item
-  \textbf{Nearest-replica reads (v4.11.1--v4.11.2).} \texttt{pull} is
+  \textbf{Nearest-replica reads (v4.11.1--v4.16.0).} \texttt{pull} is
   answered by the first replica the request reaches instead of always
   the root: exact for \texttt{pull(msgId)}, and \emph{recent}
   (eventually-consistent) for pull-latest, which spreads a hot read path
