@@ -13,8 +13,9 @@ message, and logs what comes back.
 
 Companion documents:
 
+- [Programmer Guide](Axona-Programmer-Guide-v4.11.2.md) — the five ideas + recipes for real apps.
 - [API Reference](Axona-API-Reference-v4.11.2.md) — every exported symbol.
-- [Programmer Guide](Axona-Programmer-Guide-v4.11.2.md) — mental model + worked example.
+- [AI Grounding](Axona-AI-Grounding-v4.11.2.md) — building with an AI assistant? Hand it this file.
 
 ## Prerequisites
 
@@ -109,6 +110,8 @@ const peer = new AxonaPeer({
 
 await transport.start(node$identity.id);
 await peer.start();
+// (A one-call version of everything above — `connect({ bridge, location })` —
+//  ships in the next kernel release; this is the 4.11.2 way.)
 
 // 3. Wait for the routing mesh to warm up before pub/sub. peer.ready() does this
 //    for you — it resolves once enough peers are in the synaptome (or a stable

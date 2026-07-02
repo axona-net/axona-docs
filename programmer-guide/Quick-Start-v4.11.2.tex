@@ -166,11 +166,14 @@ Companion documents:
 \begin{itemize}
 \tightlist
 \item
+  \href{Axona-Programmer-Guide-v4.11.2.md}{Programmer Guide} --- the
+  five ideas + recipes for real apps.
+\item
   \href{Axona-API-Reference-v4.11.2.md}{API Reference} --- every
   exported symbol.
 \item
-  \href{Axona-Programmer-Guide-v4.11.2.md}{Programmer Guide} --- mental
-  model + worked example.
+  \href{Axona-AI-Grounding-v4.11.2.md}{AI Grounding} --- building with
+  an AI assistant? Hand it this file.
 \end{itemize}
 
 \subsection{Prerequisites}\label{prerequisites}
@@ -305,6 +308,8 @@ Save this as \texttt{index.js} --- it mirrors how
 
 \ControlFlowTok{await}\NormalTok{ transport}\OperatorTok{.}\FunctionTok{start}\NormalTok{(node$identity}\OperatorTok{.}\AttributeTok{id}\NormalTok{)}\OperatorTok{;}
 \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{start}\NormalTok{()}\OperatorTok{;}
+\CommentTok{// (A one{-}call version of everything above — \textasciigrave{}connect(\{ bridge, location \})\textasciigrave{} —}
+\CommentTok{//  ships in the next kernel release; this is the 4.11.2 way.)}
 
 \CommentTok{// 3. Wait for the routing mesh to warm up before pub/sub. peer.ready() does this}
 \CommentTok{//    for you — it resolves once enough peers are in the synaptome (or a stable}

@@ -10,11 +10,13 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+# NOTE: the AI grounding file (Axona-AI-Grounding-*.md) is deliberately NOT
+# rendered — it is a machine-facing markdown file, consumed as text.
 DOCS=(
   "Quick-Start-v4.11.2"
   "Axona-Programmer-Guide-v4.11.2"
   "Axona-API-Reference-v4.11.2"
-  "Axona-Services-Guide-v0.3"
+  "Axona-Services-Guide-v4.11.2"
 )
 [ "$#" -gt 0 ] && DOCS=("$@")
 

@@ -1,5 +1,7 @@
 # Axona Services Guide
 
+*(kernel 4.11.2 · testnet — versioned with the protocol it describes)*
+
 The other programmer-guide documents teach the **library** — how to build your
 own peer with `@axona/protocol` and speak pub/sub. This guide covers the
 **services**: the ready-made programs you *run* (or rent) rather than write —
@@ -18,6 +20,7 @@ browser tab is open, this is the document for you.
   code default still targets prod/3.x; see §3).
 - **Companion docs**:
   - [Quick Start](Quick-Start-v4.11.2.md) · [Programmer Guide](Axona-Programmer-Guide-v4.11.2.md) · [API Reference](Axona-API-Reference-v4.11.2.md) — the library.
+  - [AI Grounding](Axona-AI-Grounding-v4.11.2.md) — building with an AI assistant.
   - [Architecture](../architecture/Axona-Architecture.tex) — how the bridge + transport work under the hood.
 
 > **Library vs. services.** A *peer* is the unit the library gives you: an

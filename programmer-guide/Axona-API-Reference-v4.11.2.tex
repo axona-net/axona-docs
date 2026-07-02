@@ -191,83 +191,16 @@ Sub-path imports (e.g.~\texttt{@axona/protocol/contracts/Transport.js},
 \texttt{@axona/protocol/persistence/file.js}) work for symbols that need
 them, but most apps only need the main barrel.
 
-\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
-
-\subsection{What changed in the 4.x line (since
-v3.6.0)}\label{what-changed-in-the-4.x-line-since-v3.6.0}
-
-The \textbf{public API surface is unchanged} from v3.6.0 --- same
-identity factories, topic descriptors, and
-\texttt{pub}/\texttt{sub}/\texttt{pull}/\texttt{kill}/\texttt{host}
-signatures. The 4.x work is a routing-and-reliability rewrite
-\emph{under} that surface, so existing code keeps working while delivery
-gets more robust:
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{Routing-only axonic-tree pub/sub (v3.14, clean break).} Topics
-  route to an emergent root (the live node XOR-closest to the topic id)
-  with no separate overlay to maintain. Behavioral only --- no call
-  changed.
-\item
-  \textbf{K-closest cohort distribution (v4.10.0).} A topic's
-  authoritative state (messages \emph{and} retractions) is replicated
-  across the closest-K nodes, not one root. A \texttt{kill} reaches the
-  whole cohort and internal transfers carry their tombstones, so a
-  killed message can't resurface to a late subscriber, and a publish
-  survives the root churning out.
-\item
-  \textbf{Metrics rebuilt (v4.10.1).}
-  \texttt{rootedTopics()}/\texttt{peer.metrics()} were silently dead
-  across early 4.x; rebuilt with two new fields ---
-  \textbf{\texttt{seq}} (dense message counter) and
-  \textbf{\texttt{cohortSize}} --- and cohort-aware aggregation (see
-  §4.3).
-\item
-  \textbf{Cold-publish burst (v4.11.0).} A freshly-joined node's first
-  publishes are automatically re-sent a few times over the first second,
-  so a cold-start publish isn't lost while the routing table warms. No
-  app action --- \texttt{pub} is unchanged.
-\item
-  \textbf{Nearest-replica reads (v4.11.1--v4.11.2).} \texttt{pull} is
-  answered by the first replica the request reaches instead of always
-  the root: exact for \texttt{pull(msgId)}, and \emph{recent}
-  (eventually-consistent) for pull-latest, which spreads a hot read path
-  off the root (see §4.3).
-\end{itemize}
-
-\subsection{What changed since v2.x}\label{what-changed-since-v2.x}
-
-The pub/sub and identity surfaces were redesigned in the v3 line. If you
-are migrating, the load-bearing differences are:
-
-\begin{itemize}
-\tightlist
-\item
-  \textbf{Two identity factories.}
-  \texttt{createNodeIdentity(\{\ lat,\ lng\ \})} mints the
-  \emph{connection} key (the nodeId); \texttt{createAuthorIdentity()}
-  mints a location-free \emph{authorship} key (the Author ID). The old
-  single \texttt{deriveIdentity()} is gone.
-\item
-  \textbf{Topics are descriptors, not strings.} A topic is
-  \texttt{\{\ region?,\ owner?,\ name,\ write?\ \}}. \texttt{peer.pub}
-  takes the descriptor; \texttt{peer.sub} / \texttt{pull} /
-  \texttt{metrics} take the descriptor \textbf{or} a 66-hex topic ID.
-  There is no \texttt{publisher}/\texttt{publishId} argument anywhere.
-\item
-  \textbf{Signing is explicit per publish.}
-  \texttt{peer.pub(topic,\ message,\ \{\ signWith\ \})} requires a
-  signer --- an author identity or the \texttt{ANONYMOUS} sentinel.
-  There is no default author, the node key never signs publishes, and
-  there is no \texttt{sign:\ false}.
-\item
-  \textbf{The envelope carries the topic descriptor.} A signed publish
-  binds the exact \texttt{\{\ region,\ owner,\ name,\ write\ \}}, so a
-  storing node recomputes the topic ID and enforces the write policy
-  (\texttt{signer\ ===\ owner} for owned topics).
-\end{itemize}
+\begin{quote}
+\textbf{How to read this reference.} It has three parts. The
+\textbf{Application surface} (§§1--9) is what applications call --- most
+readers never need anything else. The \textbf{Transport + protocol
+surface} (§§10--16) and \textbf{Low-level utilities} (§§17--23) exist
+for transport authors, tooling, and the curious. Building with an AI
+assistant? Hand it the \href{Axona-AI-Grounding-v4.11.2.md}{AI
+Grounding} file --- the application surface distilled to rules and
+patterns.
+\end{quote}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
@@ -319,6 +252,12 @@ first)}\label{application-surface-what-youll-use-first}
 \subsubsection{Transport + protocol
 surface}\label{transport-protocol-surface}
 
+\begin{quote}
+\textbf{You probably don't need this part.} Everything an application
+calls is in §§1--9 above. The sections from here on are for people
+implementing transports, embedding the kernel, or building tooling.
+\end{quote}
+
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
 \setcounter{enumi}{9}
@@ -341,6 +280,12 @@ surface}\label{transport-protocol-surface}
 \end{enumerate}
 
 \subsubsection{Low-level utilities}\label{low-level-utilities}
+
+\begin{quote}
+\textbf{Internals.} Pure helpers the kernel itself is built from. Apps
+import these only for unusual jobs (custom signing, ID math, region
+tables).
+\end{quote}
 
 \begin{enumerate}
 \def\labelenumi{\arabic{enumi}.}
@@ -2233,6 +2178,13 @@ pulls \texttt{node:fs} into a browser bundle nor
 \subsection{Transport + protocol
 surface}\label{transport-protocol-surface-1}
 
+\begin{quote}
+\textbf{You probably don't need this part.} Everything an application
+calls is in the Application surface (§§1--9). These sections are for
+people implementing transports, embedding the kernel, or building
+tooling.
+\end{quote}
+
 \subsection{10. Contracts}\label{contracts}
 
 Abstract base classes that transports / DHT implementations extend.
@@ -2450,6 +2402,12 @@ for implementors building custom engines.
 
 \subsection{Low-level utilities}\label{low-level-utilities-1}
 
+\begin{quote}
+\textbf{Internals.} Pure helpers the kernel itself is built from. Apps
+import these only for unusual jobs (custom signing, ID math, region
+tables).
+\end{quote}
+
 \subsection{17. Ed25519 helpers}\label{ed25519-helpers}
 
 Web Crypto Ed25519 wrappers --- useful for signing/verifying outside
@@ -2641,9 +2599,93 @@ explicit --- omitting a signer is an error, never silent anonymity.
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
+\subsection{Appendix: version history for
+migrators}\label{appendix-version-history-for-migrators}
+
+\emph{(Only relevant if you have code from an earlier kernel line. New
+readers: skip.)}
+
+\subsubsection{What changed in the 4.x line (since
+v3.6.0)}\label{what-changed-in-the-4.x-line-since-v3.6.0}
+
+The \textbf{public API surface is unchanged} from v3.6.0 --- same
+identity factories, topic descriptors, and
+\texttt{pub}/\texttt{sub}/\texttt{pull}/\texttt{kill}/\texttt{host}
+signatures. The 4.x work is a routing-and-reliability rewrite
+\emph{under} that surface, so existing code keeps working while delivery
+gets more robust:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Routing-only axonic-tree pub/sub (v3.14, clean break).} Topics
+  route to an emergent root (the live node XOR-closest to the topic id)
+  with no separate overlay to maintain. Behavioral only --- no call
+  changed.
+\item
+  \textbf{K-closest cohort distribution (v4.10.0).} A topic's
+  authoritative state (messages \emph{and} retractions) is replicated
+  across the closest-K nodes, not one root. A \texttt{kill} reaches the
+  whole cohort and internal transfers carry their tombstones, so a
+  killed message can't resurface to a late subscriber, and a publish
+  survives the root churning out.
+\item
+  \textbf{Metrics rebuilt (v4.10.1).}
+  \texttt{rootedTopics()}/\texttt{peer.metrics()} were silently dead
+  across early 4.x; rebuilt with two new fields ---
+  \textbf{\texttt{seq}} (dense message counter) and
+  \textbf{\texttt{cohortSize}} --- and cohort-aware aggregation (see
+  §4.3).
+\item
+  \textbf{Cold-publish burst (v4.11.0).} A freshly-joined node's first
+  publishes are automatically re-sent a few times over the first second,
+  so a cold-start publish isn't lost while the routing table warms. No
+  app action --- \texttt{pub} is unchanged.
+\item
+  \textbf{Nearest-replica reads (v4.11.1--v4.11.2).} \texttt{pull} is
+  answered by the first replica the request reaches instead of always
+  the root: exact for \texttt{pull(msgId)}, and \emph{recent}
+  (eventually-consistent) for pull-latest, which spreads a hot read path
+  off the root (see §4.3).
+\end{itemize}
+
+\subsubsection{What changed since v2.x}\label{what-changed-since-v2.x}
+
+The pub/sub and identity surfaces were redesigned in the v3 line. If you
+are migrating, the load-bearing differences are:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Two identity factories.}
+  \texttt{createNodeIdentity(\{\ lat,\ lng\ \})} mints the
+  \emph{connection} key (the nodeId); \texttt{createAuthorIdentity()}
+  mints a location-free \emph{authorship} key (the Author ID). The old
+  single \texttt{deriveIdentity()} is gone.
+\item
+  \textbf{Topics are descriptors, not strings.} A topic is
+  \texttt{\{\ region?,\ owner?,\ name,\ write?\ \}}. \texttt{peer.pub}
+  takes the descriptor; \texttt{peer.sub} / \texttt{pull} /
+  \texttt{metrics} take the descriptor \textbf{or} a 66-hex topic ID.
+  There is no \texttt{publisher}/\texttt{publishId} argument anywhere.
+\item
+  \textbf{Signing is explicit per publish.}
+  \texttt{peer.pub(topic,\ message,\ \{\ signWith\ \})} requires a
+  signer --- an author identity or the \texttt{ANONYMOUS} sentinel.
+  There is no default author, the node key never signs publishes, and
+  there is no \texttt{sign:\ false}.
+\item
+  \textbf{The envelope carries the topic descriptor.} A signed publish
+  binds the exact \texttt{\{\ region,\ owner,\ name,\ write\ \}}, so a
+  storing node recomputes the topic ID and enforces the write policy
+  (\texttt{signer\ ===\ owner} for owned topics).
+\end{itemize}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
 \subsection{A word on stability}\label{a-word-on-stability}
 
-\texttt{@axona/protocol} v3.x is stable for the application surface
+\texttt{@axona/protocol} 4.x is stable for the application surface
 (§§1--9). The transport + protocol surface (§§10--16) is stable but
 expect occasional additions. Low-level utilities (§§17--23) may grow but
 won't change incompatibly.

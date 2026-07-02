@@ -32,57 +32,17 @@ Sub-path imports (e.g. `@axona/protocol/contracts/Transport.js`,
 `@axona/protocol/persistence/file.js`) work for symbols that need them,
 but most apps only need the main barrel.
 
----
-
-## What changed in the 4.x line (since v3.6.0)
-
-The **public API surface is unchanged** from v3.6.0 — same identity factories,
-topic descriptors, and `pub`/`sub`/`pull`/`kill`/`host` signatures. The 4.x work
-is a routing-and-reliability rewrite *under* that surface, so existing code keeps
-working while delivery gets more robust:
-
-- **Routing-only axonic-tree pub/sub (v3.14, clean break).** Topics route to an
-  emergent root (the live node XOR-closest to the topic id) with no separate
-  overlay to maintain. Behavioral only — no call changed.
-- **K-closest cohort distribution (v4.10.0).** A topic's authoritative state
-  (messages *and* retractions) is replicated across the closest-K nodes, not one
-  root. A `kill` reaches the whole cohort and internal transfers carry their
-  tombstones, so a killed message can't resurface to a late subscriber, and a
-  publish survives the root churning out.
-- **Metrics rebuilt (v4.10.1).** `rootedTopics()`/`peer.metrics()` were silently
-  dead across early 4.x; rebuilt with two new fields — **`seq`** (dense message
-  counter) and **`cohortSize`** — and cohort-aware aggregation (see §4.3).
-- **Cold-publish burst (v4.11.0).** A freshly-joined node's first publishes are
-  automatically re-sent a few times over the first second, so a cold-start publish
-  isn't lost while the routing table warms. No app action — `pub` is unchanged.
-- **Nearest-replica reads (v4.11.1–v4.11.2).** `pull` is answered by the first
-  replica the request reaches instead of always the root: exact for `pull(msgId)`,
-  and *recent* (eventually-consistent) for pull-latest, which spreads a hot read
-  path off the root (see §4.3).
-
-## What changed since v2.x
-
-The pub/sub and identity surfaces were redesigned in the v3 line. If you
-are migrating, the load-bearing differences are:
-
-- **Two identity factories.** `createNodeIdentity({ lat, lng })` mints
-  the *connection* key (the nodeId); `createAuthorIdentity()` mints a
-  location-free *authorship* key (the Author ID). The old single
-  `deriveIdentity()` is gone.
-- **Topics are descriptors, not strings.** A topic is
-  `{ region?, owner?, name, write? }`. `peer.pub` takes the descriptor;
-  `peer.sub` / `pull` / `metrics` take the descriptor **or** a 66-hex
-  topic ID. There is no `publisher`/`publishId` argument anywhere.
-- **Signing is explicit per publish.** `peer.pub(topic, message,
-  { signWith })` requires a signer — an author identity or the
-  `ANONYMOUS` sentinel. There is no default author, the node key never
-  signs publishes, and there is no `sign: false`.
-- **The envelope carries the topic descriptor.** A signed publish binds
-  the exact `{ region, owner, name, write }`, so a storing node
-  recomputes the topic ID and enforces the write policy
-  (`signer === owner` for owned topics).
+> **How to read this reference.** It has three parts. The
+> **Application surface** (§§1–9) is what applications call — most
+> readers never need anything else. The **Transport + protocol
+> surface** (§§10–16) and **Low-level utilities** (§§17–23) exist for
+> transport authors, tooling, and the curious. Building with an AI
+> assistant? Hand it the
+> [AI Grounding](Axona-AI-Grounding-v4.11.2.md) file — the application
+> surface distilled to rules and patterns.
 
 ---
+
 
 ## Table of contents
 
@@ -106,6 +66,10 @@ are migrating, the load-bearing differences are:
 
 ### Transport + protocol surface
 
+> **You probably don't need this part.** Everything an application
+> calls is in §§1–9 above. The sections from here on are for people
+> implementing transports, embedding the kernel, or building tooling.
+
 10. [Contracts](#10-contracts)
 11. [Sim transport](#11-sim-transport)
 12. [Web transport](#12-web-transport)
@@ -115,6 +79,10 @@ are migrating, the load-bearing differences are:
 16. [Low-level pub/sub builders](#16-low-level-pubsub-builders)
 
 ### Low-level utilities
+
+> **Internals.** Pure helpers the kernel itself is built from. Apps
+> import these only for unusual jobs (custom signing, ID math, region
+> tables).
 
 17. [Ed25519 helpers](#17-ed25519-helpers)
 18. [Hex / ID math](#18-hex--id-math)
@@ -1254,6 +1222,12 @@ const peer = new AxonaPeer({ nodeIdentity, domain, node, transport,
 
 ## Transport + protocol surface
 
+
+> **You probably don't need this part.** Everything an application
+> calls is in the Application surface (§§1–9). These sections are for
+> people implementing transports, embedding the kernel, or building
+> tooling.
+
 ## 10. Contracts
 
 Abstract base classes that transports / DHT implementations extend.
@@ -1438,6 +1412,11 @@ exported for implementors building custom engines.
 
 ## Low-level utilities
 
+
+> **Internals.** Pure helpers the kernel itself is built from. Apps
+> import these only for unusual jobs (custom signing, ID math, region
+> tables).
+
 ## 17. Ed25519 helpers
 
 Web Crypto Ed25519 wrappers — useful for signing/verifying outside
@@ -1603,9 +1582,64 @@ await peer.pub({ region: 'useast', name: 'lobby' }, msg, { signWith: ANONYMOUS }
 
 ---
 
+## Appendix: version history for migrators
+
+*(Only relevant if you have code from an earlier kernel line. New
+readers: skip.)*
+
+### What changed in the 4.x line (since v3.6.0)
+
+The **public API surface is unchanged** from v3.6.0 — same identity factories,
+topic descriptors, and `pub`/`sub`/`pull`/`kill`/`host` signatures. The 4.x work
+is a routing-and-reliability rewrite *under* that surface, so existing code keeps
+working while delivery gets more robust:
+
+- **Routing-only axonic-tree pub/sub (v3.14, clean break).** Topics route to an
+  emergent root (the live node XOR-closest to the topic id) with no separate
+  overlay to maintain. Behavioral only — no call changed.
+- **K-closest cohort distribution (v4.10.0).** A topic's authoritative state
+  (messages *and* retractions) is replicated across the closest-K nodes, not one
+  root. A `kill` reaches the whole cohort and internal transfers carry their
+  tombstones, so a killed message can't resurface to a late subscriber, and a
+  publish survives the root churning out.
+- **Metrics rebuilt (v4.10.1).** `rootedTopics()`/`peer.metrics()` were silently
+  dead across early 4.x; rebuilt with two new fields — **`seq`** (dense message
+  counter) and **`cohortSize`** — and cohort-aware aggregation (see §4.3).
+- **Cold-publish burst (v4.11.0).** A freshly-joined node's first publishes are
+  automatically re-sent a few times over the first second, so a cold-start publish
+  isn't lost while the routing table warms. No app action — `pub` is unchanged.
+- **Nearest-replica reads (v4.11.1–v4.11.2).** `pull` is answered by the first
+  replica the request reaches instead of always the root: exact for `pull(msgId)`,
+  and *recent* (eventually-consistent) for pull-latest, which spreads a hot read
+  path off the root (see §4.3).
+
+### What changed since v2.x
+
+The pub/sub and identity surfaces were redesigned in the v3 line. If you
+are migrating, the load-bearing differences are:
+
+- **Two identity factories.** `createNodeIdentity({ lat, lng })` mints
+  the *connection* key (the nodeId); `createAuthorIdentity()` mints a
+  location-free *authorship* key (the Author ID). The old single
+  `deriveIdentity()` is gone.
+- **Topics are descriptors, not strings.** A topic is
+  `{ region?, owner?, name, write? }`. `peer.pub` takes the descriptor;
+  `peer.sub` / `pull` / `metrics` take the descriptor **or** a 66-hex
+  topic ID. There is no `publisher`/`publishId` argument anywhere.
+- **Signing is explicit per publish.** `peer.pub(topic, message,
+  { signWith })` requires a signer — an author identity or the
+  `ANONYMOUS` sentinel. There is no default author, the node key never
+  signs publishes, and there is no `sign: false`.
+- **The envelope carries the topic descriptor.** A signed publish binds
+  the exact `{ region, owner, name, write }`, so a storing node
+  recomputes the topic ID and enforces the write policy
+  (`signer === owner` for owned topics).
+
+---
+
 ## A word on stability
 
-`@axona/protocol` v3.x is stable for the application surface (§§1–9). The
+`@axona/protocol` 4.x is stable for the application surface (§§1–9). The
 transport + protocol surface (§§10–16) is stable but expect occasional
 additions. Low-level utilities (§§17–23) may grow but won't change
 incompatibly.
