@@ -1,23 +1,23 @@
 # Axona API Reference
 
-Reference for every public symbol exported from `@axona/protocol` v4.16.0.
+Reference for every public symbol exported from `@axona/protocol` v4.16.1.
 
 Organized by what application developers reach for first (identity, peer
 lifecycle, pub/sub, direct messaging, introspection), then the
 transport/protocol surface, then low-level utilities. Every signature
-below is verified against the v4.16.0 kernel source.
+below is verified against the v4.16.1 kernel source.
 
 > **Which network?** The 4.x line runs on **testnet** (`wss://testnet.axona.net`)
 > during the current phase; the **production** bridges (`wss://bridge.axona.net`)
 > are still on the 3.x line. The wire major partitions them (wire 3.0 vs 4.0), so a
 > v4.x peer talks to testnet, a v3.x peer talks to prod — they do not interoperate.
-> Install `github:axona-net/axona-protocol#v4.16.0` and point at testnet to use this
+> Install `github:axona-net/axona-protocol#v4.16.1` and point at testnet to use this
 > API surface.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v4.16.0.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v4.16.0.md) — mental model +
+- [Quick Start](Quick-Start-v4.16.1.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v4.16.1.md) — mental model +
   worked example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects.
@@ -38,7 +38,7 @@ but most apps only need the main barrel.
 > surface** (§§10–16) and **Low-level utilities** (§§17–23) exist for
 > transport authors, tooling, and the curious. Building with an AI
 > assistant? Hand it the
-> [AI Grounding](Axona-AI-Grounding-v4.16.0.md) file — the application
+> [AI Grounding](Axona-AI-Grounding-v4.16.1.md) file — the application
 > surface distilled to rules and patterns.
 
 ---
@@ -731,7 +731,7 @@ expected, not an error.
 | `opts.topic` | `TopicDescriptor \| string` | descriptor **or** 66-hex id. |
 | `opts.timeoutMs` | `number` | default `1000`. |
 
-**Nearest-replica reads (v4.11.1–v4.16.0).** A pull is answered by the
+**Nearest-replica reads (v4.11.1–v4.16.1).** A pull is answered by the
 **first replica the request reaches** — a cohort member, a child relay, or a
 `host()` node — not necessarily the topic's root. This lowers latency, spreads
 reads off the root, and lets a pull that would otherwise strand toward the root
@@ -772,16 +772,15 @@ during its short window and returns the freshest view. Owned topics' metrics
 are **public too** — anyone who can derive the id can read them — so there is
 no owner gate.
 
-> **Cold-topic gotcha.** Because publication starts *on demand*, the very first
-> snapshot for a topic nobody was watching arrives **~2–20 s after** demand
-> turns on (the root's next refresh tick, plus routing) — longer than the
-> default 1500 ms collection window. So the **first `metrics()` call on a cold
-> topic normally returns `stale: true`**. That is not an error: either call it
-> again a few seconds later, pass a longer window (`{ timeoutMs: 25_000 }`
-> spans one full publish cadence), or — better — keep a standing
-> `sub(metricTopic(T), …)` and treat metrics as the stream it is. If *any*
-> peer watched the topic's metrics within the 48 h hold window, replay serves
-> the last cached snapshot immediately and the first call succeeds.
+> **Cold-topic note.** Publication starts *on demand*, and since v4.16.1 the
+> root answers a freshly armed lease **immediately** — the first snapshot rides
+> back at routing latency (~0.3 s measured on testnet), normally inside the
+> default 1500 ms collection window. Under churn (the root re-homing at that
+> instant) it can take a few seconds; if the window closes empty the call
+> returns `stale: true` — retry, widen the window, or — better — keep a
+> standing `sub(metricTopic(T), …)` and treat metrics as the stream it is. If
+> *any* peer watched the topic's metrics within the 48 h hold window, replay
+> serves the last cached snapshot immediately regardless.
 
 **Cohort-aware (v4.10.1).** Under the K-closest cohort model every co-hosting root
 publishes its own snapshot, so `metrics()` collects them over the window and
@@ -839,22 +838,21 @@ and, because snapshots are ordinary messages that age out at the 48 h hold
 ceiling, a **rolling ~48 h history for free** to plot trends. This is also how
 you subscribe to an **owned** topic's metrics without owning it.
 
-**When snapshots arrive.** Metrics is an *eventually-arriving stream*, not a
-synchronous read — plan around this timing contract:
+**When snapshots arrive.** The timing contract (v4.16.1):
 
-- **First snapshot:** typically **~2 s** after you subscribe (measured on the
-  testnet), but allow **up to ~20–25 s** — the root publishes on its next
-  refresh tick, and a root that churns right then must re-home first. If any
-  peer watched this topic's metrics within the last 48 h, replay hands you the
-  most recent snapshot immediately.
+- **First snapshot: at routing latency.** The root answers the moment your
+  subscription's lease arms — **~0.3 s measured on testnet**, arriving with
+  (or before) your data-topic replay, whether or not anyone has ever published
+  or watched. Allow a few seconds if the root churns at exactly that moment
+  (it must re-home first). If any peer watched this topic's metrics within the
+  last 48 h, replay hands you the most recent snapshot immediately as well.
 - **Cadence:** one snapshot every **~20 s** per rooting node, for as long as at
   least one metric subscriber remains.
 - **Shut-off:** the lease lapses **~70 s** after the last metric subscriber
   unsubscribes; publishing stops until demand returns.
-- **Tests and short-lived probes:** subscribe early and *await the first
-  envelope* with a generous allowance (≥ 25 s) — a subscription torn down a few
-  seconds after it starts will often observe nothing and misread a healthy
-  topic as "metrics not working."
+- **Silence is *unknown*, not zero.** Until the first snapshot (or your data
+  replay) arrives, don't render "no activity" as a definitive answer; a
+  `current_count: 0` snapshot is the real "nothing here."
 
 ```js
 import { deriveTopicId, metricTopic } from '@axona/protocol';
@@ -1369,7 +1367,7 @@ import { webTransport } from '@axona/protocol/transport/web/index.js';
 const transport = webTransport({
   bridgeUrl:   'wss://testnet.axona.net',  // the 4.x line runs on testnet (prod is 3.x)
   identity:    node,                       // from createNodeIdentity — signs the handshake
-  peerVersion: '4.16.0',                   // your app version (gated by the bridge)
+  peerVersion: '4.16.1',                   // your app version (gated by the bridge)
   reconnect:   true,
 });
 await transport.start();                  // resolves after the bridge handshake
@@ -1620,7 +1618,7 @@ introduces no keyspace skew.
 
 ```js
 WIRE_VERSION         // '4.0'      — wire format major.minor (bridges gate on this)
-KERNEL_VERSION       // '4.16.0'   — kernel semver (npm release tag)
+KERNEL_VERSION       // '4.16.1'   — kernel semver (npm release tag)
 AUTH_PROTO           // 'axona/5'  — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426       — WebSocket close code for a version mismatch
 ENVELOPE_DOMAIN      // 'axona:pubsub-envelope:v2'
@@ -1649,14 +1647,16 @@ await peer.pub({ region: 'useast', name: 'lobby' }, msg, { signWith: ANONYMOUS }
 *(Only relevant if you have code from an earlier kernel line. New
 readers: skip.)*
 
-### What changed in v4.12.0–v4.16.0 (2026-07-02 testnet roll)
+### What changed in v4.12.0–v4.16.1 (2026-07-02 testnet roll)
 
 - **`connect()` (v4.16.0)** — the one-call bootstrap above; no other API change.
+- **Immediate metrics answer (v4.16.1)** — a topic root publishes the FIRST
+  metric snapshot the moment a metrics lease arms, so it arrives at routing
+  latency (measured ~0.3 s on testnet) instead of on the next 5 s tick. Cadence
+  (~20 s) and lease (~70 s) unchanged.
 - **Demand-driven metrics (v4.12.0)** — snapshots publish to `metricTopic(T)`
   only while a subscriber's lease is fresh; `peer.metrics()` unchanged. The
-  relay's old push-metrics loop is retired. Consequence: the first snapshot on
-  a cold topic arrives ~2–20 s *after* the first metric subscribe — see the
-  timing contract in §4.3.
+  relay's old push-metrics loop is retired. See the timing contract in §4.3.
 - **Region-occupancy rule (v4.13.0, gated OFF in v4.15.0)** — the kernel can
   enforce region-homogeneous topic service (`configureRegionLock({ enforce })`);
   disabled by default until regional coverage justifies it.
@@ -1684,7 +1684,7 @@ working while delivery gets more robust:
 - **Cold-publish burst (v4.11.0).** A freshly-joined node's first publishes are
   automatically re-sent a few times over the first second, so a cold-start publish
   isn't lost while the routing table warms. No app action — `pub` is unchanged.
-- **Nearest-replica reads (v4.11.1–v4.16.0).** `pull` is answered by the first
+- **Nearest-replica reads (v4.11.1–v4.16.1).** `pull` is answered by the first
   replica the request reaches instead of always the root: exact for `pull(msgId)`,
   and *recent* (eventually-consistent) for pull-latest, which spreads a hot read
   path off the root (see §4.3).

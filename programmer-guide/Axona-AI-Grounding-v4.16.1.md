@@ -1,8 +1,8 @@
-# Axona AI Grounding — kernel 4.16.0
+# Axona AI Grounding — kernel 4.16.1
 
 This file is the complete, self-contained grounding for an AI system building
 an application on the Axona protocol. It matches the network it targets:
-**kernel 4.16.0 / wire 4.0, deployed on testnet (`wss://testnet.axona.net`)**.
+**kernel 4.16.1 / wire 4.0, deployed on testnet (`wss://testnet.axona.net`)**.
 Everything below is exact and current; nothing outside this file is required.
 If this version does not match the bridge you are connecting to, request the
 matching grounding file.
@@ -58,7 +58,7 @@ central server, message broker, or database.
 ## Install
 
 ```bash
-npm install github:axona-net/axona-protocol#v4.16.0
+npm install github:axona-net/axona-protocol#v4.16.1
 ```
 
 `package.json` must contain `"type": "module"`.
@@ -192,14 +192,15 @@ await peer.sub(mt, (env) => {
 TIMING RULES (metrics are published ON DEMAND — the subscribe itself turns
 them on; there is no always-on publisher):
 
-- First snapshot: ~2 s typical, up to ~25 s. Cadence: every ~20 s while
-  subscribed. Publishing stops ~70 s after the last metric subscriber leaves.
-- `peer.metrics()` on a cold topic (no recent watcher) returns `stale: true`
-  on the FIRST call — its 1.5 s default window is shorter than the on-demand
-  start-up. Retry, pass `{ timeoutMs: 25_000 }`, or prefer the `sub()` form.
-- In tests: subscribe to the metric topic EARLY, await the first envelope with
-  a ≥25 s allowance, and keep the subscription open — a sub torn down after a
-  few seconds observes nothing on a healthy topic.
+- First snapshot: at ROUTING LATENCY (~0.3 s typical; allow a few seconds
+  under churn) — the root answers the moment the lease arms, independent of
+  other users' publish/watch activity. Cadence: every ~20 s while subscribed.
+  Publishing stops ~70 s after the last metric subscriber leaves.
+- `peer.metrics()` (one-shot) normally succeeds within its 1.5 s default
+  window; `stale: true` means the answer didn't arrive in time (churn) —
+  retry or prefer the standing `sub()` form.
+- Render silence as UNKNOWN, never as zero: a `current_count: 0` snapshot is
+  the real "no activity" answer. Keep the subscription open in tests.
 
 Metrics are advisory (unauthenticated counts) — never a security input.
 
@@ -337,7 +338,7 @@ outcomes (missing/expired message; nothing to retract) — not errors.
 - Browser: HTTPS only. Node: v20+; the same `webTransport` connects to the
   bridge over WSS (the WebRTC mesh is browser-side; Node peers converse via
   the bridge and routing).
-- The testnet bridge is `wss://testnet.axona.net` (kernel 4.16.0, wire 4.0).
+- The testnet bridge is `wss://testnet.axona.net` (kernel 4.16.1, wire 4.0).
   Production (`wss://bridge.axona.net`) runs the older 3.x line and does NOT
   interoperate with 4.x code.
 - Multiple tabs = independent peers (fine, but each is a separate node).

@@ -3,7 +3,7 @@
 # pandoc (tufte-handout .tex) + tectonic. Run from anywhere; operates on this dir.
 #
 #   ./render.sh            # render all four
-#   ./render.sh Quick-Start-v4.16.0   # render one (basename, no extension)
+#   ./render.sh Quick-Start-v4.16.1   # render one (basename, no extension)
 #
 # Requires: pandoc + tectonic on PATH (no system TeX Live needed — tectonic is
 # self-contained and auto-fetches tufte-latex). Menlo font (macOS) for code.
@@ -13,10 +13,10 @@ cd "$(dirname "$0")"
 # NOTE: the AI grounding file (Axona-AI-Grounding-*.md) is deliberately NOT
 # rendered — it is a machine-facing markdown file, consumed as text.
 DOCS=(
-  "Quick-Start-v4.16.0"
-  "Axona-Programmer-Guide-v4.16.0"
-  "Axona-API-Reference-v4.16.0"
-  "Axona-Services-Guide-v4.16.0"
+  "Quick-Start-v4.16.1"
+  "Axona-Programmer-Guide-v4.16.1"
+  "Axona-API-Reference-v4.16.1"
+  "Axona-Services-Guide-v4.16.1"
 )
 [ "$#" -gt 0 ] && DOCS=("$@")
 

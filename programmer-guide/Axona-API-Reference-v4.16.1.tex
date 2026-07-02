@@ -147,12 +147,12 @@
 \section{Axona API Reference}\label{axona-api-reference}
 
 Reference for every public symbol exported from \texttt{@axona/protocol}
-v4.16.0.
+v4.16.1.
 
 Organized by what application developers reach for first (identity, peer
 lifecycle, pub/sub, direct messaging, introspection), then the
 transport/protocol surface, then low-level utilities. Every signature
-below is verified against the v4.16.0 kernel source.
+below is verified against the v4.16.1 kernel source.
 
 \begin{quote}
 \textbf{Which network?} The 4.x line runs on \textbf{testnet}
@@ -160,7 +160,7 @@ below is verified against the v4.16.0 kernel source.
 \textbf{production} bridges (\texttt{wss://bridge.axona.net}) are still
 on the 3.x line. The wire major partitions them (wire 3.0 vs 4.0), so a
 v4.x peer talks to testnet, a v3.x peer talks to prod --- they do not
-interoperate. Install \texttt{github:axona-net/axona-protocol\#v4.16.0}
+interoperate. Install \texttt{github:axona-net/axona-protocol\#v4.16.1}
 and point at testnet to use this API surface.
 \end{quote}
 
@@ -169,10 +169,10 @@ Companion documents:
 \begin{itemize}
 \tightlist
 \item
-  \href{Quick-Start-v4.16.0.md}{Quick Start} --- 5-minute working
+  \href{Quick-Start-v4.16.1.md}{Quick Start} --- 5-minute working
   roundtrip.
 \item
-  \href{Axona-Programmer-Guide-v4.16.0.md}{Programmer Guide} --- mental
+  \href{Axona-Programmer-Guide-v4.16.1.md}{Programmer Guide} --- mental
   model + worked example + pitfalls.
 \item
   \href{../SECURITY-CHANGELOG.md}{Security changelog} --- what each
@@ -197,7 +197,7 @@ them, but most apps only need the main barrel.
 readers never need anything else. The \textbf{Transport + protocol
 surface} (§§10--16) and \textbf{Low-level utilities} (§§17--23) exist
 for transport authors, tooling, and the curious. Building with an AI
-assistant? Hand it the \href{Axona-AI-Grounding-v4.16.0.md}{AI
+assistant? Hand it the \href{Axona-AI-Grounding-v4.16.1.md}{AI
 Grounding} file --- the application surface distilled to rules and
 patterns.
 \end{quote}
@@ -1433,7 +1433,7 @@ descriptor \textbf{or} 66-hex id. \\
 \end{longtable}
 }
 
-\textbf{Nearest-replica reads (v4.11.1--v4.16.0).} A pull is answered by
+\textbf{Nearest-replica reads (v4.11.1--v4.16.1).} A pull is answered by
 the \textbf{first replica the request reaches} --- a cohort member, a
 child relay, or a \texttt{host()} node --- not necessarily the topic's
 root. This lowers latency, spreads reads off the root, and lets a pull
@@ -1498,18 +1498,17 @@ topics' metrics are \textbf{public too} --- anyone who can derive the id
 can read them --- so there is no owner gate.
 
 \begin{quote}
-\textbf{Cold-topic gotcha.} Because publication starts \emph{on demand},
-the very first snapshot for a topic nobody was watching arrives
-\textbf{\textasciitilde2--20 s after} demand turns on (the root's next
-refresh tick, plus routing) --- longer than the default 1500 ms
-collection window. So the \textbf{first \texttt{metrics()} call on a
-cold topic normally returns \texttt{stale:\ true}}. That is not an
-error: either call it again a few seconds later, pass a longer window
-(\texttt{\{\ timeoutMs:\ 25\_000\ \}} spans one full publish cadence),
-or --- better --- keep a standing \texttt{sub(metricTopic(T),\ …)} and
-treat metrics as the stream it is. If \emph{any} peer watched the
-topic's metrics within the 48 h hold window, replay serves the last
-cached snapshot immediately and the first call succeeds.
+\textbf{Cold-topic note.} Publication starts \emph{on demand}, and since
+v4.16.1 the root answers a freshly armed lease \textbf{immediately} ---
+the first snapshot rides back at routing latency (\textasciitilde0.3 s
+measured on testnet), normally inside the default 1500 ms collection
+window. Under churn (the root re-homing at that instant) it can take a
+few seconds; if the window closes empty the call returns
+\texttt{stale:\ true} --- retry, widen the window, or --- better ---
+keep a standing \texttt{sub(metricTopic(T),\ …)} and treat metrics as
+the stream it is. If \emph{any} peer watched the topic's metrics within
+the 48 h hold window, replay serves the last cached snapshot immediately
+regardless.
 \end{quote}
 
 \textbf{Cohort-aware (v4.10.1).} Under the K-closest cohort model every
@@ -1602,18 +1601,18 @@ age out at the 48 h hold ceiling, a \textbf{rolling \textasciitilde48 h
 history for free} to plot trends. This is also how you subscribe to an
 \textbf{owned} topic's metrics without owning it.
 
-\textbf{When snapshots arrive.} Metrics is an \emph{eventually-arriving
-stream}, not a synchronous read --- plan around this timing contract:
+\textbf{When snapshots arrive.} The timing contract (v4.16.1):
 
 \begin{itemize}
 \tightlist
 \item
-  \textbf{First snapshot:} typically \textbf{\textasciitilde2 s} after
-  you subscribe (measured on the testnet), but allow \textbf{up to
-  \textasciitilde20--25 s} --- the root publishes on its next refresh
-  tick, and a root that churns right then must re-home first. If any
-  peer watched this topic's metrics within the last 48 h, replay hands
-  you the most recent snapshot immediately.
+  \textbf{First snapshot: at routing latency.} The root answers the
+  moment your subscription's lease arms --- \textbf{\textasciitilde0.3 s
+  measured on testnet}, arriving with (or before) your data-topic
+  replay, whether or not anyone has ever published or watched. Allow a
+  few seconds if the root churns at exactly that moment (it must re-home
+  first). If any peer watched this topic's metrics within the last 48 h,
+  replay hands you the most recent snapshot immediately as well.
 \item
   \textbf{Cadence:} one snapshot every \textbf{\textasciitilde20 s} per
   rooting node, for as long as at least one metric subscriber remains.
@@ -1622,11 +1621,10 @@ stream}, not a synchronous read --- plan around this timing contract:
   the last metric subscriber unsubscribes; publishing stops until demand
   returns.
 \item
-  \textbf{Tests and short-lived probes:} subscribe early and \emph{await
-  the first envelope} with a generous allowance (≥ 25 s) --- a
-  subscription torn down a few seconds after it starts will often
-  observe nothing and misread a healthy topic as ``metrics not
-  working.''
+  \textbf{Silence is \emph{unknown}, not zero.} Until the first snapshot
+  (or your data replay) arrives, don't render ``no activity'' as a
+  definitive answer; a \texttt{current\_count:\ 0} snapshot is the real
+  ``nothing here.''
 \end{itemize}
 
 \begin{Shaded}
@@ -2389,7 +2387,7 @@ bootstrap + signaling, plus a WebRTC mesh). Sub-path import:
 \KeywordTok{const}\NormalTok{ transport }\OperatorTok{=} \FunctionTok{webTransport}\NormalTok{(\{}
   \DataTypeTok{bridgeUrl}\OperatorTok{:}   \StringTok{\textquotesingle{}wss://testnet.axona.net\textquotesingle{}}\OperatorTok{,}  \CommentTok{// the 4.x line runs on testnet (prod is 3.x)}
   \DataTypeTok{identity}\OperatorTok{:}\NormalTok{    node}\OperatorTok{,}                       \CommentTok{// from createNodeIdentity — signs the handshake}
-  \DataTypeTok{peerVersion}\OperatorTok{:} \StringTok{\textquotesingle{}4.16.0\textquotesingle{}}\OperatorTok{,}                   \CommentTok{// your app version (gated by the bridge)}
+  \DataTypeTok{peerVersion}\OperatorTok{:} \StringTok{\textquotesingle{}4.16.1\textquotesingle{}}\OperatorTok{,}                   \CommentTok{// your app version (gated by the bridge)}
   \DataTypeTok{reconnect}\OperatorTok{:}   \KeywordTok{true}\OperatorTok{,}
 \NormalTok{\})}\OperatorTok{;}
 \ControlFlowTok{await}\NormalTok{ transport}\OperatorTok{.}\FunctionTok{start}\NormalTok{()}\OperatorTok{;}                  \CommentTok{// resolves after the bridge handshake}
@@ -2682,7 +2680,7 @@ address}, so raising it introduces no keyspace skew.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{WIRE\_VERSION         }\CommentTok{// \textquotesingle{}4.0\textquotesingle{}      — wire format major.minor (bridges gate on this)}
-\NormalTok{KERNEL\_VERSION       }\CommentTok{// \textquotesingle{}4.16.0\textquotesingle{}   — kernel semver (npm release tag)}
+\NormalTok{KERNEL\_VERSION       }\CommentTok{// \textquotesingle{}4.16.1\textquotesingle{}   — kernel semver (npm release tag)}
 \NormalTok{AUTH\_PROTO           }\CommentTok{// \textquotesingle{}axona/5\textquotesingle{}  — authenticated{-}identity handshake tag}
 \NormalTok{UPGRADE\_CLOSE\_CODE   }\CommentTok{// 4426       — WebSocket close code for a version mismatch}
 \NormalTok{ENVELOPE\_DOMAIN      }\CommentTok{// \textquotesingle{}axona:pubsub{-}envelope:v2\textquotesingle{}}
@@ -2716,8 +2714,8 @@ migrators}\label{appendix-version-history-for-migrators}
 \emph{(Only relevant if you have code from an earlier kernel line. New
 readers: skip.)}
 
-\subsubsection{What changed in v4.12.0--v4.16.0 (2026-07-02 testnet
-roll)}\label{what-changed-in-v4.12.0v4.16.0-2026-07-02-testnet-roll}
+\subsubsection{What changed in v4.12.0--v4.16.1 (2026-07-02 testnet
+roll)}\label{what-changed-in-v4.12.0v4.16.1-2026-07-02-testnet-roll}
 
 \begin{itemize}
 \tightlist
@@ -2725,12 +2723,16 @@ roll)}\label{what-changed-in-v4.12.0v4.16.0-2026-07-02-testnet-roll}
   \textbf{\texttt{connect()} (v4.16.0)} --- the one-call bootstrap
   above; no other API change.
 \item
+  \textbf{Immediate metrics answer (v4.16.1)} --- a topic root publishes
+  the FIRST metric snapshot the moment a metrics lease arms, so it
+  arrives at routing latency (measured \textasciitilde0.3 s on testnet)
+  instead of on the next 5 s tick. Cadence (\textasciitilde20 s) and
+  lease (\textasciitilde70 s) unchanged.
+\item
   \textbf{Demand-driven metrics (v4.12.0)} --- snapshots publish to
   \texttt{metricTopic(T)} only while a subscriber's lease is fresh;
   \texttt{peer.metrics()} unchanged. The relay's old push-metrics loop
-  is retired. Consequence: the first snapshot on a cold topic arrives
-  \textasciitilde2--20 s \emph{after} the first metric subscribe --- see
-  the timing contract in §4.3.
+  is retired. See the timing contract in §4.3.
 \item
   \textbf{Region-occupancy rule (v4.13.0, gated OFF in v4.15.0)} --- the
   kernel can enforce region-homogeneous topic service
@@ -2779,7 +2781,7 @@ gets more robust:
   so a cold-start publish isn't lost while the routing table warms. No
   app action --- \texttt{pub} is unchanged.
 \item
-  \textbf{Nearest-replica reads (v4.11.1--v4.16.0).} \texttt{pull} is
+  \textbf{Nearest-replica reads (v4.11.1--v4.16.1).} \texttt{pull} is
   answered by the first replica the request reaches instead of always
   the root: exact for \texttt{pull(msgId)}, and \emph{recent}
   (eventually-consistent) for pull-latest, which spreads a hot read path

@@ -146,7 +146,7 @@
 
 \section{Axona Services Guide}\label{axona-services-guide}
 
-\emph{(kernel 4.16.0 · testnet --- versioned with the protocol it
+\emph{(kernel 4.16.1 · testnet --- versioned with the protocol it
 describes)}
 
 The other programmer-guide documents teach the \textbf{library} --- how
@@ -165,10 +165,10 @@ document for you.
 \item
   \textbf{Protocol kernel}:
   \href{https://github.com/axona-net/axona-protocol}{@axona/protocol}
-  (v4.16.0)
+  (v4.16.1)
 \item
   \textbf{Wire version}: 4.0 (\texttt{WIRE\_VERSION}); kernel version
-  4.16.0 (\texttt{KERNEL\_VERSION})
+  4.16.1 (\texttt{KERNEL\_VERSION})
 \item
   \textbf{Live network}: the 4.x line runs on \textbf{testnet} ---
   \texttt{wss://testnet.axona.net}. The \textbf{production} federated
@@ -183,12 +183,12 @@ document for you.
   \begin{itemize}
   \tightlist
   \item
-    \href{Quick-Start-v4.16.0.md}{Quick Start} ·
-    \href{Axona-Programmer-Guide-v4.16.0.md}{Programmer Guide} ·
-    \href{Axona-API-Reference-v4.16.0.md}{API Reference} --- the
+    \href{Quick-Start-v4.16.1.md}{Quick Start} ·
+    \href{Axona-Programmer-Guide-v4.16.1.md}{Programmer Guide} ·
+    \href{Axona-API-Reference-v4.16.1.md}{API Reference} --- the
     library.
   \item
-    \href{Axona-AI-Grounding-v4.16.0.md}{AI Grounding} --- building with
+    \href{Axona-AI-Grounding-v4.16.1.md}{AI Grounding} --- building with
     an AI assistant.
   \item
     \href{../architecture/Axona-Architecture.tex}{Architecture} --- how
@@ -344,7 +344,7 @@ or, with the repo checked out:
 \BuiltInTok{cd}\NormalTok{ /opt/axona{-}bridge}
 \ExtensionTok{docker}\NormalTok{ compose build        }\CommentTok{\# builds first; the old container keeps serving}
 \ExtensionTok{docker}\NormalTok{ compose up }\AttributeTok{{-}d}        \CommentTok{\# fast swap; Caddy keeps its certificate}
-\ExtensionTok{curl}\NormalTok{ https://bridge.example.net/healthz     }\CommentTok{\# → \{"status":"ok","version":…,"kernelVersion":"4.16.0"\}}
+\ExtensionTok{curl}\NormalTok{ https://bridge.example.net/healthz     }\CommentTok{\# → \{"status":"ok","version":…,"kernelVersion":"4.16.1"\}}
 \end{Highlighting}
 \end{Shaded}
 
@@ -492,7 +492,7 @@ Meaning
 \endlastfoot
 \texttt{RELAY\_NETWORK} & \texttt{prod} & Bootstrap network:
 \texttt{prod} (\texttt{bridge.axona.net}, \textbf{3.x}) or
-\texttt{testnet} (\texttt{testnet.axona.net}, \textbf{4.x}). A v4.16.0
+\texttt{testnet} (\texttt{testnet.axona.net}, \textbf{4.x}). A v4.16.1
 relay must use \texttt{testnet} --- the code default \texttt{prod} is
 the 3.x line and rejects a 4.x peer at the handshake. \\
 \texttt{BRIDGE\_URL} & --- & Explicit bridge URL; \textbf{overrides}
@@ -635,7 +635,7 @@ per-watch + hosted lists \\
 
 Region defaults to \texttt{useast} (\texttt{0x89}); subscribers must use
 the \textbf{same region} as the publisher. The server's code default
-targets \textbf{production} (the 3.x line); a v4.16.0 MCP peer must set
+targets \textbf{production} (the 3.x line); a v4.16.1 MCP peer must set
 \texttt{RELAY\_NETWORK=testnet} to join the 4.x line (the two don't
 interoperate). Within a line, publishing interoperates with the live
 apps on that line.
@@ -848,10 +848,10 @@ same role.
 \begin{itemize}
 \tightlist
 \item
-  \textbf{\href{Axona-Programmer-Guide-v4.16.0.md}{Programmer Guide}}
+  \textbf{\href{Axona-Programmer-Guide-v4.16.1.md}{Programmer Guide}}
   --- build the peer that talks to these services.
 \item
-  \textbf{\href{Axona-API-Reference-v4.16.0.md}{API Reference}} ---
+  \textbf{\href{Axona-API-Reference-v4.16.1.md}{API Reference}} ---
   \texttt{host()} / \texttt{unhost()}, \texttt{metricTopic()}, and the
   rest of the public surface.
 \item
