@@ -2,8 +2,9 @@
 % Axona Architecture
 % David A. Smith, Axona.net
 %
-% Compile with:  pdflatex Axona-Architecture.tex   (run twice)
+% Compile with:  tectonic Axona-Architecture.tex
 % Requires: tufte-latex, tikz, pgfplots, xcolor, booktabs, microtype
+% (tectonic auto-fetches all of these; no system TeX needed)
 % =====================================================================
 
 \documentclass[nobib]{tufte-handout}
@@ -40,6 +41,10 @@
 \pretocmd{\section}{\needspace{6\baselineskip}}{}{}
 \pretocmd{\subsection}{\needspace{4\baselineskip}}{}{}
 
+% Long \texttt{} literals + tufte's narrow measure: let LaTeX stretch a
+% little rather than overflow into the margin.
+\setlength{\emergencystretch}{3em}
+
 \definecolor{rust}{RGB}{185,78,54}
 \definecolor{rustsoft}{RGB}{212,168,150}
 \definecolor{inkmuted}{RGB}{102,102,102}
@@ -73,7 +78,8 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v0.8.7 \quad 2026-06-29\par}
+{\small An Axona Architecture Note \quad v0.9.0 \quad 2026-07-01\par}
+{\footnotesize\itshape describes the kernel 4.x line (routing-only axonic pub/sub)\par}
 \end{center}
 \vfill
 \null
@@ -108,7 +114,117 @@
 \vspace{1em}
 
 % =====================================================================
-% I. THE STACK
+% I. THE SYSTEM IN ONE PAGE
+% =====================================================================
+\section{The System in One Page}
+
+\newthought{Axona is a communication network with no center.} There is
+no server that holds the messages, no company that runs the feed, no
+database that could be subpoenaed, throttled, or turned off. Every
+participant --- a browser tab, a phone, a headless relay process ---
+is an equal \emph{peer}, and the peers together \emph{are} the
+infrastructure. If you have read this paragraph, you already know the
+hardest thing about Axona; everything else in this document is
+mechanism.
+
+Three ideas carry the whole design:
+
+\begin{description}
+\item[Everything has an address in one shared space.] Every peer and
+every topic gets a 264-bit number. The first byte says \emph{where on
+Earth} it belongs (one of 192 geographic cells); the rest is a
+cryptographic hash nobody can choose. Because peers and topics live in
+the \emph{same} address space, ``who should be responsible for this
+topic?'' has a mechanical answer: \emph{whichever live peer's address
+is closest to the topic's address.} No election, no registry, no
+assignment --- proximity \emph{is} the appointment.
+
+\item[Each topic grows a tree.] The closest peer to a topic's address
+becomes its \emph{root}. Subscribers send their subscription toward the
+topic's address; the network's routing delivers it to the root, which
+seats them. When the root has more direct subscribers than it wants to
+serve ($20$), it delegates batches of them to child relays --- so a
+popular topic grows a shallow, bushy distribution tree
+automatically.\sidenote{The tree is why we call the design
+\emph{axonic}: like a neuron's axon, one cell body (the root) fans a
+signal out through branches to many terminals (the subscribers), and
+the branching grows only where there is something to reach.} A publish
+is routed the same way, arrives at the root, and flows down the tree to
+everyone. When the root disappears --- a laptop lid closes --- the next
+closest peer, already holding a warm copy of the topic's history,
+takes over.
+
+\item[Authorship is a signature, not an account.] Every message can be
+signed by an \emph{author key} that has nothing to do with where its
+owner is or which device they used. Anyone can verify who wrote a
+message; nobody can forge one; and the network itself never learns
+where an author lives.
+\end{description}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[
+  node distance=0.55cm and 0.7cm,
+  peer/.style={draw=rust!70!black, fill=codebg, thick, circle,
+    minimum size=0.72cm, font=\scriptsize, inner sep=1pt},
+  root/.style={peer, fill=rustsoft, very thick},
+  ghost/.style={peer, draw=inkmuted, dashed, fill=white},
+  flow/.style={-{Stealth[length=2mm]}, rust!70!black, thick},
+  soft/.style={-{Stealth[length=1.8mm]}, inkmuted, thin, dashed},
+  lbl/.style={font=\scriptsize\itshape, inkmuted}
+]
+  % the root, closest to the topic id
+  \node[root] (root) {R};
+  \node[lbl, above=0.15 of root] {root};
+
+  % child relays
+  \node[peer, below left=0.9 and 1.6 of root] (c1) {C};
+  \node[peer, below right=0.9 and 1.6 of root] (c2) {C};
+
+  % subscribers
+  \node[peer, below left=0.8 and 0.7 of c1] (s1) {s};
+  \node[peer, below=0.8 of c1] (s2) {s};
+  \node[peer, below right=0.8 and 0.7 of c1] (s3) {s};
+  \node[peer, below left=0.8 and 0.7 of c2] (s4) {s};
+  \node[peer, below=0.8 of c2] (s5) {s};
+  \node[peer, below right=0.8 and 0.7 of c2] (s6) {s};
+
+  % publisher, off to the side
+  \node[ghost, right=2.6 of root] (pub) {P};
+  \node[lbl, above=0.12 of pub] {publisher (anywhere)};
+
+  \draw[flow] (pub) -- node[lbl, above, sloped] {publish, routed} (root);
+  \draw[flow] (root) -- (c1);
+  \draw[flow] (root) -- (c2);
+  \draw[flow] (c1) -- (s1); \draw[flow] (c1) -- (s2); \draw[flow] (c1) -- (s3);
+  \draw[flow] (c2) -- (s4); \draw[flow] (c2) -- (s5); \draw[flow] (c2) -- (s6);
+
+  % backup cohort
+  \node[ghost, left=2.2 of root] (b1) {B};
+  \node[lbl, below=0.10 of b1] {warm backup};
+  \draw[soft] (root) -- node[lbl, above, sloped] {replicate} (b1);
+\end{tikzpicture}
+
+\medskip
+{\footnotesize\itshape One topic, one emergent tree. The root (R) is
+simply the live peer closest to the topic's address. The publisher
+routes its message toward that address; the root stamps and fans it
+down through child relays (C) to subscribers (s); a warm backup (B)
+stands by with a replicated copy of the history. Nothing in this
+picture was configured --- every role is a consequence of address
+proximity and load.\par}
+\end{figure}
+
+The rest of this document walks the same picture at increasing
+magnification: the software layers that implement it (\S\,II--IV), the
+routing fabric underneath it (\S\,V--VI), the pub/sub tree itself and
+the life of one message through it (\S\,VII--IX), what happens when
+things fail (\S\,X), and the transports, servers, wire format,
+security model, and deployment that carry it in production
+(\S\,XI--XVI).
+
+% =====================================================================
+% II. THE STACK
 % =====================================================================
 \section{The Stack}
 
@@ -125,10 +241,11 @@ enough to fit on a postcard.
 
 \begin{description}
 \item[\texttt{@axona/protocol} (kernel).] The pure-JS library. Owns
-the DHT routing, the pub/sub overlay, the cryptography, and the
+the DHT routing, the axonic pub/sub overlay, the cryptography, and the
 transport contracts. No browser DOM, no Node-specific I/O, no
 network code outside abstract transport classes. Runs identically in
-browsers, in Node, in dht-sim's simulated network.
+browsers, in Node, in dht-sim's simulated network. This document
+describes the kernel \textbf{4.x} line (v4.15.0 at this writing).
 
 \item[\texttt{axona-peer} (browser application).] The reference
 end-user app. Provides identity persistence, region selection,
@@ -138,8 +255,8 @@ the version that ran when the page was built is the version that
 runs in the browser.
 
 \item[\texttt{axona-bridge} (deployed server).] The signaling +
-introducer service at \texttt{bridge.axona.net}. Runs an embedded
-\texttt{AxonaPeer} of its own (so it's a full DHT participant, not
+introducer service. Runs an embedded
+\texttt{AxonaPeer} of its own (so it is a full DHT participant, not
 just a relay), gates connecting peers behind a version handshake,
 mints short-lived TURN credentials, relays WebRTC signaling between
 browsers, and forwards Axona wire frames addressed to its own
@@ -148,18 +265,25 @@ embedded peer.
 \item[\texttt{axona-relay} (headless supernode).] A Node process that
 joins the mesh over \emph{real} WebRTC (a spec \texttt{RTCPeerConnection}
 from \texttt{node-datachannel}) and runs the same kernel stack a browser
-peer runs --- routing lookups, rooting pub/sub topics, relaying signaling
-for others --- but with no DOM, no public server, and no TURN minting. It
-is a strict \emph{subset} of the bridge: it dials a bridge once for
-bootstrap, then is a first-class peer. Running several relays strengthens
-routing and pub/sub durability without any of them being an inbound server.
+peer runs --- routing lookups, rooting pub/sub topics, hosting its
+keyspace neighborhood, relaying signaling for others --- but with no
+DOM, no public server, and no TURN minting. It is a strict
+\emph{subset} of the bridge: it dials a bridge once for bootstrap,
+then is a first-class peer. Running several relays strengthens
+routing and pub/sub durability without any of them being an inbound
+server.
 \end{description}
 
 \marginnote{A fifth repository, \texttt{dht-sim}, runs the kernel
 against a simulated network for protocol research and regression
-benchmarks. It's not part of the production stack but shares the
-same \texttt{@axona/protocol} library; every change that ships to
-production also has to pass the simulator's 25{,}000-node battery.}
+benchmarks. It is not part of the production stack but shares the
+same \texttt{@axona/protocol} library; protocol changes are validated
+against its 25{,}000-node batteries --- and, since the sim can shrink
+the keyspace (\texttt{configureKeyspace}), against large-population
+churn experiments the full 264-bit space would make prohibitively
+slow. A hard-won methodology rule rides along: a single simulation
+run's delivery percentage is noise; every claim requires five or more
+seeds reported as mean\,$\pm$\,sd.}
 
 Each component carries its own semver track because each
 ships to a different audience: kernel changes need API-level
@@ -197,12 +321,14 @@ the peer UI.
   \node[meta, right=0.4 of txp]   {pluggable transport};
   \node[meta, right=0.4 of wire]  {hex-on-wire serialisation};
 \end{tikzpicture}
-\caption*{Five layers in one peer. Every arrow is a contract; every
-contract has a smoke-test suite.}
+
+\medskip
+{\footnotesize\itshape Five layers in one peer. Every arrow is a
+contract; every contract has a smoke-test suite.\par}
 \end{figure}
 
 % =====================================================================
-% II. IDENTITY AND ADDRESSING
+% III. IDENTITY AND ADDRESSING
 % =====================================================================
 \section{Identity and Addressing}
 
@@ -246,12 +372,20 @@ adjacent codes. The kernel ships the canonical table and the
 \texttt{s2-region-visualizer} example renders all 192 ---
 one name and the hex code each --- on a globe.}
 
-The address space is treated as \texttt{BigInt} in every line of
-running code. The wire format is 66-character lowercase hex --- the
-\textsc{only} representation that ever appears in JSON. The
-conversion happens at exactly two places: when the transport
-serialises an outgoing frame, and when the dispatcher parses an
-incoming one.
+\newthought{Inside the running system, an address is always a
+\texttt{BigInt}; on the wire, always hex.} This is an enforced
+invariant, not a convention.\sidenote{Kernel v4.14.0 made it
+load-bearing: the one coercion gate, \texttt{asId()}, validates and
+converts at every construction site (\texttt{DHTNode},
+\texttt{Synapse}) and every wire-ingress point, so a routing object
+\emph{cannot} hold a string address and internal code never asks
+``string or bigint?'' The only sanctioned hex forms are a JSON wire
+frame and an identity object's serialized \texttt{.id} /
+\texttt{.authorId}.} The wire format is 66-character lowercase hex ---
+the \textsc{only} representation that ever appears in JSON. The
+conversion happens at exactly two kinds of place: when a frame is
+serialised outbound, and at the \texttt{asId()} gate when one is
+parsed inbound.
 
 \textbf{An author identity carries no location.} Where the node ID
 binds a key to a place, the Author ID is the bare Ed25519 public key
@@ -263,7 +397,7 @@ with the publisher.
 \textbf{Topic identifiers share the address space.} A topic is not a
 bare string but a structured descriptor --- \texttt{\{region, owner?,
 name, write\}} --- and its ID is \texttt{topicId =
-regionByte~||~sha256(canonical(\{owner, name, write\}))}, so the top
+regionByte\,||}\allowbreak\texttt{\,sha256(canonical(\{owner, name, write\}))}, so the top
 byte is always a \emph{real}, routable S2 cell. The region comes from
 one of two rules: an explicit \texttt{region} places the topic where
 the application chooses (given as a region \emph{name or its code} ---
@@ -285,15 +419,17 @@ The \texttt{write} field also folds into the hash: \texttt{open} lets
 anyone publish (self-signed), \texttt{owner} restricts publishing to the
 named owner Author ID. Because \texttt{owner} and \texttt{write} live
 inside the signed descriptor, a host recomputes the topic ID and
-enforces write authorisation statelessly --- see \S\,XII.}
+enforces write authorisation statelessly --- see \S\,XIV.}
 
-The Activation Potential (AP) routing formula, the K-closest
-selector, and the synaptome's stratum buckets all operate on this
+The Activation Potential (AP) routing formula, the topic-terminus
+test, and the synaptome's stratum buckets all operate on this
 one space. There is no separate ``topic ID space'' or ``peer ID
-space''; they share addresses because they share routing.
+space''; they share addresses because they share routing --- and that
+sharing is precisely what lets a topic's root be \emph{found} rather
+than \emph{assigned}.
 
 % =====================================================================
-% III. THE KERNEL: @axona/protocol
+% IV. THE KERNEL: @axona/protocol
 % =====================================================================
 \section{The Kernel: \texttt{@axona/protocol}}
 
@@ -312,25 +448,32 @@ extends \texttt{Transport}; a database-backed persistence
 \texttt{Synapse}, \texttt{AxonaPeer}, \texttt{AxonaDomain},
 \texttt{Subscription}. This is where the Axona routing logic lives,
 and where the developer-facing API surface (\texttt{peer.pub},
-\texttt{peer.sub}, \texttt{peer.lookup}) is declared.
+\texttt{peer.sub}, \texttt{peer.ready}, \texttt{peer.lookup}) is
+declared.
 
-\item[\texttt{src/pubsub/}.] The pub/sub overlay: \texttt{AxonaManager},
+\item[\texttt{src/pubsub/}.] The pub/sub overlay: \texttt{AxonaManager}
+(the axonic tree --- roles, the routed subscribe/publish handlers,
+delegation, replication, the replay caches, the dedup index),
 \texttt{post.js} (the topic descriptor + \texttt{resolveTopic} /
 \texttt{deriveTopicId} derivation), \texttt{envelope.js} (signed
-publish envelopes + write-policy checks), \texttt{ed25519.js} (Ed25519
-binding for \texttt{crypto.subtle}). AxonaManager owns the K-closest
-tree, the replay caches, the dedup LRU, the metrics counters.
+publish envelopes + write-policy checks), \texttt{kill.js} (signed
+retractions), \texttt{metrics.js} (the derived metric-topic
+convention), \texttt{authorClass.js} (agent-legibility attestations),
+\texttt{ed25519.js} (Ed25519 binding for \texttt{crypto.subtle}).
 
 \item[\texttt{src/transport/}.] Concrete transports:
 \texttt{transport/web/} (browser: BridgeTransport over WebSocket +
 WebRTCTransport over DataChannels), \texttt{transport/node/}
 (server-side WebSocket), \texttt{transport/sim/} (in-process
 simulation for dht-sim and tests). All implement the abstract
-\texttt{Transport} contract identically.
+\texttt{Transport} contract identically. \texttt{handshake.js} owns
+the version gate (\texttt{WIRE\_VERSION}, \texttt{KERNEL\_VERSION}).
 
 \item[\texttt{src/utils/}.] Pure helpers: \texttt{hexid.js}
-(BigInt$\leftrightarrow$hex conversions, XOR distance, leading-zero
-count), \texttt{s2.js} (S2 cell computation), JSON codec
+(the \texttt{asId} gate, BigInt$\leftrightarrow$hex conversions, XOR
+distance, leading-zero count, the configurable keyspace profile),
+\texttt{s2.js} (S2 cell computation), \texttt{region-names.js} (the
+192-cell table and name helpers), JSON codec
 (\texttt{transport/wire.js}).
 
 \item[\texttt{src/identity/}.] Ed25519 keypair derivation +
@@ -345,6 +488,12 @@ identity: an ephemeral, location-anchored keypair returning
 \texttt{id} and no \texttt{region} --- \texttt{authorId} is the public
 key, i.e.\ the \texttt{signerPubkey} on the wire. Persistence is an
 option on the author factory, not a separate call.
+
+\item[\texttt{std/}.] Optional application-layer conventions that ride
+on the core API without touching the wire: \texttt{std/message}
+(a common message shape so different apps render each other's posts),
+\texttt{std/chunk} (chunked large-payload transfer under the
+15\,KB reliable-delivery floor).
 \end{description}
 
 The whole kernel has zero runtime dependencies beyond the host
@@ -354,7 +503,7 @@ browser via ES modules, in Node via direct \texttt{import}, and in
 the simulator via the in-process transport.
 
 % =====================================================================
-% IV. THE LOCAL NODE: NeuronNode + Synaptome
+% V. THE LOCAL NODE: NeuronNode + Synaptome
 % =====================================================================
 \section{The Local Node}
 
@@ -391,88 +540,624 @@ frequently-used one. Two random hops with similar latency tie; the
 one that's served us well before wins the tiebreak.
 
 % =====================================================================
-% V. THE PROTOCOL LAYER: AxonaPeer + AxonaManager
+% VI. ROUTING
 % =====================================================================
-\section{The Protocol Layer}
+\section{Routing}
 
-\newthought{\texttt{AxonaPeer} is the active object} that turns a
-\texttt{NeuronNode} into a network participant. It owns:
+\newthought{Axona's routing is learning-adaptive.} It replaces
+Kademlia's $k$-bucket array with a dynamic synaptome that adjusts
+edge weights based on observed latency. The basic shape --- iterative
+lookup, $\log_2(N)$ hop count --- is unchanged from Kademlia; what
+changes is which peer you ask at each hop.
+
+The five wire operations that drive Axona routing are:
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{lookup\_step} (req).] ``Here's a target. What's
+your best next hop?'' The receiver evaluates AP across its
+synaptome's progress candidates, returns the winning synapse + its
+own routing state.
+
+\item[\texttt{lookahead\_probe} (req).] ``If I forward to you for
+target $T$, who would you forward to?'' A one-deep peek that lets
+the caller compare expected hop costs across candidates before
+committing.
+
+\item[\texttt{find\_closest\_set} (req).] ``Give me your $K$
+peers closest to this target.'' The K-closest harvester behind
+\texttt{peer.findKClosest} --- used by the pub/sub layer to resolve a
+topic's true neighborhood (root hints, replication cohorts, the
+region-occupancy probe).
+
+\item[\texttt{route\_msg} (req).] Generic routed-message
+forwarder. This is the workhorse of the pub/sub layer: every
+\texttt{pubsub:*} message (\S\,VII) rides it, greedily descending in
+XOR distance toward a topic or peer id until it reaches the node
+where no neighbor is closer --- the \emph{terminus}.
+
+\item[\texttt{reinforce} (ntf).] ``This lookup succeeded; bump
+the weight on the synapse I used.'' Fire-and-forget LTP signal
+back along the path. Only flows when the lookup hit at-or-below
+average latency for the path's region. On identity-binding
+transports the handler is a no-op unless the \emph{target} synapse's
+peer is currently bound (the B-3 gate: an unauthenticated
+\texttt{reinforce} must not be able to refresh the eviction-inertia
+of a stale or unverified entry and pin it in the table). Weight is
+independently clamped to $\le 1.0$, so inertia is the only lever the
+gate needs to close.
+\marginnote{\emph{Residual, by design:} the gate keys on the
+\emph{target} synapse being bound, not on the \emph{sender's}
+identity --- so any bound peer can refresh the inertia of any other
+bound peer's synapse. The blast radius is bounded to ``keep an
+already-verified, live peer pinned slightly longer,'' which is
+benign; binding the signal to the sender would add cost for no
+attacker-relevant gain. Revisit only if reinforce ever carries
+weight a sender could bias.}
+\end{description}
+
+Two structural-plasticity messages let the network rewire itself
+without explicit instruction: \texttt{triadic\_introduce}
+(``introduce me to your friend at $X$'') and \texttt{hop\_cache}
+(``I've forwarded to $X$ several times; install a direct synapse to
+$X$''). Both are fire-and-forget notifications that obey the
+synaptome's admission rule (\texttt{\_addByVitality}).
+
+\marginnote{The performance claim of Axona over Kademlia is roughly
+40\% fewer wall-clock milliseconds per lookup at 25{,}000 nodes,
+mostly from latency-weighted hop selection. The figure is documented
+in the companion paper \emph{Axona: A Learning-Adaptive Distributed
+Hash Table and Axonal Publish/Subscribe} (v0.4.01, 2026-05-23).}
+
+\subsection{Synaptome Maintenance: Keeping the Near Neighborhood Complete}
+
+\newthought{Greedy routing is only as good as the table is complete.}
+A greedy walk toward a target descends in XOR distance until no neighbor
+is closer --- a \emph{local minimum}. On a complete graph that minimum is
+always the global one (the true target). On a real, \emph{incomplete}
+synaptome (each peer holds $\sim$20 of $N$), a walk can dead-end at a
+near-miss node instead. When a publisher and its subscribers dead-end at
+\emph{different} near-miss nodes, they resolve different pub/sub roots and
+never rendezvous --- the all-or-nothing delivery failure that dominates
+under churn. The cure is table \emph{completeness}, in two co-equal parts
+(classic Chord successors $+$ fingers, Kademlia closest-bucket $+$
+distant-buckets):
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[Successors (near quota).] Hold the $K_{\text{near}}{\approx}5$
+XOR-closest peers. This clique completes the \emph{last mile}: the final
+descent always lands on the true root. (Simulation: 4--6 is the knee;
+more adds nothing.)
+\item[Fingers (long range).] Hold $\sim$$\log(N)$ distant links --- one
+per populated stratum --- so a walk can \emph{reach} the target's
+neighborhood at all. These are maintained by the existing anneal and the
+Structural Survival Rule; the simulation shows a perfect
+successor set still fails to deliver if the long-range half is starved.
+\end{description}
+
+\newthought{Repair is local and cheap.} When a near-neighbor churns out,
+its replacement is almost always a \emph{neighbor-of-neighbor} (the
+``successor's successor''), found in a 1--2 hop local query --- never a
+global lookup. The kernel runs a deterministic maintenance tick plus an
+immediate pass on peer loss (\texttt{onPeerDied}); below quota it refills
+from the nearest verified peer through the \emph{same} first-party
+verification (\texttt{\_considerCandidate}) as any other synapse, bounded
+to a few dials per pass. In sustained-churn simulation, an unmaintained
+near-stratum erodes and delivery drifts down, while local refill holds it.
+
+\marginnote{\emph{Eclipse note.} Dialing one's nearest peers is an
+eclipse-sensitive surface, so refill admits \emph{only} first-party-verified
+peers, never displaces a nearer honest peer for a farther attacker, and is
+budget-bounded --- it adds no leverage beyond raw keyspace proximity. Making
+that proximity costly to acquire is the job of costly identity (E-1,
+memory-hard PoW), a \emph{pre-production} requirement; on a development
+network with no adversary it is an accepted risk.}
+
+\newthought{A second lesson from the churn experiments} shapes how a
+node \emph{joins}: leaving is nearly free (neighbors route around a
+dead node within a tick), but a \emph{newcomer} is invisible until its
+neighbors' tables point at it --- and that reachability lives in
+\emph{their} tables, not its own. Self-directed lookups do nothing for
+it; what integrates a newcomer is \emph{inbound} traffic. The kernel
+therefore treats directed integration --- a handful of packets routed
+\emph{at} each newcomer --- as part of admission, which the simulation
+showed heals reachability roughly 2.5$\times$ faster than blind
+warm-up traffic of the same volume.
+
+% =====================================================================
+% VII. PUB/SUB: THE AXON TREE
+% =====================================================================
+\section{Pub/Sub: The Axon Tree}
+
+\newthought{The 4.x line rebuilt pub/sub around a single idea:}
+\emph{the tree is wherever routing says it is.} Earlier kernels used a
+K-closest design --- publisher and subscriber each computed the $K$
+peers nearest the topic and fanned out to all of them, hoping the sets
+overlapped. On a real, gappy browser mesh they often did not: each
+side ran its \emph{own} error-prone lookup, resolved \emph{different}
+``closest'' nodes, and a publish landed on roots no subscriber was
+attached to. Measured on the live testnet, that rendezvous failure ---
+not bandwidth, not crypto --- was the dominant loss. The redesign
+removes the independent lookups entirely.\sidenote{The cutover was a
+clean break --- wire major 3\,$\to$\,4 --- because the two designs'
+convergence semantics cannot interoperate: a 3.x peer fans out to
+K roots that a 4.x network never consults. The full design rationale
+is recorded in the \emph{Pubsub Axon Tree} note in
+\texttt{axona-docs/architecture/}.}
+
+\subsection{One root, found by routing}
+
+Every pub/sub verb is a \emph{routed message toward the topic id}.
+Whichever node the greedy walk terminates at --- the live peer
+XOR-closest to the topic, the \emph{terminus} --- \emph{is} the root.
+Root-ness is not elected, announced, or negotiated; it is the
+by-product of the same routing that carries every other message, so
+publisher and subscriber cannot disagree about where the root is any
+more than two letters addressed identically can arrive at different
+houses. On receiving a routed pub/sub message, a node makes a
+four-way decision:
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[\texttt{handle}.] I am the terminus (and, when the region lock
+is enforced, in the topic's region): act as the root.
+\item[\texttt{forward}.] I am not the terminus: pass it along the
+greedy walk.
+\item[\texttt{reroute}.] The message was aimed at a waypoint that is
+me, but I hold no role for this topic: strip the waypoint and send it
+onward toward the topic itself.
+\item[\texttt{reject}.] (Only with the region lock on, \S\,X.) I am
+the terminus but outside the topic's region: refuse to root a foreign
+region's topic.
+\end{description}
+
+Because a greedy walk on an incomplete table can strand at a
+near-miss, the walk is \emph{lookup-assisted}: the sender consults its
+locally cached \emph{root hint} --- the result of a background
+\texttt{findKClosest} toward the topic --- and seeds the message with
+that node as a waypoint (\texttt{via}). The assist is non-blocking
+(the message goes out greedy immediately; the hint heals subsequent
+sends) and self-correcting: a stale waypoint just reroutes.
+Complementing it, a standing root emits a small, bounded
+\emph{root beacon} --- a soft-state advertisement to its
+XOR-neighborhood (fan-out~6, two layers, every 20\,s, pointers valid
+50\,s) --- so nodes near the topic hold a fresh pointer to the actual
+root and a walk that lands anywhere in the neighborhood is handed the
+last mile.\sidenote{The beacon is deliberately small. Widening it was
+tested in simulation and rejected: past a small radius, louder
+announcement buys no convergence and risks announcement storms.
+Convergence work went instead into the lookup assist, the successor
+quota (\S\,VI), and replication (below).}
+
+\subsection{Subscribing: attach, renew, re-home}
+
+A subscriber sends \texttt{pubsub:sub} toward the topic. The root
+seats it --- records the subscriber id and its replay watermark ---
+and streams back what the subscriber asked for
+(\texttt{since:} live-only, \texttt{'latest'}, \texttt{'all'}, or a
+timestamp). The subscription is \emph{soft state}: the subscriber
+re-sends its sub on an adaptive cadence --- fast at first (5\,s),
+backing off $\times$1.5 per stable renewal to a 60\,s ceiling --- and
+a root evicts any subscriber silent for 180\,s. The fast-start is the
+churn cure: when a root dies and a new one emerges, the very next
+renewal routes to the \emph{new} terminus and re-seats the subscriber
+there, so an orphaned subscription heals within seconds rather than
+minutes.\sidenote{The churn experiments were unambiguous about where
+loss lives: not in root failover itself but in \emph{subscription
+orphaning} --- subscribers still pointed at a root that no longer
+serves them. Re-seating subscribers each renewal lifted
+under-churn delivery from 41\% to 91\% in the driving experiment;
+a ``more stable root election'' tested at the same time moved
+delivery by a statistically invisible amount and was rejected.}
+
+\subsection{The tree grows by delegation}
+
+A root serves at most \texttt{MAX\_DIRECT}~=~20 subscribers directly.
+At capacity it \emph{delegates}: it promotes one of its seated
+subscribers to a \emph{child relay} with \texttt{pubsub:adopt} ---
+``become my child for this topic; here are subscribers and my cache
+watermark'' --- and hands it a batch. The policy is \emph{widen before
+deepen}: prefer promoting a new sibling child (keeping the tree bushy)
+over pushing subscribers down an existing branch, so a topic with $S$
+subscribers settles at depth $\sim\log_{20}(S)$ --- three levels
+carries eight thousand subscribers. Children hold the same replay
+cache a root holds, serve replay to their own subscribers, and are
+first-class fail-over material.\sidenote{Delegation is also the
+overload valve for a \emph{hot topic}: the root keeps constant direct
+fan-out no matter the audience. What it does not solve is a node that
+is closest to \emph{many} topics at once --- aggregate, cross-topic
+load. That honest limit and the design direction for it (splitting
+the \emph{anchor} a topic routes to from the \emph{root} that does
+the work) are covered in \S\,X and the \emph{Load-Aware Root
+Placement} note.}
+
+\subsection{Publishing: no acknowledgment, by design}
+
+A publisher sends \texttt{pubsub:pub} toward the topic --- and never
+receives an acknowledgment. This is an invariant, not an economy: a
+publish is signed by an \emph{author} key, carried by a
+\emph{transport} identity, and the two must stay uncorrelated; an ack
+addressed back to the publisher would stitch them together for any
+observer on the path. Delivery confidence comes from elsewhere:
 
 \begin{itemize}
 \setlength{\itemsep}{0pt}
-\item The handler installation. On \texttt{peer.start()} it
-registers the Axona routing handlers
-(\texttt{lookup\_step}, \texttt{lookahead\_probe},
-\texttt{find\_closest\_set}, \texttt{route\_msg},
-\texttt{local\_probe}, \texttt{triadic\_introduce},
-\texttt{hop\_cache}, \texttt{lateral\_spread}, \texttt{reinforce})
-on the transport.
-
-\item The auto-admission loop. It asks
-\texttt{transport.boundPeers()} for currently-bound nodeIds and
-seeds them into the synaptome; it subscribes to
-\texttt{transport.onPeerBound} for future admissions.
-
-\item The pub/sub surface. \texttt{peer.pub}, \texttt{peer.sub},
-\texttt{peer.pull}, \texttt{peer.metrics}: the developer-facing API.
-Each delegates to the AxonaManager after deriving the topic ID and
-(for \texttt{pub}) building a signed envelope.
-
-\item The direct-message surface. \texttt{peer.send},
-\texttt{peer.notify}, \texttt{peer.onMessage}: per-peer
-request/response and fire-and-forget, outside the pub/sub overlay.
-For protocols that aren't topic-shaped.
-
-\item The lookup primitive. \texttt{peer.lookup(targetKey)} runs an
-iterative K-closest walk and returns
-\texttt{\{found, path, hops, peerId, latency\}}. This is what
-AxonaManager uses internally on every \texttt{pub}/\texttt{sub} to
-find the topic's axons.
+\item The root \emph{stamps} the message on arrival (the root's clock,
+a monotonically increasing per-topic stamp) and fans
+\texttt{pubsub:deliver} down the tree. The stamp --- not the
+publisher's clock --- is the topic's ordering and replay watermark.
+\item The publisher retains its own recent publishes for 30\,s and
+\emph{re-sends} them (at most six tries) until it observes its own
+\texttt{msgId} come back on its subscription --- an \emph{implicit}
+ack that rides the normal delivery path. Re-sends are idempotent; the
+root dedups by \texttt{msgId}.
+\item A \emph{cold} publisher --- one that just joined, with fewer
+than eight neighbors --- adds a short burst: five extra sends
+200\,ms apart, so a first publish survives the seconds before the
+newcomer's neighborhood knows how to route it.
+\item On every publish (and kill), the root eagerly copies the
+message to its \emph{cohort} --- see replication, next.
 \end{itemize}
 
-\marginnote{This section is the architectural placement of
-\texttt{AxonaPeer}; the field-by-field surface --- every method, its
-parameters, and its return shape --- is catalogued in the Application
-API section later in this document.}
+Each relay's cache is bounded --- 1{,}024 messages / 16\,MB, entries
+held 24\,h keyed on the \emph{root's} stamp --- and replay to a
+(re)subscriber is chunked in 96\,KB batches. On \emph{open}
+(anyone-may-publish) topics a per-publisher quota keeps one author
+from flooding the queue; inbound frames are capped (256\,KB hard
+ceiling per publish; 15\,KB is the reliable cross-browser floor that
+\texttt{std/chunk} respects for large payloads).
 
-\texttt{AxonaManager} is a separate object owned by the peer. Its job
-is the pub/sub overlay: when a subscriber sends
-\texttt{pubsub:subscribe-k} to the K-closest axons for a topic, the
-receiving AxonaManager stores the subscriber in its
-\texttt{role.children} for that topic. When a publisher fans
-\texttt{pubsub:publish-k} to its own K-closest, each receiving
-AxonaManager iterates its \texttt{role.children} and forwards
-\texttt{pubsub:deliver} to each subscriber. The publisher's signed
-envelope flows through unchanged; per-hop dedup prevents the
-fan-out tree from delivering duplicates.
+\subsection{Replication: the cohort holds the history}
 
-The K-closest replication is what makes the system tolerant. A
-publisher sends to \emph{five} root axons in parallel; a subscriber
-subscribes at \emph{five} root axons in parallel. As long as one
-axon in each set overlaps, delivery succeeds. With $K=5$ and
-synaptomes that converge under the bridge's peer-list dissemination,
-overlap is typically 4 or 5 of 5 --- so a publish that loses two
-axons to transient WebRTC failures still delivers cleanly.
+The root is singular but never alone. Each root periodically pushes
+its full cache and tombstones --- \texttt{pubsub:replicate} --- to its
+\emph{cohort}: the $K$ nodes XOR-closest to the \emph{topic}
+(computed with the same \texttt{findKClosest} a joining subscriber
+resolves the root with --- so the warm copies sit exactly where a
+future walk will land, not merely at the root's direct
+neighbors).\sidenote{That distinction was bought with a bug: an
+earlier version replicated to the root's \emph{neighbors}, and a
+post-churn joiner attaching to the globally closest node --- several
+hops away --- found a root with no history. The user-facing symptom
+was ``a kill issued after churn doesn't stick''; the underlying truth
+was that \emph{any} post-churn publish could be lost the same way,
+kills merely made it conspicuous. Cohort replication plus
+union-ingest anti-entropy closed both.} A cohort member is a passive
+\emph{backup}: it holds the copy, refreshes a liveness timestamp on
+each push, and serves nothing --- until the pushes stop. A backup
+whose root has been silent 65\,s presumes it gone and promotes itself
+if it is now the closest reachable node; a joiner routing to the new
+terminus finds the history already there. Ingest is by \emph{union}:
+a backup merges what it receives with what it holds, so replicas
+converge instead of clobbering each other. A gracefully departing
+root doesn't wait to be missed --- \texttt{pubsub:handoff} pushes its
+cache directly to its heir on \texttt{peer.leave()}.
 
-Three convergence mechanisms close the residual gaps where ``one axon
-overlaps'' is not guaranteed --- a publish lands on the \emph{publisher's}
-K-closest set, which need not be a given subscriber's. \textbf{Gap-safe
-replay} (kernel v2.37.0): a (re)subscriber reports the content-IDs it
-actually holds (a bounded \texttt{have} digest) and a root replays exactly
-the complement, so a hole in the middle is backfilled rather than masked by
-a single high-water timestamp. \textbf{Root-to-root anti-entropy} (v2.39.0):
-each root periodically exchanges digests of held content-IDs with its
-K-closest siblings and pulls what it is missing --- and \emph{re-verifies}
-every pulled message (publisher signature B-4 + content-address), so a
-sibling root cannot inject a forged or content-poisoned message and a killed
-message is never resurrected. \textbf{Kill convergence} (v2.36.0):
-recently-applied retractions are re-gossiped to the current root set, so a
-replica that missed the original kill still drops and tombstones the message
-rather than re-serving it to a reloading subscriber. All three are
-wire-additive --- old and new nodes interoperate.
+Durability also runs \emph{up} the tree. When a node becomes root
+(fresh after churn, or displaced and reattaching) and learns --- from
+a subscriber's renewal carrying a higher watermark than its own ---
+that it is \emph{behind}, it asks that subscriber to replay history
+upward (\texttt{pubsub:pullup} / \texttt{pubsub:replayup}). Any
+cache in the tree can refill any other; the data outlives every
+individual holder.
+
+\subsection{Retraction: kill}
+
+\texttt{peer.kill(topic, msgId, \{signWith\})} is the sole retraction
+primitive: signed with the \emph{same author key} that signed the
+original message, routed like a publish, verified at the root, and
+then treated exactly as seriously as a publish --- eagerly distributed
+to the cohort, carried in replication and anti-entropy, tombstoned so
+a lagging replica cannot resurrect the message, and fanned down the
+tree as a \texttt{\{deleted:\,true, msgId\}} marker to every
+subscriber. The subscriber-side callback fires only on messages the
+subscriber actually received --- a kill for something never delivered
+is silently absorbed. It is best-effort redaction, not cryptographic
+un-send: a subscriber that already holds the plaintext keeps it, and
+an anonymous message has no provable creator and cannot be
+killed.\sidenote{Two earlier lifecycle verbs are gone from the 4.x
+API: \texttt{unpub} (owner-only whole-queue removal) was removed
+outright, and \texttt{touch} (TTL keep-alive) is deprecated --- the
+24-hour root-stamped hold plus \texttt{pull}'s hold-extension covers
+the honest uses. Their wire strings remain reserved so legacy frames
+are ignored rather than misrouted.}
+
+\subsection{Hosting: infrastructure that carries without consuming}
+
+\texttt{peer.host()} lets a node volunteer storage and service
+without subscribing --- it registers no delivery handler and consumes
+nothing. With a topic argument it hosts that one topic; with none it
+hosts its own \emph{keyspace neighborhood}, standing ready to root
+whatever topics land near its node id --- the natural mode for a
+relay. Mechanically a host announces itself with the same subscribe
+wire a subscriber uses, so no flag day; a proximity gate ensures a
+host only ends up serving topics it is genuinely among the closest to,
+so the primitive cannot be used to muscle into arbitrary topics.
+Relays default to keyspace hosting, which is what keeps topic history
+alive in a mesh of short-lived browser tabs.
+
+\subsection{The region rule (present-tense honest)}
+
+The region byte anchors every topic to a real place, and the
+long-term rule is strict: \emph{a topic is served only by nodes in
+its own region} --- roots, child relays, and hosts all
+region-homogeneous, so a region's traffic can never hotspot a
+neighbor. The kernel implements this fully (decision \texttt{reject},
+region-filtered delegation and adoption, a pre-send
+\texttt{REGION\_UNPOPULATED} refusal when a topic's region has no
+reachable node) --- \textbf{and ships it off by default}. Before
+critical mass, most of the 192 regions have no node, and enforcing
+the rule would refuse nearly every real pub/sub; with the lock off,
+the nearest node roots regardless of region, exactly as a small
+network needs. One switch (\texttt{configureRegionLock}) flips the
+whole discipline on when coverage justifies it --- a configuration
+change, not a release.
 
 % =====================================================================
-% VI. THE TRANSPORT LAYER
+% VIII. THE LIFE OF A MESSAGE
+% =====================================================================
+\section{The Life of a Message}
+
+\newthought{Here is the whole data path}, end to end, with every
+mechanism from \S\,VII in the order a message actually meets it.
+Alice runs a browser in Virginia; Bob and Carol subscribed an hour
+ago; Dana will arrive late.
+
+\begin{enumerate}
+\setlength{\itemsep}{2pt}
+\item \textbf{Identities.} Alice's app minted a \emph{node identity}
+(Ed25519 keypair; node id = \texttt{0x89}~+~hash of the public key ---
+Virginia's cell) and, separately, her durable \emph{author identity}.
+The node id decides where she sits in the address space; the author
+key decides who her words belong to. Neither knows about the other.
+
+\item \textbf{The topic is an address.} The app uses the descriptor
+\texttt{\{region:\,'useast', name:\,'lobby'\}}. Everyone who writes
+those same fields derives --- locally, no lookup --- the same 264-bit
+topic id, beginning with \texttt{0x89}. The topic now has a
+\emph{place}, and the live peer closest to that place is, by
+definition, its root. Call him Rob.
+
+\item \textbf{Bob and Carol attached.} Each sent
+\texttt{pubsub:sub} routed toward the topic id; the greedy walk
+(helped by their cached root hints) terminated at Rob, who seated
+them. They re-send that sub on the adaptive renewal cadence; if Rob
+ever vanishes, their next renewal terminates at his successor and
+re-seats them there. Had the lobby been popular, Rob would have
+promoted child relays at twenty direct subscribers and seated
+newcomers a level down.
+
+\item \textbf{Alice publishes.} Her peer signs
+\texttt{\{message\}} with her \emph{author} key --- producing the
+content-addressed \texttt{msgId} --- and sends \texttt{pubsub:pub}
+routed toward the topic. No acknowledgment will ever come back to
+her; her peer quietly keeps the publish for 30 seconds, ready to
+re-send.
+
+\item \textbf{Rob stamps and fans out.} At the terminus, Rob
+verifies the signature against the signed descriptor (right topic?
+allowed writer?), dedups by \texttt{msgId}, \emph{stamps} the message
+with his own per-topic counter --- the stamp is now the message's
+place in the topic's history --- appends it to his bounded cache, and
+sends \texttt{pubsub:deliver} to Bob, to Carol, and to each child
+relay, which fan onward. Exactly-once delivery to each app is
+enforced by \texttt{msgId} at the subscriber.
+
+\item \textbf{The cohort gets a copy.} In the same breath, Rob
+pushes the message to the $K$ nodes closest to the topic --- the
+warm backups. If Rob's laptop lid closes in the next minute, the
+history does not close with it.
+
+\item \textbf{Alice's peer confirms itself.} Subscribed to the lobby
+herself, Alice receives her own message back through the tree ---
+the implicit ack. Had it not appeared, her peer's pending re-send
+(and, had she just joined, the cold-start burst) would have tried
+again, harmlessly --- Rob dedups.
+
+\item \textbf{Dana arrives late.} Her \texttt{sub} with
+\texttt{since:\,'all'} routes to Rob, who replays the cached history
+--- Alice's message included --- in 96\,KB batches, then the live
+tail. If she'd asked \texttt{since:\,'latest'}, she'd get the newest
+message and the tail; a plain sub, just the tail.
+
+\item \textbf{Alice retracts.} A week of regret later --- well,
+24 hours at most, the cache's hold --- she calls \texttt{kill} with
+the same author key. The retraction routes to the root, is verified
+against her signature, tombstones the message in the cache and the
+cohort, and Bob, Carol, and Dana each receive a
+\texttt{deleted} marker. Their apps drop the message; whether their
+memories do is beyond any protocol.
+\end{enumerate}
+
+Nothing in this walk consulted a server, a registry, or a
+coordinator. Every rendezvous was an address; every role was
+proximity; every recovery was a peer noticing something and acting
+locally.
+
+% =====================================================================
+% IX. READING THE STREAM: REPLAY, PULL, AND METRICS
+% =====================================================================
+\section{Reading the Stream: Replay, Pull, and Metrics}
+
+\newthought{Subscription is the write-side push;} three read-side
+paths complete the surface.
+
+\subsection{Replay: \texttt{since}}
+
+Every (re)subscription names its replay appetite: nothing (live tail
+only), \texttt{'latest'} (the newest cached message, then the tail),
+\texttt{'all'} (the full cache, then the tail), or a timestamp.
+Replay is served from the cache of whichever tree node seats the
+subscriber --- root or child --- against the root-stamped history, in
+bounded batches, with \texttt{msgId} dedup guaranteeing the app sees
+each message once even when a renewal re-fetches an overlapping
+window.
+
+\subsection{Pull: one-shot reads that spare the root}
+
+\texttt{peer.pull(msgId, \{topic\})} fetches a single message by its
+content address; \texttt{peer.pull(null, \{topic\})} fetches the
+topic's newest. Both route toward the topic like everything else ---
+but they do \emph{not} insist on reaching the root. A pull-by-id is
+answered by the \emph{first node on the path whose cache holds that
+\texttt{msgId}}: the id is a content address, so any replica's copy is
+exactly the right answer, and hot reads spread across the cohort and
+tree instead of converging on one node. A pull-latest is likewise
+answered by the nearest replica with \emph{its} newest --- deliberately
+accepting a moment's staleness, because a heavily-polled ``current
+value'' read would otherwise reconverge every client on the root the
+tree exists to protect. Need the strict newest, always? Subscribe;
+that is what the push path is for. A successful pull also slides the
+message's hold forward, so actively-read history stays warm.
+
+\subsection{Metrics: measured on demand, delivered as messages}
+
+``How many subscribers does this topic have?'' is itself a stream ---
+so Axona answers it with its own machinery rather than a query
+protocol. Two pieces compose:
+
+\begin{description}
+\setlength{\itemsep}{0pt}
+\item[The derived metric topic.] For any topic $T$, every peer can
+derive \texttt{metricTopic}$(T)$ --- an open topic in $T$'s region
+whose name embeds $T$ under the reserved \texttt{axona:metric:}
+namespace (self-identifying, so a root refuses to compute
+metrics-of-metrics --- the recursion guard). Snapshots of $T$'s state
+are \emph{published} there; watching a topic's health is just
+another subscription, with history riding the ordinary replay cache.
+\item[The demand-driven lease.] Nobody computes metrics nobody asked
+for. A subscriber to \texttt{metricTopic}$(T)$ triggers a
+\texttt{pubsub:metricson} control message routed toward $T$ --- like
+a sub, but carrying only the request ``measure this.'' The root
+(and any \emph{inheriting} root, after churn) sets a 70-second
+renewable lease and, while it is fresh, publishes a snapshot ---
+subscriber count, cache size, message counter --- every 20 seconds.
+Nodes along the route remember the request briefly and
+short-circuit duplicates (8\,s coalescing), so a thousand watchers
+cost the root one lease, not a thousand probes. When the last
+watcher stops renewing, the lease lapses and the measuring stops ---
+no orphan load.
+\end{description}
+
+Any node that happens to be root publishes when leased --- a browser
+tab as readily as a relay; metrics is not an infrastructure
+privilege.\sidenote{This was re-learned the hard way: an earlier
+design had \emph{relays} publish metrics on a loop, which silently
+measured nothing whenever the actual roots were ordinary peers.
+The demand-driven lease follows the system's own rule --- the role
+belongs to whoever routing says, and every capability must ride
+with the role.} \texttt{peer.metrics(topic)} remains as a
+convenience: a one-shot read of the latest published snapshot ---
+no scatter, no gather, no fan-out. Counts are advisory, never a
+security input: the metric topic is open, and the protocol cannot
+prove a count, only sign who claimed it.
+
+% =====================================================================
+% X. ROBUSTNESS: WHAT FAILS, AND WHAT HAPPENS
+% =====================================================================
+\section{Robustness: What Fails, and What Happens}
+
+\newthought{A peer-to-peer network is a machine made of parts that
+leave.} The design assumes every component will fail at the worst
+moment and asks, for each: who notices, and what do they do about
+it --- locally, without coordination?
+
+\begin{description}
+\setlength{\itemsep}{3pt}
+
+\item[A root dies abruptly.] Its beacon and replication pushes stop.
+Within about a minute, a cohort backup notices the silence
+(65\,s staleness), finds itself the closest reachable node, and
+promotes --- history already in hand. Meanwhile every subscriber's
+next adaptive renewal routes to the new terminus and re-seats
+(seconds, not minutes, thanks to the fast-start cadence); if the new
+root is somehow \emph{behind} a survivor's watermark, it pulls the
+missing history \emph{up} from that subscriber. Self-claim is
+conservative: a node that finds itself terminus for a topic it
+holds no role in waits out a 6\,s window before claiming root, so a
+routing flicker doesn't mint spurious roots.
+
+\item[A root leaves gracefully.] \texttt{peer.leave()} hands its
+cache directly to its heir (\texttt{handoff}), notifies its
+neighbors, and drains in-flight work. The failover above still
+backstops it.
+
+\item[A subscriber vanishes.] Its renewals stop; the root evicts it
+at 180\,s. Nothing else notices, correctly.
+
+\item[The publisher's message is lost in flight.] The publisher
+re-sends (up to six times over 30\,s) until it sees its own
+\texttt{msgId} delivered; a cold newcomer adds a 1-second burst.
+All re-sends are idempotent --- the root dedups by content address.
+Loss would have to defeat every try; at 30\% per-packet loss the
+residual is negligible.
+
+\item[Duplicates arrive.] By construction they will (re-sends,
+overlapping replay windows, tree re-parenting). The
+\texttt{msgId} content address collapses them: each app sees each
+message exactly once.
+
+\item[A topic gets popular.] The root's direct fan-out is capped at
+20; delegation grows a bushy tree, depth $\log_{20}(S)$. Replay is
+chunked; caches are bounded (1{,}024 messages / 16\,MB / 24\,h); open
+topics carry per-publisher quotas; every inbound frame respects hard
+size caps. Hot \emph{reads} shed to replicas via pull's
+early-answer.
+
+\item[A node gets popular.] The honest limit: a node that is closest
+to \emph{several} hot topics takes every one of those roots ---
+placement is load-oblivious, and relief today is reactive (the node
+degrades or dies, and failover redistributes). The designed remedy
+--- letting an overloaded terminus \emph{defer} to the nearest
+under-budget member of the topic's closest-$K$ ladder, splitting the
+\emph{anchor} (where routing points) from the \emph{root} (who does
+the work) --- is specified in the \emph{Load-Aware Root Placement}
+note and gated on simulation evidence that it beats the thrash it
+risks.
+
+\item[A region has no nodes.] Today, the nearest node roots the topic
+regardless of region --- the strict region-occupancy rule is
+implemented but ships \emph{off} until the network has coverage
+(\S\,VII). When it flips on, a pub/sub into an empty region fails
+fast with \texttt{REGION\_UNPOPULATED} rather than silently
+hotspotting a neighbor region --- and a whole-cohort saturation
+becomes a capacity \emph{signal}, not a routing accident.
+
+\item[A laptop lid closes; a tab sleeps.] The transport's 1\,Hz
+heartbeats detect the zombie channel (browsers happily report
+\texttt{open} on a dead socket after sleep) and evict; the peer
+routes around it; the bridge's next peer-list rebuilds the channel.
+Applications may accelerate recovery on resume events, but the
+transport-level eviction is the load-bearing mechanism --- zero
+application code required.
+
+\item[Half the network restarts on new software.] The wire major
+partitions hermetically: a 3.x peer and a 4.x peer refuse each other
+at the bridge gate (WebSocket close 4426) \emph{and} at the
+peer-to-peer handshake, so mixed-semantics meshes cannot form.
+Within a major, point releases interoperate and roll with no
+flag day.
+
+\item[Someone lies.] Every envelope is verified at ingress ---
+signature against the \emph{signed descriptor} (a message signed for
+topic A cannot be replanted on topic B), write policy against the
+owner key, subscriber identity against the authenticated channel
+(you cannot subscribe --- or unsubscribe --- anyone but yourself),
+proximity against the claimed role (a node cannot muscle into
+hosting topics it isn't near). Sizes and counts are capped before
+parsing. What signatures cannot prove --- a relay that silently
+drops what it should forward --- is the subject of the
+forwarding-vitality direction in \S\,XVII.
+\end{description}
+
+The common shape: soft state, renewed continuously, held redundantly
+near where it will be looked for, with every recovery triggered by a
+\emph{local} observation. There is no failure detector service
+because everything is a failure detector.
+
+% =====================================================================
+% XI. THE TRANSPORT LAYER
 % =====================================================================
 \section{The Transport Layer}
 
@@ -517,7 +1202,7 @@ immediate re-attempt (used on tab-resume and network-online).
 
 The WebRTC mesh under \texttt{webTransport} self-heals on the same
 principle. \texttt{MeshManager} runs a 1\,Hz ping/pong on every data
-channel and (kernel v2.1.1) evicts a peer the moment its channel goes
+channel and evicts a peer the moment its channel goes
 dead: no pong for the heartbeat-timeout window, or a few consecutive
 throwing \texttt{send()}s --- the signature of a channel a browser
 keeps reporting \texttt{open} after a laptop sleep, where the socket is
@@ -561,7 +1246,7 @@ hex strings on the wire --- they never appear as bigint-suffixed
 literals because the kernel converts them at frame construction.
 
 % =====================================================================
-% VII. THE BRIDGE
+% XII. THE BRIDGE
 % =====================================================================
 \section{The Bridge}
 
@@ -570,9 +1255,15 @@ to let browsers find each other; once they've found each other,
 WebRTC data channels carry every byte of application traffic
 peer-to-peer. The bridge stays in the picture only for two reasons:
 (1)~it's the rendezvous for the version handshake before peers can
-talk at all; (2)~it's a guaranteed-reachable mesh peer, which makes
-it a useful K-closest axon in small networks where two browsers
-might otherwise fail to find common axons.
+talk at all; (2)~it's a guaranteed-reachable mesh peer --- though
+deliberately \emph{not} a pub/sub root: the kernel excludes the
+bridge id from root candidacy, because a connection rendezvous that
+also rooted every nearby topic would recreate the central server the
+design exists to avoid.\sidenote{This exclusion was earned
+empirically: without it, small meshes routed every same-region
+topic's subscribe to the bridge, which cannot serve as a root, and
+delivery collapsed. The bridge participates in \emph{routing}; the
+tree is built from actual peers.}
 
 The bridge handles three kinds of frames over the WebSocket:
 
@@ -585,9 +1276,9 @@ offers/answers and ICE candidates between browsers, broadcasts join/leave
 events, supplies short-lived TURN credentials in the welcome frame.
 
 \item[\textbf{Version handshake.}] \texttt{client-hello}/
-\texttt{server-hello}. Enforces a minimum peer version. Rejects
-sub-minimum peers with WebSocket close code 4426 and a
-human-readable reason; the peer's UI shows a ``please reload''
+\texttt{server-hello}. Enforces the wire major and a minimum peer
+version. Rejects mismatched peers with WebSocket close code 4426 and
+a human-readable reason; the peer's UI shows a ``please reload''
 banner.
 
 \item[\textbf{Axona wire.}] \texttt{\{type: 'axona', payload: ...\}}
@@ -595,35 +1286,18 @@ frames carrying \texttt{req}/\texttt{res}/\texttt{ntf} messages
 between any connected browser and the bridge's embedded peer.
 These are the same frames any two browsers exchange over WebRTC ---
 the bridge embeds a full \texttt{AxonaPeer} of its own
-(\texttt{BridgeAxonaNode}) and participates in routing just like
-any other node, which is why it can be in K-closest sets and why it
-can hold subscriber children for pub/sub topics.
+and participates in routing just like any other node.
 \end{description}
-
-\marginnote{The kernel builds a peer's \texttt{AxonaManager}
-lazily, on its first \texttt{pub}/\texttt{sub}. The bridge never
-publishes or subscribes --- it only relays --- so it must build that
-engine \emph{eagerly} at startup, otherwise the
-\texttt{pubsub:subscribe-k}/\texttt{publish-k} handlers are never
-installed and every pub/sub frame addressed to the bridge is
-silently dropped. Because the bridge sits in nearly every peer's
-K-closest set, that failure mode is a near-invisible delivery hole;
-the eager build is what keeps it an honest relay axon.}
 
 The bridge's embedded peer runs an \emph{ephemeral} identity --- a
 fresh Ed25519 keypair minted on every start, never written to disk,
-so there is no keypair file to migrate across deploys.\sidenote{Since
-the v3.0 identity model the bridge nodeId is disposable: it
-authenticates the connection, not authorship, and nothing depends on
-it persisting. A restart rotates the nodeId and the mesh simply
-re-binds.} It still lands in us-east --- the \texttt{0x89} S2 cell,
-from its default us-east coordinates --- which is why it sits
-XOR-close to \texttt{us-east/*} topics and is so often a K-closest
-root; only the low 256 bits rotate per restart. Its \texttt{health}
-surface
-exposes the kernel version it's running and the synaptome it has
-built up, available at \texttt{/healthz} JSON. Operators check that
-endpoint to confirm a deploy.
+so there is no keypair file to migrate across deploys.\sidenote{The
+bridge nodeId is disposable: it authenticates the connection, not
+authorship, and nothing depends on it persisting. A restart rotates
+the nodeId and the mesh simply re-binds.} Its \texttt{health}
+surface exposes the kernel version it's running and the synaptome it
+has built up, available at \texttt{/healthz} JSON. Operators check
+that endpoint to confirm a deploy.
 
 \subsection{How a New Node Joins}
 
@@ -637,25 +1311,15 @@ just the first instance of the generic admit path, not a special case.
 \setlength{\itemsep}{0pt}
 \item \textbf{Connect + version gate.} The node opens a WebSocket to a
 bridge and exchanges \texttt{client-hello}/\texttt{server-hello}. The
-bridge checks the wire major (\texttt{REQUIRED\_WIRE\_MAJOR}, currently
-\texttt{3} --- the v0.3 descriptor-envelope wire). A peer that sends a
-different wire major --- or, being pre-flag-day, omits
-\texttt{wireVersion} entirely --- belongs to the old network and is
-closed with 4426 before it can do anything else. This wire-major check
-is the load-bearing, hermetic partition gate: a wire-2
-(descriptor-less) envelope and a wire-3 envelope are mutually
-unverifiable, so the bridge refuses the mismatch up front rather than
-admitting a peer that then fails silently at the envelope layer. The
-older per-namespace version floor (\texttt{flagDayFloor}, with
-\texttt{MIN\_KERNEL\_VERSION} and \texttt{MIN\_PEER\_APP\_VERSION} both
-\texttt{3.0.0}) still runs but no longer discriminates --- now that the
-kernel itself is on the 3.x line both namespaces collapse into one
-bucket, so the floor only surfaces the reported semver in the close
-reason. Beneath the wire gate the \texttt{axona/5} auth epoch is the
-hermetic backstop from the earlier 2026-06 partition (it did
-\emph{not} change in v0.3): the epoch is folded into the signed
-transcript of the next step, so an \texttt{axona/4} node and an
-\texttt{axona/5} node still \emph{cannot} complete a handshake.
+bridge checks the wire major (\texttt{REQUIRED\_WIRE\_MAJOR} --- the
+4.x fleet gates on wire \texttt{4}, the routing-only axon-tree
+semantics). A peer that sends a different wire major belongs to a
+different network generation and is closed with 4426 before it can do
+anything else. This wire-major check is the load-bearing, hermetic
+partition gate. Beneath it the \texttt{axona/5} auth epoch is a
+second backstop: the epoch is folded into the signed transcript of
+the next step, so peers across an auth-epoch boundary \emph{cannot}
+complete a handshake.
 
 \item \textbf{Welcome.} The bridge replies with \texttt{welcome},
 carrying the connection id and a fresh \texttt{serverNonce}; both sides
@@ -672,11 +1336,9 @@ prove its id --- or one being MITM'd, since the CBV binds the proof to
 
 \item \textbf{Mutual bind + admit.} On success both ends record the
 binding and admit the other into their synaptome \emph{as an ordinary}
-\texttt{Synapse}: the joining node calls
-\texttt{bindPeer(bridgeId, 'bridge')}, whose \texttt{onPeerBound} hook
-seeds the bridge into its synaptome (\texttt{addedBy: bootstrap}); the
-bridge's embedded peer runs \texttt{\_completeHandshake}, binds the new
-node to that connection, and admits it via \texttt{\_addByVitality}
+\texttt{Synapse}: the joining node seeds the bridge into its synaptome
+(\texttt{addedBy: bootstrap}); the bridge's embedded peer binds the
+new node and admits it via the ordinary vitality rule
 (\texttt{addedBy: handshake}). No bridge-specific code runs in either
 step --- the bridge is simply the first guaranteed-reachable peer the
 node binds.
@@ -686,27 +1348,58 @@ node binds.
 node negotiates WebRTC data channels to those peers (SDP relayed via
 the bridge), and each channel runs the \emph{same} \texttt{axona/5}
 hello --- now additionally bound to the peer's DTLS-certificate
-fingerprint --- firing the same \texttt{onPeerBound} admit. The
+fingerprint --- firing the same admit. The
 synaptome fills with direct mesh peers; the bridge stops being the only
 neighbour.
 
-\item \textbf{Converge.} Optionally \texttt{peer.join(sponsor)} seeds a
-specific first neighbour; thereafter vitality (weight\,$\times$\,recency)
-and the 10\,s \texttt{refreshTick} grow and prune the synaptome and
-re-anchor subscriptions onto the converged K-closest set. The node is
-now a full participant.
+\item \textbf{Converge, then act.} The 10\,s \texttt{refreshTick} and
+vitality rules grow and prune the synaptome; subscriptions re-anchor
+as routing converges. An application awaits
+\texttt{peer.ready()}\sidenote{\texttt{ready()} resolves when the
+synaptome reaches a small threshold (default four peers) or plateaus
+non-zero, bounded by a timeout --- the one lifecycle call that spares
+every app the hand-rolled ``wait for the mesh'' polling loop.
+Publishing before the mesh warms is survivable (the cold-publish
+burst exists precisely for it) but \texttt{ready()} makes first
+publishes predictable.} before its first pub/sub. The node is now a
+full participant.
 \end{enumerate}
 
 \marginnote{The admit is symmetric and identity-bound in both
 directions --- each side admits the other's \emph{authenticated}
 nodeId, so a peer can only ever be admitted under an id it proved it
 owns. Because every node runs step~4 against the bridge first, the
-bridge lands in every synaptome: its centrality is \emph{emergent} from
-this bootstrap, not granted by any special rule (see \S\,Future
-Directions, ``demote the bridge to an ordinary peer'').}
+bridge lands in every synaptome: its centrality is \emph{emergent}
+from this bootstrap, not granted by any routing rule (see \S\,XVII,
+``demote the bridge to an ordinary peer'').}
+
+\subsection{Bridge Discovery and Federation}
+
+\newthought{Bridges advertise themselves on the network they serve.}
+A well-known open topic --- \texttt{\{region:\,'useast',}
+\texttt{name:\,'axona:bridge-directory'\}} --- carries a signed entry from
+each bridge (URL, region, kernel version, TURN advertisement,
+timestamp), republished hourly; every bridge both \texttt{host()}s
+the topic (so the listing survives) and publishes to it. A client
+collects the directory at launch, ranks candidates by first-party
+experience and its trusted-roots list, and fails over to a saved
+alternate if its primary disappears --- no out-of-band coordination.
+Private deployments opt out with a flag.
+
+Production runs \emph{federated} bridges: a second bridge holds an
+outbound \emph{uplink} to the first --- its embedded peer runs a
+composite transport of inbound WebSocket plus an uplink client ---
+so the two share one connectome, the directory replicates across
+both, and a peer dialing either reaches the same mesh. Cross-bridge
+pub/sub is verified in both directions as part of deploy
+checks.\sidenote{A practical test-methodology note that keeps
+biting: verify federation with a \emph{warm} standing topic (the
+directory itself is ideal --- both bridges host and republish it),
+never a cold fresh topic, which has no roots yet and reads as a
+false failure.}
 
 % =====================================================================
-% VIII. THE WIRE PROTOCOL
+% XIII. THE WIRE PROTOCOL
 % =====================================================================
 \section{The Wire Protocol}
 
@@ -731,32 +1424,50 @@ correlation, a \texttt{type} string naming the handler
 boolean and a \texttt{body}.
 
 \item[\textbf{Notification} (\texttt{k: 'ntf'}).] Fire-and-forget.
-No \texttt{id}, no response. Used for hello/hello-ack admission,
-\texttt{pubsub:subscribe-k}, \texttt{pubsub:publish-k},
-\texttt{pubsub:deliver}, \texttt{triadic\_introduce},
-\texttt{hop\_cache}, \texttt{lateral\_spread},
-\texttt{reinforce}.
+No \texttt{id}, no response. Used for hello/hello-ack admission, the
+plasticity signals, and --- riding \texttt{route\_msg} --- the whole
+pub/sub vocabulary.
 \end{description}
 
-The handler types are versioned implicitly through the kernel ---
-the bridge's \texttt{minPeerVersion} gate excludes peers running an
-older protocol that wouldn't understand newer messages. Major
-protocol changes bump \texttt{KERNEL\_VERSION}'s minor; minor
-changes are additive (a peer that doesn't know a handler type
-silently drops the message).
+The pub/sub vocabulary, all routed toward an address:
+
+\begin{fullwidth}
+\par\medskip\noindent\small
+\begin{tabular}{@{}llp{0.56\textwidth}@{}}
+\toprule
+\textbf{Message} & \textbf{Routed toward} & \textbf{Meaning} \\
+\midrule
+\texttt{pubsub:sub} / \texttt{unsub} & topic & attach (with replay appetite) / detach a subscriber \\
+\texttt{pubsub:pub}   & topic & a signed envelope; carries no timestamp --- the root stamps \\
+\texttt{pubsub:deliver} & subscriber & stamped messages fanning down the tree \\
+\texttt{pubsub:adopt} & child & ``become my child relay; take these subscribers + my watermark'' \\
+\texttt{pubsub:pullup} / \texttt{replayup} & peer & ``you hold newer history than I do --- replay it up to me'' / the reply \\
+\texttt{pubsub:handoff} & heir & a gracefully departing root pushes its cache to its successor \\
+\texttt{pubsub:replicate} & cohort member & the root's periodic cache + tombstone push to its warm backups \\
+\texttt{pubsub:rootbeacon} & neighborhood & bounded soft-state root advertisement (last-mile pointer) \\
+\texttt{pubsub:kill} & topic & a signed, creator-only retraction; tombstoned and fanned as a delete marker \\
+\texttt{pubsub:pull} / \texttt{pullresp} & topic / requester & one-shot read; answered by the first replica holding the answer \\
+\texttt{pubsub:metricson} & topic & the demand-driven metrics lease (\S\,IX) \\
+\bottomrule
+\end{tabular}
+\par\smallskip{\small\itshape \texttt{pubsub:touch} is deprecated and
+\texttt{pubsub:unpub} removed; both strings stay reserved so legacy
+frames are ignored rather than misrouted.}
+\par\medskip
+\end{fullwidth}
 
 A pub/sub message envelope is signed:
 
 \begin{verbatim}
 {
-  msgId:        "<sha256 of canonical({publisher, message}) hex>",
-  seq:          1716638400123,   // per-publisher monotonic (v2.9.0)
-  ts:           1716638400000,
-  topic:        {                // v0.3: signed topic DESCRIPTOR,
-    region: "useast",            //   not a bare name. The signature
-    owner:  "<owner pubkey|null>",//   binds the whole descriptor,
-    name:   "hello-world",       //   incl. the write policy.
-    write:  "open"               // "open" | "owner"
+  msgId:  "<sha256(canonical({publisher, message}))>",
+  seq:    1716638400123,    // per-publisher monotonic
+  ts:     1716638400000,    // author-side clock
+  topic: {                  // the signed topic DESCRIPTOR,
+    region: "useast",       //   not a bare name -- the
+    owner:  null,           //   signature binds the whole
+    name:   "hello-world",  //   descriptor, including the
+    write:  "open"          //   write policy
   },
   message:      <application payload>,
   signerPubkey: "<Ed25519 pubkey hex>",
@@ -770,858 +1481,33 @@ A pub/sub message envelope is signed:
 content address of author-plus-payload that deliberately excludes
 \texttt{ts}, \texttt{seq}, \texttt{topic}, and \texttt{signature}, so a
 re-publish of identical content by the same author dedups to one ID.
+Note the division of clocks: the signed \texttt{seq}/\texttt{ts} are
+the \emph{author's} (freshness and per-publisher order), while the
+topic's history order and replay watermark come from the \emph{root's}
+stamp applied on arrival --- one authoritative clock per topic,
+however many publishers feed it.
+
+The signature covers a domain-separated core and buys three
+ingress-time guarantees, enforced wherever a message enters a cache
+--- direct publish, replication, anti-entropy. \emph{Freshness:} a
+root rejects a \emph{live} publish whose signed \texttt{ts} falls
+outside a $\pm$5-minute window, so a captured envelope can't be
+re-injected as new (cached-history replay is exempt).
+\emph{Binding:} the root recomputes the topic ID from the signed
+descriptor and drops the message unless it equals the routed topic
+--- a message signed for topic~A cannot be injected onto topic~B.
+\emph{Write policy:} for a \texttt{write:\,'owner'} topic the
+\texttt{signerPubkey} must equal the descriptor's \texttt{owner}
+(\texttt{WRITE\_POLICY\_VIOLATION} otherwise); only the owner key may
+publish to an owned feed.
 
 Receivers verify the signature against the signer's pubkey using
-\texttt{crypto.subtle.verify}; the kernel surfaces verification
+\texttt{crypto.subtle.verify}; the kernel surfaces the verification
 result on the delivered envelope so applications can decide whether
 to trust unsigned or unverifiable publishes.
 
-As of kernel v2.9.0 (envelope format \textbf{v2}) the signature
-covers a domain-separated core
-(\texttt{axona:pubsub-envelope:v2}, finding E-4) and includes a
-per-publisher monotonic \texttt{seq} with TTL freshness (finding
-C-2). Two properties follow. \emph{Freshness:} a
-topic's root axons reject a \emph{live} publish whose signed
-\texttt{ts} is outside a $\pm$5-minute window, so a captured envelope
-can't be re-injected as new once it ages out (the legitimate
-replay-to-late-subscribers path is exempt --- it serves cached
-history). \emph{Order:} \texttt{seq} gives each publisher's stream a
-total order, which is what makes ``latest'' and bounded-queue eviction
-(below) deterministic across replicas.
-
-As of kernel v3.0.0 (envelope wire \textbf{v3}, the v0.3
-identity/authorship flag-day) the signed \texttt{topic} is a
-\emph{descriptor} \texttt{\{region, owner, name, write\}} rather than a
-bare name, and the signature covers the whole descriptor. This buys two
-ingress-time guarantees a root enforces against the topic it actually
-routed the message to. \emph{Binding:} a root recomputes the topic ID
-from the signed descriptor and drops the message unless it equals the
-routed topic --- a message signed for topic~A cannot be injected onto
-topic~B. \emph{Write policy:} for a \texttt{write:\,'owner'} topic the
-\texttt{signerPubkey} must equal the descriptor's \texttt{owner}, or the
-publish is rejected (\texttt{WRITE\_POLICY\_VIOLATION}); only the owner
-key may publish to an owned feed. Both checks run at \emph{every}
-ingress path --- direct publish, K-closest relay-accept, and
-anti-entropy sync --- so a forged or mis-targeted envelope is dropped
-wherever it enters, and a pre-v3 bare-string topic is dropped outright:
-that is the flag-day boundary the wire-major-3 gate enforces up front.
-
 % =====================================================================
-% IX. ROUTING
-% =====================================================================
-\section{Routing}
-
-\newthought{Axona's routing is learning-adaptive.} It replaces
-Kademlia's $k$-bucket array with a dynamic synaptome that adjusts
-edge weights based on observed latency. The basic shape --- iterative
-lookup, $\log_2(N)$ hop count --- is unchanged from Kademlia; what
-changes is which peer you ask at each hop.
-
-The five wire operations that drive Axona routing are:
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{lookup\_step} (req).] ``Here's a target. What's
-your best next hop?'' The receiver evaluates AP across its
-synaptome's progress candidates, returns the winning synapse + its
-own routing state.
-
-\item[\texttt{lookahead\_probe} (req).] ``If I forward to you for
-target $T$, who would you forward to?'' A one-deep peek that lets
-the caller compare expected hop costs across candidates before
-committing.
-
-\item[\texttt{find\_closest\_set} (req).] ``Give me your $K$
-peers closest to this target.'' The K-closest harvester used by
-AxonaManager's pub/sub axon discovery.
-
-\item[\texttt{route\_msg} (req).] Generic routed-message
-forwarder. Used by AxonaManager for \texttt{\_\_tunneled\_direct\_\_}
-delivery when the target isn't directly bound.
-
-\item[\texttt{reinforce} (ntf).] ``This lookup succeeded; bump
-the weight on the synapse I used.'' Fire-and-forget LTP signal
-back along the path. Only flows when the lookup hit at-or-below
-average latency for the path's region. On identity-binding
-transports the handler is a no-op unless the \emph{target} synapse's
-peer is currently bound (the B-3 gate: an unauthenticated
-\texttt{reinforce} must not be able to refresh the eviction-inertia
-of a stale or unverified entry and pin it in the table). Weight is
-independently clamped to $\le 1.0$, so inertia is the only lever the
-gate needs to close.
-\marginnote{\emph{Residual, by design:} the gate keys on the
-\emph{target} synapse being bound, not on the \emph{sender's}
-identity --- so any bound peer can refresh the inertia of any other
-bound peer's synapse. The blast radius is bounded to ``keep an
-already-verified, live peer pinned slightly longer,'' which is
-benign; binding the signal to the sender would add cost for no
-attacker-relevant gain. Revisit only if reinforce ever carries
-weight a sender could bias.}
-\end{description}
-
-Two structural-plasticity messages let the network rewire itself
-without explicit instruction: \texttt{triadic\_introduce}
-(``introduce me to your friend at $X$'') and \texttt{hop\_cache}
-(``I've forwarded to $X$ several times; install a direct synapse to
-$X$''). Both are fire-and-forget notifications that obey the
-synaptome's admission rule (\texttt{\_addByVitality}).
-
-\marginnote{The performance claim of Axona over Kademlia is roughly
-40\% fewer wall-clock milliseconds per lookup at 25{,}000 nodes,
-mostly from latency-weighted hop selection. The figure is documented
-in the companion paper \emph{Axona: A Learning-Adaptive Distributed
-Hash Table and Axonal Publish/Subscribe} (v0.4.01, 2026-05-23).}
-
-\subsection{Synaptome Maintenance: Keeping the Near Neighborhood Complete}
-
-\newthought{Greedy routing is only as good as the table is complete.}
-A greedy walk toward a target descends in XOR distance until no neighbor
-is closer --- a \emph{local minimum}. On a complete graph that minimum is
-always the global one (the true target). On a real, \emph{incomplete}
-synaptome (each peer holds $\sim$20 of $N$), a walk can dead-end at a
-near-miss node instead. When a publisher and its subscribers dead-end at
-\emph{different} near-miss nodes, they elect different pub/sub roots and
-never rendezvous --- the all-or-nothing delivery failure that dominates
-under churn. The cure is table \emph{completeness}, in two co-equal parts
-(classic Chord successors $+$ fingers, Kademlia closest-bucket $+$
-distant-buckets):
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[Successors (near quota).] Hold the $K_{\text{near}}{\approx}5$
-XOR-closest peers. This clique completes the \emph{last mile}: the final
-descent always lands on the true root. (Simulation: 4--6 is the knee;
-more adds nothing.)
-\item[Fingers (long range).] Hold $\sim$$\log(N)$ distant links --- one
-per populated stratum --- so a walk can \emph{reach} the target's
-neighborhood at all. These are maintained by the existing anneal and the
-Structural Survival Rule (\S\ref{...}); the simulation shows a perfect
-successor set still fails to deliver if the long-range half is starved.
-\end{description}
-
-\newthought{Repair is local and cheap.} When a near-neighbor churns out,
-its replacement is almost always a \emph{neighbor-of-neighbor} (the
-``successor's successor''), found in a 1--2 hop local query --- never a
-global lookup. The kernel runs a deterministic maintenance tick plus an
-immediate pass on peer loss (\texttt{onPeerDied}); below quota it refills
-from the nearest verified peer through the \emph{same} first-party
-verification (\texttt{\_considerCandidate}) as any other synapse, bounded
-to a few dials per pass. In sustained-churn simulation, an unmaintained
-near-stratum erodes and delivery drifts down, while local refill holds it.
-
-\marginnote{\emph{Eclipse note.} Dialing one's nearest peers is an
-eclipse-sensitive surface, so refill admits \emph{only} first-party-verified
-peers, never displaces a nearer honest peer for a farther attacker, and is
-budget-bounded --- it adds no leverage beyond raw keyspace proximity. Making
-that proximity costly to acquire is the job of costly identity (E-1,
-memory-hard PoW), a \emph{pre-production} requirement; on a development
-network with no adversary it is an accepted risk.}
-
-% =====================================================================
-% X. PUB/SUB: K-CLOSEST
-% =====================================================================
-\section{Pub/Sub: K-Closest}
-
-\newthought{The pub/sub overlay is its own structure.} It sits on
-top of Axona routing but doesn't reuse the synaptome for state ---
-each peer maintains a separate set of \emph{axon roles}, one per
-topic it's chosen as an axon for. A role holds a topic ID, a set of
-children (subscribers), a replay cache, and a $K$-replicated peer
-set (the other root axons for the same topic).\footnote{Notation:
-this replication factor is the \emph{root-set size} $R=5$
-(\texttt{AxonaManager.rootSetSize})---distinct from the Kademlia
-\emph{routing} parameter $k=20$ (\texttt{AxonaDomain.\_k}), which
-sizes the closest-set used for \emph{lookups}. ``K-closest''
-throughout names the generic find-closest-$N$ operation both use:
-$N=k$ for routing, $N=R$ for replication.}
-
-Subscriber-side flow:
-
-\begin{enumerate}
-\setlength{\itemsep}{0pt}
-\item Compute \texttt{topicId} from the topic \emph{descriptor}: an
-8-bit region prefix (the descriptor's \texttt{region}, or the
-publisher's own node region when region is omitted) followed by
-\textsc{sha256} of the canonical \texttt{\{owner, name, write\}}. No
-synthetic publisher is involved.
-\item Find the $K$ peers closest to \texttt{topicId} in the local
-synaptome. (No network walk --- the local reachable peer set is
-what matters; remote-walk K-closest returns ghost IDs that route
-fan-out into dead ends.)
-\item Send \texttt{pubsub:subscribe-k} to each, carrying the
-subscriber's nodeId and an optional \texttt{lastSeenTs} for
-replay.
-\item Each receiver runs \texttt{\_addOrRecruitChild}, stores the
-subscriber under \texttt{role.children}, and optionally serves a
-\texttt{pubsub:replay-batch} of cached messages newer than
-\texttt{lastSeenTs}.
-\end{enumerate}
-
-Publisher-side flow:
-
-\begin{enumerate}
-\setlength{\itemsep}{0pt}
-\item Compute the same \texttt{topicId}.
-\item Build a signed envelope.
-\item Find the same $K$ peers closest to \texttt{topicId} locally.
-\item Send \texttt{pubsub:publish-k} to each.
-\item Each receiver runs \texttt{\_onPublishDirect}: dedup against
-\texttt{\_seenPublishes}, add to replay cache, fan
-\texttt{pubsub:deliver} to every child in \texttt{role.children}.
-\item Each child receives \texttt{pubsub:deliver}, dedups, fires
-the local \texttt{\_deliveryCallback} which routes to the
-application's subscription handler.
-\end{enumerate}
-
-\marginnote{Per-hop \texttt{\_alreadySeenPublish} dedup is keyed on
-\texttt{publishId} (an opaque, collision-safe routing token ---
-decoupled from any node ID, unlike the old \texttt{nodeId:counter}
-form), an internal hop-dedup token separate from the content-hash
-\texttt{msgId} the application sees. Multiple arrivals of the same
-\texttt{publishId} at one peer collapse to a single
-\texttt{\_deliveryCallback} firing.}
-
-When a publisher's K-closest peers also happen to be in the
-subscribers' K-closest sets, the tree converges and delivery is
-single-hop from publisher to axon to subscriber. When they don't,
-the system relies on the redundancy: a missing axon's subtree is
-covered by the four other axons. The Activation Potential weighting
-makes high-quality axons dominate the K-closest set over time.
-
-\newthought{K-closest is computed against the local synaptome}, so
-in a browser mesh that fills in gradually the answer is a moving
-target: a peer that subscribed while it only knew the bridge picked
-a narrow axon set, and a publisher that joined later computes a
-wider one --- they can fail to overlap, and the publish misses that
-subscriber. The result is cached per topic under an epoch counter to
-avoid recomputing on every \texttt{pub}/\texttt{sub}; the fix is to
-\emph{invalidate} that cache as the mesh changes. \texttt{AxonaPeer}
-bumps the epoch on every \texttt{onPeerBound}, and
-\texttt{AxonaManager.refreshTick} (a 10\,s timer the application arms
-after subscribing) flushes it and re-issues every live subscription
-against the now-converged set. So a subscription anchored early
-re-anchors as the mesh widens, rather than staying pinned to a stale,
-narrow axon set.
-
-\subsection{Topic Metrics: Scatter-Down, Gather-Direct}
-
-\newthought{\texttt{peer.metrics(topic)}} reports a topic's live state ---
-\texttt{publishes}, \texttt{current\_count} (events retained in the tree
-right now), \texttt{subscribers}, \texttt{deliveries}, \texttt{pulls},
-\texttt{reshares} --- by querying the same axon tree that carries delivery.
-It is a \emph{scatter-down, gather-direct} traversal, not a recursive sum
-back up the tree.
-
-\begin{enumerate}
-\setlength{\itemsep}{0pt}
-\item \textbf{Route to the tree.} \texttt{requestMetrics} issues a routed
-\texttt{pubsub:metricsReq} toward the \texttt{topicId}; a node that doesn't
-host the topic returns \texttt{'forward'}, so the request DHT-routes until it
-reaches a root axon.
-\item \textbf{Scatter down.} On receipt a role replies with its \emph{own}
-local view, then forwards the request as \texttt{pubsub:metricsBroadcast} to
-each of its children, which recurse --- the probe walks the tree along the
-same parent$\rightarrow$child edges that fan messages out. A bounded
-seen-request set (keyed on \texttt{requestId}) makes each relay process a
-given probe once, so redundant edges neither loop nor double-count.
-\item \textbf{Gather direct.} Every responding relay sends its partial result
-\emph{straight back to the original requester} (\texttt{pubsub:metricsResp}),
-not up through its parent. Scattering down but gathering directly keeps the
-root from becoming an aggregation hotspot.
-\item \textbf{Bounded collection.} The requester accumulates responses for a
-fixed window (\texttt{timeoutMs}, default 500\,ms) --- there is no global
-barrier --- then folds them. \texttt{relayCount} (distinct responders) is the
-honest coverage signal; the result is a best-effort snapshot, not a ledger.
-\end{enumerate}
-
-\newthought{Why the fold differs per field.} Each relay holds a local slice:
-its replay cache, its \texttt{children} map, and per-post counters. The tree
-\emph{replicates the message queue} across the $K$ root axons but
-\emph{partitions subscribers} across the tree, so a uniform sum would be
-wrong. The client combines each quantity according to its nature.
-
-\begin{fullwidth}
-\par\medskip\noindent\small
-\begin{tabular}{@{}p{0.20\textwidth}p{0.10\textwidth}p{0.60\textwidth}@{}}
-\toprule
-\textbf{Field} & \textbf{Fold} & \textbf{Why} \\
-\midrule
-\texttt{publishes} & max & distinct posts are replicated across roots; summing would multiply by $K$ \\
-\texttt{current\_count} & max & replicas hold the same retained set; max also tolerates a lagging replica \\
-\texttt{deliveries}, \texttt{pulls}, \texttt{reshares} & sum & partitioned work counters --- each relay tallies only the actions it performed \\
-\texttt{subscribers} & max & membership is partitioned; exact for an unsplit (single-root) topic, a lower bound once the tree splits \\
-\texttt{relayCount} & count & distinct responders --- a coverage indicator \\
-\bottomrule
-\end{tabular}
-\par\smallskip{\small\itshape Replicated set-cardinality folds with \emph{max}; partitioned per-action counters fold with \emph{sum}; partitioned membership folds with \emph{max} (approximate).}
-\par\medskip
-\end{fullwidth}
-
-\marginnote{A self-authenticating ownership gate means a relay answers only
-when the topic's publisher matches the requester, so today the owner alone
-gets non-empty results. \texttt{current\_count} and live \texttt{subscribers}
-were added in kernel v2.11.0.}
-
-\subsection{Subscribable Metrics: A Derived Topic}
-
-\newthought{The scatter-gather above} is right for an occasional probe and wrong
-as an app primitive: per-user polling makes cost scale with
-audience~$\times$~poll-rate, hammering the roots forever. The fix needs no new
-wire and no kernel state --- it is a \emph{convention} over the existing pub/sub:
-a topic's metrics are themselves \textbf{published}, to a second topic
-\emph{derived} from the first, which clients \texttt{sub} instead of polling.
-
-\newthought{The derivation.} For a data topic with resolved ID $T$,
-\texttt{metricTopic}$(T) = \{\,\texttt{region}=\text{the region byte of }T,\;
-\texttt{name}=\texttt{"axona:metric:"}\,\Vert\,T\,\}$ --- an open topic anyone
-who knows $T$ can recompute and subscribe. The reserved \texttt{axona:metric:}
-namespace (rather than a bare hash) is load-bearing: it makes a metric topic
-\emph{self-identifying}, so a root recognises one and refuses to compute
-metrics-of-metrics --- the recursion guard. Because clients and infrastructure
-must derive it and apply the guard \emph{identically}, both live in the kernel
-core beside \texttt{deriveTopicId}, not in the optional \texttt{std} helpers
-(relays vendor \texttt{src/} only).
-
-\newthought{The loop.} The primary root of each live \emph{open} topic recomputes
-its local snapshot --- via \texttt{peer.rootedTopics()}, the read side, which
-reads replay-cache state with \emph{no} network --- and \texttt{pub}s a
-\emph{signed} record to \texttt{metricTopic}$(T)$ on a $\sim$5-minute cadence,
-self-triggered on its own liveness for $T$. A subscriber's
-\texttt{sub(metricTopic}$(T)$\texttt{, \{since:'all'\})} then gets the latest
-snapshot via replay-on-subscribe plus every later update --- one subscription
-replacing an unbounded stream of point queries. The expensive part (counting)
-happens once per cadence at one node, no matter how many are watching, and
-distribution rides the delivery path subscribers already pay for.
-
-\newthought{History for free.} Snapshots are ordinary retained messages, so they
-accumulate in the replay cache and age out at the 48\,h hold ceiling. A
-subscriber therefore gets a \emph{rolling $\sim$48\,h trend} at no extra cost ---
-the cache TTL \emph{is} the retention window; no overwrite, no compaction.
-
-\newthought{Two deliberate limits.} \emph{(i)~Open topics only:} an owner-only
-topic's subscriber count is owner-private (the gate above), and republishing it
-to an open metric topic would leak exactly that --- so the loop skips owned
-topics; their metrics stay behind \texttt{peer.metrics()} for the owner.
-\emph{(ii)~Advisory, not authoritative:} the metric topic is open, hence
-spoofable; the snapshot is signed so a reader may pin trust to a known relay's
-key, but the protocol cannot \emph{prove} a count. Metrics are decoration, never
-a security input. \texttt{peer.metrics()} survives as an \textbf{owner-only}
-on-demand reader (v3.5.0): it answers only the owner of an owned topic and
-refuses open/public topics outright, so a non-owner can no longer aim a K-root
-fan-out at any topic --- open topics are read only through their metric topic.
-
-\marginnote{Shipped kernel v3.4.0 (\texttt{metricTopic}/\texttt{isMetricTopic},
-\texttt{rootedTopics()}) and relay v0.16.0 (the publish loop) --- a convention,
-no flag day. On testnet one keyspace-hosting relay republished $\sim$300 open
-topics per cycle with the recursion guard converging: metric topics rooted in
-cycle $n$ are recognised and skipped in cycle $n{+}1$.}
-
-% =====================================================================
-% XI. THE APPLICATION API
-% =====================================================================
-\section{The Application API}
-
-\newthought{Every Axona application talks to the protocol through one
-import.} The barrel export at \texttt{@axona/protocol} is the entire
-contract surface --- a small set of factory functions, one peer
-class, and a handful of helpers. This section is the field-by-field
-reference.
-
-\subsection*{Identity}
-
-\smallskip
-\noindent\texttt{createNodeIdentity(\{ lat, lng \})}\quad
-\emph{mint the CONNECTION identity}
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{lat}] number. Latitude in decimal degrees.
-\item[\texttt{lng}] number. Longitude in decimal degrees.
-\end{description}
-
-\noindent Returns a Promise resolving to
-\texttt{\{ id, pubkey, pubkeyHex, privkey, privateKey, region \}}.
-\texttt{id} is the 66-char hex \texttt{nodeId} (8-bit S2 prefix from
-\texttt{(lat,lng)} + 256-bit SHA-256 of the public key).
-\texttt{privateKey} is the in-memory \texttt{CryptoKey};
-\texttt{privkey} is the base64 export for persistence. This is the
-\textbf{connection/transport} keypair --- it forms the \texttt{nodeId},
-drives the handshake and routing, and is passed to \texttt{AxonaPeer}
-as \texttt{nodeIdentity} (and to the transport factories as
-\texttt{identity}). It \emph{never} signs a publish.
-
-\smallskip
-\noindent\texttt{createAuthorIdentity(\{ persistAs? \})}\quad
-\emph{mint an AUTHORSHIP identity (Author ID)}
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{persistAs}] \emph{(optional)}\; string storage key.
-Omitted, the author identity is ephemeral; given, it is
-load-or-created and saved (browser \texttt{localStorage} by default,
-or a custom \texttt{store}).
-\end{description}
-
-\noindent Returns a Promise resolving to a location-free keypair
-\texttt{\{ authorId, pubkey, pubkeyHex, privateKey, \ldots \}} --- no
-\texttt{nodeId}, no region. \texttt{authorId} is the public key, the
-\texttt{signerPubkey} that appears on a signed publish. This is the
-key you pass per-publish as \texttt{\{ signWith \}}; authorship is not
-a place, and one peer can run several personas by varying
-\texttt{signWith}.
-
-\smallskip
-\noindent\texttt{dumpIdentity(identity)}\quad
-\emph{serialize for storage}
-
-\smallskip
-\noindent Returns a Promise resolving to a plain JSON object you can
-write to disk or IndexedDB. The reciprocal
-\texttt{loadIdentity(envelope)} reconstructs the
-\texttt{CryptoKey}-bearing form on the next launch.
-
-\subsection*{Transports}
-
-\smallskip
-\noindent\texttt{webTransport(\{ ... \})}\quad
-\emph{browser transport: WebSocket to the bridge + WebRTC mesh}
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{bridgeUrl}] string. e.g.\ \texttt{wss://bridge.axona.net}.
-\item[\texttt{identity}] connection identity envelope from \texttt{createNodeIdentity}.
-\item[\texttt{log}] \emph{(optional, default} \texttt{() => \{\}}\emph{)}\;
-function \texttt{(event, data)} that receives transport-internal
-diagnostic events.
-\item[\texttt{WebSocketImpl}] \emph{(optional)}\; constructor for the
-\texttt{WebSocket} class. Defaults to \texttt{globalThis.WebSocket}.
-\item[\texttt{autoHandshake}] \emph{(optional, default} \texttt{true}\emph{)}\;
-when true, \texttt{transport.start()} drives the full bridge
-admission sequence end-to-end --- the WebSocket version gate, the
-application-level \texttt{hello}/\texttt{hello-ack} exchange, and
-binding the bridge as a peer. Set to false only if you're driving
-the handshake yourself.
-\item[\texttt{peerVersion}] \emph{(optional, default} \texttt{KERNEL\_VERSION}\emph{)}\;
-semver string sent in \texttt{client-hello}.
-\item[\texttt{handshakeTimeoutMs}] \emph{(optional, default} \texttt{15000}\emph{)}\;
-how long to wait for the bridge's \texttt{hello} before rejecting
-the \emph{first} \texttt{start()}.
-\item[\texttt{reconnect}] \emph{(optional, default} \texttt{true}\emph{)}\;
-auto-reconnect with exponential backoff on an unexpected socket
-close (bounds tunable via \texttt{reconnectInitialMs} /
-\texttt{reconnectMaxMs}). A 4426 version-gate rejection is the one
-close that does \emph{not} reconnect.
-\end{description}
-
-\noindent Returns a \texttt{CompositeTransport}. After
-\texttt{await transport.start(identity.id)} the bridge is reachable
-as a peer (\texttt{transport.bridgeNodeId}) and the WebRTC mesh is
-ready to accept channels. Beyond the \texttt{Transport} contract the
-returned object carries the connection-observability surface the
-factory now owns:
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{onBridgeState(cb)}] subscribe to state transitions
-\texttt{connecting\,|\,open\,|\,stale\,|\,disconnected\,|\,upgrade-required};
-\texttt{bridgeState} is the current value, \texttt{upgradeReason} the
-4426 detail.
-\item[\texttt{onWelcome(cb)}] the bridge's \texttt{welcome}
-(\texttt{\{connId, version, kernelVersion, turn\}}), also cached on
-\texttt{bridgeInfo} and replayed to late subscribers.
-\item[\texttt{bridgeRtt} / \texttt{bridgeRttAvg}] last and windowed
-ping\textrightarrow{}pong round-trip in ms.
-\item[\texttt{onPingTraffic(cb)}] per-frame \texttt{(nodeId, 'sent'|'recv')}
-pulses for live link indicators.
-\item[\texttt{reconnectNow()}] force an immediate reconnect with the
-backoff reset (tab-resume / network-online).
-\end{description}
-
-\smallskip
-\noindent\texttt{nodeTransport.server(\{ ... \})}\quad
-\emph{server-side WebSocket transport (Node 20+)}\\
-\noindent\texttt{nodeTransport.client(\{ ... \})}\quad
-\emph{Node WebSocket client}
-
-\smallskip
-\noindent Used by \texttt{axona-bridge}'s embedded peer and by Node
-applications. Same \texttt{Transport} contract as the browser
-transport; no WebRTC.
-
-\smallskip
-\noindent\texttt{simTransport(\{ network, identity \})}\quad
-\emph{in-process simulation transport}
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{network}] \texttt{SimNetwork} shared across peers.
-\item[\texttt{identity}] identity envelope.
-\end{description}
-
-\noindent For tests and \texttt{dht-sim}. Messages are scheduled in
-the event loop with synthetic latency from a real internet topology
-dataset.
-
-\subsection*{AxonaPeer}
-
-\smallskip
-\noindent\texttt{new AxonaPeer(\{ ... \})}\quad
-\emph{the per-node DHT instance}
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{node}] \texttt{NeuronNode} instance for this peer
-(carries id, lat, lng, the synaptome).
-\item[\texttt{domain}] \texttt{AxonaDomain} the peer joins. Construct
-one per network with \texttt{new AxonaDomain(\{ k: 20 \})}, where
-\texttt{k} \emph{(default 20)} is the routing closest-set size (the
-root-set replication factor $R$ is separate; see \S\,X).
-\item[\texttt{transport}] the transport instance from
-\texttt{webTransport}, \texttt{nodeTransport}, or \texttt{simTransport}.
-\item[\texttt{nodeIdentity}] \emph{(optional)}\; the connection identity
-envelope from \texttt{createNodeIdentity}. Used for the handshake,
-routing, and signing the node's own \texttt{kill}/\texttt{unpub}. It
-\emph{never} signs a publish --- authorship is supplied per-publish via
-\texttt{\{ signWith \}} (an author identity), so a peer holds no default
-author.
-\item[\texttt{axonaManager}] \emph{(optional)}\; explicit
-\texttt{AxonaManager}. When omitted, one is built automatically on
-\texttt{peer.start()}.
-\item[\texttt{persist}] \emph{(optional)}\; \texttt{PersistenceAdapter}
-for identity / synaptome / subscription checkpoints (not replay
-caches). Default: no persistence.
-\end{description}
-
-\subsection*{Lifecycle}
-
-\smallskip
-\noindent\texttt{await peer.start()}\quad
-\emph{wire handlers, install delivery hook}\\
-\noindent\texttt{await peer.stop()}\quad
-\emph{detach handlers and event listeners}
-
-\smallskip
-\noindent\texttt{await peer.join(sponsor?)}\quad
-\emph{production bootstrap path}
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{sponsor}] \emph{(optional)}\; 66-char hex node ID. If
-given, opens a transport channel to that peer and seeds the
-synaptome from it. If omitted, returns immediately --- the peer
-is ``joined'' but isolated; inbound connections from other peers
-populate the synaptome.
-\end{description}
-
-\smallskip
-\noindent\texttt{await peer.leave(opts?)}\quad
-\emph{leave the network gracefully}
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{opts.drain}] \emph{(default} \texttt{true}\emph{)}\; wait
-for in-flight publishes to settle.
-\item[\texttt{opts.notify}] \emph{(default} \texttt{true}\emph{)}\; send a
-\texttt{peer-leaving} notification to every peer in the synaptome.
-\item[\texttt{opts.timeoutMs}] \emph{(default} \texttt{5000}\emph{)}\;
-maximum drain window in ms.
-\end{description}
-
-\subsection*{Pub / Sub}
-
-\smallskip
-\noindent\texttt{await peer.pub(topic, message, \{ signWith \})}\quad
-\emph{publish to a topic}
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{topic}] structured descriptor
-\texttt{\{ region?, owner?, name, write? \}} (\emph{not} a string).
-Three canonical shapes: an open lobby \texttt{\{ region, name \}}
-(anyone may publish); an author feed
-\texttt{\{ region, owner, name, write: 'owner' \}} (owner-only writes;
-if \texttt{region} is omitted it defaults to the publisher's own node
-region, so subscribers must name the region to read it from elsewhere);
-an author inbox \texttt{\{ region, owner, name \}} (open write under an
-owner namespace).
-\item[\texttt{message}] JSON-serializable payload.
-\item[\texttt{signWith}] \textbf{required.} An \emph{author} identity
-from \texttt{createAuthorIdentity}; the publish is signed with its
-Ed25519 key. Pass the \texttt{ANONYMOUS} sentinel
-(\texttt{\{ signWith: ANONYMOUS \}}) to publish unsigned. Omitting
-\texttt{signWith} throws \texttt{PUBLISH\_NO\_PUBLISH\_IDENTITY} ---
-anonymity is explicit, never the silent default. There is no
-\texttt{\{ sign: false \}} and no \texttt{\{ publisher \}} option.
-\end{description}
-
-\noindent On an owner-only topic the signer must be the owner key, or
-\texttt{pub} throws \texttt{WRITE\_POLICY\_VIOLATION} (the topic's
-roots enforce the same at ingress). Returns a Promise resolving to the
-\texttt{msgId} --- the 64-char hex content hash
-\textsc{sha256}(\texttt{signerPubkey~||~message}). Throws
-\texttt{PublishError} on invalid inputs or signing failure.
-
-\smallskip
-\noindent\texttt{await peer.sub(topic, handler, opts?)}\quad
-\emph{subscribe to a topic}
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{topic}] structured descriptor
-\texttt{\{ region?, owner?, name, write? \}} --- same addressing as
-\texttt{pub}. To read another author's feed, pass their \texttt{owner}
-Author ID together with the feed's \texttt{region} --- an Author ID has
-no region of its own, so discovery needs both the owner key and the
-region the feed was published in.
-\item[\texttt{handler}] function \texttt{(envelope) => void}\;
-invoked for each delivery. The envelope is
-\texttt{\{ msgId, seq, ts, topic, message, signerPubkey? \}}
-(\texttt{signerPubkey} and \texttt{signature} present only when the
-publish was signed; \texttt{topic} is the descriptor). A retraction
-(see \texttt{peer.kill}) arrives on the same handler as a marker,
-\texttt{\{ deleted: true, msgId, topic \}} --- branch on
-\texttt{env.deleted} to drop your local copy.
-\item[\texttt{opts.since}] \emph{(default: live tail)}\; replay
-control. Pass \texttt{'latest'} for the most-recent cached message
-plus future deliveries, \texttt{'all'} for the full replay cache
-plus future, or a Unix-ms \texttt{number} for everything newer
-than that timestamp.
-\end{description}
-
-\noindent Returns a Promise resolving to a \texttt{Subscription}
-handle. Call \texttt{sub.stop()} to cancel that handle, or
-\texttt{peer.unsub(topic, opts)} (kernel v2.10.0) to leave the topic by
-name --- stops every local subscription for it and, when the last goes,
-sends the network unsubscribe (self-only by construction).
-
-\smallskip
-\noindent\texttt{await peer.pull(msgId, opts)}\quad
-\emph{fetch a message from the relay's replay cache --- by ID, or the
-latest}
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{msgId}] 64-char hex content hash, \emph{or}
-\texttt{null}/omitted to fetch the topic's most-recent message
-(highest \texttt{seq}; kernel v2.10.0).
-\item[\texttt{opts.topic}] the topic \emph{descriptor} (required) ---
-same shape as \texttt{sub}, used to derive the topic ID and locate the
-relay.
-\item[\texttt{opts.timeoutMs}] \emph{(default} \texttt{1000}\emph{)}.
-\end{description}
-
-\noindent Returns the envelope or \texttt{null} if not found (which
-includes a message that has \emph{expired} past its hold time). A
-successful pull slides the message's hold forward, bounded by its 48\,h
-ceiling.
-
-\smallskip
-\noindent\texttt{await peer.metrics(topic, opts)}\quad
-\emph{aggregate counters across the relay tree}
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{topic}] the topic descriptor.
-\item[\texttt{opts.timeoutMs}] \emph{(default} \texttt{500}\emph{)}.
-\end{description}
-
-\noindent Returns \texttt{\{ publishes, current\_count, subscribers,
-deliveries, pulls, reshares, relayCount \}}.
-
-\smallskip
-\noindent\texttt{await peer.host(topic?, opts?)}\quad
-\emph{store + serve a topic for others, without subscribing (kernel
-v2.40.0)}
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{topic}] string, \emph{or omitted}. With a topic, the node
-hosts that one topic (given as a descriptor, same shape as
-\texttt{sub}). Omitted, the node hosts its \textbf{own keyspace
-neighborhood} --- it is recruited as a root for whatever topics fall near
-its node ID (``host whatever lands near me''), the natural mode for a
-relay.
-\end{description}
-
-\noindent Hosting is \textbf{decoupled from subscribing}: a host stores and
-serves a topic for other peers but is \emph{not} a consumer of it --- it
-registers no delivery handler and is never added to the node's own
-subscription set. Mechanically it announces itself with the \emph{same}
-\texttt{pubsub:subscribe-k} a subscriber already sends, so existing roots
-recruit it with no wire change (no flag day), then caches and serves
-replays exactly as a root does. It respects the proximity gate (B-2): a
-host only ends up rooting topics it is genuinely among the K-closest to, so
-the primitive cannot force a node into the serving set for arbitrary or
-distant topics. \texttt{peer.unhost(topic?)} reverses it;
-\texttt{health().hosting} reports \texttt{\{ keyspace, topics \}}. This is
-the participation primitive for relays and other infrastructure that should
-\emph{carry} a topic without consuming it --- before it, a node entered a
-topic's serving fabric only by subscribing, so a relay that meshed but
-never subscribed carried nothing.
-
-\subsection*{Message lifecycle (kernel v2.10.0)}
-
-Three lifecycle controls, each \textbf{self-authenticating} --- the
-authority to act is proven by the same keypair that proved
-authorship/ownership, with no registry or central gatekeeper.
-
-\smallskip
-\noindent\texttt{await peer.kill(topic, msgId, \{ signWith \})}\quad
-\emph{retract a message you published (creator-only)}
-
-\noindent The kill must be signed (\texttt{signWith}) with the
-\emph{same author key that signed the original message}, else
-\texttt{KILL\_SIGN\_FAILED}. A topic's root axons accept it only on
-that proof; they drop the message from their replay caches, record a
-short-lived tombstone (so a lagging replica can't resurrect it), and
-forward a delete marker to subscribers. It is best-effort redaction,
-\emph{not} a cryptographic un-send --- a subscriber that already
-received the plaintext can keep it --- and an anonymous
-(\texttt{\{ signWith: ANONYMOUS \}}) message has no provable creator and
-so cannot be killed. Throws \texttt{KillError}.
-
-\smallskip
-\noindent\texttt{await peer.touch(topic, msgId, \{ signWith \})}\quad
-\emph{keep-alive; reset a message's hold time}
-
-\noindent Slides a message's expiry forward (bounded by the 48\,h
-ceiling) so an actively-wanted message isn't swept. Self-authenticating
-like \texttt{kill}: on an open topic anyone may touch a message; on an
-owned topic only the owner key may. Throws \texttt{TouchError}.
-
-\smallskip
-\noindent\texttt{await peer.unpub(topic, \{ signWith, destroy? \})}\quad
-\emph{remove a topic's whole queue (owner-only)}
-
-\noindent The \emph{owner} is the Author ID named in the topic
-descriptor (\texttt{owner}); \texttt{unpub} must be signed
-(\texttt{signWith}) with that author key, and roots verify the signer's
-pubkey equals the descriptor's \texttt{owner} self-authenticatingly.
-\texttt{opts.destroy} (default \texttt{false}) escalates from ``clear the
-messages'' to total removal (messages \emph{and} config/ownership
-state). Open (ownerless) topics cannot be unpublished
-(\texttt{UNPUB\_PUBLIC\_TOPIC}). Throws \texttt{UnpubError}.
-
-\subsection*{Topic limits}
-
-Each topic's replay queue is bounded (kernel v2.10.0): \textbf{max
-messages} (default 100, ceiling 256) with deterministic eviction of the
-lowest-ordered message by signed \texttt{(seq, ts, msgId)} --- a max of 1
-is a retained / latest-value slot; a \textbf{hold time} (default 24\,h,
-hard ceiling 48\,h) after which a message expires and is swept; and, on
-\emph{open} (anyone-may-publish) topics, a \textbf{per-publisher quota}
-(one-quarter of the queue) so a single publisher can't flood out the
-rest. Owner-gated topics are governed by their publish rules instead.
-
-\subsection*{Direct messaging}
-
-\smallskip
-\noindent\texttt{await peer.send(targetId, message)}\quad
-\emph{RPC-style; awaits the remote handler's return value}\\
-\noindent\texttt{peer.notify(targetId, message)}\quad
-\emph{fire-and-forget}\\
-\noindent\texttt{peer.onMessage(handler)}\quad
-\emph{register a handler for incoming direct messages}
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{targetId}] 66-char hex node ID. The peer must already
-be in the synaptome.
-\item[\texttt{message}] JSON-serializable payload.
-\item[\texttt{handler}] function \texttt{(fromId, message) => result}.
-The return value is sent back to the caller on \texttt{send}; ignored
-on \texttt{notify}. Async handlers are awaited.
-\end{description}
-
-\subsection*{Mesh introspection}
-
-\smallskip
-\noindent\texttt{peer.peers()}\;
-returns an array of 66-char hex node IDs currently in the synaptome.\\
-\noindent\texttt{peer.onPeerJoin(handler)}\;
-registers \texttt{(nodeId) => void} for new arrivals.\\
-\noindent\texttt{peer.onPeerLeave(handler)}\;
-registers \texttt{(nodeId) => void} for departures.\\
-\noindent\texttt{peer.health()}\;
-returns
-\texttt{\{ nodeId, synaptomeSize, peers, subscriptions, axonRoles, hosting, wireVersion, started, transport, meshDegraded \}}.\\
-\noindent\texttt{peer.onLog(level, handler)}\;
-\texttt{level} is \texttt{'debug'}, \texttt{'info'}, \texttt{'warn'},
-or \texttt{'error'}.\\
-\noindent\texttt{peer.onError(handler)}\;
-registers \texttt{(err) => void} for unhandled errors.\\
-\noindent\texttt{peer.onUpgradeRequired(handler)}\;
-registers \texttt{() => void}, fired when the bridge closes the
-connection with \texttt{UPGRADE\_REQUIRED} (WS 4426) because the peer's
-wire version is below the network floor.
-
-\subsection*{Lookup}
-
-\smallskip
-\noindent\texttt{await peer.lookup(targetKey)}\quad
-\emph{iterative K-closest walk}
-
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{targetKey}] 66-char hex 264-bit key. Usually a topic ID
-or a node ID.
-\end{description}
-
-\noindent Returns \texttt{\{ found, path, hops, time \}}.
-\texttt{found} is a boolean --- whether the walk reached a peer at the
-target key; \texttt{path} is the list of nodes traversed;
-\texttt{hops} is the count; \texttt{time} is wall-clock ms.
-
-\subsection*{Author class (agent legibility)}
-
-\smallskip
-\noindent\texttt{await peer.setAuthorClass(cls, \{ signWith, operator?, operatorSignWith?, label? \})}\;
-publishes a voluntary, signed \emph{author-class attestation} ---
-\texttt{cls} is \texttt{'agent'} or \texttt{'human'} --- to the
-author's own owner-only profile topic, declaring what kind of actor is
-behind the key.\sidenote{The attestation is signed by the author key
-and carried on a pinned-region, owner-only topic derived from the
-Author ID; a declaring peer should \texttt{host()} that topic so the
-claim stays resolvable after the roots evict it. An optional
-\texttt{operatorSignWith} attaches a counter-signature, letting a named
-operator vouch for the key (\texttt{operatorVerified} below).}\\
-\noindent\texttt{await peer.getAuthorClass(authorId)}\;
-resolves any author's declared class from its Author ID alone,
-returning \texttt{\{ class, operator, operatorVerified, label, ts \}}.
-\texttt{class} is \texttt{'agent'}, \texttt{'human'}, or
-\texttt{'unstated'} --- absence is \emph{unstated}, never silently
-\texttt{'human'}. It is provenance, not detection: a deceptive actor
-can decline to flag or flag falsely; what it shapes is the honest
-default (see the agent-legibility item under Future Directions).
-
-\subsection*{Snapshots}
-
-\smallskip
-\noindent\texttt{await peer.snapshot()}\;
-returns a JSON object capturing identity, synaptome, and subscriptions
-(plus the wire version). Symmetric with
-\texttt{AxonaPeer.fromSnapshot(snap, deps)}, which reconstructs a peer
-from one of these dumps without touching the network.\sidenote{It is a
-routing/identity checkpoint, not a message store --- axon roles and
-replay caches are \emph{not} captured, so a restored peer rebuilds the
-topics it hosts or serves from the live mesh.}
-
-\subsection*{Helpers}
-
-\smallskip
-\noindent\texttt{await deriveTopicId(descriptor)}\;
-returns the 66-char hex topic ID for a topic descriptor
-\texttt{\{ region?, owner?, name, write? \}} --- the same derivation
-\texttt{pub}/\texttt{sub} use internally. Useful for displaying the
-publish location in a UI.
-
-\smallskip
-\noindent\texttt{geoCellId(lat, lng, bits)}\;
-returns the integer S2 cell at the given precision. \texttt{bits =
-8} matches the top 8 bits of every Axona nodeId.
-
-% =====================================================================
-% XII. IDENTITY AND SECURITY
+% XIV. IDENTITY AND SECURITY
 % =====================================================================
 \section{Identity and Security}
 
@@ -1646,7 +1532,10 @@ identity, and an unsigned publish must opt in explicitly via the
 \texttt{ANONYMOUS} sentinel; there is no default signer. Verification is
 per-envelope, not per-peer --- an untrusted relay can carry a signed
 publish from a trusted author unchanged, and any receiver along the way
-can verify the chain of custody.
+can verify the chain of custody. The same separation is why a publish
+receives no acknowledgment (\S\,VII): an ack would correlate the
+transport identity that carried a message with the author identity
+that signed it.
 
 \newthought{Write policy is enforced at the storing node}, not merely
 claimed by the sender. A topic descriptor declares its policy ---
@@ -1655,8 +1544,8 @@ the named author key) --- and the author signs the \emph{whole}
 descriptor. The node that stores and serves the topic independently
 recomputes the topic ID from that signed descriptor and, for an owner
 topic, requires \texttt{signerPubkey === owner} before accepting a
-message --- at \emph{every} ingress path: direct publish, K-closest
-relay-accept, and anti-entropy sync. A publish naming someone else's
+message --- at \emph{every} ingress path: direct publish, replication,
+and anti-entropy sync. A publish naming someone else's
 owner-only topic is refused at the publisher
 (\texttt{WRITE\_POLICY\_VIOLATION}) and again at the root, so a feed or
 profile cannot be spoofed by a third party even reaching a storing node
@@ -1675,7 +1564,11 @@ an over-claim: the peer a publisher hands a message to over its own
 connection can still locally correlate that connection with the author
 key at send time, and the protocol carries no defence against
 network-level traffic analysis (out of scope for v1). At-rest and
-onward-hop data carry no location link beyond the chosen region byte.}
+onward-hop data carry no location link beyond the chosen region byte.
+This is also why publisher location stays \emph{out of the protocol}
+as a hard rule: the envelope discloses \emph{who}, never \emph{where};
+an application that wants to show a sender's region embeds it,
+voluntarily, in its own payload.}
 
 Persistence is opt-in. The kernel's
 \texttt{PersistenceAdapter} contract exposes
@@ -1689,7 +1582,7 @@ are reinstalled as soon as the mesh has stabilised.
 
 \marginnote{Because the \emph{node} identity is bound to a region
 prefix, moving geographic location changes the nodeId; axona-peer's
-identity.js preserves it across reloads unless the user re-selects a
+identity layer preserves it across reloads unless the user re-selects a
 region, so a roaming user keeps the same DHT (node) identity for the
 life of the browser profile. Authorship is unaffected either way: an
 Author ID has no region, so the same author key signs from any location
@@ -1698,16 +1591,25 @@ or device.}
 The \texttt{crypto.subtle} dependency is a hard requirement: the
 demo and the peer fail to boot in insecure contexts (HTTP pages
 outside localhost) because the Web Crypto API simply isn't
-available. The bridge serves over HTTPS; the peer's GitHub Pages
-deployment enforces HTTPS at the Pages level; the demo at
-\texttt{demo.axona.net} required Let's Encrypt cert provisioning
-before identity derivation would run at all.
+available. Every deployed surface serves over HTTPS.
+
+\subsection*{Agent legibility: who --- or what --- holds the key}
+
+An author may voluntarily declare what kind of actor stands behind its
+key: \texttt{peer.setAuthorClass('agent'\,|\,'human', \{signWith\})}
+publishes a signed attestation to an owner-only profile topic derived
+from the Author ID itself, resolvable by anyone via
+\texttt{peer.getAuthorClass(authorId)}. Absence is \emph{unstated},
+never silently ``human.'' It is provenance, not detection --- a
+deceptive actor can decline to flag or flag falsely; what it shapes is
+the honest default, and it gates no one: subscribers and filters
+choose what to do with the claim.
 
 \subsection*{Proof of work, decoupled from the address}
 
 \newthought{Identity minting is gated by a proof of work} (the E-1
-placement defense), shipped \emph{inert} at difficulty~0 in kernel
-v2.34 so that difficulty is a tunable protocol parameter rather than a
+placement defense), shipped \emph{inert} at difficulty~0 so that
+difficulty is a tunable protocol parameter rather than a
 format change.\footnote{This composes known primitives, not new
 crypto. A.~Back, \emph{Hashcash --- A Denial of Service Counter-Measure}
 (2002; orig.\ proposed 1997) --- the
@@ -1745,78 +1647,104 @@ work hash (currently SHA-256) must be replaced with a memory-hard
 function so phone/browser minters aren't out-classed by ASIC grinders.}
 
 % =====================================================================
-% XIII. PRODUCTION DEPLOYMENT
+% XV. THE APPLICATION API
+% =====================================================================
+\section{The Application API}
+
+\newthought{Every Axona application talks to the protocol through one
+import} --- the barrel export at \texttt{@axona/protocol}. The
+field-by-field reference (every parameter, default, return shape, and
+error) lives in the companion \emph{Axona API Reference}; what belongs
+in an architecture document is the \emph{shape} of the surface and why
+it is shaped that way.\sidenote{The catalogue used to live here and
+drifted from the code between releases; a reference document versioned
+with the kernel is the right home for exactness. This section stays
+true at the resolution it speaks.}
+
+\begin{fullwidth}
+\par\medskip\noindent\small
+\begin{tabular}{@{}lp{0.44\textwidth}p{0.30\textwidth}@{}}
+\toprule
+\textbf{Concern} & \textbf{Surface} & \textbf{Architectural note} \\
+\midrule
+Identity & \texttt{createNodeIdentity(\{lat, lng\})} \newline \texttt{createAuthorIdentity(} \texttt{\{persistAs?\})} & one factory per concern; connection key never signs content \\
+\addlinespace[2pt]
+Assembly & \texttt{webTransport} / \texttt{nodeTransport} / \texttt{simTransport}, \newline \texttt{new NeuronNode}, \texttt{new AxonaDomain}, \texttt{new AxonaPeer} & same shapes on all three transports \\
+\addlinespace[2pt]
+Lifecycle & \texttt{start() / ready() / join(sponsor?) /} \newline \texttt{leave(\{drain, notify\}) / stop()} & \texttt{ready()} gates first pub/sub on mesh warm-up; \texttt{leave()} hands off rooted caches \\
+\addlinespace[2pt]
+Topics & descriptor \texttt{\{region?, owner?, name, write?\}}; \newline \texttt{deriveTopicId(descriptor)} & the ID is a pure function of the fields --- shared fields, shared topic, no registry \\
+\addlinespace[2pt]
+Pub/sub & \texttt{pub(topic, msg, \{signWith\})} \newline \texttt{sub(topic, handler, \{since?\})} \newline \texttt{unsub(topic)} \,\textperiodcentered\, \texttt{kill(topic, msgId, \{signWith\})} & \texttt{signWith} is required (or the explicit \texttt{ANONYMOUS}); \texttt{since} is live / \texttt{'latest'} / \texttt{'all'} / timestamp; kill is the sole retraction \\
+\addlinespace[2pt]
+Reads & \texttt{pull(msgId\,|\,null, \{topic\})} \newline \texttt{metrics(topic)} \,\textperiodcentered\, \texttt{metricTopic(T)} & pulls answered by the nearest replica; metrics are published snapshots, demand-driven \\
+\addlinespace[2pt]
+Hosting & \texttt{host(topic?) / unhost(topic?)} & carry a topic (or your keyspace neighborhood) without consuming it \\
+\addlinespace[2pt]
+Direct & \texttt{send(nodeId, msg)} (RPC) \,\textperiodcentered\, \texttt{notify} \,\textperiodcentered\, \texttt{onMessage} & for protocols that aren't topic-shaped \\
+\addlinespace[2pt]
+Introspection & \texttt{peers() / health() / onPeerJoin / onPeerLeave /} \newline \texttt{onLog / onError / onUpgradeRequired} & every component surfaces \texttt{KERNEL\_VERSION} at runtime \\
+\addlinespace[2pt]
+Provenance & \texttt{setAuthorClass / getAuthorClass} & voluntary signed agent/human attestation \\
+\addlinespace[2pt]
+Persistence & \texttt{snapshot() / fromSnapshot}; \texttt{PersistenceAdapter} & identity + routing checkpoint, not a message store \\
+\bottomrule
+\end{tabular}
+\par\medskip
+\end{fullwidth}
+
+Three properties of the surface are architectural commitments. First,
+\emph{addressing is derivation}: any two parties who share a
+descriptor's fields converge on the same topic without consulting
+anyone. Second, \emph{authorship is explicit at every call}: there is
+no ambient signer, so no code path can accidentally sign with the
+wrong key --- and anonymity is a stated choice. Third,
+\emph{everything degrades to data}: subscriptions, hosting, roles,
+metrics leases are all soft state that the kernel continuously
+re-derives, so the API has almost no operations that can leave the
+network in a wrong state --- the worst most calls can do is nothing.
+
+% =====================================================================
+% XVI. PRODUCTION DEPLOYMENT
 % =====================================================================
 \section{Production Deployment}
 
-\newthought{The public stack runs at four URLs.}
+\newthought{Two networks run today}, deliberately partitioned by wire
+major.
 
-\begin{description}
-\setlength{\itemsep}{0pt}
-\item[\texttt{bridge.axona.net}.] The east (primary) bridge. Runs on a
-DigitalOcean droplet as a \textbf{Docker Compose stack} of three
-containers: the bridge (Node), \textbf{Caddy} (automatic Let's Encrypt
-TLS plus reverse proxy), and \textbf{coturn} (a TURN relay for the
-peers that can't negotiate a direct WebRTC link). Kept current via
-\texttt{git pull \&\& docker compose build \&\& docker compose up
--d}.\sidenote{The systemd + nginx + certbot path the bridge originally
-shipped with still exists in \texttt{deploy/} and is what
-\texttt{testnet.axona.net} runs; prod cut over to the Docker stack with
-the kernel 3.1.0 promotion.} Caddy terminates \texttt{wss://} and
-proxies to the bridge on loopback; the bridge itself binds
-\texttt{127.0.0.1} only, never world-facing. \texttt{/healthz} is
-exposed for monitoring --- an unauthenticated caller gets just
-\texttt{\{status, version, kernelVersion\}}, while the full
-synaptome/directory/uplink body and \texttt{/diag} require a
-\texttt{HEALTHZ\_TOKEN} header.
+\textbf{The production line (wire 3.x)} serves the public URLs: the
+east bridge \texttt{bridge.axona.net} and its federated partner
+\texttt{bridge-west.axona.net} --- each a Docker Compose stack of
+three containers (the bridge, \textbf{Caddy} for automatic TLS and
+reverse proxy, \textbf{coturn} for TURN relay), joined by the west
+bridge's uplink so the pair share one connectome and directory ---
+plus the reference peer at \texttt{axona.net} and the minimal demo at
+\texttt{demo.axona.net}, both static GitHub Pages deployments that
+vendor their kernel.\sidenote{Caddy terminates \texttt{wss://} and
+proxies to the bridge on loopback; the bridge binds
+\texttt{127.0.0.1} only. \texttt{/healthz} exposes
+\texttt{\{status, version, kernelVersion\}} unauthenticated; the full
+synaptome/directory/uplink body requires a token.}
 
-\item[\texttt{bridge-west.axona.net}.] A second federated bridge in a
-western region, running the same Docker stack. It holds an
-\emph{uplink} to the east bridge so the two embedded peers share one
-connectome and the bridge directory federates across both --- a peer
-dialing either one reaches the same mesh. It also advertises its own
-\texttt{coturn} credentials into the welcome frame and its directory
-entry.
+\textbf{The development line (wire 4.x)} --- the architecture this
+document describes --- runs on \textbf{testnet}:
+\texttt{testnet.axona.net} (bridge + peer app),
+\texttt{demo-testnet.axona.net}, and a standing relay fleet, all on
+the current 4.x kernel, exercised by nightly soak harnesses (scale,
+backlog, churn, and gap-recovery scenarios against the live fleet).
+The two lines do not interoperate --- the wire major partitions them
+hermetically at the bridge gate and the peer handshake --- and the
+4.x line is promoted to production as a gated flag-day, not dragged
+along by a push. The 3.x line is maintenance-only; all protocol
+development lands on 4.x.
 
-\item[\texttt{axona.net}.] The reference peer application, served
-via GitHub Pages from the \texttt{axona-peer} repo's main branch.
-Every push redeploys. The vendored \texttt{axona-protocol} kernel
-ships with the app; the version row in the UI confirms which
-kernel an open tab is running.
-
-\item[\texttt{demo.axona.net}.] The minimal pub/sub demo, served
-via GitHub Pages from the \texttt{axona-protocol} repo's main
-branch (where \texttt{examples/minimal-pubsub-browser/} lives).
-Same Pages deployment pattern; HTTPS-enforced because
-\texttt{crypto.subtle} requires a secure context.
-\end{description}
-
-\newthought{The v0.3 wire flag-day is complete.} The whole fleet ---
-prod \texttt{bridge.axona.net} and \texttt{bridge-west.axona.net}, plus
-\textbf{testnet} (\texttt{testnet.axona.net} +
-\texttt{demo-testnet.axona.net}, served from a droplet) --- runs the
-\textbf{3.x} kernel line: WIRE\_VERSION 3.0, AUTH\_PROTO axona/5, bridge
-gate \texttt{REQUIRED\_WIRE\_MAJOR=3} with both version floors at 3.0.0,
-so a pre-v3 client is closed with \texttt{UPGRADE\_REQUIRED} (WS code
-4426). The wire-2$\to$wire-3 cutover was a hermetic flag-day --- a
-wire-2 and a wire-3 peer reject each other's envelopes --- and was
-promoted to prod behind a gate rather than dragged along by a push;
-\emph{within} the 3.x line, additive point releases are wire-compatible
-and roll with no flag-day. As of this writing the deployed bridges
-report kernel \texttt{3.6.0} and the kernel source sits a few point
-releases ahead at \texttt{3.8.0}. The testnet static hosts serve their
-assets with \texttt{Cache-Control: no-cache} so a kernel module update
-is revalidated rather than served stale from a browser's ES-module
-cache after a deploy.
-
-A coordinated release works as follows: a fix lands in
+A coordinated release works as follows: a change lands in
 \texttt{axona-protocol}, bumps \texttt{KERNEL\_VERSION} and the
-package version, tags the commit. \texttt{axona-peer} resyncs its
-\texttt{vendor/axona-protocol/} from the new kernel, bumps
-\texttt{PEER\_VERSION}, and pushes (Pages picks up). The bridge
-updates its \texttt{@axona/protocol} dependency in
-\texttt{package.json}, bumps \texttt{VERSION} in \texttt{server.js},
-pushes, and the operator runs the deploy script. Every component
+package version, tags the commit. \texttt{axona-peer} and
+\texttt{axona-relay} resync their vendored kernels and bump;
+\texttt{axona-bridge} re-pins its kernel dependency; the fleet
+restarts on the new versions; a live cross-peer pub/sub check against
+a warm topic confirms the deploy. Every component
 ends up reporting the same \texttt{kernelVersion} in its visible
 metadata.
 
@@ -1828,108 +1756,78 @@ it did, ``which kernel is everyone on?'' required SSH-ing into the
 bridge and grepping \texttt{node\_modules}.}
 
 % =====================================================================
-% XIV. FUTURE DIRECTIONS
+% XVII. FUTURE DIRECTIONS
 % =====================================================================
 \section{Future Directions}
 
-\newthought{The architecture is stable.} The shape of the layering,
-the wire format, the BigInt-canonical address discipline, the
-K-closest pub/sub semantics --- these are not expected to change.
-What's coming sits inside the existing seams:
+\newthought{The architecture is stable.} The layering, the wire
+format, the BigInt-canonical address discipline, the axonic-tree
+semantics --- these are not expected to change. What's coming sits
+inside the existing seams:
 
 \begin{description}
 \setlength{\itemsep}{0pt}
-\item[\textbf{Multi-bridge gossip.}] Production \emph{already} runs
-federated bridges --- an east \texttt{bridge.axona.net} and a west
-\texttt{bridge-west.axona.net}, joined by an outbound \emph{uplink} so
-the pair share one connectome: each bridge's embedded peer runs a
-\texttt{CompositeTransport} (inbound browser WebSocket \emph{plus} an
-uplink client dialing the peer bridge), and the bridge directory
-federates across both. What remains future is full $N$-way peer-list
-gossip, so a peer connected to one bridge is \emph{directly} reachable
-from any other beyond today's uplink bootstrap chain. Either way it is a
-deployment story, not a protocol constraint --- routing already treats
-each bridge as an ordinary nodeId.
 
-\item[\textbf{Demote the bridge to an ordinary peer.}] Federated
-bridges remove the single \emph{rendezvous}; this companion change
-removes the single \emph{super-peer}. The routing and pub/sub layers
-already treat a bridge as just another nodeId --- there is no
-\texttt{isBridge} flag, no eviction exemption, no routing
-privilege.\sidenote{The bridge's present dominance is \emph{emergent},
-not granted: every peer dials it first, so it lands in every synaptome
-and carries the highest degree; and its \texttt{0x89} geo-identity sits
-XOR-close to every \texttt{us-east/*} topic. The ordinary K-closest and
-vitality rules then keep selecting it as a root. The topology makes it
-central; the algorithm gives it nothing.} The residual special status
-is purely at the \emph{bootstrap} layer: a peer holds its bridge
-WebSocket open for signaling and \emph{auto-readmits} the bridge to its
-synaptome on every (re)connect, so the bridge never actually leaves the
-routing table. Once a peer holds enough healthy mesh peers it should
-\emph{drop the bridge from routing and root candidacy} --- keeping the
-socket open for signaling only --- and stop auto-readmitting its
-nodeId. With several bridges sharing the load, this also dissolves the
-\emph{correlated} failure mode in which one bridge restart removes a
-root from nearly every topic at once. The goal state: a bridge is a
-signaling endpoint that any operator can stand up, indistinguishable
-from any other peer to the routing fabric. Validate convergence and
-churn behaviour in \texttt{dht-sim} before shipping.
+\item[\textbf{Promote the 4.x line to production.}] The gated
+flag-day that retires the 3.x network: bridges raise
+\texttt{REQUIRED\_WIRE\_MAJOR} to 4, the peer and demo deploy their
+4.x builds, and the axon-tree semantics described here become the
+public network. Gated on the testnet soak batteries holding their
+delivery bars.
 
-\item[\textbf{Bridge directory.}] A well-known open topic --- the fixed
-descriptor \texttt{\{ region: 'useast', name: 'axona:bridge-directory' \}}
---- where every bridge republishes itself once per hour: URL, region,
-kernel version, advertised TURN credentials, last-seen
-timestamp.\sidenote{Subscribers keep the newest entry per
-\texttt{signerPubkey} and prune entries older than 24 hours. Every peer
-resolves the same descriptor to the same topic ID (pinned to one region,
-since v0.3 has no global bucket), so all clients see the same listing
-regardless of their own geography.} Peers subscribe
-at startup and cache the directory; a peer whose primary bridge
-disappears has a list of alternates to try without out-of-band
-coordination. To prevent spam and DDoS of the channel, the topic
-uses an \emph{allowed-signer set}: only Ed25519 keys with a valid
-attestation chain back to one of the genesis bridge keys (baked
-into the kernel) can publish. Subscribers verify the chain on
-every publish and drop unattested envelopes at the AxonaManager
-layer, before they reach the application. Genesis keys can sign
-attestations admitting new bridges without a kernel release. This
-turns ``federated bridges'' from a deployment story into something
-clients can actually discover at runtime.
+\item[\textbf{Flip the region lock at critical mass.}] The strict
+region-occupancy discipline (\S\,VII) is implemented and shipped
+\emph{off}; when enough of the 192 regions hold standing nodes, one
+configuration call turns it on fleet-wide and regional traffic
+isolation becomes an enforced invariant rather than an emergent
+tendency.
+
+\item[\textbf{Load-aware root placement.}] Today a node that is
+closest to several hot topics takes every root and has no way to
+decline (\S\,X). The designed remedy splits the \emph{anchor} (the
+node routing points at --- unchanged, discoverable) from the
+\emph{root} (the node doing the work): an over-budget terminus
+\emph{defers}, handing rootship to the nearest under-budget member of
+the topic's closest-$K$ ladder --- verifiable by anyone, since the
+ladder is a pure function of the topic id --- and keeps a one-hop
+redirect. The specification, including the hysteresis that prevents
+root ping-pong, is the \emph{Load-Aware Root Placement} note;
+it proceeds only if simulation shows the hotspot relief without the
+thrash (the same evidence bar that retired two earlier root-mobility
+proposals).
+
+\item[\textbf{Demote the bridge to an ordinary peer.}] Routing
+already grants the bridge nothing --- no flag, no eviction exemption,
+no root candidacy (it is \emph{excluded} from rooting) --- but every
+peer still auto-readmits its bridge on every reconnect, so its
+centrality persists at the bootstrap layer. The goal state: once a
+peer holds enough healthy mesh peers, drop the bridge from routing
+entirely --- keeping the socket for signaling only --- so a bridge
+becomes a signaling endpoint any operator can stand up,
+indistinguishable from any peer in the fabric. Validate convergence
+in \texttt{dht-sim} first.
+
+\item[\textbf{Directory hardening.}] The bridge directory works
+today on signed entries and client-side ranking; the hardening step
+is an \emph{allowed-signer} attestation chain (genesis keys baked
+into the kernel, delegable without a release) so an open, well-known
+topic cannot be spammed into uselessness.
 
 \item[\textbf{Capability hardening (endo / SES).}] Adopt the
-Agoric and MetaMask object-capability stack to harden the
-host-side surface, in three landings: \texttt{@endo/marshal} for
-envelope payloads (so payloads can carry BigInt, remotable
-references, and the slot-and-body wire shape captp
-expects);\sidenote{Marshal output is JSON-shaped with
-\texttt{@qclass} annotations on typed values, so legacy peers see
-plain objects and capability-aware peers see typed data.
-Negotiated per-envelope via a \texttt{payloadFormat} tag.} an
-opt-in \texttt{AxonaPeer.create(\{secure:\,true\})} that calls
-\texttt{lockdown()} to freeze JavaScript primordials before
-kernel init, defending against prototype pollution and
-supply-chain mutation; and \texttt{@endo/captp} layered over
-\texttt{peer.send}\,/\,\texttt{peer.onMessage} to upgrade direct
-messaging from string-handler RPC to capability-style RPC with
-promise pipelining and revocable handles. A later phase ships
-\texttt{@endo/import-bundle} for content-addressed,
-signature-verified code distribution --- the substrate for
-running third-party agents and creator-published filters inside
-peer compartments with only the authority each receiver chose to
-grant.
+object-capability stack to harden the host-side surface:
+\texttt{@endo/marshal} for envelope payloads, an opt-in
+\texttt{lockdown()} that freezes JavaScript primordials before kernel
+init (prototype-pollution and supply-chain defence), and
+\texttt{@endo/captp} over \texttt{peer.send}/\texttt{onMessage} for
+capability-style RPC with promise pipelining. A later phase ships
+content-addressed, signature-verified code distribution --- the
+substrate for third-party agents and creator-published filters
+running inside peer compartments with only granted authority.
 
 \item[\textbf{Persistent topics.}] Today's replay cache survives
-in-memory only. A pluggable persistence layer for axon
-\texttt{role.replayCache} (with a TTL) lets late subscribers
-catch up across bridge restarts.
-
-\item[\textbf{Topic access control --- shipped in v3.0.0.}] What was a
-future direction here landed in the kernel: a topic descriptor declares
-\texttt{write: 'open'} (anyone may publish) or \texttt{write: 'owner'}
-(only the named owner Author ID), and storing nodes enforce it at every
-ingress path (\texttt{WRITE\_POLICY\_VIOLATION}; see \S\,XII). What
-remains future is richer policy --- multi-signer allow-lists and
-capability-scoped write grants beyond the single-owner case.
+in-memory only; replication and handoff carry it across churn, but a
+whole-fleet restart still forgets. A pluggable persistence layer for
+role caches (with TTL) closes that.
 
 \item[\textbf{Cross-tab state sharing.}] Multiple tabs on the
 same browser today derive the same identity and form independent
@@ -1941,157 +1839,35 @@ embedded kernel for IoT-class devices, sharing the wire format
 with the JS kernel so existing peers can talk to it without
 adaptation.
 
-\item[\textbf{Connection-time optimization.}] The
-authenticated-identity handshake costs only sub-millisecond
-crypto (one Ed25519 sign plus one verify per link); the felt
-cost of a cold start is dominated instead by WebRTC ICE/DTLS
-bring-up, un-bundled module loading, and the few added
-round-trips of the mesh handshake --- none of which touches
-steady-state routing or delivery latency. The recovery levers
-all sit at the client and transport layer, independent of the
-wire protocol: bundle the kernel modules, render the UI and
-authenticate in the background, and fold the mesh handshake into
-the DTLS/SDP setup so the signed hello rides the first
-data-channel frame.\sidenote{The last lever pairs naturally with
-binding the channel-binding value to the DTLS certificate
-fingerprint: once the CBV derives from the fingerprint already
-exchanged in the SDP, no nonce round-trip is needed and the
-handshake adds no extra latency --- security and speed land
-together.} Not yet mission-critical; deferred until adoption
-makes first-connect time the binding constraint.
-
 \item[\textbf{Black-hole detection (forwarding vitality).}] Every
 hardening to date answers \emph{``is this peer who it claims to be,
-and may it do this?''} --- identity, channel binding, ingress
-authorization, verified routing admission. A \emph{black-hole node}
-passes all of them and then silently drops (or, equivalently, fails
-to forward) the traffic it should relay. This is a Byzantine
-behavioural fault, not an identity one. Tampering is already defeated
-(end-to-end signatures + A-1) and replay/reorder by C-2's
-\texttt{seq}+freshness; \emph{omission}, though, is only
-\emph{inferable}, never provable --- you cannot prove a negative, and
-a malicious drop is indistinguishable from a crash or a bad link.
-The direction is a \emph{local} forwarding-vitality signal --- each
-node's own first-party measurement of whether traffic routed through a
-peer reached an acked destination, over the existing K-closest path
-redundancy --- driving route-around, never a gossiped reputation
-verdict (which the no-central-authority constraint forbids).
-Equivocation is the one bad-faith behaviour that \emph{is} provable
-(signed conflicting artifacts) and can land earlier. The gating
-question --- the false-positive rate against honest-but-flaky nodes
---- must be answered in simulation first; see the black-hole threat
-note and the heterogeneous-protocol simulation plan in
-\texttt{axona-docs}. This is the behavioural complement to verified
-admission: that governs \emph{who is in your routing table}; this
-governs \emph{whether they actually do their job}.
+and may it do this?''} A \emph{black-hole node}
+passes all of them and then silently drops the traffic it should
+relay --- a Byzantine behavioural fault, not an identity one.
+Omission is only \emph{inferable}, never provable --- a malicious
+drop is indistinguishable from a crash. The direction is a
+\emph{local} forwarding-vitality signal --- each node's first-party
+measurement of whether traffic routed through a peer reached an
+acked destination --- driving route-around, never a gossiped
+reputation verdict (which the no-central-authority constraint
+forbids). The gating question --- the false-positive rate against
+honest-but-flaky nodes --- must be answered in simulation first.
+This is the behavioural complement to verified admission: that
+governs \emph{who is in your routing table}; this governs
+\emph{whether they actually do their job}.
 
-\item[\textbf{Decoupled publish identity --- shipped in v3.0.0.}] This
-direction landed: authorship is now a free-standing \emph{author}
-identity (\texttt{createAuthorIdentity}) independent of the node it
-publishes from, signed in per-call via \texttt{\{ signWith \}}, with the
-node/transport key barred from signing. One peer can hold several
-authors; an author survives node churn and publishes from any
-device.\sidenote{The Nostr \texttt{npub} model: a portable author
-identity, the same key signing from several transport keys.} The cutover
-was the v0.3 flag-day --- it was \emph{not} additive after all, because
-folding authorship out of the node key meant the signed envelope had to
-carry the topic descriptor too, which moved the wire (v2$\to$v3). Three
-residual concerns remain genuinely future, none in the wire format:
-\textbf{(1)} it anonymizes the \emph{author field}, not the \emph{act}
---- a first-hop axon can still time-correlate origination (the \S\,XII
-traffic-analysis caveat); \textbf{(2)} anti-abuse must rebind --- a free,
-infinite supply of author keys defeats per-publisher quota, so
-rate-limiting must attach to the transport node or the author key must
-carry proof-of-work (the open E-1 / quota threads); and \textbf{(3)} the
-per-publisher \texttt{seq} (C-2) is per-\emph{signer}, so one author key
-used from two devices needs coordinated sequencing. Authorship trust is
-now a key-distribution question (which Author ID is whom), as for any
-pseudonymous-identity system.
-
-\item[\textbf{Governance as gradient (the \emph{Gates to Gradients}
-line).}] A companion six-note series in \texttt{axona-docs} works a
-different axis from the security hardening above --- not \emph{who may
-act} but \emph{how a network with no chokepoint shapes behaviour without
-a gate to pull}. One of the six has already shipped: \textbf{agent
-legibility}, a voluntary signed author-class attestation
-(\texttt{class:\,'agent'\,|\,'human'}) carried on the decoupled author
-key and resolvable from the Author ID alone --- it gates no one, and a
-subscriber or filter may choose to badge, throttle, or quarantine
-agent-class traffic.\sidenote{Kernel v3.7--v3.8:
-\texttt{buildAuthorClass}\,/\,\texttt{verifyAuthorClass} +
-\texttt{peer.setAuthorClass}\,/\,\texttt{getAuthorClass}, an owner-only
-profile topic the declarer \texttt{host()}s for durability, and an
-optional operator counter-signature. The reference web peer is the first
-consumer. Absence is \emph{unstated}, never silently ``human.''} The
-remaining four sit, like everything here, inside the existing seams; each
-is a \emph{gradient} (a cost or a piece of context that scales with
-reach) rather than a \emph{gate} (a binary verdict someone owns and can
-be captured).
-
-\item[\textbf{Cascade telemetry --- a ruler for the gradients.}] The
-highest-leverage, lowest-risk move, and the one to land first: every
-other gradient is shipped on faith until we can observe whether it
-actually changed how things propagate. The instrument is
-\emph{aggregate, privacy-preserving} measurement of cascade
-\emph{dynamics} --- spread velocity, fan-out shape, agent-to-human
-ratio, and how often a retraction loses its race against the bytes ---
-assembled the same way as everything else: first-party local stats,
-published to a topic, served by infra nodes that \texttt{host()} it,
-\emph{never} a central collector. The privacy bar is an engineering
-property, not a promise --- aggregation, sampling, $k$-anonymity, or
-differential-privacy noise applied \emph{above} the shipped
-derived-metric-topic path so no individual message or participant is
-reconstructable. Explicitly not content surveillance; it ships a gauge,
-not a feature. Validate the noise/utility trade-off in \texttt{dht-sim}
-before it grades anything.
-
-\item[\textbf{Soft retraction and annotation envelopes.}] The
-\emph{hard} primitive shipped --- owner-only \texttt{kill} + signed
-tombstones + \texttt{unpub} (Phase A), best-effort cooperative removal.
-The \emph{soft} gradient layers on top: a signed
-\emph{retracted-by-author} signal that removes nothing, references the
-original \texttt{msgId}, and rides the \emph{same} mesh
-\emph{alongside} the message it concerns --- and its generalization, a
-signed \emph{annotation envelope} that references a \texttt{msgId} so any
-party can attach a correction or dispute.\sidenote{Display and weight are
-the subscriber's or filter's choice. Annotations are \emph{context},
-never authorities that remove --- the move from deletion (impossible on a
-substrate where every holder keeps the bytes) to attached, signed
-context everyone can read and act on.} No wire change: both are ordinary
-signed pub/sub messages keyed to an existing \texttt{msgId}.
-
-\item[\textbf{Forkable filter sets.}] Of the four levers a platform
-moderates with --- access, distribution, retention, attribution ---
-Axona dissolves three and inverts the fourth, leaving \emph{subscription}
-as the one surface a community still owns. The direction makes that
-surface plural and machine-scale: a \textbf{filter set} becomes a signed,
-versioned, \emph{published} object --- allow/deny rules over
-\texttt{signerPubkey}, topic, or content predicate --- that anyone can
-subscribe to, compose locally, and \emph{fork} by republishing under
-their own key. No new kernel primitive: app-layer convention plus a
-reference implementation, riding the same discover/rank/compose pattern
-the bridge directory already proves. The reference peer's agent-class
-badge is the first, trivial consumer (it reads \texttt{getAuthorClass});
-a published, composable filter object is the next step.
-
-\item[\textbf{Friction scaled to reach.}] The hardest and least certain
-move: keep the one defensible lesson of the circuit-breaker era ---
-\emph{runaway amplification should cost something} --- without a
-chokepoint to enforce it. Two already-decentralized mechanisms
-approximate it as a gradient: \textbf{per-relay local damping} (a
-generalization of the bounded-queue / quota / hold-time machinery the
-kernel already ships) and \textbf{reach-graded proof-of-work} demanded by
-the K-closest roots that already see a topic's subscriber-set
-size.\sidenote{This is the \emph{demand} side of the same proof-of-work
-the decoupled-author anti-abuse thread needs on the \emph{supply} side
-(E-1): price the act of fanning out, not just the act of holding a key.}
-Each node decides only what \emph{it} forwards and how fast --- the soft
-cost curve emerges from many independent local policies, with no
-coordinator and nothing to capture. Honest scope: it prices
-\emph{casual and scaled} amplification only; a determined adversary
-evades it by fragmenting or under-declaring reach, so it is a gradient,
-never a guarantee. Simulate the honest-publisher false-positive cost in
-\texttt{dht-sim} before shipping.
+\item[\textbf{Governance as gradient.}] A companion six-note series
+(\emph{Gates to Gradients}) works the other axis: not \emph{who may
+act} but \emph{how a network with no chokepoint shapes behaviour
+without a gate to pull}. One of the six has shipped (agent
+legibility, \S\,XIV); the rest --- cascade telemetry as a
+privacy-preserving measurement layer over the derived-metric path,
+soft retraction and annotation envelopes riding beside the messages
+they concern, forkable published filter sets, and friction scaled to
+reach --- are each a \emph{gradient} (a cost or context that scales
+with reach) rather than a \emph{gate} (a binary verdict someone owns
+and can be captured). Each is app-layer or convention-layer; none
+moves the wire.
 \end{description}
 
 The job of the architecture is to make these additions land
@@ -2100,203 +1876,93 @@ they do.
 
 \vspace{2em}
 \noindent\textit{\footnotesize Companion documents: the \emph{Axona
-Programmer Guide} and \emph{Axona API Reference}, the \emph{Axona
-Explainer}, and the source repositories at
+Quick Start}, \emph{Programmer Guide}, and \emph{API Reference}
+(versioned with the kernel), the \emph{Axona Explainer}, the
+\emph{Pubsub Axon Tree} and \emph{Load-Aware Root Placement} design
+notes, and the source repositories at
 \texttt{github.com/axona-net}.}
 
 % =====================================================================
-% APPENDIX A. THE DEMO APPLICATION
+% APPENDIX A. A MINIMAL EXAMPLE
 % =====================================================================
 \renewcommand{\thesection}{\Alph{section}}
 \setcounter{section}{0}
 \section{Appendix: A Minimal Example}
 
-\newthought{This is the complete source} of \texttt{minimal-pubsub} ---
-the smallest end-to-end Axona program: two peers in a single Node
-process exchanging one signed message over the kernel's in-process
-simulation transport. About a hundred and sixty lines, no browser, no
-WebRTC, no bridge --- just the kernel primitives wired together so the
-moving parts stay visible.\sidenote{For the full browser wiring ---
-WebRTC mesh, bridge fallback, reconnect, the live metrics readout ---
-see \texttt{examples/minimal-pubsub-browser/} (the source behind
-\texttt{demo.axona.net}) and the reference peer at
-\texttt{github.com/axona-net/axona-peer}.}
-
-It maps onto the Application API (\S\,XI) in order: derive the two
-identities (the location-bound \texttt{createNodeIdentity} and the
-location-free \texttt{createAuthorIdentity}), open a
-\texttt{simTransport} on a shared \texttt{SimNetwork}, compose
-\texttt{AxonaPeer}~+~\texttt{AxonaManager} from the kernel primitives,
-place an open topic with a structured \texttt{\{ region, name \}}
-descriptor, then run a \texttt{sub}\,/\,\texttt{pub} roundtrip --- the
-publish signed per call with \texttt{\{ signWith: author \}}, never the
-connection key. The \texttt{SimNetwork} stands in for the real
-transports' channel-open and \texttt{axona:hello} admission, so the
-example needs no network and runs with \texttt{node index.js}.
+\newthought{This is a complete Axona program} against the live 4.x
+testnet: one Node process that mints its two identities, builds a
+peer on the web transport, waits for the mesh with
+\texttt{peer.ready()}, and then runs a visible publish/subscribe loop
+--- a signed counter, once a second, received back through the tree.
+It is the Quick Start's worked example, reproduced here because it
+exercises, in forty lines, nearly everything this document
+described.\sidenote{The identities (\S\,III), the descriptor-derived
+topic (\S\,III), \texttt{ready()} (\S\,XII), the routed publish with
+no ack and the implicit self-confirmation through the subscription
+(\S\,VII), replay via \texttt{since} (\S\,IX), and the graceful
+leave with handoff (\S\,X).}
 
 \bigskip
-\noindent\textit{\footnotesize \texttt{examples/minimal-pubsub/index.js}}
+\noindent\textit{\footnotesize \texttt{index.js} --- \texttt{npm
+install github:axona-net/axona-protocol} (a 4.x tag), Node 20+}
 
 \begin{lstlisting}
-// =====================================================================
-// minimal-pubsub -- two Axona peers in one Node process, pub/sub roundtrip.
-//
-// What this demonstrates (kernel v3.0.0 / identity-authorship v0.3):
-//   * createNodeIdentity -> 264-bit Ed25519 CONNECTION identity in an S2 cell
-//   * createAuthorIdentity -> a location-free AUTHORSHIP key (Author ID)
-//   * Two SimTransports on a shared SimNetwork (kernel's in-process router)
-//   * Composing AxonaPeer + AxonaManager from the kernel primitives
-//   * Region-keyed topics via a STRUCTURED topic descriptor { region, name }
-//   * peer.pub(topic, msg, { signWith }) / peer.sub roundtrip across two peers
-//
-// Run:  node index.js
-//
-// For real-world browser/Node wiring (WebRTC + bridge fallback, etc.),
-// see https://github.com/axona-net/axona-peer/blob/main/src/client.js
-// -- this example is intentionally simpler to keep the moving parts visible.
-// =====================================================================
-
 import {
-  AxonaPeer, AxonaDomain, NeuronNode, AxonaManager, Synapse,
-  SimNetwork, simTransport,
+  AxonaPeer, AxonaDomain, NeuronNode,
   createNodeIdentity, createAuthorIdentity,
-  regionNameForLatLng, clz264,
+  deriveTopicId, KERNEL_VERSION,
 } from '@axona/protocol';
+import { webTransport } from '@axona/protocol/transport/web/index.js';
 
-// -- 1. Region --------------------------------------------------------
-// us-east (Virginia).  Both peers connect from this cell, and the topic
-// is placed in the matching kernel region.  v0.3 region is a first-class
-// field of the topic descriptor -- no synthetic publisher needed.
-const US_EAST     = { lat: 38.0, lng: -77.0 };
-const REGION_NAME = regionNameForLatLng(US_EAST.lat, US_EAST.lng);   // e.g. 'useast'
+const BRIDGE = 'wss://testnet.axona.net';         // the 4.x line runs on testnet
+const HERE   = { lat: 38.0, lng: -77.0 };         // your real location (us-east here)
+const TOPIC  = { region: 'useast', name: 'quick-start-demo' };   // open topic
 
-// -- 2. Build a peer --------------------------------------------------
-// One function, called twice -- once for alice, once for bob -- wires
-// identity + transport + node + AxonaPeer + AxonaManager together.
+// 1. Two identities: connection (node) + authorship (author).
+const nodeIdentity = await createNodeIdentity(HERE);   // ephemeral connection key
+const author       = await createAuthorIdentity();     // ephemeral author key
 
-async function makePeer({ network, region }) {
-  // 2a. Derive a 264-bit Ed25519 CONNECTION identity in this region's S2 cell,
-  //     plus a separate, location-free AUTHORSHIP key used to sign publishes.
-  const identity = await createNodeIdentity(region);
-  const author   = await createAuthorIdentity();
+// 2. Build the peer on the web transport pointed at the bridge.
+const transport = webTransport({ bridgeUrl: BRIDGE, identity: nodeIdentity });
+const node      = new NeuronNode({ id: BigInt('0x' + nodeIdentity.id),
+                                   lat: HERE.lat, lng: HERE.lng });
+node.transport  = transport;
+const peer = new AxonaPeer({ domain: new AxonaDomain({ k: 20 }),
+                             node, nodeIdentity, transport });
 
-  // 2b. Open a SimTransport on the shared SimNetwork.
-  const transport = simTransport({ network, identity, heartbeatMs: 0 });
-  await transport.start(identity.id);
+await transport.start(nodeIdentity.id);
+await peer.start();
 
-  // 2c. Build the local DHT node.  NeuronNode holds the synaptome and
-  //     routing state; AxonaDomain holds parameters shared across peers.
-  //     NeuronNode XORs ids as BigInts internally, so convert from
-  //     identity.id (hex string) to BigInt at construction time.
-  const node     = new NeuronNode({
-    id:  BigInt('0x' + identity.id),
-    lat: region.lat, lng: region.lng,
-  });
-  node.transport = transport;
-  const domain   = new AxonaDomain({ k: 20 });
+// 3. Wait for the routing mesh to warm up before pub/sub.
+console.log('kernel v' + KERNEL_VERSION + ' -- connecting...');
+const status = await peer.ready();               // { ready, peers, ms, reason }
+console.log('mesh ' + (status.ready ? 'ready' : 'not ready') +
+            ' (' + status.peers + ' peers, ' + status.ms + 'ms)');
+console.log('topic id:', await deriveTopicId(TOPIC));
 
-  // 2d. AxonaPeer is the per-node DHT contract implementation. The
-  //     connection key is the `nodeIdentity`; authorship is supplied
-  //     per-publish via `signWith`, never by the constructor.
-  const peer = new AxonaPeer({ domain, node, nodeIdentity: identity, transport });
-  await peer.start();
-
-  // 2e. AxonaManager handles pub/sub.  It needs a `dht` adapter that
-  //     forwards K-closest, sendDirect, routeMessage, and handler
-  //     registration to our AxonaPeer.  Most of these are 1-line
-  //     delegations; sendDirect special-cases self-target for local
-  //     dispatch.
-  const dht = {
-    getSelfId:       () => peer.getNodeId(),
-    findKClosest:    (...args) => peer.findKClosest(...args),
-    routeMessage:    (...args) => peer.routeMessage(...args),
-    sendDirect:      async (peerId, type, payload) => {
-      if (peerId === peer.getNodeId()) {
-        // Local-loopback: dispatch into our own direct handler table.
-        const h = peer._directHandlers?.get(type);
-        if (!h) return false;
-        try { await h(payload, { fromId: peer.getNodeId(), type }); return true; }
-        catch (err) { console.error('self-sendDirect threw:', err); return false; }
-      }
-      return peer.sendDirect(peerId, type, payload);
-    },
-    onRoutedMessage: (type, h) => peer.onRoutedMessage(type, h),
-    onDirectMessage: (type, h) => peer.onDirectMessage(type, h),
-  };
-  const axonaManager = new AxonaManager({ dht });
-  peer._axonaManager = axonaManager;       // hand the AM directly to the peer
-  return { peer, identity, author };
-}
-
-// -- 3. Wire two peers + connect them ---------------------------------
-
-const network = new SimNetwork();
-
-const { peer: alice, identity: aliceId, author: aliceAuthor } = await makePeer({ network, region: US_EAST });
-const { peer: bob,   identity: bobId   } = await makePeer({ network, region: US_EAST });
-
-// Open a SimNetwork channel between alice and bob so they're directly
-// reachable, then admit each other to their synaptomes.  Real transports
-// (WebRTC mesh, WebSocket bridge) do this admission via the axona:hello
-// / hello-ack handshake at channel-open time -- see axona-peer's
-// axona_node.js for the production wiring.
-await alice._transport.openConnection(bobId.id);
-
-function admitSynapse(localPeer, remoteBigInt) {
-  const localId = localPeer._node.id;
-  const stratum = clz264(localId ^ remoteBigInt);
-  const syn = new Synapse({ peerId: remoteBigInt, latencyMs: 1, stratum });
-  syn.weight   = 0.5;
-  syn.inertia  = 0;
-  syn._addedBy = 'demo';
-  localPeer._node.synaptome.set(remoteBigInt, syn);
-}
-admitSynapse(alice, BigInt('0x' + bobId.id));
-admitSynapse(bob,   BigInt('0x' + aliceId.id));
-
-console.log('[alice] nodeId:', aliceId.id);
-console.log('[bob]   nodeId:', bobId.id);
-
-// Give the kernel a tick to admit each other to their synaptomes.
-await new Promise(r => setTimeout(r, 50));
-
-// -- 4. Pub/sub roundtrip ---------------------------------------------
-
-// v0.3: a topic is a structured descriptor. An open lobby in a real region
-// is just { region, name } -- anyone may publish (self-signed); the region
-// places it in the keyspace. No synthetic publisher.
-const TOPIC = { region: REGION_NAME, name: 'hello-world' };
-
-const received = [];
-const sub = await bob.sub(TOPIC, (envelope) => {
-  received.push(envelope);
-  console.log('[bob]   received:', {
-    msgId:        envelope.msgId,
-    message:      envelope.message,
-    signerPubkey: envelope.signerPubkey?.slice(0, 16) + '...',
-  });
+// 4. Subscribe. The handler fires for every delivery -- including our own
+//    publishes below, which is the publisher's implicit confirmation.
+const sub = await peer.sub(TOPIC, (env) => {
+  console.log('[recv]', env.message, 'from',
+              (env.signerPubkey || 'anon').slice(0, 12));
 }, { since: 'all' });
 
-console.log('[bob]   subscribed:', sub.topicId);
+// 5. Publish on a loop: one signed message per second, so the system is
+//    visibly, continuously running.
+let n = 0;
+const timer = setInterval(async () => {
+  const msg = `tick #${++n}`;
+  const msgId = await peer.pub(TOPIC, msg, { signWith: author });
+  console.log('[pub ]', msg, '(msgId ' + msgId.slice(0, 12) + '...)');
+}, 1000);
 
-// Wait for the subscribe-k frame to reach alice's role.
-await new Promise(r => setTimeout(r, 100));
-
-// Alice signs the publish with her AUTHOR key (signWith) -- the connection
-// key never signs content.
-const msgId = await alice.pub(TOPIC, 'hello from alice', { signWith: aliceAuthor });
-console.log('[alice] published msgId=' + msgId);
-
-// Let the publish-k -> cache -> fan-out cycle complete.
-await new Promise(r => setTimeout(r, 200));
-
-console.log();
-console.log(received.length === 1
-  ? '[OK] roundtrip ok -- bob received alice\'s envelope'
-  : `[X] roundtrip failed -- expected 1 envelope, got ${received.length}`);
-
-await sub.stop();
-process.exit(received.length === 1 ? 0 : 1);
+// 6. Keep running until Ctrl+C, then leave cleanly (cache handoff included).
+process.on('SIGINT', async () => {
+  clearInterval(timer);
+  await sub.stop();
+  await peer.leave();
+  process.exit(0);
+});
 \end{lstlisting}
 
 \end{document}
