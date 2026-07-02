@@ -379,6 +379,19 @@ await peer.sub(metricTopic(await deriveTopicId(topic)), (env) => {
 }, { since: 'latest' });                       // live-updating counter
 ```
 
+Metrics are **published on demand**: your subscription is what switches them
+on, and the first snapshot lands **~2 s later in the typical case — allow up
+to ~25 s** (then one every ~20 s while you stay subscribed). Two consequences
+worth knowing:
+
+- The **first** `peer.metrics()` call on a topic nobody was watching usually
+  returns `stale: true` — its default collection window (1.5 s) closes before
+  the first on-demand snapshot can arrive. Call it again, pass
+  `{ timeoutMs: 25_000 }`, or just use the subscription form above.
+- **Don't subscribe-then-teardown in seconds** (test suites love to do this)
+  and conclude metrics is broken — keep the subscription open and await the
+  first envelope with a real allowance.
+
 Counts are advisory — decorate with them, never authorize with them.
 
 ### 4.9 Remembering your users

@@ -189,6 +189,18 @@ await peer.sub(mt, (env) => {
 }, { since: 'latest' });
 ```
 
+TIMING RULES (metrics are published ON DEMAND — the subscribe itself turns
+them on; there is no always-on publisher):
+
+- First snapshot: ~2 s typical, up to ~25 s. Cadence: every ~20 s while
+  subscribed. Publishing stops ~70 s after the last metric subscriber leaves.
+- `peer.metrics()` on a cold topic (no recent watcher) returns `stale: true`
+  on the FIRST call — its 1.5 s default window is shorter than the on-demand
+  start-up. Retry, pass `{ timeoutMs: 25_000 }`, or prefer the `sub()` form.
+- In tests: subscribe to the metric topic EARLY, await the first envelope with
+  a ≥25 s allowance, and keep the subscription open — a sub torn down after a
+  few seconds observes nothing on a healthy topic.
+
 Metrics are advisory (unauthenticated counts) — never a security input.
 
 ## Direct messages (peer-to-peer, not pub/sub)

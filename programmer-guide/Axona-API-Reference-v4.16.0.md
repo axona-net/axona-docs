@@ -762,12 +762,26 @@ const latest = await peer.pull(null, { topic: feedId });   // most recent on the
 #### `peer.metrics(topic, { timeoutMs? })` → `Promise<metricsObj>`
 
 A one-shot read of a topic's latest published metric snapshot — for **any**
-topic, open or owned. As of kernel **v4.3.0** metrics are no longer scatter-
-gathered: a topic's root publishes a signed snapshot to `metricTopic(T)` every
-~20 s (the relay fleet runs this), and `metrics()` subscribes to that *open*
-metric topic briefly and returns the freshest snapshot via replay-on-subscribe.
-Owned topics' metrics are **public too** — anyone who can derive the id can read
-them — so there is no owner gate.
+topic, open or owned. Metrics are **demand-driven** (v4.12.0): subscribing to
+`metricTopic(T)` — which `metrics()` does internally — sends a renewable
+*metrics-on* lease toward the data topic's root, and **any node that roots the
+topic** (relay or ordinary client peer alike) then publishes a signed snapshot
+to that *open* metric topic every ~20 s while at least one metric subscriber
+remains. `metrics()` collects whatever arrives (or is replayed from the cache)
+during its short window and returns the freshest view. Owned topics' metrics
+are **public too** — anyone who can derive the id can read them — so there is
+no owner gate.
+
+> **Cold-topic gotcha.** Because publication starts *on demand*, the very first
+> snapshot for a topic nobody was watching arrives **~2–20 s after** demand
+> turns on (the root's next refresh tick, plus routing) — longer than the
+> default 1500 ms collection window. So the **first `metrics()` call on a cold
+> topic normally returns `stale: true`**. That is not an error: either call it
+> again a few seconds later, pass a longer window (`{ timeoutMs: 25_000 }`
+> spans one full publish cadence), or — better — keep a standing
+> `sub(metricTopic(T), …)` and treat metrics as the stream it is. If *any*
+> peer watched the topic's metrics within the 48 h hold window, replay serves
+> the last cached snapshot immediately and the first call succeeds.
 
 **Cohort-aware (v4.10.1).** Under the K-closest cohort model every co-hosting root
 publishes its own snapshot, so `metrics()` collects them over the window and
@@ -815,14 +829,32 @@ if (!m.stale) console.log(`${m.subscribers} subscribers, ${m.current_count} live
 
 #### `metricTopic(dataTopicId)` → `TopicDescriptor` *(subscribe to metrics — the live path)*
 
-The producer side of the convention. A topic's primary root publishes a signed
-metric snapshot to a *derived, open* topic every ~20 s — for **both open and
-owned** data topics (v4.3.0). Compute that topic with `metricTopic()` and `sub()`
-it: you get the latest snapshot via replay-on-subscribe plus every update — one
-subscription instead of a poll — and, because snapshots are ordinary messages
-that age out at the 48 h hold ceiling, a **rolling ~48 h history for free** to
-plot trends. This is also how you subscribe to an **owned** topic's metrics
-without owning it.
+The producer side of the convention. Compute the derived, open metric topic
+with `metricTopic()` and `sub()` it — **your subscription is what turns
+publishing on**: it routes a renewable *metrics-on* lease to the data topic's
+root, and while the lease is fresh the root publishes a signed snapshot every
+~20 s, for **both open and owned** data topics. You get the latest snapshot via
+replay-on-subscribe plus every update — one subscription instead of a poll —
+and, because snapshots are ordinary messages that age out at the 48 h hold
+ceiling, a **rolling ~48 h history for free** to plot trends. This is also how
+you subscribe to an **owned** topic's metrics without owning it.
+
+**When snapshots arrive.** Metrics is an *eventually-arriving stream*, not a
+synchronous read — plan around this timing contract:
+
+- **First snapshot:** typically **~2 s** after you subscribe (measured on the
+  testnet), but allow **up to ~20–25 s** — the root publishes on its next
+  refresh tick, and a root that churns right then must re-home first. If any
+  peer watched this topic's metrics within the last 48 h, replay hands you the
+  most recent snapshot immediately.
+- **Cadence:** one snapshot every **~20 s** per rooting node, for as long as at
+  least one metric subscriber remains.
+- **Shut-off:** the lease lapses **~70 s** after the last metric subscriber
+  unsubscribes; publishing stops until demand returns.
+- **Tests and short-lived probes:** subscribe early and *await the first
+  envelope* with a generous allowance (≥ 25 s) — a subscription torn down a few
+  seconds after it starts will often observe nothing and misread a healthy
+  topic as "metrics not working."
 
 ```js
 import { deriveTopicId, metricTopic } from '@axona/protocol';
@@ -1622,7 +1654,9 @@ readers: skip.)*
 - **`connect()` (v4.16.0)** — the one-call bootstrap above; no other API change.
 - **Demand-driven metrics (v4.12.0)** — snapshots publish to `metricTopic(T)`
   only while a subscriber's lease is fresh; `peer.metrics()` unchanged. The
-  relay's old push-metrics loop is retired.
+  relay's old push-metrics loop is retired. Consequence: the first snapshot on
+  a cold topic arrives ~2–20 s *after* the first metric subscribe — see the
+  timing contract in §4.3.
 - **Region-occupancy rule (v4.13.0, gated OFF in v4.15.0)** — the kernel can
   enforce region-homogeneous topic service (`configureRegionLock({ enforce })`);
   disabled by default until regional coverage justifies it.

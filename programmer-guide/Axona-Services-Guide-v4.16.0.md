@@ -163,14 +163,20 @@ durable, well-placed members. Two jobs:
    model a topic is replicated across the K-closest nodes, so durability no
    longer rests on one relay — several co-hosting relays converge on the same
    history via anti-entropy, and any of them can answer a read.
-2. **Metrics** — every ~20 s the relay walks its rooted topics and publishes a
-   signed snapshot (`{current_count, seq, subscribers, bytes}`) to the derived
-   `metricTopic(T)`, so clients can `sub()` for live counts + a rolling ~48 h
-   trend instead of polling. As of v4.3.0 **both open and owned** topics publish
-   metrics (owned-topic activity counts are public too); `seq` is the dense
-   message counter (total events ever, kills included). Because every co-hosting
-   root publishes its own snapshot, the reader-side `peer.metrics()` aggregates
-   across the cohort (sums subscribers, maxes the rest — see the API Reference).
+2. **Metrics** — served **on demand** (v4.12.0): when any client subscribes to
+   a topic's derived `metricTopic(T)`, a renewable *metrics-on* lease routes to
+   the topic's root — often a relay, since relays root what they host — and
+   while the lease is fresh that root publishes a signed snapshot
+   (`{current_count, seq, subscribers, bytes}`) every ~20 s, giving subscribers
+   live counts + a rolling ~48 h trend instead of polling. The first snapshot
+   lands ~2–20 s after demand turns on; publishing stops ~70 s after the last
+   metric subscriber leaves. (The pre-4.12 push loop — publish every rooted
+   topic on a timer, watched or not — is retired.) **Both open and owned**
+   topics serve metrics (owned-topic activity counts are public too); `seq` is
+   the dense message counter (total events ever, kills included). Because every
+   co-hosting root publishes its own snapshot, the reader-side `peer.metrics()`
+   aggregates across the cohort (sums subscribers, maxes the rest — see the API
+   Reference).
 
 ### Running one
 
@@ -376,7 +382,7 @@ backlog.)
 |---|---|
 | Let strangers connect to your app's network | A **bridge** (or use the live one for your line — `testnet.axona.net` for 4.x, `bridge.axona.net` for 3.x) |
 | Keep a topic's messages alive when no author is online | A **relay** that `host()`s it |
-| Publish live subscriber counts for a topic | A **relay** (metrics on — the default) |
+| Publish live subscriber counts for a topic | Nothing extra — **any root serves metrics on demand** when a client subscribes to `metricTopic(T)`; a relay just makes the root durable |
 | Publish/subscribe from a shell, cron, or CI | The **CLI** (`axona-cli`) |
 | Give an AI agent native Axona tools | The **MCP server** (`axona-mcp`) |
 | Contribute a node from a desktop, no terminal | The **desktop app** |
