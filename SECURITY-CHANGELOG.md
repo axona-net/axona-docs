@@ -16,6 +16,23 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.17.1 — 2026-07-03 (testnet)
+
+**Cross-region pub/sub delivery restored (availability).** A subscriber whose
+node sits in a different region than a topic could fail to reach that topic's
+root: the root-hint resolver consulted only *locally-known* peers, so a
+foreign-region node — which holds few or no synapses into the topic's region —
+concluded it was itself the closest node and formed a *second, disjoint* root,
+splitting the topic's tree so the publisher's messages never reached the
+subscriber. The resolver now falls back to the network's iterative closest-node
+lookup before a node roots a topic itself, so publisher and subscriber converge
+on one root regardless of region. The region prefix remains a *placement hint*
+(topics still land near their region for locality); it never gates rooting or
+delivery. No trust or authorization change — purely which node serves as root.
+(v4.17.1)
+
+---
+
 ## Kernel v4.17.0 — 2026-07-03 (testnet)
 
 **Topic history survives the loss of its serving node within a churn window.**
