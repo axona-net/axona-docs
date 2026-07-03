@@ -16,6 +16,20 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.17.2 — 2026-07-03 (testnet)
+
+**First-publish delivery hardened against convergence races (availability).**
+Two reliability tweaks to the publish path, both idempotent (the root dedups by
+message id, so a re-send never double-delivers): a freshly-joined node's
+cold-publish burst now runs a second, slower wave (≈2 s past the first) so it
+keeps getting fresh shots at the true root as its routing table warms; and the
+*first* publish to a topic — even from an already-integrated node — is re-sent
+once after a short beat, so a message published in the instant a topic's tree is
+forming (a subscriber that just arrived, a root that just rooted) is not lost to
+a single-shot timing race. No trust, authorization, or wire change. (v4.17.2)
+
+---
+
 ## Kernel v4.17.1 — 2026-07-03 (testnet)
 
 **Cross-region pub/sub delivery restored (availability).** A subscriber whose
