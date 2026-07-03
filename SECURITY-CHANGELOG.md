@@ -16,6 +16,31 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.17.0 — 2026-07-03 (testnet)
+
+**Topic history survives the loss of its serving node within a churn window.**
+A topic's cache is continuously replicated from its serving root to the nearest
+backup nodes. Previously a backup waited a fixed silence interval (~65s) before
+taking over — so when the root actually *left* the network, the topic's stored
+history was unreachable to new subscribers for that whole window. The backup now
+distinguishes a root that has genuinely departed the reachable set (promote after
+a short grace) from one that is merely momentarily quiet (still wait the full
+interval, so a live-but-lossy root is never split). This closes an availability
+gap in which post-departure subscribers could transiently read an empty topic;
+it changes recovery *timing* only — no node gains authority it could not already
+prove, and a rare over-promotion is reconciled by the existing closest-node and
+beacon-demote checks. (v4.17.0)
+
+**A node that is itself a topic's root now replays that topic's history to its
+own application.** A holder of a topic's cache subscribing for full history
+previously received none of it (its own outbound request carries a high-water
+mark and does not self-seat), leaving a root-hosting subscriber blind to the
+history it was storing. It now replays its local cache directly to the app under
+the same exactly-once dedup as the wire path. Correctness fix; no trust change.
+(v4.17.0)
+
+---
+
 ## Kernel v4.13.0–v4.16.0 — 2026-07-02 (testnet)
 
 **Message ingress hardened by a single validated ID gate.** Every address
@@ -1359,4 +1384,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-07-02.*
+*Last updated: 2026-07-03.*
