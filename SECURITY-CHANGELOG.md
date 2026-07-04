@@ -16,6 +16,30 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Bridge v2.60.0 — 2026-07-03 (testnet) — bootstrap-nursery: bounded, load-spread introductions
+
+**What's protected:** a newcomer's *first contacts* are no longer a fixed,
+unbounded set. Previously the bridge handed every joining peer the entire
+admitted peer-list, so the same well-connected nodes were every newcomer's
+initial neighbours — a concentration an adversary could exploit to sit astride
+most bootstraps (an eclipse foothold). The bridge now introduces each newcomer
+to a **bounded, curated anchor set** and applies a **relative-usage penalty** so
+introductions spread across many eligible peers instead of funneling through a
+few. The peer then self-expands into the rest of the mesh over **mesh-relayed
+signalling** — a path proven to work with the bridge process entirely dead
+(`mesh_relay_multihop_e2e`), so reaching the network never depends on any single
+introducer. Anchor eligibility is gated on connection uptime and spread across
+keyspace regions; selection auto-falls-back to the full list only when too few
+peers are eligible (a cold/small network), and the whole behaviour is reversible
+via `BRIDGE_NURSERY=off`.
+
+This is a decentralization / eclipse-resistance improvement, validated in
+simulation before deployment (dht-sim `results/w2`: the load penalty cut anchor
+concentration — Gini 0.75→0.20 — while every newcomer stayed 100% reachable).
+No wire or API change; peers are unaffected.
+
+---
+
 ## Kernel v4.17.2 — 2026-07-03 (testnet)
 
 **First-publish delivery hardened against convergence races (availability).**
