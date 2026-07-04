@@ -16,6 +16,37 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.18.2 — 2026-07-04 (testnet) — single-root election on churn (no split-brain)
+
+**What's protected:** a topic keeps **exactly one authoritative root** when the
+node currently serving it departs, so publications and **kills survive churn**.
+Delivery and revocation are integrity guarantees — a subscriber must receive
+every published message for a topic it holds, and a kill (tombstone) must reach
+**every** holder so revoked content is provably gone network-wide. Previously,
+when a topic's root left the mesh, more than one of its warm backup replicas
+could each independently promote itself to root; the topic then briefly had two
+disjoint roots, and a subsequent publish or kill would land on one while some
+subscribers renewed against the other — silently dropping that message or
+leaving a killed item live for a subset of the network until the roots
+reconciled.
+
+The fix removes the separate, locally-decided promotion path entirely. A backup
+is now an ordinary **subscribing relay**: it renews toward the topic every cycle,
+so a departed root is replaced through the **same network-confirmed election**
+every subscriber already uses — an iterative closest-node lookup that resolves to
+a single globally-closest terminus. The closest survivor becomes the sole root
+and serves the full history it had prefetched (gap-free); the others re-home
+underneath it. Two replicas can no longer both believe they are closest, because
+the decision is confirmed against the mesh rather than each node's partial local
+view. Validated by a single-root-election regression test and by an 8/8 live
+restart-and-kill suite on a quiesced backbone (previously bimodal, ~1-in-2-to-5
+runs splitting).
+
+Testnet only; production remains on the 3.x line pending the gated wire-major
+promotion.
+
+---
+
 ## Bridge v2.61.0 — 2026-07-03 (testnet) — bootstrap-nursery: bounded, load-spread introductions
 
 **What's protected:** a newcomer's *first contacts* are no longer a fixed,
