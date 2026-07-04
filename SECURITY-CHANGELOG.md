@@ -16,7 +16,7 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
-## Bridge v2.60.0 — 2026-07-03 (testnet) — bootstrap-nursery: bounded, load-spread introductions
+## Bridge v2.61.0 — 2026-07-03 (testnet) — bootstrap-nursery: bounded, load-spread introductions
 
 **What's protected:** a newcomer's *first contacts* are no longer a fixed,
 unbounded set. Previously the bridge handed every joining peer the entire
@@ -32,6 +32,14 @@ introducer. Anchor eligibility is gated on connection uptime and spread across
 keyspace regions; selection auto-falls-back to the full list only when too few
 peers are eligible (a cold/small network), and the whole behaviour is reversible
 via `BRIDGE_NURSERY=off`.
+
+Bounding only **engages at scale**: a self-protecting threshold keeps the bridge
+handing out the full list until the eligible pool is comfortably larger than the
+anchor count (default ≥ 3×k). On a network barely larger than k, dropping any peer
+removes redundancy the network doesn't have — so below the threshold the nursery is
+inert. (This was found live: on a 9-relay testnet, bounding to 8 dropped the one
+relay rooting a cross-region topic and stalled that direction until the threshold
+was added.)
 
 This is a decentralization / eclipse-resistance improvement, validated in
 simulation before deployment (dht-sim `results/w2`: the load penalty cut anchor
