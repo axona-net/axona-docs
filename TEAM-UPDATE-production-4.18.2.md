@@ -1,8 +1,9 @@
 # Team Update — Axona is in production (kernel v4.18.2) — 2026-07-04
 
 **Headline:** production is now on the 4.x line. We completed the 3.x → 4.x
-wire-major flag day — the one we'd deliberately gated for months — and kernel
-**v4.18.2** is live on both production bridges, on **axona.net**, and on the
+wire-major flag day — the one we'd deliberately held prod back from for the couple
+of weeks the 4.x line was baking on testnet — and kernel **v4.18.2** is live on
+both production bridges, on **axona.net**, and on the
 production demo. The trigger was earning it: Howard's CivilDefense app has been
 running cleanly on the 4.18.2 testnet, which is the real-world signal we'd been
 waiting for before touching prod.
