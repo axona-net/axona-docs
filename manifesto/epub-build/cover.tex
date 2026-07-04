@@ -1,0 +1,24 @@
+\documentclass{standalone}
+\usepackage{tikz}
+\usepackage{xcolor}
+\definecolor{rust}{RGB}{185,78,54}
+\definecolor{cream}{RGB}{247,244,240}
+\definecolor{ink}{RGB}{40,38,36}
+\definecolor{inkmuted}{RGB}{110,105,100}
+\begin{document}
+\begin{tikzpicture}
+  % 1600 x 2560 canvas (EPUB cover ratio), in cm-ish units
+  \fill[cream] (0,0) rectangle (16,25.6);
+  \fill[rust] (0,24.2) rectangle (16,24.5);
+  \fill[rust] (0,1.1) rectangle (16,1.4);
+  \node[ink, font=\fontsize{110}{110}\selectfont\bfseries\scshape] at (8,18.2) {Axona};
+  \draw[rust, line width=2pt] (5.5,16.4) -- (10.5,16.4);
+  \node[ink, font=\fontsize{30}{38}\selectfont\itshape, align=center, text width=13cm]
+    at (8,14.4) {A Free Substrate\\ for a Society of Minds};
+  \node[inkmuted, font=\fontsize{20}{20}\selectfont\scshape] at (8,9.2)
+    {Manifesto and White Paper};
+  \node[inkmuted, font=\fontsize{18}{18}\selectfont] at (8,8.2) {v0.2};
+  \node[ink, font=\fontsize{22}{22}\selectfont] at (8,4.2) {David A. Smith};
+  \node[inkmuted, font=\fontsize{16}{16}\selectfont\itshape] at (8,3.4) {Axona.net};
+\end{tikzpicture}
+\end{document}
