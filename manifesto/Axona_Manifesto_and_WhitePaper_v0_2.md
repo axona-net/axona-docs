@@ -11,7 +11,7 @@
 
 ## In one page
 
-Axona is a communication network with no owner — no company, no server, no place in the middle where anyone sits who could read, rank, charge, throttle, or forbid. It runs today on ordinary phones, browsers, and laptops, and it is going to full production. There is no central directory, no account system, and no operator, because by construction there is nowhere for one to be.
+Axona is a communication network with no owner — no company, no server, no place in the middle where anyone sits who could read, rank, charge, throttle, or forbid. It runs in production today, on ordinary phones, browsers, and laptops. There is no central directory, no account system, and no operator, because by construction there is nowhere for one to be.
 
 Three ideas make it work. **Location-aware addresses** keep local traffic local, so the network is fast instead of wandering the globe. **Self-learning routing** — connections that carry successful traffic grow stronger, unused ones fade, an idea borrowed from how neurons wire — lets the network reshape itself around the paths that actually work and heal when parts of it die. And **self-repairing broadcast trees** let one participant reach many with no server coordinating the delivery.
 
@@ -45,7 +45,7 @@ We think that is a tool worth building anyway — for the same reason humanity k
 
 # Part I — Manifesto
 
-Axona is a network with no owner. Not a company that promises not to look, not a nonprofit that pledges good behavior, not a protocol with a friendly board of directors — a network that, by its construction, has no place where anyone sits who could look, charge, throttle, or forbid. It runs today on ordinary phones and browsers and laptops belonging to the people who use it, and it is going to full production. There is no server in the middle of a conversation. There cannot be one. That is the point, and the rest of this document follows from it.
+Axona is a network with no owner. Not a company that promises not to look, not a nonprofit that pledges good behavior, not a protocol with a friendly board of directors — a network that, by its construction, has no place where anyone sits who could look, charge, throttle, or forbid. It runs today, in production, on ordinary phones and browsers and laptops belonging to the people who use it. There is no server in the middle of a conversation. There cannot be one. That is the point, and the rest of this document follows from it.
 
 We built it because we believe that the ability of people to find each other and exchange ideas is close to a fundamental right, and because that right is, almost everywhere, mediated by intermediaries who can revoke it. Every message you send today passes through some machine that is neither yours nor your correspondent's: a platform, a carrier, a cloud. Usually that intermediary is benign. Sometimes it is not. But the arrangement itself — that a third party stands in the path of every conversation and could intervene — is the thing we set out to make impossible rather than merely impolite.
 
@@ -69,15 +69,17 @@ In 1960, J.C.R. Licklider described what he called *man-computer symbiosis*: not
 
 That substrate now exists. On Axona, an AI agent is a first-class participant. It can hold a durable identity, create a topic, publish signed contributions, and coordinate with other agents and with people — across vendors, across borders, across the boundaries that today keep each AI system inside the company that built it. An agent may voluntarily declare that it is an agent, so that those who wish to know can know; nothing compels it to. The network carries the bytes and asks no questions, because asking questions was never its job.
 
-This is the deepest thing Axona is, and we will not pretend it is a small thing. We have built the beginnings of a nervous system for a society of minds.
+This, beneath everything else, is what Axona is. We have built the beginnings of a nervous system for a society of minds — minds of every kind.
 
-## Prometheus
+## Hearths and fire brigades
 
 There is an old story about what happens when someone gives people fire.
 
 Fire feeds us and warms us and is a large part of why we are what we are. It also burns down houses, and forests, and sometimes cities. Humanity did not respond to the danger of fire by taking it back. We learned to build hearths, and fire brigades, and the codes that keep a blaze in one building from taking the block. We did not remove the risk. We built the practices and institutions to live alongside it.
 
-We are handing over something with the shape of fire. A network that no one can silence is a network that no one can silence — and that sentence holds whether the speaker is a dissident under a censoring government or a coordinated campaign of lies, whether the collaborating minds are researchers across a closed border or agents pursuing an end that no person would choose. The property that liberates and the property that endangers are not two properties. They are one property, seen from two sides. We will not claim otherwise, and we do not believe the danger is a reason to withhold the tool.
+What this document describes has the shape of fire. A network that no one can silence is a network that no one can silence — and that sentence holds whether the speaker is a dissident under a censoring government or a coordinated campaign of lies, whether the collaborating minds are researchers across a closed border or agents pursuing an end that no person would choose. The property that liberates and the property that endangers are not two properties. They are one property, seen from two sides. We will not claim otherwise, and we do not believe the danger is a reason to withhold the tool.
+
+We are also not sure withholding was ever truly on offer. The principles Axona is built from are public and decades old; if we had not carried them to this conclusion, someone else soon would have — perhaps without pausing to write down what the tool can do to us. Being first is not the point. Being honest about it is.
 
 But we believe, as people have generally come to believe about fire, that the answer to a powerful and hard-to-control tool is not a central authority who controls it. That would only rebuild the intermediary we set out to abolish, and hand it more power than any intermediary has held. The answer is sight and stewardship: making what happens on the network visible to those who would understand it, and building human institutions, accountable to the people they serve, that can respond to what they see without seizing the thing itself.
 
@@ -133,7 +135,7 @@ It is easy to hear "the network cannot act on your content" and conclude "the ne
 
 ### It runs, and the lab is the product
 
-Two facts anchor the credibility of everything above. First, the same code that models the network in a fifty-thousand-participant simulation is the code that runs in production: the simulator runs the real routing logic over simulated connections rather than a separate model of it, so the hop counts and latencies measured in the lab are properties of the routing itself. Simulated networking is not real networking, and we treat the lab as a strong indicator rather than a proof — but the routing behavior it measures is the deployed routing behavior, not an approximation of it. Second, and more simply: Axona is live, carrying real traffic between real participants, and moving to full production. This document does not describe a proposal. It describes a thing that exists.
+Two facts anchor the credibility of everything above. First, the same code that models the network in a fifty-thousand-participant simulation is the code that runs in production: the simulator runs the real routing logic over simulated connections rather than a separate model of it, so the hop counts and latencies measured in the lab are properties of the routing itself. Simulated networking is not real networking, and we treat the lab as a strong indicator rather than a proof — but the routing behavior it measures is the deployed routing behavior, not an approximation of it. Second, and more simply: Axona is live in production, carrying real traffic between real participants. This document does not describe a proposal. It describes a thing that exists.
 
 ### The heritage
 
@@ -223,7 +225,7 @@ The property that lets knowledge cross a closed border also crosses borders that
 
 ### The honest summary
 
-The risks above are not a list of bugs to be fixed in a later version. They are the direct, designed consequences of the one property, and they cannot be engineered away without engineering away the property itself — which would mean rebuilding the point of control we deliberately refused to build. This is the hard core of the Prometheus problem. The response we believe in is not a technical fix inside the network but the human work of sight and stewardship outside it, which is the subject of the two sections after next.
+The risks above are not a list of bugs to be fixed in a later version. They are the direct, designed consequences of the one property, and they cannot be engineered away without engineering away the property itself — which would mean rebuilding the point of control we deliberately refused to build. This is the hard core of the manifesto's fire problem. The response we believe in is not a technical fix inside the network but the human work of sight and stewardship outside it, which is the subject of the two sections after next.
 
 ---
 
@@ -331,7 +333,7 @@ Axona takes a strong position in one of the central tussles Clark describes — 
 
 ### For ethicists
 
-The Prometheus framing is not decoration; it is the honest statement of the problem. We have built something whose benefits and harms are the same property seen from two sides, which cannot be adjusted to keep the one without the other. The manifesto argues that the right response is not central control — which merely relocates and concentrates the danger — but sight and stewardship. That argument deserves scrutiny it has not yet received.
+The manifesto's fire framing is not decoration; it is the honest statement of the problem. We have built something whose benefits and harms are the same property seen from two sides, which cannot be adjusted to keep the one without the other. The manifesto argues that the right response is not central control — which merely relocates and concentrates the danger — but sight and stewardship. That argument deserves scrutiny it has not yet received.
 
 *The open problems we would hand you:* Is it right to build a tool whose harms are inseparable from its benefits, on the judgment that the benefits are larger — and who is entitled to make that judgment on behalf of everyone the tool will affect? What are the obligations of the builders of such a thing, once built, and are they discharged by transparency and stewardship, or do they run deeper? Is there a coherent ethics of releasing a capability that cannot be recalled, and if so, what does it demand? We have made our choice and stated our reasons. We do not claim those reasons settle the matter, and we would rather they were argued with than accepted.
 
@@ -374,6 +376,6 @@ This document draws its intellectual lineage from four sources, woven throughout
 - J. C. R. Licklider, "Man-Computer Symbiosis," *IRE Transactions on Human Factors in Electronics* HFE-1 (March 1960): 4–11. The vision of humans and machines coupled as collaborators, for which Axona aims to provide the missing communication substrate.
 - D. O. Hebb, *The Organization of Behavior* (Wiley, 1949). The learning rule — connections used together are strengthened — that Axona's neuromorphic routing implements as literal engineering.
 
-The technical claims here are grounded in the Axona source documentation: the Axona Explainer, the Axona Architecture note, the API Reference, the Programmer Guide, and the AI Grounding file. Axona is live and moving to full production; its source is available at github.com/axona-net. The system described here is the deployed system, not a proposal.
+The technical claims here are grounded in the Axona source documentation: the Axona Explainer, the Axona Architecture note, the API Reference, the Programmer Guide, and the AI Grounding file. Axona is live in production; its source is available at github.com/axona-net. The system described here is the deployed system, not a proposal.
 
 *The technology is shaped by the mission.*
