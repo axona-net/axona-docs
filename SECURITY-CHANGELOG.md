@@ -16,6 +16,46 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.19.0 — 2026-07-07 (testnet + production) — root reconciliation: stranded traffic can no longer mint a competing root
+
+**What's protected:** a topic's **single authoritative root stays single** even
+when routed traffic strands on a nearby node. Delivery and revocation both
+depend on this: every subscriber must attach to the same root that publishers
+and kills reach, or messages are silently lost for part of the network and
+killed content stays live for a subset of holders.
+
+Previously, a subscribe (or metrics request) that terminated at a near-miss
+node caused that node to take the topic's root **even while it held a live,
+verified root announcement naming a strictly closer node**. The announcement
+machinery demoted it moments later — and the next stranded message re-rooted
+it. Between two long-lived infrastructure relays serving the same region this
+became a standing oscillation: subscribers and publishers split across the two
+root variants, and fresh subscribers received little or nothing. Observed on
+the production backbone within hours of the relay tier going live; confirmed
+by journal forensics (75 of 285 topics rooted on more than one relay) and a
+failing delivery soak.
+
+The fix routes every root-taking decision through one shared gate: a node
+never takes (or retakes) a root while a live root announcement names a
+strictly closer root it can verify — either over a direct authenticated
+channel, or by having heard the announcement within the last announcement
+period. Stranded traffic is instead forwarded to the true root, and any
+spurious local claim demotes and re-homes beneath it, carrying its cached
+history upward. Churn recovery is preserved: when a root genuinely dies, its
+channel drop (or its announcements going silent) reopens promotion at once.
+The same change closes a pre-existing bounded loop where a stranded publish
+could chase a departed root's stale announcement for its full validity window.
+
+Root-state introspection (`health().axonRoles`) is also restored — it had been
+silently empty since the v3.12 internals rebuild, which masked this defect.
+
+Validated by a new divergent-view regression suite (the unfixed kernel fails
+it), the full kernel test suite, a 13/14 quiesced live restart-and-kill gate,
+and a production delivery soak. No wire change; deployed to testnet and
+production the same day.
+
+---
+
 ## Kernel v4.18.2 — 2026-07-04 (testnet) — single-root election on churn (no split-brain)
 
 **What's protected:** a topic keeps **exactly one authoritative root** when the
@@ -1478,4 +1518,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-07-03.*
+*Last updated: 2026-07-07.*
