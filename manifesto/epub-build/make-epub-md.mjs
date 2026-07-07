@@ -4,15 +4,18 @@ let md = readFileSync(src, 'utf8');
 
 // Replace the italic figure placeholders with real image embeds.
 // pandoc's implicit_figures turns an image alone in a paragraph into a captioned figure.
+// Sequential order in the document: 1 dht (fig1.png), 2 healing tree (fig4.png),
+// 3 identity keystone (fig2.png), 4 tussle (fig3.png). Image filenames are
+// historical; the numbers here match the md placeholders.
 const figs = [
   [/\*\(Figure 1 —[^\n]*\)\*/,
    '![**Figure 1.** Three ways to find who holds something. A *directory* is one machine everyone must ask. A *plain DHT* needs no directory but its random addresses send each lookup on a long path across the globe. *Axona* puts a coarse region into every address, so most traffic resolves in a short local walk.](images/fig1.png)'],
-  [/\*\(Figure 4 —[^\n]*\)\*/,
-   '![**Figure 4.** Self-healing delivery. When a relay in a topic’s tree disappears, the participants beneath it re-issue their subscription, which lands on whichever relative is still alive; a short cache covers what was in flight. The mechanism that builds the tree heals it.](images/fig4.png)'],
   [/\*\(Figure 2 —[^\n]*\)\*/,
-   '![**Figure 2.** The keystone. Your presence on the network and your voice as an author are different keys, and the design keeps them apart: a listener can verify *who signed* a message without the network ever learning *where the signer is*.](images/fig2.png)'],
+   '![**Figure 2.** Self-healing delivery. When a relay in a topic’s tree disappears, the participants beneath it re-issue their subscription, which lands on whichever relative is still alive; a short cache covers what was in flight. The mechanism that builds the tree heals it.](images/fig4.png)'],
   [/\*\(Figure 3 —[^\n]*\)\*/,
-   '![**Figure 3.** Relocating the tussle. Axona removes the network as a venue — there is no control point inside it to seize — and moves every such contest to the endpoints and to the institutions of society.](images/fig3.png)'],
+   '![**Figure 3.** The keystone. Your presence on the network and your voice as an author are different keys, and the design keeps them apart: a listener can verify *who signed* a message without the network ever learning *where the signer is*.](images/fig2.png)'],
+  [/\*\(Figure 4 —[^\n]*\)\*/,
+   '![**Figure 4.** Relocating the tussle. Axona removes the network as a venue — there is no control point inside it to seize — and moves every such contest to the endpoints and to the institutions of society.](images/fig3.png)'],
 ];
 for (const [re, rep] of figs) {
   if (!re.test(md)) console.error('WARN: placeholder not found:', re);

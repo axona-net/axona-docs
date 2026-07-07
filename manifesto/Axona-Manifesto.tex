@@ -107,8 +107,7 @@ for one to be.\marginnote[2pt]{\textbf{How to read this.}\; In a hurry: this
 page, then Part~I (the Manifesto), then \S2 (\emph{The One Property}), then
 the subsection of \S7 that matches your field --- \S7 is written so you can
 enter at any point. Technical reader: \S1 is for you. Skeptical reader: \S4
-(\emph{What Goes Wrong}) and \emph{What Axona Is Not} are where we keep the
-document honest. A glossary sits at the end.}
+(\emph{What Goes Wrong}) and \emph{What Axona Is Not} are where the costs are counted. A glossary sits at the end.}
 
 Three ideas make it work. \textbf{Location-aware addresses} keep local
 traffic local, so the network is fast instead of wandering the globe.
@@ -280,8 +279,7 @@ otherwise, and we do not believe the danger is a reason to withhold the tool.
 We are also not sure withholding was ever truly on offer. The principles Axona
 is built from are public and decades old; if we had not carried them to this
 conclusion, someone else soon would have --- perhaps without pausing to write
-down what the tool can do to us. Being first is not the point. Being honest
-about it is.
+down what the tool can do to us. Being first is not the point. Arriving with the risks written down is.
 
 But we believe, as people have generally come to believe about fire, that the
 answer to a powerful and hard-to-control tool is not a central authority who
@@ -295,8 +293,7 @@ We do not yet know how to build those institutions well, and we are not going
 to pretend that we do. What we know is that the technical foundation is built
 --- the network runs, it is fast, it heals itself, and it cannot be captured
 from within --- and that the human problem is now the one that matters. This
-document states the mission plainly, shows as honestly as we can what the tool
-can do and what it can do to us, and invites the people who think carefully
+document states the mission plainly, shows as plainly as we can what the tool can do and what it can do to us, and invites the people who think carefully
 about freedom, coordination, markets, minds, and power to help us work out what
 comes next.
 
@@ -432,6 +429,46 @@ the gap left by the break. There is no central failure detector and no repair
 coordinator. The same mechanism that builds the tree repairs it, and under heavy
 churn the network is designed to keep delivering to everyone still connected.
 
+% ---- FIGURE 4 : delivery tree healing ---------------------------
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[font=\scriptsize, >={Stealth[length=5pt]},
+   nd/.style={circle, draw=inkmuted, minimum size=7pt, inner sep=0pt},
+   rt/.style={circle, draw=rust, fill=rustsoft, minimum size=9pt, inner sep=0pt}]
+  % before
+  \begin{scope}
+   \node[font=\footnotesize\scshape] at (1.6,2.6) {a branch dies};
+   \node[rt] (r) at (1.6,2.0) {};
+   \node[nd] (a) at (0.6,1.1) {};   \node[nd] (b) at (2.6,1.1) {};
+   \node[nd] (a1) at (0.1,0.2) {};  \node[nd] (a2) at (1.1,0.2) {};
+   \draw[inkmuted] (r)--(a); \draw[inkmuted] (r)--(b);
+   \draw[rust, densely dashed] (a)--(a1);  \draw[rust, densely dashed] (a)--(a2);
+   \node[rust] at (0.6,1.1) {}; \draw[rust,line width=1pt] (0.35,0.85)--(0.85,1.35);
+   \draw[rust,line width=1pt] (0.35,1.35)--(0.85,0.85);
+   \node[rust, font=\scriptsize] at (0.6,1.55) {};
+  \end{scope}
+  % after
+  \begin{scope}[shift={(5.2,0)}]
+   \node[font=\footnotesize\scshape] at (1.6,2.6) {it re-subscribes};
+   \node[rt] (R) at (1.6,2.0) {};
+   \node[nd] (B) at (2.6,1.1) {};
+   \node[nd] (A1) at (0.1,0.2) {};  \node[nd] (A2) at (1.1,0.2) {};
+   \draw[inkmuted] (R)--(B);
+   \draw[rust, ->, line width=0.9pt] (A1) to[bend left=10] (R);
+   \draw[rust, ->, line width=0.9pt] (A2) to[bend right=5] (R);
+   \node[inkmuted, align=center, font=\scriptsize] at (1.4,-0.5)
+     {orphans reattach to a living relative;\\ a short cache fills the gap};
+  \end{scope}
+\end{tikzpicture}
+\caption[Self-healing delivery]{No central repair coordinator. When a relay in a
+topic's delivery tree disappears (left, the crossed node), the participants beneath
+it simply re-issue their subscription, which lands on whichever relative is still
+alive (right); a short cache of recent messages covers what was in flight during
+the break. The mechanism that builds the tree is the mechanism that heals it.}
+\label{fig:heal}
+\end{figure}
+
+
 \subsection{The keystone: two identities that never touch}
 
 Everything in the manifesto about freedom rests on one piece of engineering, so
@@ -454,7 +491,7 @@ built so that the second cannot be derived from the first.
 \centering
 \begin{tikzpicture}[font=\scriptsize]
   \node[draw=inkmuted, fill=panel, rounded corners, align=left,
-        text width=4.4cm, inner sep=6pt] (N) at (0,0)
+        text width=3.5cm, inner sep=5pt] (N) at (0,0)
     {\textbf{\scshape Node identity}\\[2pt]
      \emph{where you are, how you connect}\\[3pt]
      $\cdot$ bound to a coarse region\\
@@ -462,7 +499,7 @@ built so that the second cannot be derived from the first.
      $\cdot$ manages connections\\
      $\cdot$ \textbf{never signs content}};
   \node[draw=rust, fill=rust!8, rounded corners, align=left,
-        text width=4.4cm, inner sep=6pt] (A) at (7.2,0)
+        text width=3.5cm, inner sep=5pt] (A) at (5.9,0)
     {\textbf{\scshape Author identity}\\[2pt]
      \emph{who is speaking}\\[3pt]
      $\cdot$ a bare signing key, no location\\
@@ -470,9 +507,9 @@ built so that the second cannot be derived from the first.
      $\cdot$ anyone can verify it\\
      $\cdot$ \textbf{durable across devices}};
   % the wall
-  \draw[rust, line width=1.6pt] (3.6,-1.15) -- (3.6,1.15);
-  \node[rust, font=\scriptsize\scshape, align=center] at (3.6,1.5) {no\\ link};
-  \node[inkmuted, align=center, font=\scriptsize] at (3.6,-1.55)
+  \draw[rust, line width=1.6pt] (2.95,-1.15) -- (2.95,1.15);
+  \node[rust, font=\scriptsize\scshape, align=center] at (2.95,1.5) {no\\ link};
+  \node[inkmuted, align=center, font=\scriptsize] at (2.95,-1.55)
     {the network cannot derive one from the other};
 \end{tikzpicture}
 \caption[Two identities]{The keystone. Your presence on the network and your
@@ -686,8 +723,7 @@ document that buried it would be doing the dissident a disservice.
 We are aware --- Section~4 will insist on it --- that the same firewall-crossing
 property serves the person whose conversations a government forbids for good
 reason. We state the benefit first because we believe it is the larger one, and
-because a document that named only the danger would be as dishonest as one that
-named only the promise.
+because a document that named only the danger would be as incomplete as one that named only the promise.
 
 \subsection{AI research and safety, done in the open}
 
@@ -799,9 +835,7 @@ agents, form coalitions, and coordinate --- and the network will carry its signe
 bytes without objection, because objecting was never its function. We are building
 this before the problem of ensuring that AI systems reliably do what people intend
 is solved. We think that is a reason for urgency in the surrounding work, not a
-reason to withhold the substrate; but we would be dishonest to present the arrival
-of an agent-coordination layer, ahead of alignment, as anything other than a
-serious risk.
+reason to withhold the substrate; but an agent-coordination layer arriving ahead of alignment is a serious risk, and we present it as one.
 
 The agent-legibility feature described in Section~3 is a real mitigation and a
 partial one. It is voluntary: an agent that wishes to be legible declares itself,
@@ -824,7 +858,7 @@ individual, and it does so in a way that is difficult for a state to counter by
 technical means. We think that position is defensible, and we recognize that it
 is a position, with costs borne by interests that are not always illegitimate.
 
-\subsection{The honest summary}
+\subsection{Summary}
 
 The risks above are not a list of bugs to be fixed in a later version. They are
 the direct, designed consequences of the one property, and they cannot be
@@ -863,7 +897,7 @@ to read live entirely at the endpoints.
 of recent messages to heal delivery across churn; it is not an archive.
 Durability of anything you care about is the application's job.
 
-\item[It has introducers today, and is honest about them.] A brand-new
+\item[It has introducers today.] A brand-new
 participant needs a first contact to find the mesh, and today that first contact
 happens through \emph{bridges} --- introduction servers that anyone can run and
 that Axona is designed to make interchangeable and disposable. Once introduced, a
@@ -876,14 +910,11 @@ Problem}.
 
 None of these is a defect to be quietly patched. Each is a direct consequence of
 the end-to-end commitment --- the network declines to provide what only the
-endpoints can provide completely --- and naming them is part of keeping the rest
-of the document trustworthy.
+endpoints can provide completely --- and naming them is part of stating the design exactly.
 
 \section{How Axona Differs From What You Know}
 
-A reader who knows this territory will arrive with comparisons in hand, and the
-honest move is to make them ourselves rather than let the silence imply we have
-not.
+A reader who knows this territory will arrive with comparisons in hand, so we make them ourselves rather than let the silence imply we have not.
 
 \begin{description}
 \item[Tor] hides \emph{where you are} --- it anonymizes the network path. Axona
@@ -950,7 +981,7 @@ followed Clark's conclusion --- prefer decentralized control precisely because i
 offers no such lever --- to its end. The cost of following it is that the ordinary
 tools of governance are unavailable to us, and we must ask what can replace them.
 
-The honest first answer is that the architecture forecloses several of the
+The first answer is that the architecture forecloses several of the
 obvious replacements, and it is worth being specific about why, because the
 foreclosures are instructive.
 
@@ -1063,8 +1094,7 @@ technical; they are decisions about freedom and its limits, about the balance
 between individual and collective interests, about how a society lives alongside a
 tool it cannot control. Those are questions for a wide table --- for people who
 study governance, economics, law, ethics, and the behavior of societies, alongside
-the people who write the code. Our role, as the builders, is to state the problem
-honestly and to refuse the one solution that would betray the project: seizing
+the people who write the code. Our role, as the builders, is to state the problem plainly and to refuse the one solution that would betray the project: seizing
 control ourselves. The rest we mean to work out with others, which is the purpose
 of the section that closes this document.
 
@@ -1177,8 +1207,7 @@ that is properly yours.
 
 \subsection{For ethicists}
 
-The manifesto's fire framing is not decoration; it is the honest statement of
-the problem. We have built something whose benefits and harms are the same property
+The manifesto's fire framing is not decoration; it is the problem stated exactly. We have built something whose benefits and harms are the same property
 seen from two sides, which cannot be adjusted to keep the one without the other.
 The manifesto argues that the right response is not central control --- which
 merely relocates and concentrates the danger --- but sight and stewardship. That
@@ -1249,44 +1278,6 @@ read the code at \textbf{github.com/axona-net}.
 The fire is lit. What we build around it is the work now, and it is work for more
 hands than ours.
 
-% ---- FIGURE 4 : delivery tree healing ---------------------------
-\begin{figure}[h]
-\centering
-\begin{tikzpicture}[font=\scriptsize, >={Stealth[length=5pt]},
-   nd/.style={circle, draw=inkmuted, minimum size=7pt, inner sep=0pt},
-   rt/.style={circle, draw=rust, fill=rustsoft, minimum size=9pt, inner sep=0pt}]
-  % before
-  \begin{scope}
-   \node[font=\footnotesize\scshape] at (1.6,2.6) {a branch dies};
-   \node[rt] (r) at (1.6,2.0) {};
-   \node[nd] (a) at (0.6,1.1) {};   \node[nd] (b) at (2.6,1.1) {};
-   \node[nd] (a1) at (0.1,0.2) {};  \node[nd] (a2) at (1.1,0.2) {};
-   \draw[inkmuted] (r)--(a); \draw[inkmuted] (r)--(b);
-   \draw[rust, densely dashed] (a)--(a1);  \draw[rust, densely dashed] (a)--(a2);
-   \node[rust] at (0.6,1.1) {}; \draw[rust,line width=1pt] (0.35,0.85)--(0.85,1.35);
-   \draw[rust,line width=1pt] (0.35,1.35)--(0.85,0.85);
-   \node[rust, font=\scriptsize] at (0.6,1.55) {};
-  \end{scope}
-  % after
-  \begin{scope}[shift={(5.2,0)}]
-   \node[font=\footnotesize\scshape] at (1.6,2.6) {it re-subscribes};
-   \node[rt] (R) at (1.6,2.0) {};
-   \node[nd] (B) at (2.6,1.1) {};
-   \node[nd] (A1) at (0.1,0.2) {};  \node[nd] (A2) at (1.1,0.2) {};
-   \draw[inkmuted] (R)--(B);
-   \draw[rust, ->, line width=0.9pt] (A1) to[bend left=10] (R);
-   \draw[rust, ->, line width=0.9pt] (A2) to[bend right=5] (R);
-   \node[inkmuted, align=center, font=\scriptsize] at (1.4,-0.5)
-     {orphans reattach to a living relative;\\ a short cache fills the gap};
-  \end{scope}
-\end{tikzpicture}
-\caption[Self-healing delivery]{No central repair coordinator. When a relay in a
-topic's delivery tree disappears (left, the crossed node), the participants beneath
-it simply re-issue their subscription, which lands on whichever relative is still
-alive (right); a short cache of recent messages covers what was in flight during
-the break. The mechanism that builds the tree is the mechanism that heals it.}
-\label{fig:heal}
-\end{figure}
 
 \section{Glossary}
 

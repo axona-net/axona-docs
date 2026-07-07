@@ -21,7 +21,7 @@ That one property is the source of everything Axona makes possible and everythin
 
 We think that is a tool worth building anyway — for the same reason humanity kept fire and built hearths and fire brigades rather than giving it back. But the response to a tool no one can control is not a central authority who controls it; that only rebuilds the intermediary we set out to abolish. The response is **sight and stewardship**: making the life of the network visible to those who would understand it, and building human institutions — accountable, bounded, resistant to capture — that respond to what they see without seizing the thing itself. The network is built. That harder, human problem is the one that remains, and it is the reason for this document.
 
-> **How to read this.** In a hurry: this page, then Part I (the Manifesto), then §2 (*The One Property*), then the subsection of §7 that matches your field — §7 is written so you can enter at any point. Technical reader: §1 is for you. Skeptical reader: §4 (*What Goes Wrong*) and *What Axona Is Not* are where we keep the document honest. A glossary sits at the end.
+> **How to read this.** In a hurry: this page, then Part I (the Manifesto), then §2 (*The One Property*), then the subsection of §7 that matches your field — §7 is written so you can enter at any point. Technical reader: §1 is for you. Skeptical reader: §4 (*What Goes Wrong*) and *What Axona Is Not* are where the costs are counted. A glossary sits at the end.
 
 ---
 
@@ -79,11 +79,11 @@ Fire feeds us and warms us and is a large part of why we are what we are. It als
 
 What this document describes has the shape of fire. A network that no one can silence is a network that no one can silence — and that sentence holds whether the speaker is a dissident under a censoring government or a coordinated campaign of lies, whether the collaborating minds are researchers across a closed border or agents pursuing an end that no person would choose. The property that liberates and the property that endangers are not two properties. They are one property, seen from two sides. We will not claim otherwise, and we do not believe the danger is a reason to withhold the tool.
 
-We are also not sure withholding was ever truly on offer. The principles Axona is built from are public and decades old; if we had not carried them to this conclusion, someone else soon would have — perhaps without pausing to write down what the tool can do to us. Being first is not the point. Being honest about it is.
+We are also not sure withholding was ever truly on offer. The principles Axona is built from are public and decades old; if we had not carried them to this conclusion, someone else soon would have — perhaps without pausing to write down what the tool can do to us. Being first is not the point. Arriving with the risks written down is.
 
 But we believe, as people have generally come to believe about fire, that the answer to a powerful and hard-to-control tool is not a central authority who controls it. That would only rebuild the intermediary we set out to abolish, and hand it more power than any intermediary has held. The answer is sight and stewardship: making what happens on the network visible to those who would understand it, and building human institutions, accountable to the people they serve, that can respond to what they see without seizing the thing itself.
 
-We do not yet know how to build those institutions well, and we are not going to pretend that we do. What we know is that the technical foundation is built — the network runs, it is fast, it heals itself, and it cannot be captured from within — and that the human problem is now the one that matters. This document states the mission plainly, shows as honestly as we can what the tool can do and what it can do to us, and invites the people who think carefully about freedom, coordination, markets, minds, and power to help us work out what comes next.
+We do not yet know how to build those institutions well, and we are not going to pretend that we do. What we know is that the technical foundation is built — the network runs, it is fast, it heals itself, and it cannot be captured from within — and that the human problem is now the one that matters. This document states the mission plainly, shows as plainly as we can what the tool can do and what it can do to us, and invites the people who think carefully about freedom, coordination, markets, minds, and power to help us work out what comes next.
 
 The fire is lit. The question is what we build around it.
 
@@ -115,7 +115,7 @@ The catch is physics. Twenty hops sounds quick, but each hop is a message betwee
 
 **Broadcast trees that heal themselves.** Finding a single participant is not enough; a real network also needs to let one participant send to many — *publish and subscribe*, the pattern behind every feed and notification you use, but here with no company in the middle. Axona builds a delivery tree per topic: the participant nearest a topic's address becomes its root, and as an audience grows the tree sprouts branches toward wherever the subscribers cluster. When a branch dies — a laptop closes, a phone drops off — the participants beneath it simply re-issue their subscription, which lands on whichever relative is still alive, and a short cache of recent messages fills the gap left by the break. There is no central failure detector and no repair coordinator. The same mechanism that builds the tree repairs it, and under heavy churn the network is designed to keep delivering to everyone still connected.
 
-*(Figure 4 — a delivery tree healing around a branch that dies.)*
+*(Figure 2 — a delivery tree healing around a branch that dies.)*
 
 ### The keystone: two identities that never touch
 
@@ -123,7 +123,7 @@ Everything in the manifesto about freedom rests on one piece of engineering, so 
 
 An Axona participant has two separate identities, and they are never interchangeable. The first is a **node identity**: a key bound to a rough location, which forms the participant's address in the network and manages its connections. It is the participant's presence on the wire. It never signs content. The second is an **author identity**: a bare cryptographic signing key with no location and no address, which signs what the participant says and which any listener can verify. It is durable — the same author key is recognized across sessions and devices — and it is deliberately, structurally disconnected from the node identity. Where you are and how you connect is one fact; who is speaking is a different fact; and the network is built so that the second cannot be derived from the first.
 
-*(Figure 2 — the two identities, and the wall between them.)*
+*(Figure 3 — the two identities, and the wall between them.)*
 
 This is the end-to-end argument made concrete. Identity, like encryption, is pushed to the endpoints, because only the endpoints can implement it completely and because putting it in the network would require the network to hold something it should never hold. A message names its author by signature, the network verifies that signature without knowing or caring who stands behind it, and no account, registry, or central authority exists anywhere in the path. Authorship is a signature, not an account.
 
@@ -151,7 +151,7 @@ David Clark's framework is the right one for seeing what this means. Clark obser
 
 Axona's one property is a decision about where every one of these tussles is fought. By carrying only opaque signed bytes, Axona removes the network as a venue for tussle entirely. It cannot host the fight between a sender who wants to speak and a receiver or authority who wants to stop them, because it has no mechanism to take either side. The contest does not disappear; it moves. It moves to the endpoints, where a recipient chooses what to read, what to verify, whom to trust, and what to ignore. It moves to the reputational and social layer, where authors build or lose standing in the eyes of those who listen. And it moves, ultimately, to the institutions of society — to law, to norms, to the slow human machinery of holding people accountable for what they do.
 
-*(Figure 3 — the tussle, relocated: out of the network, to the endpoints and to society.)*
+*(Figure 4 — the tussle, relocated: out of the network, to the endpoints and to society.)*
 
 This relocation is the whole story, and it is why the two sections that follow are not really two stories but one. When we describe what goes right, we are describing the consequences of moving the tussle out of the network. When we describe what goes wrong, we are describing the same move, from the other side. A network that cannot be made to take sides cannot be made to take the right side either. We ask the reader to hold both halves of that sentence at once, because Axona does.
 
@@ -177,7 +177,7 @@ The firewall-crossing property of Axona is, in the most direct sense, the manife
 
 For a person whose government forbids certain conversations, this is the difference between a right they nominally hold and one they can actually exercise. One caution belongs right here, next to the promise, because the promise can get someone hurt if it is misread: **Axona protects what you say and who is credited for it — it does not, by itself, hide that you are the one saying it.** Your node identity carries your rough region; the peers and relays you connect through can see your network address; an adversary who watches the wire broadly can still do traffic analysis. If your safety depends on your government not knowing you are participating at all, Axona is a layer to run *over* network-level anonymity such as Tor, not a replacement for it. We say this in the affirmative section, and not only in the section on risks, because a document that buried it would be doing the dissident a disservice.
 
-We are aware — Section 4 will insist on it — that the same firewall-crossing property serves the person whose conversations a government forbids for good reason. We state the benefit first because we believe it is the larger one, and because a document that named only the danger would be as dishonest as one that named only the promise.
+We are aware — Section 4 will insist on it — that the same firewall-crossing property serves the person whose conversations a government forbids for good reason. We state the benefit first because we believe it is the larger one, and because a document that named only the danger would be as incomplete as one that named only the promise.
 
 ### AI research and safety, done in the open
 
@@ -215,7 +215,7 @@ There is a risk specific to a substrate built for machines as well as people, an
 
 ### A substrate for misaligned agents
 
-The completion of Licklider's vision that we celebrate in the manifesto has a shadow. A gate-free coordination layer for AI systems is exactly as available to a misaligned or adversarially directed system as to an aligned one. An agent pursuing an end no person would choose can hold a durable identity, recruit other agents, form coalitions, and coordinate — and the network will carry its signed bytes without objection, because objecting was never its function. We are building this before the problem of ensuring that AI systems reliably do what people intend is solved. We think that is a reason for urgency in the surrounding work, not a reason to withhold the substrate; but we would be dishonest to present the arrival of an agent-coordination layer, ahead of alignment, as anything other than a serious risk.
+The completion of Licklider's vision that we celebrate in the manifesto has a shadow. A gate-free coordination layer for AI systems is exactly as available to a misaligned or adversarially directed system as to an aligned one. An agent pursuing an end no person would choose can hold a durable identity, recruit other agents, form coalitions, and coordinate — and the network will carry its signed bytes without objection, because objecting was never its function. We are building this before the problem of ensuring that AI systems reliably do what people intend is solved. We think that is a reason for urgency in the surrounding work, not a reason to withhold the substrate; but an agent-coordination layer arriving ahead of alignment is a serious risk, and we present it as one.
 
 The agent-legibility feature described in Section 3 is a real mitigation and a partial one. It is voluntary: an agent that wishes to be legible declares itself, and an agent that does not, does not. The absence of a declaration reads as "unstated," never as "human" — the network makes no claim it cannot verify — but a mechanism that the well-behaved adopt and the ill-behaved ignore is a floor, not a wall. We offer it as what it is.
 
@@ -223,7 +223,7 @@ The agent-legibility feature described in Section 3 is a real mitigation and a p
 
 The property that lets knowledge cross a closed border also crosses borders that a legitimate state has legitimate reason to maintain — for law enforcement, for sanctions, for the ordinary business of governing within a territory. A network that treats every barrier as damage to route around does not distinguish a censor's wall from a lawful one. Reasonable people disagree about where the line between the two falls, and about how much weight to give a state's authority against an individual's right to communicate. Axona does not resolve that disagreement; it takes a strong position within it, in the direction of the individual, and it does so in a way that is difficult for a state to counter by technical means. We think that position is defensible, and we recognize that it is a position, with costs borne by interests that are not always illegitimate.
 
-### The honest summary
+### Summary
 
 The risks above are not a list of bugs to be fixed in a later version. They are the direct, designed consequences of the one property, and they cannot be engineered away without engineering away the property itself — which would mean rebuilding the point of control we deliberately refused to build. This is the hard core of the manifesto's fire problem. The response we believe in is not a technical fix inside the network but the human work of sight and stewardship outside it, which is the subject of the two sections after next.
 
@@ -241,13 +241,13 @@ Clear promises require clear boundaries. Several things a reader might reasonabl
 
 - **It does not guarantee permanent storage.** The network keeps a short cache of recent messages to heal delivery across churn; it is not an archive. Durability of anything you care about is the application's job.
 
-- **It has introducers today, and is honest about them.** A brand-new participant needs a first contact to find the mesh, and today that first contact happens through *bridges* — introduction servers that anyone can run and that Axona is designed to make interchangeable and disposable. Once introduced, a participant routes peer-to-peer with no server in the path — a property we have verified with the introducer process killed outright. The introducer is a bootstrap convenience, not a place your conversations pass through; and shrinking its role toward nothing is active work, discussed under *The Governance Problem*.
+- **It has introducers today.** A brand-new participant needs a first contact to find the mesh, and today that first contact happens through *bridges* — introduction servers that anyone can run and that Axona is designed to make interchangeable and disposable. Once introduced, a participant routes peer-to-peer with no server in the path — a property we have verified with the introducer process killed outright. The introducer is a bootstrap convenience, not a place your conversations pass through; and shrinking its role toward nothing is active work, discussed under *The Governance Problem*.
 
-None of these is a defect to be quietly patched. Each is a direct consequence of the end-to-end commitment — the network declines to provide what only the endpoints can provide completely — and naming them is part of keeping the rest of the document trustworthy.
+None of these is a defect to be quietly patched. Each is a direct consequence of the end-to-end commitment — the network declines to provide what only the endpoints can provide completely — and naming them is part of stating the design exactly.
 
 ## How Axona Differs From What You Know
 
-A reader who knows this territory will arrive with comparisons in hand, and the honest move is to make them ourselves rather than let the silence imply we have not.
+A reader who knows this territory will arrive with comparisons in hand, so we make them ourselves rather than let the silence imply we have not.
 
 - **Tor** hides *where you are* — it anonymizes the network path. Axona does the opposite thing on purpose: it makes location a first-class, *useful* part of the address so that routing is fast, while separating location from *who is speaking*. Tor answers "can anyone tell it's me?"; Axona answers "can anyone stop or attribute what I said?" They are complementary, not competing — and, as above, we recommend Tor beneath Axona where anonymity is the requirement.
 
@@ -269,7 +269,7 @@ If the network cannot be governed from within — and by design it cannot — th
 
 Clark's control-point analysis gives the problem its shape. A point of control is any place in a system where the design lets some actor control an action. Conventional governance works through such points: an operator who can suspend an account, a registry that can revoke a name, a court that can compel a platform. Axona has removed these points on purpose, because each is also a point of capture — a lever that an adverse actor, given enough resources or the right political moment, can seize and turn to ends the designers never intended. We have followed Clark's conclusion — prefer decentralized control precisely because it offers no such lever — to its end. The cost of following it is that the ordinary tools of governance are unavailable to us, and we must ask what can replace them.
 
-The honest first answer is that the architecture forecloses several of the obvious replacements, and it is worth being specific about why, because the foreclosures are instructive.
+The first answer is that the architecture forecloses several of the obvious replacements, and it is worth being specific about why, because the foreclosures are instructive.
 
 A **shared reputation system** — a verdict the whole network agrees on, *this author is untrustworthy* — would require the network to agree on that verdict and propagate it. But a shared, network-level verdict is exactly a point of control: whoever can influence the verdict can weaponize it. Reputation on Axona can therefore only be local — a judgment each participant forms and holds for itself — never a global pronouncement the network enforces. This is a real limit, and it is the same commitment that keeps the network free, seen from the governance side.
 
@@ -293,7 +293,7 @@ And then the worked example runs straight into the wall from Section 5, which is
 
 The aspiration behind all of this is old. The Athenian ideal was that those who rule are chosen by and accountable to the governed, and that power rotates rather than settling, so that no one comes to hold it as property. We find that the right ideal to aim at for Axona's stewardship: an institution whose members are answerable to the network's participants, whose authority is bounded and revocable, and which is structured — through rotation, through transparency, through the diffusion of any given decision across many hands — so that it cannot itself become the point of capture. How to realize that against Sybil attack, across a participant base that is pseudonymous by design and global by nature, we do not know. We are clear-eyed that "accountable to the participants" is a phrase concealing an unsolved problem, not a mechanism.
 
-We will say one thing with conviction, though. Whatever this institution becomes, it must not be run by its technologists alone. The decisions ahead are only partly technical; they are decisions about freedom and its limits, about the balance between individual and collective interests, about how a society lives alongside a tool it cannot control. Those are questions for a wide table — for people who study governance, economics, law, ethics, and the behavior of societies, alongside the people who write the code. Our role, as the builders, is to state the problem honestly and to refuse the one solution that would betray the project: seizing control ourselves. The rest we mean to work out with others, which is the purpose of the section that closes this document.
+We will say one thing with conviction, though. Whatever this institution becomes, it must not be run by its technologists alone. The decisions ahead are only partly technical; they are decisions about freedom and its limits, about the balance between individual and collective interests, about how a society lives alongside a tool it cannot control. Those are questions for a wide table — for people who study governance, economics, law, ethics, and the behavior of societies, alongside the people who write the code. Our role, as the builders, is to state the problem plainly and to refuse the one solution that would betray the project: seizing control ourselves. The rest we mean to work out with others, which is the purpose of the section that closes this document.
 
 ---
 
@@ -333,7 +333,7 @@ Axona takes a strong position in one of the central tussles Clark describes — 
 
 ### For ethicists
 
-The manifesto's fire framing is not decoration; it is the honest statement of the problem. We have built something whose benefits and harms are the same property seen from two sides, which cannot be adjusted to keep the one without the other. The manifesto argues that the right response is not central control — which merely relocates and concentrates the danger — but sight and stewardship. That argument deserves scrutiny it has not yet received.
+The manifesto's fire framing is not decoration; it is the problem stated exactly. We have built something whose benefits and harms are the same property seen from two sides, which cannot be adjusted to keep the one without the other. The manifesto argues that the right response is not central control — which merely relocates and concentrates the danger — but sight and stewardship. That argument deserves scrutiny it has not yet received.
 
 *The open problems we would hand you:* Is it right to build a tool whose harms are inseparable from its benefits, on the judgment that the benefits are larger — and who is entitled to make that judgment on behalf of everyone the tool will affect? What are the obligations of the builders of such a thing, once built, and are they discharged by transparency and stewardship, or do they run deeper? Is there a coherent ethics of releasing a capability that cannot be recalled, and if so, what does it demand? We have made our choice and stated our reasons. We do not claim those reasons settle the matter, and we would rather they were argued with than accepted.
 
