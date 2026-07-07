@@ -67,7 +67,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small Manifesto and White Paper \quad v0.2 \quad 2026-07-04\par}
+{\small Manifesto and White Paper \quad v0.3 \quad 2026-07-07\par}
 \end{center}
 \vfill
 \null\newpage
@@ -103,7 +103,12 @@ no server, no place in the middle where anyone sits who could read, rank,
 charge, throttle, or forbid. It runs in production today, on ordinary
 phones, browsers, and laptops. There is no central directory,
 no account system, and no operator, because by construction there is nowhere
-for one to be.
+for one to be.\marginnote[2pt]{\textbf{How to read this.}\; In a hurry: this
+page, then Part~I (the Manifesto), then \S2 (\emph{The One Property}), then
+the subsection of \S7 that matches your field --- \S7 is written so you can
+enter at any point. Technical reader: \S1 is for you. Skeptical reader: \S4
+(\emph{What Goes Wrong}) and \emph{What Axona Is Not} are where we keep the
+document honest. A glossary sits at the end.}
 
 Three ideas make it work. \textbf{Location-aware addresses} keep local
 traffic local, so the network is fast instead of wandering the globe.
@@ -119,7 +124,7 @@ where they are and how they connect is a separate fact the network never
 links to it. The network moves signed bytes between endpoints and does
 nothing else --- so it \emph{cannot act on} what you say: cannot rank it,
 suppress it, or reveal who you are, because it was never told and never
-needed to be.
+needed to know.
 
 That one property is the source of everything Axona makes possible and
 everything it makes dangerous --- they are the same property seen from two
@@ -141,15 +146,7 @@ to what they see without seizing the thing itself. The network is built. That
 harder, human problem is the one that remains, and it is the reason for this
 document.
 
-\begin{quote}
-\textbf{How to read this.}\; In a hurry: this page, then Part~I (the
-Manifesto), then \S2 (\emph{The One Property}), then the subsection of \S7
-that matches your field --- \S7 is written so you can enter at any point.
-Technical reader: \S1 is for you. Skeptical reader: \S4 (\emph{What Goes
-Wrong}) and \emph{What Axona Is Not} are where we keep the document honest. A
-glossary sits at the end.
-\end{quote}
-
+\newpage
 \manpart{Part I \;\textbullet\; Manifesto}
 
 \newthought{Axona is a network with no owner.} Not a company that promises not
@@ -266,7 +263,7 @@ There is an old story about what happens when someone gives people fire.
 
 Fire feeds us and warms us and is a large part of why we are what we are. It
 also burns down houses, and forests, and sometimes cities. Humanity did not
-respond to the danger of fire by taking it back. We learned to build hearths,
+respond to the danger of fire by giving it back. We learned to build hearths,
 and fire brigades, and the codes that keep a blaze in one building from taking
 the block. We did not remove the risk. We built the practices and institutions
 to live alongside it.
@@ -305,6 +302,7 @@ comes next.
 
 The fire is lit. The question is what we build around it.
 
+\newpage
 \manpart{Part II \;\textbullet\; White Paper}
 
 \section{1.\quad What Axona Is}
@@ -399,8 +397,8 @@ random, so a lookup wanders the globe. Axona puts a coarse geographic code into
 the first byte of every identifier, computed from the participant's rough
 location. Two participants in the same region share a leading byte and are
 therefore ``close'' in identifier space as well as on the ground. Local traffic
-stays local, and the two-second world tour collapses toward a short regional
-walk. A participant can claim any location it likes --- the code is a rough area
+stays local, and the two-second world tour collapses toward a few long jumps
+followed by a short regional walk. A participant can claim any location it likes --- the code is a rough area
 code, not a verified position --- but, as we will see, claiming a distant one
 carries a cost the network imposes automatically.
 

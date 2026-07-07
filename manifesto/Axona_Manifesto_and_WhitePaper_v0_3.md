@@ -1,7 +1,7 @@
 # Axona
 ## A Free Substrate for a Society of Minds
 
-*Manifesto and White Paper · v0.2 · David A. Smith · Axona.net*
+*Manifesto and White Paper · v0.3 · 2026-07-07 · David A. Smith · Axona.net*
 
 ---
 
@@ -15,7 +15,7 @@ Axona is a communication network with no owner — no company, no server, no pla
 
 Three ideas make it work. **Location-aware addresses** keep local traffic local, so the network is fast instead of wandering the globe. **Self-learning routing** — connections that carry successful traffic grow stronger, unused ones fade, an idea borrowed from how neurons wire — lets the network reshape itself around the paths that actually work and heal when parts of it die. And **self-repairing broadcast trees** let one participant reach many with no server coordinating the delivery.
 
-The keystone is a single design choice: **authorship is a signature, not an account.** Who is speaking is a cryptographic key the speaker holds; where they are and how they connect is a separate fact the network never links to it. The network moves signed bytes between endpoints and does nothing else — so it *cannot act on* what you say: cannot rank it, suppress it, or reveal who you are, because it was never told and never needed to be.
+The keystone is a single design choice: **authorship is a signature, not an account.** Who is speaking is a cryptographic key the speaker holds; where they are and how they connect is a separate fact the network never links to it. The network moves signed bytes between endpoints and does nothing else — so it *cannot act on* what you say: cannot rank it, suppress it, or reveal who you are, because it was never told and never needed to know.
 
 That one property is the source of everything Axona makes possible and everything it makes dangerous — they are the same property seen from two sides. It lets a researcher in a sanctioned country collaborate as an equal, and it lets a disinformation campaign route around every attempt to slow it. It gives AI agents from different companies a place to coordinate as peers, and it gives a *misaligned* agent the same place on the same terms. A network that cannot be made to take sides cannot be made to take the right side either.
 
@@ -75,7 +75,7 @@ This, beneath everything else, is what Axona is. We have built the beginnings of
 
 There is an old story about what happens when someone gives people fire.
 
-Fire feeds us and warms us and is a large part of why we are what we are. It also burns down houses, and forests, and sometimes cities. Humanity did not respond to the danger of fire by taking it back. We learned to build hearths, and fire brigades, and the codes that keep a blaze in one building from taking the block. We did not remove the risk. We built the practices and institutions to live alongside it.
+Fire feeds us and warms us and is a large part of why we are what we are. It also burns down houses, and forests, and sometimes cities. Humanity did not respond to the danger of fire by giving it back. We learned to build hearths, and fire brigades, and the codes that keep a blaze in one building from taking the block. We did not remove the risk. We built the practices and institutions to live alongside it.
 
 What this document describes has the shape of fire. A network that no one can silence is a network that no one can silence — and that sentence holds whether the speaker is a dissident under a censoring government or a coordinated campaign of lies, whether the collaborating minds are researchers across a closed border or agents pursuing an end that no person would choose. The property that liberates and the property that endangers are not two properties. They are one property, seen from two sides. We will not claim otherwise, and we do not believe the danger is a reason to withhold the tool.
 
@@ -109,7 +109,7 @@ The catch is physics. Twenty hops sounds quick, but each hop is a message betwee
 
 ### Three ideas
 
-**Addresses that know where they are.** Kademlia's identifiers are random, so a lookup wanders the globe. Axona puts a coarse geographic code into the first byte of every identifier, computed from the participant's rough location. Two participants in the same region share a leading byte and are therefore "close" in identifier space as well as on the ground. Local traffic stays local, and the two-second world tour collapses toward a short regional walk. A participant can claim any location it likes — the code is a rough area code, not a verified position — but, as we will see, claiming a distant one carries a cost the network imposes automatically.
+**Addresses that know where they are.** Kademlia's identifiers are random, so a lookup wanders the globe. Axona puts a coarse geographic code into the first byte of every identifier, computed from the participant's rough location. Two participants in the same region share a leading byte and are therefore "close" in identifier space as well as on the ground. Local traffic stays local, and the two-second world tour collapses toward a few long jumps followed by a short regional walk. A participant can claim any location it likes — the code is a rough area code, not a verified position — but, as we will see, claiming a distant one carries a cost the network imposes automatically.
 
 **A network that learns its own shortcuts.** This is the idea that gives Axona its name. A neuron in the brain connects to a limited number of others and cannot afford to keep every connection it might form, so it keeps the ones that prove useful and lets the rest weaken — "neurons that fire together, wire together," in Donald Hebb's rule from 1949. A browser faces the same problem: it can hold only a few dozen live connections while the network has hundreds of thousands of participants. Axona treats each connection as a *synapse* with a weight that rises when the connection carries a successful, fast lookup and decays when it goes unused. The network's routing table becomes a memory of what has actually worked, and it reshapes itself around the traffic it actually carries. A participant that claims to be in one region but answers from another cannot fake the round-trip time; its connections earn weight slowly and lose out to honest ones. The cheat is not forbidden — it is simply, structurally, not worth it.
 

@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-const src = '/Users/croqueteer/Documents/claude/axona-docs/manifesto/Axona_Manifesto_and_WhitePaper_v0_2.md';
+const src = '/Users/croqueteer/Documents/claude/axona-docs/manifesto/Axona_Manifesto_and_WhitePaper_v0_3.md';
 let md = readFileSync(src, 'utf8');
 
 // Replace the italic figure placeholders with real image embeds.
