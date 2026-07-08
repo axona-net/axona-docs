@@ -130,3 +130,34 @@ network's confirmation will eventually split somewhere.
 
 — shipped 2026-07-07: kernel v4.19.0 → v4.19.1, bridge v2.65.0, relay v0.47.1,
 peer v3.47.1; testnet + production; SECURITY-CHANGELOG updated.
+
+---
+
+## Postscript (2026-07-08): v4.19.2 and the acceptance verdict
+
+One more mechanism surfaced from an instrumented prod run: **every
+freshly-joined subscriber was minting its own transient root** — a client
+subscribes before its WebRTC mesh forms, the subscribe never leaves the node,
+and with no beacons heard yet it elects itself. Seven transient roots for one
+topic in a single 12-subscriber run. **v4.19.2** adds the alone-in-the-dark
+guard: a node with zero non-bridge neighbours holds its subscribe and lets the
+5-second renewal re-run the election once it is actually meshed.
+
+We explicitly considered and **rejected** the "reluctant root" alternative
+(preferring stable hosting relays in the election). Privileging stable nodes
+would suppress the symptom while hiding the churn mechanism the protocol has
+to master — the fix must hold for a network of 100% transient peers. That
+principle is now standing policy for churn work.
+
+**The acceptance soak now passes on the mechanism.** Five prod cycles on
+v4.19.2: every scenario at or near **100% whenever clients can connect** —
+scale 100×4, churn 100/100/100/92, gap 100×4, discovery 62.5 then 100×4
+(chronically ~0 before this arc), restart 100 with full timeline recovery,
+kill 100 with fresh subscribers seeing all survivors and zero leaked killed
+bodies. Every remaining failure in the run is the **bridge dropping WebSocket
+handshakes under accumulated connection churn** — clients refused at the front
+door, not messages lost in the tree. That is now a separate, well-isolated
+infrastructure investigation.
+
+— shipped 2026-07-08: kernel v4.19.2, bridge v2.66.0, relay v0.47.2, peer
+v3.47.2; testnet + production.
