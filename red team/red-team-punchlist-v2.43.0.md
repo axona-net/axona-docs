@@ -1,5 +1,8 @@
 # Axona Security Punch List — consolidated & ranked (v2.43.0)
 
+> **⚠ SUPERSEDED by [`red-team-punchlist-v4.19.3.md`](red-team-punchlist-v4.19.3.md)** (2026-07-09) — which carries these security items forward and adds the reliability/observability (R-series) class that became the system's largest issue after the 4.x rewrite + fleet deployment. This file is preserved as the point-in-time v2.43.0 security register.
+
+
 **Date:** 2026-06-15 · **Line:** `axona/5` / kernel **v2.43.0** (live on
 `axona.net` / `bridge.axona.net`; SF testnet staging).
 **Supersedes:** [`red-team-punchlist-v2.6.0.md`](red-team-punchlist-v2.6.0.md)
