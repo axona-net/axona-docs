@@ -16,6 +16,21 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.19.4 — 2026-07-11 (testnet + production) — a departing peer goes silent, and its last words arrive
+
+**What's protected:** the **integrity of a publisher's final messages** and the
+**resource safety of departure**. An application that publishes and then leaves
+now drains its in-flight publishes on evidence (bounded by the caller's
+timeout) before departing — previously the drain window was silently capped at
+50ms, so a publish-then-leave pattern could drop the very message the
+application existed to send, and the retry machinery then outlived the
+departure, consuming full CPU against a dead connection for ~40 seconds.
+Topic hand-off on graceful leave is now genuinely time-bounded, and a peer
+that has left sends nothing further. Validated by a dedicated regression
+suite and live before/after measurement on a multi-host network.
+
+---
+
 ## Kernel v4.19.3 — 2026-07-10 (testnet + production) — the mesh survives a bridge restart
 
 **What's protected:** the network's **availability across signaling-bridge
@@ -1544,4 +1559,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-07-10.*
+*Last updated: 2026-07-11.*
