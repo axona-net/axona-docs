@@ -16,6 +16,32 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.19.3 — 2026-07-10 (testnet + production) — the mesh survives a bridge restart
+
+**What's protected:** the network's **availability across signaling-bridge
+restarts**. A relay (or any peer) that loses its bridge connection and reconnects
+while the bridge is still coming back up now rides through the transient failure
+and re-establishes itself, instead of stalling permanently. Availability is the
+whole game for a delivery substrate — a node that is alive but can never rejoin is
+indistinguishable from a dead one, and a fleet that all fails this way at once is
+an outage.
+
+Previously, a reconnect attempt that met a non-WebSocket HTTP response (a proxy
+returning 502 during the bridge's boot window) surfaced as an unhandled error that
+tore down the reconnect machinery: the peer stayed running but never retried, so a
+routine bridge restart could strand the entire relay fleet until a manual restart.
+The reconnect path now treats a failed upgrade as an ordinary retry with backoff,
+and every recovery loop is bounded so it can never wait forever on the thing it is
+recovering. Validated by a regression test that reproduces the exact failure and by
+a live end-to-end reconnect through a sustained 502 window.
+
+Also in this line (v2.68.0 bridge): event-loop **stall detection with public
+health gauges**, and restored **root-state introspection** — a monitoring surface
+that had silently reported zero now reports the truth, so operators can see what
+the infrastructure is actually doing.
+
+---
+
 ## Kernel v4.19.0 — 2026-07-07 (testnet + production) — root reconciliation: stranded traffic can no longer mint a competing root
 
 **What's protected:** a topic's **single authoritative root stays single** even
@@ -1518,4 +1544,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-07-07.*
+*Last updated: 2026-07-10.*
