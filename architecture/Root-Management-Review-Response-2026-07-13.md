@@ -148,3 +148,57 @@ testnet acceptance on the 4.20.1 line 100% initial / 100% healed delivery
 *The Root-Management document was re-versioned to
 [4.20.1](Root-Management-v4.20.1.md) with the new sweep rule and the
 tightened convergence bound (neighbour-upstream death → next-tick re-home).*
+
+---
+
+## Addendum — round 2 (reviewer's reply, same day)
+
+The reviewer accepted the verdicts above and proposed six further items
+(A–F). Dispositions, same method:
+
+**A common thread first.** Items A, C, and the revived Fix-2 variant are the
+same underlying idea — *confirmed attachment* — each implemented on a signal
+that healthy quiet topics do not emit. A: drop pins whose upstream **beacon**
+expired — but beacons reach the topic's basin (the root's XOR-closest
+neighbours), not its subscribers, so most healthy attachments never hold a
+beacon for their upstream at all; the check would unpin them wholesale.
+C / Fix-2-with-a-longer-timeout: auto-clear pins with no DELIVER in
+N×RENEW_MS — but renewals of a seated subscriber deliberately don't ping, so
+any topic quiet longer than the timeout unattaches and fallback-claims:
+root churn manufactured by the monitor. The *idea* is right and is formally
+on Phase 2's list as **ack-per-renewal (lease) attachment semantics** — the
+one signal that is emitted exactly when attachment is healthy. Until then,
+the non-neighbour-upstream-death residual stays what it is: a ≤RENEW_MS
+tail healed by the renewal reroute. No timers on the wrong signal.
+
+- **A (non-direct death sanity check)** — residual acknowledged (it is the
+  bound documented in V1's verdict); proposed beacon-TTL check **rejected**
+  (wrong evidence source, see above); real fix = Phase 2 lease semantics.
+- **B (shorten verified-pointer TTL)** — **declined for now.** The 90s TTL
+  is 2× the self-verify cadence *by construction*: a pointer that expires
+  before the next verification can refresh the corner reopens the 4.19.1
+  shadowed-orphan bug. Re-cutting this constant is exactly the timing-knob
+  experiment class that consumed 4.17.0–4.17.4; the corner retires wholesale
+  under Phase 2's unified liveness rather than by another constant.
+- **C (post-demotion deprecation timer)** — **rejected** (Fix-2 variant, see
+  thread above).
+- **D (split-brain detection/alerting)** — **accepted in spirit, re-scoped.**
+  A single node cannot observe "concurrent competing roots" — it knows only
+  its own claim and heard beacons. The right observer already exists: the
+  derived metric topic, where every cohort root publishes snapshots carrying
+  `by` — two distinct `by` values both claiming root inside a window IS the
+  split signal, observable today with zero kernel change. Routed into the
+  R-0 absence-alerting/canary work (punch list #1), where it belongs.
+- **E (log the pin sweep)** — **accepted.** Consistent with invariant I-6;
+  a structured `upstream-pin-swept` log line rides the next kernel release
+  (batched — we don't cut a release for a log line).
+- **F (multi-hop re-home test)** — **already covered.**
+  `smoke_pubsub_liveness_reroute.mjs` (in the release gate since 4.8.3)
+  drives a 30-node sim, kills the root, and asserts every subscriber
+  re-homes off it within a few ticks with none left pinned — precisely the
+  non-neighbour upstream-death path. `smoke_upstream_rehome.mjs` covers the
+  sweep mechanics; between them the class is tested at both altitudes.
+
+Net of round 2: one observability line queued, one monitoring idea re-scoped
+to the canary work, and a named Phase 2 requirement (ack-per-renewal
+attachment) that now has three independent motivations on record.
