@@ -191,3 +191,50 @@ standing punch-list reliability items (R-0, cold-attach/R-3):
 
 Items 3 and 4 are small enough to fold into the next harness touch; 1 and 2
 are real (small) projects and should be scheduled against the punch list.
+
+---
+
+## Addendum — external review of this analysis (2026-07-13)
+
+The external reviewer endorsed the gap list and the priority order (G2 canary
+first, G1 `leave` second, then instrumentation) — the plan stands ratified.
+Dispositions on its additions:
+
+**Adopted:**
+- **Bridge/fleet version fields in every JSONL line** (its concretization of
+  G8): the harness will scrape `/healthz` (`version` + `kernelVersion` — note:
+  there is no `/api/version`) at cycle start and record the skew pair, making
+  de-facto skew testing data instead of accident.
+- **Instrument last-DELIVER-per-subscription now** — the reviewer's best
+  original idea: recording the inter-DELIVER distribution per subscription in
+  the soak JSONL is observation-only and builds the baseline evidence the
+  Phase 2 ack-per-renewal (lease) design will be judged against. This turns
+  a future design debate into a data comparison.
+- **A `run-soak.sh --suite=` wrapper** so campaign invocations stop being
+  bespoke command lines.
+
+**Right-sized (the reviewer assumed an org we don't have):**
+- Its owner/ETA table (observability team, platform ops, security team;
+  2–8 week ETAs) maps to a project that is one workbench plus one field
+  tester. The real costs are: `scale-deep` — minutes (one knob); resource
+  sampling + version fields — hours; the canary — about a day; the `leave`
+  scenario — a day (the `burst-live.mjs` repro is most of it). The priority
+  ORDER is unchanged; the calendar is compressed roughly 10×.
+- **PagerDuty → what we actually operate:** alert = push notification +
+  a loud line in the analyzer; there is no on-call rotation to page.
+- **S3 + time-series dashboard → declined for now:** local JSONL plus
+  trend-flagging in the analyzers is proportionate; centralized storage is
+  worth revisiting when someone other than this workbench consumes results.
+- `process._getActiveHandles()` is internal API; the sampler will use
+  `process.getActiveResourcesInfo()`.
+
+**Corrections for the record:**
+- The multi-region-only incident was the **4.17.1 cross-region self-root**;
+  the 4.19.0 root-flap was between SAME-region prod relays (G5's motivation
+  is 4.17.1, not 4.19.0).
+- "4 of 5 July incidents involve a burst publisher leaving" overstates:
+  the accurate claim is 4 of 5 were found by the field/prod rather than by
+  the soak; only two were departure-side (4.19.4, 4.19.5).
+- `LEAK-transport-signed` is soak-v3's signing-leak sentinel; an `abuse`
+  scenario (malformed frames, D-1 caps, forged beacons) would assert
+  rejection/verify-don't-trust outcomes — different metrics.
