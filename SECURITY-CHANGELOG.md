@@ -16,6 +16,24 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.19.5 — 2026-07-13 (testnet + production) — a burst publisher's topic history survives its departure
+
+**What's protected:** the **durability of published history across a
+publisher's graceful departure**, at any scale of topics. A node that roots
+many topics (a burst publisher creating dozens of fresh topics in seconds)
+and then leaves now hands off every topic's cached history to a live heir
+within the leave window: heir resolution runs in parallel, a leaver whose own
+routing table is still thin falls back to the iterative network lookup rather
+than abandoning the history, and the receiving heir retains its inherited
+root claim instead of deferring back toward the departed node's stale
+advertisement. A departed peer's root advertisements are also swept the
+moment its channel closes, so live traffic is never steered at a node that
+has left. Validated by a dedicated mechanics suite and a live burst-departure
+test (all topics' history retrievable by a fresh subscriber after the
+publisher departs, previously none).
+
+---
+
 ## Kernel v4.19.4 — 2026-07-11 (testnet + production) — a departing peer goes silent, and its last words arrive
 
 **What's protected:** the **integrity of a publisher's final messages** and the
@@ -1559,4 +1577,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-07-11.*
+*Last updated: 2026-07-13.*
