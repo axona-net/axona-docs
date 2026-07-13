@@ -1,0 +1,365 @@
+11:15:58 AM Deleted 650 previous publications and then posted 180 alerts with 3064 publications in 2125 topics, in 365,521 ms.
+11:15:58 AM Waiting 0 seconds before disconnecting the publishing node.
+11:16:04 AM 476a204fb1c0cf4b11b596a4dd3044b31943327381637b0a3420a5d976e2014a35 disconnected with 14 connections and 1140 axons.
+
+11:16:04 AM Waiting 0 seconds before creating new node to confirm delivery.
+11:16:06 AM 47cc8f768e7a1c05a8ee17a7cb5c726d038ed96083e6093bd0bb059688ff110bd9 Created network node for kernel 4.19.4 region 0x47.
+11:16:06 AM 47cc8f768e7a1c05a8ee17a7cb5c726d038ed96083e6093bd0bb059688ff110bd9 Connected 4 connections in 1,355 ms.
+11:16:06 AM Waiting 0 seconds before subscribing with this new node.
+11:16:06 AM Subscribing to 2125 topics.
+11:16:07 AM Waiting up to 65 seconds for subscriptions to fire.
+11:17:12 AM FAILED to receive all events.
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5130936981714370560:news","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5131003161791692800:news","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5171191476796784640:news","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5171191550884970496:news","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"b791ec8f2fb94e74ac8e08f367ec8f008415f817e27e77f8f268b84d6e2bd83e","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5169892331599429632:news","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5170132372221329408:pop","region":71} published 51 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5169891579174846464:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5169892317909221376:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5169892335021981696:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5171939299322494976:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5154038177085784064:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5183643171103440896:pop","region":71} published 6 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5118622451483279360:pop","region":71} published 5 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5118653237808857088:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5118689766505709568:pop","region":71} published 2 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5118689769726935040:pop","region":71} published 2 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5180265471382913024:pop","region":71} published 2 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5180952666150273024:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5171170311197949952:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5170765690918928384:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5170737155156213760:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5170737153277165568:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5170737153344274432:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5170649967320104960:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5161758491664187392:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5161726674546458624:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5161726704611229696:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"af06dc7cf71fd3f627a17de40add55ca7d6d9fe05050cb86d4266a7638f35b7b","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5154651248502243328:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5154520681496444928:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5154520887654875136:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5118850548606435328:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5118850541291569152:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5141070080875954176:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5141052488689909760:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5141065682829443072:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5171733261151371264:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5171740201818521600:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5171740150278914048:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5172060554839195648:pop","region":71} published 2 but received 0!
+11:17:12 AM Topic {"name":"36151cdd2494e852f6a82340a84345ee933da75f7be41c973e42b704d3263151","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5169358316035375104:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5169300986811908096:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5146777645735739392:pop","region":71} published 2 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5185032953800949760:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5185027644147630080:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5177085683755384832:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5155202103827759104:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5155201610980261888:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5162922874478002176:pop","region":71} published 4 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5162321441617608704:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5162376787639926784:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5122563101157228544:pop","region":71} published 4 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5122509225087467520:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5120526805622587392:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5178347923104071680:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5155425304688197632:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5155372510144888832:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5155372510346215424:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5157980569711149056:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5157977271176265728:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5179851230377148416:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5179851281916755968:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5179851285137981440:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5179851285473525760:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"91764a49abe9d29a17f8108dffd7ff604ff453fe4c8b521fb10e917902d9f94f","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5135277369564594176:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5152962398641979392:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5153139243920392192:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5153139243115085824:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5153139243047976960:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"73fdbddd402e41f939fcfce222e9aa23e635ea7ae667ddde4276c237e8595937","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5149334010270318592:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5149332910758690816:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5149332086124969984:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5120944620041142272:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5120928058647248896:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5120928100187635712:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5122381681738645504:pop","region":71} published 2 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5122382274175696896:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5122382274108588032:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5122383758154006528:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5122381956616552448:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5122381741599752192:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5122868421792366592:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5124758320145498112:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"f8b732cafe325a3294d015574c481afc017a583d3a32857a160a37a8aa5e0854","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5118629662733369344:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"759d06bb54c354702f421174dd98e3de5fc1eff968780f1048d8b389f2895f6a","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5160773329245700096:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5160843354392494080:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5160843367277395968:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5160843364056170496:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5167381119250726912:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5155733061844860928:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5181522213173460992:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5181521839511306240:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5181521842732531712:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5168367381180841984:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5119396507669233664:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5119387449583206400:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5119387452468887552:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5146778080399851520:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5136759995295072256:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5136751817677340672:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"c0aa43039ff206c19804d42f2e3be80129556853563b449666f2c6c0f992723b","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5163172532336984064:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5163172542000660480:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5146642358560882688:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5146639443083395072:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5134627154264326144:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5181795991568777216:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5158591898176192512:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5158626408238415872:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5134655314217402368:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5123337157343182848:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5123298849456128000:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5154025299968524288:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5154025304263491584:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5154025301310701568:pop","region":71} published 1 but received 0!
+11:17:12 AM Topic {"name":"civildefense.io:071026C:5124758326587949056:pop","region":71} published 1 but received 0!
+11:17:12 AM 47cc8f768e7a1c05a8ee17a7cb5c726d038ed96083e6093bd0bb059688ff110bd9 disconnected with 6 connections and 940 axons.
+11:17:12 AM Done.
+howardstearns@Howards-M5 alert-bot % 
+
+
+howardstearns@Howards-M5 alert-bot % npm start -- --regions 47 --subTimeoutS 650
+
+> alert-bot@1.0.3 start
+> node ./index.js --regions 47 --subTimeoutS 650
+
+11:53:31 AM 4725c890679ce81a3609aa43af6c686a9c5150a6f7dc65186332a82cfceaa381ff Created network node for kernel 4.19.4 region 0x47.
+11:53:31 AM 4725c890679ce81a3609aa43af6c686a9c5150a6f7dc65186332a82cfceaa381ff Connected 4 connections in 603 ms.
+11:53:31 AM Waiting 0 seconds before publishing.
+
+11:53:32 AM https://civildefense.io/?lat=50.3115&lng=11.923&sub=aa68d1581962de42ed7468cbbcba2c6ffa4b47b53da84ff5b0e35a3dcdd14ac6&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+11:53:33 AM https://civildefense.io/?lat=50.3115&lng=11.923&sub=ec4f34424fa80d5a9717dc537423307b27b402d66d50207c73b5e708107384ff&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+11:53:33 AM https://civildefense.io/?lat=50.83716687845954&lng=4.394531250000001&sub=d1ebfa7c058d67614560c7f9bba9999eb979a1aa2597215516bb4deeb33a5918&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+11:53:34 AM https://civildefense.io/?lat=45.898843211891226&lng=6.126186847686768&sub=3a1cf40f9c5982f1dee463e58b6ed5705ea929a0c0c75e763f2348ce55feb535&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+11:53:35 AM https://civildefense.io/?lat=43.72273351808177&lng=20.686231255531315&sub=7d7c85fccad7d83fdc848c58eaca65379954953e1046963d660c26a9d90a3a02&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+11:53:36 AM https://civildefense.io/?lat=45.52378&lng=9.26581&sub=9a97c273140e63c151cf02786ce1d00deed4e9eca6f3c1886d42a4fff1b24bab&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+11:53:37 AM https://civildefense.io/?lat=49.45838511024686&lng=11.094539165496826&sub=e99b6f0c902a24c12712ad3d7009eafb32a10a27bb0e7809ee5679bec254f6a0&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+11:53:38 AM https://civildefense.io/?lat=48.71727141908168&lng=21.25227688853824&sub=47845fdccfb20a9d44fba0c369fc4a48057cad270f000e7816860b646beb59eb&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+11:53:40 AM https://civildefense.io/?lat=52.20362938571888&lng=21.047046209981595&sub=ba34b9456477f4aab58e92a064aa055904ce44792c0182d5c716d8e1070d4d7d&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+11:53:41 AM https://civildefense.io/?lat=51.10514548255657&lng=17.031211853027347&sub=e039995da850fcb18c6802178f1f957637a77503f85f4274e71234ea632788da&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+11:53:42 AM https://civildefense.io/?lat=52.18201568524859&lng=21.005859375000004&sub=487c008daa0f161e5d03bb921b80caa8c2e2fd569058bafb0a2c5ec85685e5a1&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+11:53:43 AM https://civildefense.io/?lat=45.49255970823094&lng=9.207552714449497&sub=a6412616d6263643ed7b11d42a00700636dc3e7ee29131e6c44ff1d3057144c0&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+11:53:44 AM https://civildefense.io/?lat=46.52079217681949&lng=6.632591607596554&sub=f6830aaa34e91ac95fb0966a1781c57bf55216904fa679b2266dbfdc8bb1e2e9&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+11:53:45 AM https://civildefense.io/?lat=48.17636305281637&lng=11.256377572719613&sub=964891e1699d52d215e9c09dbc221f68dd62525901e380112929c01734d04019&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+11:53:46 AM https://civildefense.io/?lat=48.137&lng=11.576&sub=db06f62099e8ecc7f6f1770bf11739e9e797aacf343da7219bf43de9dcd6601b&tags=%25F0%259F%258E%25BC%2520classical
+11:53:47 AM https://civildefense.io/?lat=48.154022695412486&lng=17.113933448551457&sub=f94c82c9e0649125f9cac9737eba888b1fc954e94cee0888172632f6fffcb4c7&tags=%25F0%259F%258E%25BC%2520classical
+11:53:48 AM https://civildefense.io/?lat=52.29909985896803&lng=5.148923700679139&sub=7122dfbd6893c94d13c6cc674b5a658851b20fa8ae49d19ace6010d7bb27f33e&tags=%25F0%259F%25A4%25A0%2520country
+11:53:49 AM https://civildefense.io/?lat=51.212&lng=16.163&sub=7d8cf8e01d2b2391c05b72404a4b6b49828b9672f7ae1cfc566d71355b8f12db&tags=%25F0%259F%258E%25A7%2520edm
+11:53:50 AM https://civildefense.io/?lat=51.299925466442645&lng=10.118408203125002&sub=46905fbefa197e7ced259dd8a2172131216efb23d5b942d28dcbb11cc6d62e8f&tags=%25F0%259F%258E%25A7%2520edm
+11:53:51 AM https://civildefense.io/?lat=46.34193573280533&lng=6.164314448833466&sub=27e262c83fedf5d26147a2dcf0e549dcee05e1d59645708808b447b0db8b95b9&tags=%25F0%259F%258E%25A7%2520edm
+11:53:52 AM https://civildefense.io/?lat=47.886340401130184&lng=20.381481349468235&sub=c16bc0e75b91e67811e67cb987af0c59d7ec78e500a0ad7babf2697b33f4a8f6&tags=%25F0%259F%258E%25A7%2520edm
+11:53:53 AM https://civildefense.io/?lat=46.207&lng=6.156&sub=88a13631e158816fb254cc0c009d628ed9d992a7d89680811380ac8728d18c1d&tags=%25F0%259F%258E%25A4%2520hiphop
+11:53:54 AM https://civildefense.io/?lat=46.224546466080426&lng=7.351583540439607&sub=c0e81afcd221a61af92a50b0ae2a9ef54a904117c1d1818c5f1c5a4c7d7146d3&tags=%25F0%259F%258E%25A4%2520hiphop
+11:53:55 AM https://civildefense.io/?lat=46.992244424655674&lng=2.1093750000000004&sub=768a64eae685427d85549298c68c8b815068144dc69cab0192e176e677323e50&tags=%25F0%259F%258E%25A4%2520hiphop
+11:53:56 AM https://civildefense.io/?lat=50.9375&lng=6.9603&sub=d5bd32e68de2f8265be43cf19dc3ed9e67b8e0815414f0e725ace401a60f242e&tags=%25F0%259F%258E%25B7%2520jazz
+11:53:57 AM https://civildefense.io/?lat=48.57419362107014&lng=7.789306640625001&sub=0e9eaa535d5de66351a48b9ac79bbc7e27434d3bdce9cf5edf9b7aa03209d08e&tags=%25F0%259F%258E%25B7%2520jazz
+11:53:58 AM https://civildefense.io/?lat=48.85255684615909&lng=2.2782683372497563&sub=496a552136415aa68cf10a342bb267afb07450b0f160a2e3135c8b525cfe7cd5&tags=%25F0%259F%258E%25B7%2520jazz
+11:53:59 AM https://civildefense.io/?lat=48.15446657982691&lng=17.107357084751133&sub=eb58083853686bf7aca91ce4dc3f31882937c1ed9ca912b3828a4d24c97cb666&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:00 AM https://civildefense.io/?lat=48.85323266811434&lng=2.3479894540897295&sub=4dc56bf72032954671057115333424d0936d4883198d4cd741c795467d0af582&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:01 AM https://civildefense.io/?lat=54.02342257336746&lng=10.670471191406252&sub=47048e75610d862109a1a3a217e7638e56a3a4505190d224ff4d389b257555b9&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:02 AM https://civildefense.io/?lat=48.8533495076904&lng=2.3487219214439397&sub=7d39e98131391e0214a2ef6435a64d859e91721a3a81d4c2b3d7ef1d8758c714&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:03 AM https://civildefense.io/?lat=45.39844997630411&lng=5.141601562500001&sub=7f9a9cd4b7062f7879ee121546ac8fcd1726741875355b153a99b53e5f277da9&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:05 AM https://civildefense.io/?lat=48.206764&lng=16.393611&sub=6ece1218cf9dfe957aad482b5f850e19e9be195210b58ded4c6b04e1dfb47fdc&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:06 AM https://civildefense.io/?lat=50.85325707417748&lng=4.402635790952025&sub=82964042e2f6c2e56517ac6e82ad8f77de4a8c82046a4d6025f7d7eb850d3fe2&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:07 AM https://civildefense.io/?lat=50.85325707417748&lng=4.402635790952025&sub=a14777d7fd230fc52b426a107cd7b045e0a998d968569b5be0e961b75db3c90a&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:08 AM https://civildefense.io/?lat=48.1993032&lng=16.3605854&sub=b8f9348c2723937eb77e49cb0b876f487c594072d0c6540db1f08ec394f3e065&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:09 AM https://civildefense.io/?lat=51.33820964939759&lng=12.379529178142548&sub=cc7db148f499cf31e2d78b0be609e93ba8bb651e5ae394f5c6c978252aa509f5&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:10 AM https://civildefense.io/?lat=51.48122258996969&lng=11.96425884962082&sub=84264847d2db5ce0f5f4ec0c327ff1f14cd610eb26cd81e119efde1a44eff050&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:11 AM https://civildefense.io/?lat=45.75724097144021&lng=11.00504571486261&sub=7aba2e3c9d3db19acf13404638672aa050cadf042abcd16cbf3f2986673853eb&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:12 AM https://civildefense.io/?lat=48.848239031179205&lng=2.350387573242188&sub=41020c38fe72209c4143588bf254257336f86a2e7dbb40e682b3a73330df2c1a&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:13 AM https://civildefense.io/?lat=51.37726540697961&lng=3.69140625&sub=6f0d48c5c268eb07e5a6a20a9c864c6eb6f4e43c6941246d294e20d60abf4fa9&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:14 AM https://civildefense.io/?lat=51.07165184883159&lng=17.006425559520725&sub=6d79b74bcc7e7706452cd3c872819f1635bea0c156997e5cd0cd0e9e68058732&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:15 AM https://civildefense.io/?lat=48.15688848799896&lng=17.11364418268204&sub=258a8a3bddc0987c2a74ec40a2a09411b4360cd0bcd64d0faef0b9c4b05bbe8b&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:17 AM https://civildefense.io/?lat=51.398206044888&lng=0.014298980702007748&sub=b7396296d7fe1dcc982706d5398d78e91c295fc1119f4ab9146a18e7f16b8aaf&tags=%25F0%259F%258E%25B7%2520jazz
+11:54:18 AM https://civildefense.io/?lat=47.14095978042224&lng=24.50624406337738&sub=9277d4b99caf100ee7094f5efbfadc567ddc30b9574f8c910609c58e4c595d99&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:19 AM https://civildefense.io/?lat=47.95183548657533&lng=21.720297932624817&sub=0f16b03b7a05c49e3e0cfcc44fc45e38185b34a3e9cefa8d8feb4e372c77391d&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:20 AM https://civildefense.io/?lat=46.07287620927694&lng=18.223161399364475&sub=a07611d03fb308e438ba470f30087e45ab7e628bcea6484008a030733c59263d&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:21 AM https://civildefense.io/?lat=48.836382892654385&lng=2.273617386817933&sub=f4925a6b375b1983af99e4f89d81f3e5a1928dbd3334120af01ff8887c350317&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:22 AM https://civildefense.io/?lat=51.59094927139297&lng=4.761618375778199&sub=c62b25800071c4e0814c133fedb6cbbc352f5438be7363e81ee06c7b14b30297&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:23 AM https://civildefense.io/?lat=47.13602337199739&lng=7.242736816406251&sub=0136c779847b681c2644707e950e8d0b432438294288a7d9615c5347e5b45358&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:24 AM https://civildefense.io/?lat=51.35021562585538&lng=5.459775924682618&sub=470ac3c2665be18e180eac8394651e3f8a6a95e13b031ba695403bef9f9594d8&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:26 AM https://civildefense.io/?lat=50.0784563475663&lng=14.434372186660768&sub=8835fd3ffbe94c2ba4c1177ec9ade2f90fd551996af2f9cffca695dcb078989f&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:27 AM https://civildefense.io/?lat=50.07850373641097&lng=14.43459749221802&sub=47a0fbf771b29e783bdb2b3dd4267fae188bc21d065f9a567943d9c75987f474&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:28 AM https://civildefense.io/?lat=50.07854160442121&lng=14.43460285663605&sub=77ce834518cd866e0b71f87017c9be4a78126f217bfae5ec9749ba466a34ab42&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:29 AM https://civildefense.io/?lat=46.39168895953556&lng=23.854064941406257&sub=8627c6b364782109612b7bef53be6961a0b3cf46e08d4748d196eb6ed40e23a7&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:30 AM https://civildefense.io/?lat=50.94100829141749&lng=6.95632088207276&sub=5dc25ffc694371b17ef13c1038220da1726fba857c46bd1ea1fe03a69b61d066&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:32 AM https://civildefense.io/?lat=48.85273757048368&lng=2.2784185409545903&sub=779e37161edb99683a6161fbfde1468652ebd2a2de20a5918443688e02325742&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:33 AM https://civildefense.io/?lat=48.85261332263444&lng=2.2781825065612797&sub=6e7f6bf38e0014ef6e3f7d8c3122646e4265c11f18e93402f7c874f70240eb45&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:34 AM https://civildefense.io/?lat=52.24034952547831&lng=5.17157793045044&sub=d5b39c847376c7fe7e056966d178e53aaebded5d0ffb2ca66a47cceea20bd954&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:36 AM https://civildefense.io/?lat=52.386287102699654&lng=4.638290405273438&sub=136ae6791838c2ecf99f77c7d50168187ece40d7d6bf30161cb12a3d44376a5a&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:37 AM https://civildefense.io/?lat=52.03814029864769&lng=8.49431403165701&sub=300ce243b22eea7e1114359b00337d0f05949fdcd55146d7a6d2d5acd0fadde3&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:38 AM https://civildefense.io/?lat=49.52996793048396&lng=0.9331083297729492&sub=382bc575d40a3d507977764bb1bb326607179fe1ba18c016162af1cb6eb622ee&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:39 AM https://civildefense.io/?lat=47.486028093177474&lng=19.055786132812504&sub=8cff2cc5219ef2d4555bc391ad8c0a3e3f89d64d96ef6ae7cd64141f7a25fd2c&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:40 AM https://civildefense.io/?lat=46.934147330701826&lng=7.470703125000001&sub=0438baa1ca801c10ff6d399b7eda41208913416f7c18037f06b5a6fe8e5a527c&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:42 AM https://civildefense.io/?lat=45.24777867109564&lng=0.33839017152786255&sub=8e379223d65169fc5e7c87470751f68204089fedf8e023d49cf6c2dfff8dfda3&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:43 AM https://civildefense.io/?lat=51.31616309772316&lng=12.3858779668808&sub=d5275f1068499b81155b11918fdf74f2dfb534cd9bef742f7af9060652936066&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:44 AM https://civildefense.io/?lat=51.481171642673544&lng=11.964666545391085&sub=f361bb9eb5170c403563ada4163ff2512b4ca218ed5c8eea24c458fba87c21ef&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:45 AM https://civildefense.io/?lat=53.57646503859918&lng=9.991121292114258&sub=3fc417e399623df93c869503305d7b9de7615f48eaf5cd61bd7ea292af3a9b2c&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:46 AM https://civildefense.io/?lat=46.93924163197874&lng=7.784205079078675&sub=3b39a3caa4ff5c09d043786a6dc6515f740abb9185b8f53e5c13ac743fcddb50&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:47 AM https://civildefense.io/?lat=52.237555934842206&lng=21.036071777343754&sub=f53191a5f74267b0cea2357fc2a54cb746c710125b88a9fd014cf556c9e1d07e&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:49 AM https://civildefense.io/?lat=49.87353011576381&lng=8.641884326934816&sub=bc4420344cbe71903d57369b06eb73a002beb01c75841b5263a5b1a27664766e&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:50 AM https://civildefense.io/?lat=49.62221151291465&lng=6.152285474818201&sub=052202e2966b74b75e7da9f0b3709ec89d6e44e06913714027c9111522c086e5&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:51 AM https://civildefense.io/?lat=51.46193533764895&lng=5.402634143829347&sub=c6f63fb4a5f33df182e4ff7c8c18d4f9084df5f706451dfcd1ba6d89eeee05fb&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:52 AM https://civildefense.io/?lat=50.53936990462846&lng=5.81338969110386&sub=4eccd7bb67ce9955d3db5ec9391a11d86449449e6444eb039f0c36cd442644f6&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:53 AM https://civildefense.io/?lat=46.25284527681449&lng=20.154353121323524&sub=4264912ca4367431efcf1d8f33f03c81330d0bfa1d92523c95fc626caed29b78&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:55 AM https://civildefense.io/?lat=52.20049232799439&lng=5.95884919166565&sub=d48f7242cdbbe1187015775c020a66c2e50965f13caaa1c78d3f244dab290c42&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:56 AM https://civildefense.io/?lat=45.14460026914964&lng=24.674305915832523&sub=bbcf83e87ae93363b7c77feddd267b1a4b81036d00e17a8890530e85148bfad7&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:57 AM https://civildefense.io/?lat=52.40235808750872&lng=4.910804734289599&sub=8ba68702f883e5f316927a2d74d6feff4f5d17ea9c7bd42c2a73ce5f2fae449e&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:58 AM https://civildefense.io/?lat=44.5315723087303&lng=11.314486414788549&sub=9bfcc2e1580ae30207a26a0ca87c79e1b605680459d0e860373e045a4295a5ff&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:54:59 AM https://civildefense.io/?lat=51.487669166454&lng=11.970610320568086&sub=154801db3c0b1244cfdda0e664243e6dfe66b927300b17702bc9d5f0a6d0948b&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:01 AM https://civildefense.io/?lat=51.487750159039706&lng=11.970572769641878&sub=90fd77f01c927cfc30a7d861379cf8d687198bded8395b37b888593984f71591&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:02 AM https://civildefense.io/?lat=45.47809346079712&lng=9.167589247226717&sub=5fe07efcb4f95583f91d81ec1ec636f5a41426fa6d8e84daeb259f6232172514&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:03 AM https://civildefense.io/?lat=50.6550329684959&lng=6.7929840087890625&sub=9fa9914b0b6e4343ec789d2be247d0f639b849dddef24a00430daff2cf0af7be&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:04 AM https://civildefense.io/?lat=45.15851022417583&lng=1.5329360961914065&sub=8e4570511d7bd0ab53974947a0aa190559e5c609e5ee9fed7a14b61fbd4be840&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:06 AM https://civildefense.io/?lat=46.56493586138179&lng=23.779896497726444&sub=b216155f01d61e71030575618d02e8b57c8995f39ec039dc5b30ba6fed5dfce9&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:07 AM https://civildefense.io/?lat=52.20207938164688&lng=20.41648183518281&sub=e68bc96f6663e1857fed7fc60ae6d5001a00fc05e58d9d6aa9fd9c2fe7c57d6c&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:08 AM https://civildefense.io/?lat=48.83297967460744&lng=2.2374343872070317&sub=fd29df920b0fc305d1d3b696fa2d7ff543049cd527fddcf9fd3e3d4b6b98029a&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:10 AM https://civildefense.io/?lat=50.08831915420747&lng=14.40533278575496&sub=1788798082985567a0e3b1916ce87308af08b92f1e3e9125a27fb4f059484b27&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:11 AM https://civildefense.io/?lat=48.856447926807185&lng=2.3460102081298833&sub=c0413bfb106dc8068a2fadc2ba4ba259b748d1753c8306f49db4c388a61a2e58&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:13 AM https://civildefense.io/?lat=51.40308030993556&lng=19.695897996425632&sub=273b6a9c0a146a9be45687c496f650282433a3c2eafc7260c4fb8c01a25ea853&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:14 AM https://civildefense.io/?lat=47.50519113344825&lng=8.714137673377992&sub=24ba69c434a2ea8d533f4a7757c4d0679fcfc5e52b3a3582dec0014a3d8e80c7&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:15 AM https://civildefense.io/?lat=48.85385014026355&lng=2.346868515014649&sub=2913b5b4bb8ac92419822b0046c8379c1fc1a362bad64b95e86ffdb485d805a9&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:17 AM https://civildefense.io/?lat=51.94792995991253&lng=5.227468673842407&sub=e1534a8879d15550d3df5c55e61c745c7187a5a16f4475937ffb138d0bd5ffc8&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:18 AM https://civildefense.io/?lat=47.644527699630736&lng=26.261295409883218&sub=ce84d443eb802ffbec113c7929c3f5a7b2dc389be8c4e567879a77032eaca7c4&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:19 AM https://civildefense.io/?lat=50.85325707417748&lng=4.402635790952025&sub=a04584eededd7f703183f3dffde4720f206d308be38e2165d4057169bd1c387b&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:20 AM https://civildefense.io/?lat=51.35626066999899&lng=6.73015594482422&sub=c9457f13f3b13e28cb2388e46afd61b4f6c26b8317551d064ef7e2ead8e5c43e&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:22 AM https://civildefense.io/?lat=50.939799731122505&lng=6.951425052012802&sub=7d66dfea38d6597da959d171c21a96e14ef7f263815f902244c9aa08da80298c&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:23 AM https://civildefense.io/?lat=48.853692000227&lng=2.351055047164841&sub=a3e537d487bf984fe436d0809744615bd602642b04416495ece3da96fd558a95&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:24 AM https://civildefense.io/?lat=44.825285717808896&lng=20.455470085144047&sub=d1072c3c404086bcd7215264d5db8ea60703d0f2d24d7c7f1348abc9798e07bd&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+11:55:26 AM https://civildefense.io/?lat=50.94043090224256&lng=6.957092285156251&sub=82cba2db1b86ba5eed4168cd15bff19b6cce78d5a8255a28ac8bbd329c97860b&tags=%25F0%259F%258E%25B5%2520pop
+11:55:27 AM https://civildefense.io/?lat=52.224228341860425&lng=5.162200197158536&sub=0ee6ed0fd33ec0ee9b7537289cbf1b1ee42891c08dfb9a8497b966868d34c874&tags=%25F0%259F%258E%25B5%2520pop
+11:55:28 AM https://civildefense.io/?lat=45.35111607252073&lng=9.361922982896688&sub=b6a75101bcf224ea2f2cdaec411b6c396eaa5fcb31543e1ea4fb50b8f52db5b7&tags=%25F0%259F%258E%25B5%2520pop
+11:55:30 AM https://civildefense.io/?lat=50.85050601776351&lng=4.353332519531251&sub=9993dd4dc468a22c71107fe6473387470b6f56a52892b5a94a4e1b2e6d80e6f8&tags=%25F0%259F%258E%25B5%2520pop
+11:55:31 AM https://civildefense.io/?lat=47.32128328912536&lng=5.04150152206421&sub=e91a6c6f77071c2512731ac86846dc6c2816d244f0191581515476c28b767811&tags=%25F0%259F%258E%25B5%2520pop
+11:55:33 AM https://civildefense.io/?lat=52.515183191478044&lng=13.395375346755584&sub=59dca36a58b6166974934f2c80a46bd31883c1dee81196b75943111a243bdeac&tags=%25F0%259F%258E%25B5%2520pop
+11:55:34 AM https://civildefense.io/?lat=50.9555&lng=14.6803&sub=8193c089d8d5258647d637f9aaea3db2d50b6f6d85aca32243b4e3a6914e317f&tags=%25F0%259F%258E%25B5%2520pop
+11:55:36 AM https://civildefense.io/?lat=50.897&lng=14.8077&sub=df5d4ca9371e7a1b2f429f7dbc19b1f189509bca2e6ce3885a623d58242ba076&tags=%25F0%259F%258E%25B5%2520pop
+11:55:37 AM https://civildefense.io/?lat=48.85098111595351&lng=2.349700927734375&sub=bcaebe49796db5e64a107fb1ff681761431ad3ed061b2ca27e12a822d37e71b3&tags=%25F0%259F%258E%25B5%2520pop
+11:55:38 AM https://civildefense.io/?lat=50.93860995729761&lng=4.039363861083985&sub=271bf55c7837e0f0ae7a984c795cab6679c456c73990f9cefaebb0a9e4cdda04&tags=%25F0%259F%258E%25B5%2520pop
+11:55:40 AM https://civildefense.io/?lat=50.411766641013806&lng=4.444508457374501&sub=b7d6eaefc20dd66ded5d5a93b70e67738e1fc764a73c9ac57ef52fff91400df8&tags=%25F0%259F%258E%25B5%2520pop
+11:55:42 AM https://civildefense.io/?lat=49.97384379874117&lng=5.129395472714444&sub=cab8489ac1fb73848b88bf84935ff77a1c9d79c9fed58fe8aea625c75460d7f6&tags=%25F0%259F%258E%25B5%2520pop
+11:55:43 AM https://civildefense.io/?lat=49.89164428440768&lng=10.886799395084385&sub=5d11752fc65ae0978842b84df004c2527a0d3f346c6dfc44baf5421fa28373d5&tags=%25F0%259F%258E%25B5%2520pop
+11:55:47 AM https://civildefense.io/?lat=45.38684118018553&lng=7.704605030176951&sub=50a5bbe32e1e740fdae6f071e7528b9d70013561caffd36197d773a88dfe1874&tags=%25F0%259F%258E%25B5%2520pop
+11:55:48 AM https://civildefense.io/?lat=51.06058945164904&lng=13.72642993927002&sub=46c8ae492371f2baf6d272d80fc6eeffc2fa6e4f5a536649f4f9efb24dc78249&tags=%25F0%259F%258E%25B5%2520pop
+11:55:49 AM https://civildefense.io/?lat=43.637665960830745&lng=18.519038169458216&sub=d9f19c36e6a2518f68cfbac76cfe3bedfa8fa6a9c602f12256ae14085a9d552e&tags=%25F0%259F%258E%25B5%2520pop
+11:55:52 AM https://civildefense.io/?lat=50.316544&lng=11.91362&sub=c4a11b21d712b2c6a0485e7b41124c0bc3ddb8032937f2232a344fb58ea4a263&tags=%25F0%259F%258E%25B5%2520pop
+11:55:53 AM https://civildefense.io/?lat=52.04939651485778&lng=4.356272220611573&sub=a3f1c9b04786643a1ba55c3dde67eb3a43a5232b02747ad34e2c88419f6499b6&tags=%25F0%259F%258E%25B5%2520pop
+11:55:55 AM https://civildefense.io/?lat=51.426271967040314&lng=5.479431152343751&sub=7a530ea1e1d00780061876ff4fb646875805d44f74424de8cb430bffd1f2931d&tags=%25F0%259F%258E%25B5%2520pop
+11:55:58 AM https://civildefense.io/?lat=50.897&lng=14.8077&sub=050ec805f32acbecb15d2c51cfb719049ec110491818316aa076aff0049dab14&tags=%25F0%259F%258E%25B5%2520pop
+11:55:59 AM https://civildefense.io/?lat=50.10878402422607&lng=8.634449076688925&sub=af6045ec276691eb14031ea93dc60a2b750d915af8ea67e036df8aeea55dc92a&tags=%25F0%259F%258E%25B5%2520pop
+11:56:04 AM https://civildefense.io/?lat=48.18907058186412&lng=16.415277229760495&sub=aed83b7b2f96a60fd4a49dbe898deea0cea3715740ecb66b1d9fff756ec04a91&tags=%25F0%259F%258E%25B5%2520pop
+11:56:07 AM https://civildefense.io/?lat=45.79873339194978&lng=4.831664264202119&sub=1dfec68913a5b9acf7801a3cf46f28df24308797a78ab378bcdfa7a71f1a3ffa&tags=%25F0%259F%258E%25B5%2520pop
+11:56:09 AM https://civildefense.io/?lat=51.44279913947265&lng=0.251762866973877&sub=92296ab44acdaeb0e713bc14c4e57e9095105bc8508503769b78f0cddaf6a3c3&tags=%25F0%259F%258E%25B5%2520pop
+11:56:12 AM https://civildefense.io/?lat=45.186223168298405&lng=5.731594416986727&sub=4224db61f31e64b82d1c15d7e94cd659709cd2ff32300b6ab9d927e31cb6ee79&tags=%25F0%259F%258E%25B5%2520pop
+11:56:14 AM https://civildefense.io/?lat=51.48115577383197&lng=11.964494884014131&sub=7696e77be555aae94716b94aefb300d1c3ccc61d2d9b3b694b97e32abab019a0&tags=%25F0%259F%258E%25B5%2520pop
+11:56:17 AM https://civildefense.io/?lat=51.481261844404955&lng=11.964575350284578&sub=9872e68ff197aed5b55d048340d25c31075fd0b23cc6450fc961ea511e89e67d&tags=%25F0%259F%258E%25B5%2520pop
+11:56:18 AM https://civildefense.io/?lat=51.48121590836033&lng=11.964661180973057&sub=3e51749b22c4fe52f5df72defe78a70b882944b8d4e6429a388f3ec60b3ff060&tags=%25F0%259F%258E%25B5%2520pop
+11:56:20 AM https://civildefense.io/?lat=50.96217046210176&lng=10.995678305625916&sub=9864bf3279f2fafaa675a583c064f7ad4b328a36248552b250a84389faf50b2d&tags=%25F0%259F%258E%25B5%2520pop
+11:56:22 AM https://civildefense.io/?lat=51.48112236572637&lng=11.964484155178072&sub=22c7295173206e34f48d01519cefd7a7885319b6893ead2c8a332e321391f3cc&tags=%25F0%259F%258E%25B5%2520pop
+11:56:23 AM https://civildefense.io/?lat=50.26055147697984&lng=19.02093887329102&sub=d92928ab986185962eb8a2889f9b37689a162e91571d0d136b6a16fffc3f4f69&tags=%25F0%259F%258E%25B5%2520pop
+11:56:25 AM https://civildefense.io/?lat=51.11001576087922&lng=17.017822265625004&sub=0d85086f104b9e2bc1415533d3627206dc06872f987dcb09280970548c4eb444&tags=%25F0%259F%258E%25B5%2520pop
+11:56:27 AM https://civildefense.io/?lat=50.44154387413145&lng=2.800923585891724&sub=8e29e15d834e9368580d069e727ebe9d05fd9d44eff3c3fe3808b1b708277f64&tags=%25F0%259F%258E%25B5%2520pop
+11:56:28 AM https://civildefense.io/?lat=50.85325707417748&lng=4.402635790952025&sub=f88183b8eec548506c609aabe6017c01c4b1ef78038d9175f375259ad1191905&tags=%25F0%259F%258E%25B5%2520pop
+11:56:30 AM https://civildefense.io/?lat=50.85325707417748&lng=4.402635790952025&sub=e994f69d14e34c181ea172d414feca49ee14d4437a25d26afdad70eaf0a041ef&tags=%25F0%259F%258E%25B5%2520pop
+11:56:32 AM https://civildefense.io/?lat=45.89851468536549&lng=6.126101016998291&sub=7db354646a3efa2390e92ead9b95069678bfe6145a964c6142d44e5f04b55444&tags=%25F0%259F%258E%25B5%2520pop
+11:56:34 AM https://civildefense.io/?lat=52.27959319978926&lng=8.041809027234207&sub=ab2d64928e89bc324ceba5f51f8230547fc1a6c10b9a6f7cdd680aeec8fd7881&tags=%25F0%259F%258E%25B5%2520pop
+11:56:35 AM https://civildefense.io/?lat=49.09904896047899&lng=5.976562500000001&sub=6245305262d5a69b4e8451c593b9b82640f55d2f0fea14314da2e8b85fcab913&tags=%25F0%259F%258E%25B5%2520pop
+11:56:37 AM https://civildefense.io/?lat=48.067770153291434&lng=0.083770751953125&sub=e4858db8c2d598376a4a1eadabc55c24e3cd829f702b274d3b89d5d067ec44b8&tags=%25F0%259F%258E%25B5%2520pop
+11:56:39 AM https://civildefense.io/?lat=49.53498688612049&lng=26.20797157287598&sub=ef70065bd4ada03f891d77f79e29ef7cb0790ac469fce52688c0653655d71e80&tags=%25F0%259F%258E%25B5%2520pop
+11:56:41 AM https://civildefense.io/?lat=46.66797417296129&lng=21.08482360839844&sub=28e8d2af53562b3e6b98cde32954875aa48ae1fa7ac72e1ee4f27b02ddaf20d8&tags=%25F0%259F%258E%25B5%2520pop
+11:56:43 AM https://civildefense.io/?lat=52.10444852789345&lng=9.362795054912567&sub=63e627b2a099f7f8ad5aca3a5f53b5024e9c305babc9ec5768592497d94688d4&tags=%25F0%259F%258E%25B5%2520pop
+11:56:45 AM https://civildefense.io/?lat=46.332278&lng=10.235862&sub=02f75f30221db7ecbbe09f8f52a3c6ad1c51f847eec697a22f1be68e9e796a7c&tags=%25F0%259F%258E%25B5%2520pop
+11:56:47 AM https://civildefense.io/?lat=47.85514530036572&lng=12.126203321642947&sub=c3a39867c0ac878bdd4af35af006ebfea6c228ac6289986604d4ec15c7264a42&tags=%25F0%259F%258E%25B5%2520pop
+11:56:49 AM https://civildefense.io/?lat=50.29394222358779&lng=18.665674924850467&sub=1e781e521cac9ae8f1fb9fe34d96698e330576d7b8a9c8b6dfa6de6e3ec61ece&tags=%25F0%259F%258E%25B5%2520pop
+11:56:51 AM https://civildefense.io/?lat=50.04504335917305&lng=19.88665325498781&sub=824db54292cd991bc6e1a83c0aa6d44b0f92321dd441114f86360adefc9c22b1&tags=%25F0%259F%258E%25B5%2520pop
+11:56:53 AM https://civildefense.io/?lat=50.003372397523705&lng=19.89872989968032&sub=6ec501ecfe2a4e785a7674571204eef731035af9c7d16bdab9ccfd0f20e57b55&tags=%25F0%259F%258E%25B5%2520pop
+11:56:55 AM https://civildefense.io/?lat=50.06126503881816&lng=19.936623573303223&sub=6d6e7c6f5a7bcea55360faf8fb95f6cf55a5898d74bf2c1abec9656d714b9140&tags=%25F0%259F%258E%25B5%2520pop
+11:56:58 AM https://civildefense.io/?lat=51.06264440453559&lng=21.076436340808872&sub=722d0944c752e533461206530367c324bbf6d1ef7d5f293ae13e1379fcdca40c&tags=%25F0%259F%258E%25B5%2520pop
+11:56:59 AM https://civildefense.io/?lat=52.23604214034325&lng=21.005859375000004&sub=d5fe874cafc3168ebf6c417855cc8a5c2f46cd91266240a2e30b7b840f982d10&tags=%25F0%259F%258E%25B5%2520pop
+11:57:01 AM https://civildefense.io/?lat=51.005920345490104&lng=14.451171814683592&sub=b7f0cb500e0c8837ddd413155afe33fe1f812b71c100635f7baf894887f2fdfc&tags=%25F0%259F%258E%25B5%2520pop
+11:57:03 AM https://civildefense.io/?lat=49.30061630763213&lng=10.53451806306839&sub=ffad6fdba130d5163e41418ceaa70fc8390c96763c14cc6f4966f38cee549871&tags=%25F0%259F%258E%25B5%2520pop
+11:57:05 AM https://civildefense.io/?lat=52.4702334232259&lng=13.3154296875&sub=63d10ee67337130eb703abb480b93633afab418fdb42221580e37d5a5b2c02d1&tags=%25F0%259F%258E%25B5%2520pop
+11:57:08 AM https://civildefense.io/?lat=48.76642526359372&lng=11.439149379730226&sub=c0ce8253b33ec2244840ea0f924a8ceb5d7db4cd0ff3e2313bff97215ef56ed7&tags=%25F0%259F%258E%25B5%2520pop
+11:57:09 AM https://civildefense.io/?lat=53.36939480150035&lng=7.205033004283906&sub=a3adf45164875abc8086759794f84b3c867ca11736316aa50a0cb800ba070c5a&tags=%25F0%259F%258E%25B5%2520pop
+11:57:12 AM https://civildefense.io/?lat=46.68600094033044&lng=5.546722412109375&sub=3fdfbba089fc6854bfcd9f804577f1d314d9d877cfacce8f035c2b3b00070c27&tags=%25F0%259F%258E%25B5%2520pop
+11:57:14 AM https://civildefense.io/?lat=49.5691802157092&lng=2.977128031411791&sub=b3b077c7b619264f9c38e8a84e65362b97b2e2efb1b057db327123305042c026&tags=%25F0%259F%258E%25B5%2520pop
+11:57:17 AM https://civildefense.io/?lat=51.962768424497774&lng=7.624082565307618&sub=bc5c4a7d9068253ef6af431857c537a3d052112664ee180a774a0661d0f2de1c&tags=%25F0%259F%258E%25B5%2520pop
+11:57:19 AM https://civildefense.io/?lat=50.13915687299896&lng=14.10140544176102&sub=be20239f1ca89f47b5855e251e519704c2179a377d07f0ac7e190a3f027489f2&tags=%25F0%259F%258E%25B5%2520pop
+11:57:22 AM https://civildefense.io/?lat=48.19628757252702&lng=16.386108398437504&sub=ac42c5e9f7bc1f11e5f979233980cc8010d3fcd429586a9c59f0cd2cc3f7db6a&tags=%25F0%259F%258E%25B5%2520pop
+11:57:24 AM https://civildefense.io/?lat=48.536155681075755&lng=12.151587009429932&sub=cbb739b10b87e8e6195a4c3de7ac2ae5e29c5901021b56fdc2c8622b58b3e65a&tags=%25F0%259F%258E%25B5%2520pop
+11:57:26 AM https://civildefense.io/?lat=46.56488275150286&lng=23.77994384417976&sub=32262f8ae6271ec622f85553a5ce04184aaab1dc07d6b6c13c6636c43210c93e&tags=%25F0%259F%258E%25B5%2520pop
+11:57:28 AM https://civildefense.io/?lat=50.814357&lng=12.931109&sub=80ef374d7c69539f0b01bc6c1106aa1f2013fea07f0ba8fb3e9d2ffcc204742a&tags=%25F0%259F%258E%25B5%2520pop
+11:57:30 AM https://civildefense.io/?lat=48.1620121474756&lng=17.075859432955717&sub=0cbb9ba18b0951c7fe6966ac9862c81996ee7e3c28d5adae772085ce476ceb7b&tags=%25F0%259F%258E%25B5%2520pop
+11:57:33 AM https://civildefense.io/?lat=48.15400062627361&lng=17.11393386125565&sub=136d49b0e0a2b5b04bf6ab0049517fd93e67183b87fd10f0ba9d04df702e4121&tags=%25F0%259F%258E%25B5%2520pop
+11:57:35 AM https://civildefense.io/?lat=47.4888558&lng=19.0335664&sub=100613dcdf2eefa92fd1d3fb2186d84280df9f4c6c7cca6fb0ac5d66b531953d&tags=%25F0%259F%258E%25B5%2520pop
+11:57:37 AM https://civildefense.io/?lat=49.250369&lng=4.037195&sub=1d0a5bccd3679656184f2bf31029954991f0f3eb11f6ae2d907e78f84329a20d&tags=%25F0%259F%258E%25B5%2520pop
+11:57:39 AM https://civildefense.io/?lat=46.74523882452312&lng=23.49528996041045&sub=9272d1f9a19929fe0213ca060df5c65ee6c83193cda14e281f5084e355e6037c&tags=%25F0%259F%258E%25B5%2520pop
+11:57:42 AM https://civildefense.io/?lat=50.80722377122821&lng=4.936852455139161&sub=11bc1e0caec2f37a90c01155dc594f9ff4f61c5e05e03763d53d0b5eb15435a8&tags=%25F0%259F%258E%25B5%2520pop
+11:57:44 AM https://civildefense.io/?lat=50.85325707417748&lng=4.402635790952025&sub=ef1eed1c026fd4d760f9198380981f46dcf74bff14d2077de0057cbd2bebd069&tags=%25F0%259F%258E%25B5%2520pop
+11:57:46 AM https://civildefense.io/?lat=50.84728913138913&lng=4.380513053173743&sub=aac99acf889fdea139d83ebebfd67f60c802408138f58cac511fbc6b7834040d&tags=%25F0%259F%258E%25B5%2520pop
+11:57:49 AM https://civildefense.io/?lat=51.426271967040314&lng=5.479431152343751&sub=268b0cb93da0ac723f8994f4753bb6bfad52f6eb5729a9edb1ad9bea22647746&tags=%25F0%259F%258E%25B5%2520pop
+11:57:51 AM https://civildefense.io/?lat=48.74961031022668&lng=8.225744962692263&sub=938136455e9f7083d557eeed75a4ec3e4faa974b5a93e4a7cf17a2fa69b40cc4&tags=%25F0%259F%258E%25B5%2520pop
+11:57:54 AM https://civildefense.io/?lat=47.15403309163589&lng=19.03628255722763&sub=28e4ab3cc42801b4dea7df984bd4cbcd646b3975ca654ebd8813df6eef1e2629&tags=%25F0%259F%258E%25B5%2520pop
+11:57:57 AM https://civildefense.io/?lat=44.784975838110704&lng=20.469270393761462&sub=3bea490c08c8a45fa09f44e3666ecaf223f70a6e25ec910a318aca0bfc21f9ea&tags=%25F0%259F%258E%25B5%2520pop
+11:57:59 AM https://civildefense.io/?lat=50.85291573861285&lng=4.401629609696115&sub=027fc2b615f0d2e22cd2f6bb46bf15d28acfcd558d9864724096fff2ba5ebb93&tags=%25F0%259F%258E%25B5%2520pop
+11:58:01 AM https://civildefense.io/?lat=51.612558747052866&lng=20.10118681730206&sub=ef51c16cc1565a443357ce62d489cc260b6ba0e579e848471cabe89391925147&tags=%25F0%259F%258E%25B5%2520pop
+11:58:04 AM https://civildefense.io/?lat=45.473999403745474&lng=9.190063476562502&sub=271cfa470ca422086af6cbce2585fd726521d066eda4d6d1f6bfb63be1467001&tags=%25F0%259F%258E%25B5%2520pop
+11:58:07 AM https://civildefense.io/?lat=51.774192144901285&lng=8.3206844329834&sub=fb783380bcb78c9a3997d9af026d03c26d340dcf177f72f7cca1f17849683d34&tags=%25F0%259F%258E%25B5%2520pop
+11:58:09 AM https://civildefense.io/?lat=52.23521163856312&lng=21.005859375000004&sub=19f2578c85360a1e7f1bbb6d0a55488bda437cff419d4b2b2740af0c8132b9fa&tags=%25F0%259F%258E%25B5%2520pop
+11:58:13 AM https://civildefense.io/?lat=50&lng=17&sub=639d49ef135215d89bbf11b95107dbe3e6f5dc7c406412ed130b39da1037e6e0&tags=%25F0%259F%258C%258A%2520flood
+
+11:58:13 AM Deleted 0 previous publications and then posted 180 alerts with 3064 publications in 2125 topics, in 283,131 ms.
+11:58:13 AM Waiting 0 seconds before disconnecting the publishing node.
+11:58:18 AM 4725c890679ce81a3609aa43af6c686a9c5150a6f7dc65186332a82cfceaa381ff disconnected with 14 connections and 1094 axons.
+
+11:58:18 AM Waiting 0 seconds before creating new node to confirm delivery.
+11:58:20 AM 47a8a7ba568757705256d2cff2bb905b415c0fc913ad4840302f43f884d1036c93 Created network node for kernel 4.19.4 region 0x47.
+11:58:20 AM 47a8a7ba568757705256d2cff2bb905b415c0fc913ad4840302f43f884d1036c93 Connected 6 connections in 1,355 ms.
+11:58:20 AM Waiting 0 seconds before subscribing with this new node.
+11:58:20 AM Subscribing to 2125 topics.
+11:58:21 AM Waiting up to 650 seconds for subscriptions to fire.
+12:09:12 PM FAILED to receive all events.
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5171939299322494976:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5118653237808857088:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5118689769726935040:pop","region":71} published 2 but received 0!
+12:09:12 PM Topic {"name":"bcaebe49796db5e64a107fb1ff681761431ad3ed061b2ca27e12a822d37e71b3","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5170737155156213760:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5161758491664187392:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5161726704611229696:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5154520681496444928:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5118850548606435328:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5118850541291569152:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5141065682829443072:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5171733261151371264:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5171740201818521600:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5172060554839195648:pop","region":71} published 2 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5185032953800949760:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5177085683755384832:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5120526805622587392:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5178347923104071680:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5155425304688197632:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5157977271176265728:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5179851230377148416:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5179851281916755968:pop","region":71} published 1 but received 0!
+12:09:12 PM Topic {"name":"civildefense.io:071026C:5179851285473525760:pop","region":71} published 1 but received 0!
+12:09:12 PM 47a8a7ba568757705256d2cff2bb905b415c0fc913ad4840302f43f884d1036c93 disconnected with 9 connections and 1058 axons.
+12:09:12 PM Done.
+howardstearns@Howards-M5 alert-bot % 

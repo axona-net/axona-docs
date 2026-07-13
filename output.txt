@@ -1,0 +1,42 @@
+howardstearns@Howards-M5 alert-bot % npm start -- --regions 80 --tags flood country classical jazz 'classic rock'
+
+> alert-bot@1.0.3 start
+> node ./index.js --regions 80 --tags flood country classical jazz classic rock
+
+8:51:41 AM 8015cb86ba26f18c05c1521176f49964410381bdd6a2dfa4f2f0c48981026567d3 Created network node for kernel 4.19.4 region 0x80.
+8:51:41 AM 8015cb86ba26f18c05c1521176f49964410381bdd6a2dfa4f2f0c48981026567d3 Connected 4 connections in 602 ms.
+8:51:41 AM Waiting 0 seconds before publishing.
+
+8:51:42 AM https://civildefense.io/?lat=35.96516459958856&lng=-115.50095066717604&sub=79f5b9efb5e836aa7facb29af0607428c9d1844178232ce3832e8a1d454a3624&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+8:51:43 AM https://civildefense.io/?lat=34.05134604809088&lng=-118.2466220855713&sub=06bac4ffbcfaafc3bbf43397f3da0a75f49b312104c79332effeb2a049c9c974&tags=%25F0%259F%258E%25BC%2520classical
+8:51:44 AM https://civildefense.io/?lat=38.5019160992132&lng=-122.9974901676178&sub=aa2014f4118f8131038588877a4e3e048584bfdf87b8a0542b591b0ca5487e4e&tags=%25F0%259F%25A4%25A0%2520country
+8:51:45 AM https://civildefense.io/?lat=36.600682171913725&lng=-121.87685843403946&sub=d2cf8dcf66be477ba610ab1392660dce66a217bae26b16adaff759d468dd693d&tags=%25F0%259F%258E%25B7%2520jazz
+8:51:46 AM https://civildefense.io/?lat=33.78116952791262&lng=-118.1055110692978&sub=d5c59f020cbedbe31acdef0ec8e810dac47b706265d34526e1f6f4fc29aced91&tags=%25F0%259F%258E%25B7%2520jazz
+8:51:47 AM https://civildefense.io/?lat=36.59110826888709&lng=-121.86343631404624&sub=f45ee86a94802f7d3a11843d7d201f846790a0c08119418d304661ebd79dd792&tags=%25F0%259F%258E%25B7%2520jazz
+8:51:48 AM https://civildefense.io/?lat=37.467603274015495&lng=-122.26244688034059&sub=4a7acc594652ea425ce2f5969a6789565ae8349f7018f4fb9a7e7c27def2980e&tags=%25F0%259F%258C%258A%2520flood
+
+8:51:48 AM Deleted 0 previous publications and then posted 7 alerts with 123 publications in 112 topics, in 7,638 ms.
+8:51:48 AM Waiting 0 seconds before disconnecting the publishing node.
+8:51:53 AM 8015cb86ba26f18c05c1521176f49964410381bdd6a2dfa4f2f0c48981026567d3 disconnected with 16 connections and 25 axons.
+
+8:51:53 AM Waiting 0 seconds before creating new node to confirm delivery.
+8:51:55 AM 803535e95d7fd7b83e57dd925582833dcb49a64672361cc4250929dde2ec92f022 Created network node for kernel 4.19.4 region 0x80.
+8:51:55 AM 803535e95d7fd7b83e57dd925582833dcb49a64672361cc4250929dde2ec92f022 Connected 4 connections in 1,056 ms.
+8:51:55 AM Waiting 0 seconds before subscribing with this new node.
+8:51:55 AM Subscribing to 112 topics.
+8:51:55 AM Waiting up to 65 seconds for subscriptions to fire.
+8:53:00 AM FAILED to receive all events.
+8:53:00 AM Topic {"name":"civildefense.io:071026C:9279948507173617664:classic rock","region":128} published 1 but received 0!
+8:53:00 AM Topic {"name":"civildefense.io:071026C:9295429630892703744:classical","region":128} published 1 but received 0!
+8:53:00 AM Topic {"name":"civildefense.io:071026C:9278196199171555328:classical","region":128} published 1 but received 0!
+8:53:00 AM Topic {"name":"civildefense.io:071026C:9260526733780582400:country","region":128} published 1 but received 0!
+8:53:00 AM Topic {"name":"civildefense.io:071026C:9260560818641043456:country","region":128} published 1 but received 0!
+8:53:00 AM Topic {"name":"civildefense.io:071026C:9260561195524423680:country","region":128} published 1 but received 0!
+8:53:00 AM Topic {"name":"civildefense.io:071026C:9260561195255988224:country","region":128} published 1 but received 0!
+8:53:00 AM Topic {"name":"civildefense.io:071026C:9263311005050470400:jazz","region":128} published 1 but received 0!
+8:53:00 AM Topic {"name":"civildefense.io:071026C:9263312539494645760:jazz","region":128} published 1 but received 0!
+8:53:00 AM Topic {"name":"civildefense.io:071026C:9295429630892703744:flood","region":128} published 1 but received 0!
+8:53:00 AM Topic {"name":"public:071026C:avatar-5a12889c94e14b4e7bff94824685a666e11747ceea6a68a53b81cd0631312d1b","region":128,"owner":"5a12889c94e14b4e7bff94824685a666e11747ceea6a68a53b81cd0631312d1b"} published 1 but received 0!
+8:53:00 AM 803535e95d7fd7b83e57dd925582833dcb49a64672361cc4250929dde2ec92f022 disconnected with 15 connections and 27 axons.
+8:53:00 AM Done.
+howardstearns@Howards-M5 alert-bot % 

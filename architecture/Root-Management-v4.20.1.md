@@ -1,6 +1,6 @@
 # Root Management — the RootClaim state machine
 
-**Kernel:** `@axona/protocol` **4.20.0** (deployed on testnet 2026-07-13) ·
+**Kernel:** `@axona/protocol` **4.20.1** (deployed on testnet 2026-07-13) ·
 **Code:** `src/pubsub/rootClaim.js` (the machine), `src/pubsub/AxonaManager.js`
 (the caller) · **Contract:** `INVARIANTS.md` I-1/I-2 ·
 **Tests:** `test/smoke_root_claim.mjs` (decision table),
@@ -229,9 +229,16 @@ alert-bot incident:
    leaver, keep the claim.
 
 The general form of rule 1 is `pubsubPeerDied(deadHex)`: when any peer's
-channel closes, every cached beacon naming it is swept, so stranded traffic
-is never steered at a node that has left (invariant I-4: *a peer that has
-left is silent* — and the network stops listening to its echoes).
+channel closes — or it announces a graceful leave — every cached beacon
+naming it is swept **and every upstream pin on it is dropped**, with the
+pinned subscription's renewal clock reset so the very next tick re-homes
+unpinned (4.20.1, from a validated external review: a corpse pin was never a
+blackhole — the routed renewal is popped at the live terminal and re-seats —
+but it kept `attached` true, letting an app subscriber's backed-off renewal
+sit stale for up to 60s and gating off the reachable-root fallback).
+Stranded traffic is never steered at a node that has left (invariant I-4:
+*a peer that has left is silent* — and the network stops listening to its
+echoes). Test: `smoke_upstream_rehome.mjs`.
 
 ## 5. The mechanisms that feed the machine
 
@@ -296,7 +303,9 @@ Convergence intuition: a wrong claim inside the basin is corrected within
 one beacon period (≤20s); outside the basin, within one verify period (≤6s
 fresh, ≤45s steady); a claim deferring to an unreachable node self-resolves
 in ~6s; a dead root's ghost influence ends at channel-close (instant for
-neighbours, ≤30s for the loose gate, ≤50s worst case).
+neighbours, ≤30s for the loose gate, ≤50s worst case); a subscriber whose
+NEIGHBOUR upstream dies re-homes on the next tick (≤5s; non-neighbour
+upstream death heals at the next renewal via the reroute-and-re-pin path).
 
 ## 7. Invariants and their tests
 
@@ -359,5 +368,6 @@ election once the mesh forms and routes the SUB to the true root.
 `Kernel-Refactor-Analysis-v0.1.md`) from mechanisms introduced across
 4.11.0 (replication), 4.17–4.18.2 (fallback + election-by-subscription),
 4.19.0–4.19.2 (defer gates, self-verification, alone-in-the-dark), and
-4.19.4–4.19.5 (departure rules). Re-version this document on the kernel
-release that next changes root behavior.*
+4.19.4–4.19.5 (departure rules). 4.20.1 added the dead-upstream pin sweep
+(external-review finding). Re-version this document on the kernel release
+that next changes root behavior.*
