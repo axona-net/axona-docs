@@ -158,3 +158,25 @@ behavior "while we're in there." Open behavioral work (the fresh-subscriber
 cold-attach class, transient-root capture churn) stays on the punch list and
 gets *easier* after Phase 1–2, because it will land in one decision table
 instead of an eighth patch site.
+
+---
+
+## Status ledger (updated 2026-07-13)
+
+- **Phase 0 — DONE** (kernel 4.19.6): INVARIANTS.md (9 invariants → tests),
+  constants audit, dead-code removal (4 clusters + 2 tests).
+- **Phase 1 — DONE** (kernel 4.20.0): rootClaim.js state machine — every
+  isRoot flip through one transition function with why-codes; decision-table
+  smoke (27 checks). 4.20.1 added the dead-upstream pin sweep (external
+  review). Docs: Root-Management-v4.20.1.md.
+- **Phase 2 — DONE** (kernel 4.21.0): the manager split along its seams —
+  constants.js / ids.js / topicStore.js / rootElection.js / repairPlane.js /
+  wireHandlers.js behind the unchanged AxonaManager façade (methods relocated
+  verbatim as prototype mixins; state stays on the façade; every external
+  touchpoint preserved). Largest file now 700 lines (was 2,208).
+  Note: the deeper RepairPlane ambition (unify burst timers into the one
+  scheduler) is gated BEHAVIOR work, deliberately not done in this phase.
+- **Next:** Phase 3 (AxonaPeer diet + two-transports unification), Phase 4
+  (constants → policy objects — constants.js already stages this). Flake
+  stabilization (kernel handoff smoke + dht-sim bimodal delivery) remains on
+  the list; Phase 2's gates passed first-try this cycle.
