@@ -238,3 +238,31 @@ Dispositions on its additions:
 - `LEAK-transport-signed` is soak-v3's signing-leak sentinel; an `abuse`
   scenario (malformed frames, D-1 caps, forged beacons) would assert
   rejection/verify-don't-trust outcomes — different metrics.
+
+---
+
+## Addendum 2 — G1 closed: the `alertbot` scenario (2026-07-13)
+
+Howard shared the alert-bot repository (the field bot whose runs produced the
+4.19.4/4.19.5 reports). Reading it reframed G1: rather than inventing a
+departure workload, we ported his — the shape with the proven bug-finding
+record. `soak-axon`'s new **`alertbot`** scenario reproduces it against our
+own stack (no portal dependency): one cold publisher posts user profiles
+including ~12KB avatar payloads (closing the payload-size gap his avatars
+exposed — call it G11), then ALERTS×CELLS s2-style cell-topic fan-out plus a
+reply topic per alert (~93 fresh topics, ~101 publishes), then `leave()`s;
+a fresh `since:'all'` reader subscribes to every topic and tallies
+per-topic recovery. `recoveredPct` is the cold-attach residual trend line;
+`ok` gates at ALERTBOT_OK_PCT (80) so the known ~10–20% band doesn't false-
+alarm while a systematic regression flags. `leaveMs` rides along as the
+departure-latency metric.
+
+First measurement (kernel 4.21.0, testnet): 93 topics / 101 pubs,
+leave handed off in **5.1s**, recovery **89 full / 0 partial / 4 zero**
+(96% of messages) — the all-or-nothing per-topic pattern confirming the
+cold-attach class signature, now measured per cycle in the overnight
+rotation (HARD_CAP raised to 1800s for the longer cycle).
+
+Tier 2 (running the bot verbatim through Howard's civildefense portal +
+kdht stack as an occasional full-stack integration gate) remains open,
+pending those two repos.
