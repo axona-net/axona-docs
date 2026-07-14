@@ -64,7 +64,7 @@ migrates, and what we are building next.\par}
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Applications Note \quad v0.5 \quad 2026-06-07\par}
+{\small An Axona Applications Note \quad v0.6 \quad 2026-07-14\par}
 \end{center}
 \vfill
 \null
@@ -98,7 +98,8 @@ managed pub/sub services an application can replace with the protocol's
 own primitive --- then the decentralized protocols and centralized
 realtime services Axona can carry, and finally the established
 applications built on a DHT today. The Axona protocol is a live,
-browser-native network (\texttt{@axona/protocol} v2.10.0) with an
+browser-native network (\texttt{@axona/protocol} v4.22.0, live on both the
+production and staging networks) with an
 authenticated handshake, signed and freshness-bounded messages, and a
 full pub/sub lifecycle; each entry maps an application's need onto that
 surface.
@@ -106,8 +107,9 @@ surface.
 \textbf{Part~II --- Future Applications: Axona Powered} covers the
 applications we are building \emph{on} Axona rather than migrating
 \emph{to} it: \texttt{civildefense.io} (the first end-user
-application), \textsc{Syzl} (the adaptive social feed), and a
-deliberately open pipeline for what comes next.
+application), \textsc{Syzl} (the adaptive social feed), a cohort of
+\textbf{anonymous-broadcast natives} built on the capability no incumbent
+offers, and a deliberately open pipeline for what comes next.
 
 \marginnote{\emph{On the numbers.} Latency figures in Part~I are
 back-of-envelope projections from the Axona simulator's 25{,}000-node
@@ -143,30 +145,120 @@ WebRTC environment from the start. The reference network runs at
 \texttt{axona.net} via the \texttt{axona-peer} browser node and the
 \texttt{axona-bridge} signaling broker.\sidenote{The bridge carries
 WebRTC offer/answer payloads only and then drops out --- it sees no
-application traffic, and any operator can run one. A federated bridge
-mesh is on the roadmap.}
+application traffic, and any operator can run one. The live network runs
+a federated bridge pair (east + west) with a signed on-network directory
+clients use to discover bridges and fail over.}
 \item \textbf{Authenticated, not anonymous-by-accident.} Every peer
 link is established through the \texttt{axona/5} authenticated
 handshake, with the mesh channel-binding value bound to the DTLS
 certificate fingerprints --- so a relaying bridge cannot transparently
 intercept ``direct'' peer traffic.
-\item \textbf{Signed and fresh.} Every published message is an
-Ed25519-signed envelope (format v2) over a domain-tagged core carrying
-a per-publisher monotonic sequence number and timestamp, with a
-freshness window enforced at ingress. Replay-to-fresh-subscribers is
-closed.
+\item \textbf{Signed and fresh --- or deliberately anonymous.} A
+published message is an Ed25519-signed envelope (format v2) over a
+domain-tagged core carrying a per-publisher monotonic sequence number
+and timestamp, with a freshness window enforced at ingress;
+replay-to-fresh-subscribers is closed. Signing names a location-free
+\emph{author key}, never the publishing device --- and a publisher may
+instead publish \textbf{anonymously} by explicit declaration
+(\texttt{ANONYMOUS}), naming no key at all.\sidenote{Authorship is a
+dial, not a default --- see \emph{Anonymous Broadcast} below.}
 \item \textbf{A real lifecycle, not just fan-out.} Beyond
-\texttt{pub}/\texttt{sub}, the kernel now exposes \texttt{unsub},
-\texttt{pull} (by id \emph{or} latest), \texttt{kill} (creator-only
-delete with tombstones), \texttt{unpub} (owner-only topic destroy),
-bounded per-topic queues with deterministic eviction, and a hold-time
-TTL.\sidenote{24-hour default, 48-hour ceiling, sliding on pull.}
-Membership-gated topics are supported via shared-encryption group keys
-at the application layer.
+\texttt{pub}/\texttt{sub}, the kernel exposes \texttt{unsub},
+\texttt{pull} (by id \emph{or} latest), \texttt{kill} (author-only
+retraction with cohort-replicated tombstones --- the single retraction
+primitive), \texttt{host} (store-and-serve a topic without subscribing),
+bounded per-topic queues with deterministic eviction and per-publisher
+quotas, and a hold-time TTL.\sidenote{24-hour default, 48-hour ceiling,
+sliding on pull.} Owned topics carry a network-enforced write policy
+(only the owner key's publishes are accepted by the storing nodes);
+membership-gated \emph{reading} is supported via shared-encryption group
+keys at the application layer.
 \end{itemize}
 
-These four properties recur throughout the catalogue as the reason each
+These properties recur throughout the catalogue as the reason each
 application benefits.
+
+\subsection{Anonymous Broadcast --- the Capability No Incumbent Offers}
+
+\newthought{Every service in the next section} sells fan-out.
+\textbf{None of them sells fan-out where the publisher is unlinkable from
+the message} --- because each is a central operator that terminates every
+connection, and a connection the operator holds is a connection the
+operator can attribute. This is not a policy gap they could close with a
+setting; it is structural. To deliver a message, Pusher, Ably, and PubNub
+must know which socket sent it, and that socket is the sender. Anonymity,
+where these vendors offer it at all, is a promise not to look --- not an
+inability to.
+
+Axona's fan-out is the same shape but the trust model is inverted, and
+that inversion unlocks a capability class the managed tier cannot reach:
+\textbf{a publisher can reach an arbitrarily large audience while proving
+nothing about who or where it is.} Three protocol facts compose into it:
+authorship is a \emph{location-free key, never the connecting device}
+(the signing key carries no node id and no region, and the protocol never
+correlates it with the disposable transport key that carries the
+packets); a publisher \emph{may name no key at all} (\texttt{ANONYMOUS}
+publishes a valid, routable, unsigned message --- no author to subpoena,
+no key to cluster on\sidenote{The trade is explicit and enforced: an
+anonymous message cannot be retracted --- no key, no proof it is yours to
+kill.}); and \emph{there is no operator in the data path} (after the
+signaling bridge brokers the first handshake it drops out, and messages
+fan out peer-to-peer along the axonal tree, with channel-binding stopping
+even the bridge from reading or rewriting ``direct'' traffic).
+
+Put together: \textbf{one anonymous publish reaches every subscriber in
+the region, routed by the mesh, attributable to no one, expiring on its
+own.} That is a primitive with real-world demand the entire
+managed-realtime industry is structurally unable to serve. Four
+applications, by who needs it:
+
+\begin{itemize}
+\item \textbf{Whistleblowing \& secure disclosure at scale.} SecureDrop
+and GlobaLeaks route a source to \emph{one recipient} over Tor ---
+confidential \emph{submission}, not broadcast; to reach an audience the
+source must trust an intermediary who becomes both bottleneck and
+deanonymization risk. On Axona a source publishes \emph{once,
+anonymously,} to a public regional topic and every subscriber ---
+journalists, watchdogs, the affected public --- receives it directly,
+with no intermediary to pressure because none exists. The hold-time means
+the disclosure surfaces to everyone watching and then ages out, rather
+than persisting as a subpoena-able server record. Disclosure-as-broadcast,
+which no current tool offers.
+\item \textbf{Crisis, protest, and censorship-resilient coordination.} A
+regional topic \emph{is} a broadcast channel with no admin to identify
+and no server to seize; the S2 prefix makes ``everyone near this
+incident'' the native audience without anyone holding a subscriber list.
+Coordinators who want accountability sign with a persistent author key;
+sources who need deniability publish anonymously. Because the fan-out is
+the mesh, there is no chokepoint to censor --- the authenticated,
+scalable successor to the mesh-messenger idea.
+\item \textbf{Anonymous civic and organizational feedback.} Surveys,
+ethics hotlines, and 311-style tip lines run through a vendor who, by
+construction, holds the response-to-respondent map, so ``anonymous'' is a
+policy everyone knows is revocable. An Axona feedback topic has no
+operator to hold that map: a truly anonymous suggestion box, a tip line
+no administration can quietly mine, member communication an employer
+cannot enumerate.
+\item \textbf{Public accountability \& tamper-evident broadcast.} A
+\emph{pseudonymous} author key (persistent, tied to no real identity
+unless the holder chooses) publishing to a public topic gives subscribers
+a tamper-evident, gap-detectable feed --- a dropped or altered message
+shows as a sequence gap or signature failure. The substrate for
+anonymous-but-accountable broadcasters: a leaker with a track record, a
+pseudonymous analyst, an activist collective posting under one verifiable
+identity while its members stay unlinkable. The key carries reputation;
+the humans carry none of the risk.
+\end{itemize}
+
+\newthought{The honest boundary.} Axona provides \emph{content-layer}
+anonymity --- unlinkability of author from message, and no operator that
+terminates an attributable connection. It is not, by itself, a
+\emph{network-layer} anonymity system: a global passive adversary
+correlating packet timing at the IP layer is Tor's threat model, and the
+two compose (run the peer over Tor for both). What Axona uniquely adds is
+that the \emph{fan-out itself} is anonymous and operator-free --- the
+property Tor's onion services still centralize through HSDirs and that no
+managed pub/sub vendor can offer at all.
 
 \subsection{Pub/Sub-as-a-Service --- the Managed Realtime Tier}
 
@@ -205,7 +297,7 @@ Channel / topic & \texttt{peer.sub(topic)} over \texttt{deriveTopicId} (public o
 Publish & \texttt{peer.pub} --- Ed25519-signed, freshness-bounded envelope \\
 Presence (``who's online'') & \texttt{peer.peers} + \texttt{onPeerJoin}\,/\,\texttt{onPeerLeave} --- native \\
 Message history / ``rewind'' & replay cache + \texttt{peer.pull} (by id \emph{or} latest) + hold-time TTL \\
-Channel teardown / revoke & \texttt{unsub} / \texttt{kill} (creator delete + tombstone) / \texttt{unpub} \\
+Channel teardown / revoke & \texttt{unsub} / \texttt{kill} (author retraction + cohort tombstone) \\
 Private channels & Model~3 shared-encryption topic (group key at the app layer) \\
 Reach analytics & \texttt{peer.metrics} (publishes / subscribers / reshare\_count) \\
 \bottomrule
@@ -573,8 +665,8 @@ event. Crucially, the membership and privacy story is now real, not
 aspirational: a private group is a \textbf{shared-encryption topic}
 (the group key is distributed at the app layer; the protocol carries
 opaque ciphertext and gates nothing it shouldn't), and
-\texttt{kill}/\texttt{unsub}/\texttt{unpub} give first-class
-leave/remove/teardown. This is the first peer-to-peer messenger
+\texttt{kill}/\texttt{unsub}/\texttt{host} give first-class
+leave/remove/durability. This is the first peer-to-peer messenger
 architecture that scales to large groups with a centralized service's
 latency profile \emph{and} a credible membership model.
 
@@ -758,7 +850,7 @@ is, structurally, a geographically-keyed pub/sub feed, which is exactly
 what Axona routes.
 \item \textbf{Expiry is a first-class semantic now, not a side
 effect.} The original brief leaned on implicit expiry through the
-replay-cache LRU. With the v2.10.0 lifecycle, the 24-hour window is the
+replay-cache LRU. With the 4.x lifecycle, the 24-hour window is the
 \textbf{hold-time TTL} --- an explicit, principled bound, so reports age
 out deterministically rather than whenever the cache happens to evict
 them.
@@ -766,10 +858,14 @@ them.
 Ed25519-signed envelopes with per-publisher sequence numbers and a
 freshness window --- so a stale or replayed report cannot be re-injected
 at a fresh subscriber, which matters acutely for an incident feed.
-\item \textbf{Anonymous but authenticated transport.} The
-\texttt{axona/5} handshake plus mesh channel-binding means reports
-travel end-to-end without a central operator and without a relaying
-bridge being able to read or rewrite them.
+\item \textbf{Anonymous publish is the load-bearing property.} A report
+names a location-free author key --- or no key at all
+(\texttt{ANONYMOUS}) --- never the reporting device, and the
+\texttt{axona/5} handshake plus mesh channel-binding means reports travel
+end-to-end without a central operator and without a relaying bridge able
+to read or rewrite them. A resident can flag an incident to everyone
+nearby without exposing who or where they are --- the anonymous-broadcast
+primitive above, as an end-user product.
 \end{itemize}
 
 \textbf{What it still needs from us.} A membership-gated variant
@@ -831,12 +927,46 @@ worker --- which doubles as keeping the network warm while the user
 browses. Roughly six weeks of work, $\sim$70\% code-shared with the PWA
 composer.
 
-\subsection{The Pipeline --- others as we invent them}
+\subsection{Anonymous-Broadcast Natives --- built on the capability no
+incumbent has}
 
-This section is deliberately open. Part~I is, in effect, a menu:
-several of those ``what Axona changes'' analyses describe applications
-that are more interesting built \emph{fresh} on Axona than migrated.
-Natural near-term candidates, none yet committed:
+\newthought{The Part~I} \emph{Anonymous Broadcast} cohort is a menu of
+applications more interesting built \emph{fresh} on Axona than migrated,
+because their defining feature --- reach an audience while proving nothing
+about the sender --- is a protocol primitive nowhere else. These lead the
+Part~II candidates; each is almost entirely application-layer over
+\texttt{pub(ANONYMOUS)}/\texttt{sub}, plus a persistent author key where
+accountability is wanted.
+
+\begin{itemize}
+\item \textbf{A disclosure wire.} A source publishes anonymously to a
+regional or topical channel; journalists and watchdogs subscribe. No
+SecureDrop instance to run, no single recipient to compromise, no
+permanent server record --- the disclosure fans out to everyone watching
+and ages out on the hold-time. The app is a reader with a verification
+pane and a compose box that defaults to \texttt{ANONYMOUS}; the hard parts
+are protocol defaults.
+\item \textbf{A censorship-resilient community broadcast.} A neighborhood,
+campus, or movement gets an authenticated broadcast channel with no admin
+to unmask and no server to seize --- the credible successor to
+FireChat-class mesh apps, with the authenticity, history, and scale they
+lacked. Coordinators sign; sources stay anonymous; the S2 prefix makes
+``everyone nearby'' the default audience.
+\item \textbf{A pseudonymous publishing platform.} One persistent author
+key, a public topic, a tamper-evident signed feed --- a ``substack for
+pseudonyms'' where the key carries reputation and the human carries none
+of the exposure. Reach is visible to the author
+(\texttt{metrics}) without ever revealing \emph{who} subscribed.
+\item \textbf{A truly anonymous feedback channel.} An org or municipality
+hosts a public topic; stakeholders publish anonymously; everyone reads the
+same unfiltered stream --- no vendor holding the response-to-respondent
+map, because there is no vendor.
+\end{itemize}
+
+\subsection{The Rest of the Pipeline --- others as we invent them}
+
+This section stays deliberately open. Further near-term candidates from
+Part~I, none yet committed:
 
 \begin{itemize}
 \item \textbf{A browser-native swarm transport.} WebTorrent's
@@ -855,22 +985,27 @@ in this folder and a row in Part~II.
 
 \subsection{What the Axona-Powered Applications Share}
 
-Across \texttt{civildefense.io}, \textsc{Syzl}, and the pipeline, the
-same four properties keep recurring as the reason the app is
-\emph{possible}, not merely \emph{cheaper}:
+Across \texttt{civildefense.io}, \textsc{Syzl}, the anonymous-broadcast
+natives, and the pipeline, the same five properties keep recurring as the
+reason the app is \emph{possible}, not merely \emph{cheaper}:
 
 \begin{enumerate}
 \item \textbf{Geographic locality for free} --- the S2 prefix puts
 relevance and routing in the same place at zero coordination cost.
 \item \textbf{Pub/sub with a real lifecycle} ---
 \texttt{pub}/\texttt{sub}/\texttt{unsub}/\texttt{pull}/\texttt{kill}/%
-\texttt{unpub}, bounded queues, and hold-time TTL turn ``fan a message
+\texttt{host}, bounded queues, and hold-time TTL turn ``fan a message
 out'' into a managed, expiring, revocable feed.
 \item \textbf{Signed, fresh, end-to-end-secure messages} ---
 authenticity, freshness, and MITM-resistance are protocol defaults, so
 the application never has to bolt them on.
-\item \textbf{No central operator} --- ranking, membership, and reach
-live on-device and in the mesh, which removes the
+\item \textbf{Authorship as a dial} --- a location-free author key, a
+pseudonym, or \texttt{ANONYMOUS}, per message --- so an app can offer
+accountable, pseudonymous, and fully anonymous publishing from the
+\emph{same} primitive, a combination no central operator can
+structurally provide.
+\item \textbf{No central operator} --- ranking, membership, reach, and
+\emph{attribution} live on-device and in the mesh, which removes the
 surveillance-and-incentive failure mode common to their centralized
 counterparts.
 \end{enumerate}

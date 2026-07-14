@@ -313,6 +313,8 @@ PREAMBLE = r"""\documentclass[nobib]{tufte-handout}
 \newunicodechar{≈}{\ensuremath{\approx}}
 \newunicodechar{∼}{\ensuremath{\sim}}
 \newunicodechar{×}{\ensuremath{\times}}
+\newunicodechar{α}{\ensuremath{\alpha}}
+\newunicodechar{β}{\ensuremath{\beta}}
 \newunicodechar{…}{\ldots}
 \newunicodechar{✓}{\ensuremath{\checkmark}}
 \newunicodechar{⌈}{\ensuremath{\lceil}}
