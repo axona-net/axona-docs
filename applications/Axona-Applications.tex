@@ -377,7 +377,18 @@ availability weak point. For these, Axona is not a rewrite: it is a
 better transport that drops the relay as a single point of failure. In
 each case Axona supplies the \emph{fan-out and discovery layer}, not the
 protocol's own identity or data model --- those ride as opaque,
-app-signed payloads.
+app-signed payloads.\sidenote{\textbf{``Opaque payload,'' defined once.}
+An \emph{opaque payload} is a message body Axona \textbf{carries without
+reading} --- it never parses, interprets, validates, or depends on the
+bytes inside. The application's own format, identity, and signatures
+travel untouched as the \texttt{message} of an Axona publish; Axona wraps
+that blob in its own envelope, routes it, caches it, and fans it out, but
+treats the contents as sealed. So a Nostr event keeps its own signature
+and schema, a CRDT update stays whatever shape its library emits, and
+encrypted group traffic stays ciphertext Axona can't decrypt. The one
+rule Axona imposes is a size bound; \emph{what} the bytes mean is entirely
+the application's business --- which is what lets Axona drop in under an
+existing protocol without replacing it.}
 
 \textbf{Nostr.} ``Notes and Other Stuff Transmitted by Relays'' ---
 clients publish secp256k1-signed events to a handful of

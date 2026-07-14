@@ -389,6 +389,18 @@ failure. In each case Axona supplies the **fan-out and discovery layer**, not
 the protocol's own identity or data model — those ride as opaque, app-signed
 payloads.
 
+> **"Opaque payload," defined once.** Throughout this document, an *opaque
+> payload* means a message body that Axona **carries without reading** — it
+> never parses, interprets, validates, or depends on the bytes inside. The
+> application's own format, identity, and signatures travel untouched as the
+> `message` of an Axona publish; Axona wraps that blob in its own envelope,
+> routes it, caches it, and fans it out, but treats the contents as sealed. So
+> a Nostr event keeps its own signature and schema, a CRDT update stays whatever
+> shape its library emits, and encrypted group traffic stays ciphertext Axona
+> can't decrypt. The one rule Axona imposes is a size bound (§ limits); *what*
+> the bytes mean is entirely the application's business. This is what lets Axona
+> drop in as a transport under an existing protocol without replacing it.
+
 ### Nostr
 
 **What it is.** "Notes and Other Stuff Transmitted by Relays" — clients publish
