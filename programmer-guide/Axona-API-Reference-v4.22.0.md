@@ -968,9 +968,11 @@ routing-only peer with no `AxonaManager`.
 
 Every topic's replay queue is bounded:
 
-- **Max messages** — default 100, max 256. When full, the lowest-ordered
-  message (by signed `seq`) is evicted deterministically. A max of 1 is a
-  *retained/latest-value* slot; pair it with `peer.pull(null, …)`.
+- **Max messages** — up to `CACHE_MAX` (**1024**) per topic, also bounded by a
+  16 MB byte ceiling on the cache. When full, the lowest-ordered message (by
+  signed `seq`) is evicted deterministically. (Configurable per peer via the
+  `replayCacheSize` constructor option; a value of 1 is a
+  *retained/latest-value* slot — pair it with `peer.pull(null, …)`.)
 - **Hold time** — default 24 h, hard ceiling 48 h. A message past its
   hold is swept (stops being delivered or pulled). A `pull` or `touch`
   slides the hold forward, bounded by the ceiling.

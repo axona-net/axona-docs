@@ -265,7 +265,7 @@ SQS / Kinesis / EventBridge, Azure Event Hubs / Service Bus, CloudAMQP
 These are **durable commit logs and queues**: long retention, partitioning,
 replay-from-offset, exactly-once or strict FIFO delivery, transactions, and
 backend consumers. Axona is deliberately **not** this — its retention is a
-bounded queue (≤256 messages) under a 24–48 h hold-time TTL, its ordering is
+bounded queue (≤1024 messages per topic) under a 24–48 h hold-time TTL, its ordering is
 per-publisher rather than a global total order, and its delivery is high but
 best-effort under churn, not the exactly-once SLA Kafka and Ably market.
 Positioning Axona as a Kafka replacement would be the overclaim that

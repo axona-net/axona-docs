@@ -330,7 +330,7 @@ Service Bus, CloudAMQP (RabbitMQ), Solace PubSub+, IBM MQ. These are
 durable commit logs and queues: long retention, partitioning,
 replay-from-offset, exactly-once or strict FIFO delivery, transactions,
 backend consumers. Axona is deliberately \emph{not} this --- its
-retention is a bounded queue ($\le$256 messages) under a 24--48~h
+retention is a bounded queue ($\le$1024 messages per topic) under a 24--48~h
 hold-time TTL, its ordering is per-publisher rather than a global total
 order, and its delivery is high but best-effort under churn, not the
 exactly-once SLA Kafka and Ably market. Positioning Axona as a Kafka
