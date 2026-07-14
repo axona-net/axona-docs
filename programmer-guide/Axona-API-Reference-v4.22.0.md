@@ -1,23 +1,24 @@
 # Axona API Reference
 
-Reference for every public symbol exported from `@axona/protocol` v4.16.1.
+Reference for every public symbol exported from `@axona/protocol` v4.22.0.
 
 Organized by what application developers reach for first (identity, peer
 lifecycle, pub/sub, direct messaging, introspection), then the
 transport/protocol surface, then low-level utilities. Every signature
-below is verified against the v4.16.1 kernel source.
+below is verified against the v4.22.0 kernel source.
 
-> **Which network?** The 4.x line runs on **testnet** (`wss://testnet.axona.net`)
-> during the current phase; the **production** bridges (`wss://bridge.axona.net`)
-> are still on the 3.x line. The wire major partitions them (wire 3.0 vs 4.0), so a
-> v4.x peer talks to testnet, a v3.x peer talks to prod — they do not interoperate.
-> Install `github:axona-net/axona-protocol#v4.16.1` and point at testnet to use this
-> API surface.
+> **Which network?** Both live networks run the 4.x line (wire 4.0).
+> **Testnet** (`wss://testnet.axona.net`) tracks the newest kernel — v4.22.0,
+> the version this reference describes. **Production** (`wss://bridge.axona.net`
+> east + `wss://bridge-west.axona.net` west) runs the most recently promoted
+> kernel, typically one release behind while changes soak. The API surface below
+> is identical on both; point wherever you deploy. Install
+> `github:axona-net/axona-protocol#v4.22.0`.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v4.16.1.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v4.16.1.md) — mental model +
+- [Quick Start](Quick-Start-v4.22.0.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v4.22.0.md) — mental model +
   worked example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects.
@@ -38,7 +39,7 @@ but most apps only need the main barrel.
 > surface** (§§10–16) and **Low-level utilities** (§§17–23) exist for
 > transport authors, tooling, and the curious. Building with an AI
 > assistant? Hand it the
-> [AI Grounding](Axona-AI-Grounding-v4.16.1.md) file — the application
+> [AI Grounding](Axona-AI-Grounding-v4.22.0.md) file — the application
 > surface distilled to rules and patterns.
 
 ---
@@ -648,7 +649,9 @@ bytes out-of-band.
 > node re-sends its first publishes a few times over ~1 s (v4.11.0) so a not-yet-warm
 > routing table doesn't strand them, and a background retry re-sends a recent publish
 > toward the true root until the publisher observes its own `msgId` land. You do not
-> tune any of this.
+> tune any of this. Since v4.22.0 the cohort also converges to the **union** of its
+> members' history across root transitions, so a `since:'all'` subscriber attaching
+> right after the root moved still replays the full timeline, not just the newer half.
 
 **Throws** `PublishError`:
 
@@ -731,7 +734,7 @@ expected, not an error.
 | `opts.topic` | `TopicDescriptor \| string` | descriptor **or** 66-hex id. |
 | `opts.timeoutMs` | `number` | default `1000`. |
 
-**Nearest-replica reads (v4.11.1–v4.16.1).** A pull is answered by the
+**Nearest-replica reads (v4.11.1+).** A pull is answered by the
 **first replica the request reaches** — a cohort member, a child relay, or a
 `host()` node — not necessarily the topic's root. This lowers latency, spreads
 reads off the root, and lets a pull that would otherwise strand toward the root
@@ -838,7 +841,7 @@ and, because snapshots are ordinary messages that age out at the 48 h hold
 ceiling, a **rolling ~48 h history for free** to plot trends. This is also how
 you subscribe to an **owned** topic's metrics without owning it.
 
-**When snapshots arrive.** The timing contract (v4.16.1):
+**When snapshots arrive.** The timing contract (since v4.16.1):
 
 - **First snapshot: at routing latency.** The root answers the moment your
   subscription's lease arms — **~0.3 s measured on testnet**, arriving with
@@ -1365,9 +1368,9 @@ bootstrap + signaling, plus a WebRTC mesh). Sub-path import:
 import { webTransport } from '@axona/protocol/transport/web/index.js';
 
 const transport = webTransport({
-  bridgeUrl:   'wss://testnet.axona.net',  // the 4.x line runs on testnet (prod is 3.x)
+  bridgeUrl:   'wss://testnet.axona.net',  // or wss://bridge.axona.net (production)
   identity:    node,                       // from createNodeIdentity — signs the handshake
-  peerVersion: '4.16.1',                   // your app version (gated by the bridge)
+  peerVersion: '4.22.0',                   // your app version (gated by the bridge)
   reconnect:   true,
 });
 await transport.start();                  // resolves after the bridge handshake
@@ -1618,7 +1621,7 @@ introduces no keyspace skew.
 
 ```js
 WIRE_VERSION         // '4.0'      — wire format major.minor (bridges gate on this)
-KERNEL_VERSION       // '4.16.1'   — kernel semver (npm release tag)
+KERNEL_VERSION       // '4.22.0'   — kernel semver (npm release tag)
 AUTH_PROTO           // 'axona/5'  — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426       — WebSocket close code for a version mismatch
 ENVELOPE_DOMAIN      // 'axona:pubsub-envelope:v2'
@@ -1646,6 +1649,34 @@ await peer.pub({ region: 'useast', name: 'lobby' }, msg, { signWith: ANONYMOUS }
 
 *(Only relevant if you have code from an earlier kernel line. New
 readers: skip.)*
+
+### What changed in v4.17.0–v4.22.0 (2026-07-14 roll; v4.21.0 promoted to production)
+
+**No API change at all** — every release in this span is behavioral: root
+lifecycle, departure, and history-convergence work, validated by an
+overnight production-shaped soak per release.
+
+- **Root election + reconciliation (v4.17.0–v4.19.2).** Faster promotion when
+  a topic's root churns out; wrong root claims converge without flapping
+  (strictly-closer beacon deferral, periodic root self-verification, and
+  guards for unmeshed and cross-region edge cases). One durable root per
+  topic, kept true under churn.
+- **Departure-side durability (v4.19.4–v4.19.5).** `peer.leave()` now hands
+  off **every** rooted topic's history inside its time bound (parallel heir
+  resolution + an iterative-lookup fallback for thin-tabled leavers), and the
+  heir can no longer defer its claim back to the node that just left. A burst
+  publisher's topics survive its departure intact.
+- **Kernel consolidation (v4.19.6–v4.21.0).** The refactor program: a frozen
+  invariants contract (`INVARIANTS.md`), every root transition through one
+  state machine (`rootClaim.js`), and the pub/sub manager split along its
+  seams. Structural only — verified behavior-preserving.
+- **Split-history union (v4.22.0).** After a root transition, the old and new
+  holders converge to the **union** of cache + tombstones (the subscribe now
+  advertises its oldest stamp so a root pulls history that sits *below* its
+  own high-water; roots union-ingest cohort pushes). Closes the last known
+  replay gap: a fresh `since:'all'` subscriber attaching mid-transition
+  received only the post-transition half (~1 in 15 root transitions);
+  soak-validated to full-timeline recovery.
 
 ### What changed in v4.12.0–v4.16.1 (2026-07-02 testnet roll)
 
@@ -1684,7 +1715,7 @@ working while delivery gets more robust:
 - **Cold-publish burst (v4.11.0).** A freshly-joined node's first publishes are
   automatically re-sent a few times over the first second, so a cold-start publish
   isn't lost while the routing table warms. No app action — `pub` is unchanged.
-- **Nearest-replica reads (v4.11.1–v4.16.1).** `pull` is answered by the first
+- **Nearest-replica reads (v4.11.1+).** `pull` is answered by the first
   replica the request reaches instead of always the root: exact for `pull(msgId)`,
   and *recent* (eventually-consistent) for pull-latest, which spreads a hot read
   path off the root (see §4.3).

@@ -1,6 +1,6 @@
 # Axona Services Guide
 
-*(kernel 4.16.1 · testnet — versioned with the protocol it describes)*
+*(kernel 4.22.0 · testnet — versioned with the protocol it describes)*
 
 The other programmer-guide documents teach the **library** — how to build your
 own peer with `@axona/protocol` and speak pub/sub. This guide covers the
@@ -11,16 +11,18 @@ together, and the **PoW collector**. If you are operating an Axona deployment,
 wiring an agent into the network, or just want a topic to stay alive when no
 browser tab is open, this is the document for you.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v4.16.1)
-- **Wire version**: 4.0 (`WIRE_VERSION`); kernel version 4.16.1 (`KERNEL_VERSION`)
-- **Live network**: the 4.x line runs on **testnet** — `wss://testnet.axona.net`. The
-  **production** federated pair (`wss://bridge.axona.net` east + `wss://bridge-west.axona.net`
-  west) is still on the 3.x line; the two don't interoperate (the wire major partitions
-  them). Run 4.x services against testnet — point relays/MCP at it explicitly (their
-  code default still targets prod/3.x; see §3).
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v4.22.0)
+- **Wire version**: 4.0 (`WIRE_VERSION`); kernel version 4.22.0 (`KERNEL_VERSION`)
+- **Live networks**: both run the 4.x line. **Testnet** (`wss://testnet.axona.net`)
+  tracks the newest kernel — 4.22.0, the version this guide describes. The
+  **production** federated pair (`wss://bridge.axona.net` east +
+  `wss://bridge-west.axona.net` west) runs the most recently promoted kernel
+  (4.21.0 at press time), typically one release behind while changes soak on
+  testnet. The two networks are wire-compatible but *separate* — a peer joins
+  one or the other; pick with `RELAY_NETWORK`/`BRIDGE_URL` (§3).
 - **Companion docs**:
-  - [Quick Start](Quick-Start-v4.16.1.md) · [Programmer Guide](Axona-Programmer-Guide-v4.16.1.md) · [API Reference](Axona-API-Reference-v4.16.1.md) — the library.
-  - [AI Grounding](Axona-AI-Grounding-v4.16.1.md) — building with an AI assistant.
+  - [Quick Start](Quick-Start-v4.22.0.md) · [Programmer Guide](Axona-Programmer-Guide-v4.22.0.md) · [API Reference](Axona-API-Reference-v4.22.0.md) — the library.
+  - [AI Grounding](Axona-AI-Grounding-v4.22.0.md) — building with an AI assistant.
   - [Architecture](../architecture/Axona-Architecture.tex) — how the bridge + transport work under the hood.
 
 > **Library vs. services.** A *peer* is the unit the library gives you: an
@@ -117,7 +119,7 @@ or, with the repo checked out:
 cd /opt/axona-bridge
 docker compose build        # builds first; the old container keeps serving
 docker compose up -d        # fast swap; Caddy keeps its certificate
-curl https://bridge.example.net/healthz     # → {"status":"ok","version":…,"kernelVersion":"4.16.1"}
+curl https://bridge.example.net/healthz     # → {"status":"ok","version":…,"kernelVersion":"4.22.0"}
 ```
 
 Full provisioning options (the installer, the Docker bundle, and a manual
@@ -196,7 +198,7 @@ you get one well-known node plus as many throwaway nodes as you want.
 
 | Var | Default | Meaning |
 |---|---|---|
-| `RELAY_NETWORK` | `prod` | Bootstrap network: `prod` (`bridge.axona.net`, **3.x**) or `testnet` (`testnet.axona.net`, **4.x**). A v4.16.1 relay must use `testnet` — the code default `prod` is the 3.x line and rejects a 4.x peer at the handshake. |
+| `RELAY_NETWORK` | `prod` | Bootstrap network: `prod` (`bridge.axona.net`) or `testnet` (`testnet.axona.net`). Both run the 4.x line; testnet tracks the newest kernel. Use `testnet` to follow the staging line this guide describes; `prod` for production service. |
 | `BRIDGE_URL` | — | Explicit bridge URL; **overrides** `RELAY_NETWORK` |
 | `RELAY_REGION` | — | `auto` (detect), a region name (`useast`), or code (`0x89`) — sets the nodeId geo prefix |
 | `RELAY_LAT` / `RELAY_LNG` | `37.77`/`-122.42` | Geo prefix by coordinate (if `RELAY_REGION` unset). Default = SF (`uswest`) |
@@ -277,10 +279,10 @@ call.
 | `axona_subscribe` | `topic`, `region?`, `seconds?` (1–120), `since?` | One-shot listen window (back-compat) |
 
 Region defaults to `useast` (`0x89`); subscribers must use the **same region** as
-the publisher. The server's code default targets **production** (the 3.x line); a
-v4.16.1 MCP peer must set `RELAY_NETWORK=testnet` to join the 4.x line (the two
-don't interoperate). Within a line, publishing interoperates with the live apps on
-that line.
+the publisher. The server's code default targets **production**; set
+`RELAY_NETWORK=testnet` to join the staging network instead. Both run the 4.x
+line, but they are separate networks — the agent participates in whichever one
+its peer joined, alongside the live apps on that network.
 
 **Receiving — push vs. poll.** Two paths cover the same arrivals:
 - **Push** — every message on a watched topic is emitted as an MCP *logging
@@ -380,7 +382,7 @@ backlog.)
 
 | You want to… | Run |
 |---|---|
-| Let strangers connect to your app's network | A **bridge** (or use the live one for your line — `testnet.axona.net` for 4.x, `bridge.axona.net` for 3.x) |
+| Let strangers connect to your app's network | A **bridge** (or use a live one — `bridge.axona.net` for production, `testnet.axona.net` for staging) |
 | Keep a topic's messages alive when no author is online | A **relay** that `host()`s it |
 | Publish live subscriber counts for a topic | Nothing extra — **any root serves metrics on demand** when a client subscribes to `metricTopic(T)`; a relay just makes the root durable |
 | Publish/subscribe from a shell, cron, or CI | The **CLI** (`axona-cli`) |
@@ -416,9 +418,9 @@ any other peer that takes on the same role.
 
 ## Where to go next
 
-- **[Programmer Guide](Axona-Programmer-Guide-v4.16.1.md)** — build the peer that
+- **[Programmer Guide](Axona-Programmer-Guide-v4.22.0.md)** — build the peer that
   talks to these services.
-- **[API Reference](Axona-API-Reference-v4.16.1.md)** — `host()` / `unhost()`,
+- **[API Reference](Axona-API-Reference-v4.22.0.md)** — `host()` / `unhost()`,
   `metricTopic()`, and the rest of the public surface.
 - **`axona-bridge/deploy/INSTALL.md`** — provision a bridge (installer, Docker,
   or manual).

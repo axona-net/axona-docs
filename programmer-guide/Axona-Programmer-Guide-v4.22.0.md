@@ -1,6 +1,6 @@
 # The Axona Programmer Guide
 
-**Build apps that have no server.** *(kernel 4.16.1 · testnet)*
+**Build apps that have no server.** *(kernel 4.22.0 · testnet)*
 
 You're about to build something unusual: an application with no backend. No
 database to stand up, no message broker to rent, no API keys, nothing to
@@ -16,13 +16,13 @@ optional.)
 
 **Companions:**
 
-- [Quick Start](Quick-Start-v4.16.1.md) — a working roundtrip in 5 minutes. Do it first.
-- [API Reference](Axona-API-Reference-v4.16.1.md) — every signature, exactly.
-- [AI Grounding](Axona-AI-Grounding-v4.16.1.md) — building with an AI assistant? Hand it this file.
-- [Services Guide](Axona-Services-Guide-v4.16.1.md) — running bridges and relays (you can skip this for a long time).
+- [Quick Start](Quick-Start-v4.22.0.md) — a working roundtrip in 5 minutes. Do it first.
+- [API Reference](Axona-API-Reference-v4.22.0.md) — every signature, exactly.
+- [AI Grounding](Axona-AI-Grounding-v4.22.0.md) — building with an AI assistant? Hand it this file.
+- [Services Guide](Axona-Services-Guide-v4.22.0.md) — running bridges and relays (you can skip this for a long time).
 
 > **Building with an AI?** Most Axona apps are. Paste
-> [Axona-AI-Grounding-v4.16.1.md](Axona-AI-Grounding-v4.16.1.md) into your
+> [Axona-AI-Grounding-v4.22.0.md](Axona-AI-Grounding-v4.22.0.md) into your
 > assistant's context and it will know every rule in this guide. Keep this
 > guide for *you* — it explains the why.
 
@@ -70,7 +70,7 @@ state, agent-to-agent traffic — they're all arrangements of these five.
 
 ## 2. First contact
 
-If you haven't run the [Quick Start](Quick-Start-v4.16.1.md), do it now —
+If you haven't run the [Quick Start](Quick-Start-v4.22.0.md), do it now —
 five minutes, a real message through the real network. The heart of it:
 
 ```js
@@ -486,10 +486,12 @@ and `kill()` resolving `{ ok: false }` (nothing to retract).
 
 ## 8. Going live
 
-- **Point at the right network.** This guide's line (4.x) runs on
-  **testnet**: `wss://testnet.axona.net`. Production bridges run the
-  older 3.x line and will refuse 4.x apps (close 4426) — match your
-  kernel pin to your bridge.
+- **Point at the right network.** Both live networks run this guide's 4.x
+  line: **testnet** (`wss://testnet.axona.net`) tracks the newest kernel,
+  **production** (`wss://bridge.axona.net`, with a federated west sibling)
+  runs the most recently promoted release, typically one behind. Develop
+  against testnet; deploy against production. A genuinely mismatched kernel
+  is refused loudly (close 4426) — match your kernel pin to your bridge.
 - **HTTPS is mandatory** in the browser (`crypto.subtle`).
 - **Surface your versions.** Show the kernel version somewhere findable
   (`KERNEL_VERSION` import) — future-you debugging a mixed fleet will be
@@ -497,7 +499,7 @@ and `kill()` resolving `{ ok: false }` (nothing to retract).
 - **Durability beyond browser tabs.** An app whose topics matter when no
   user is online wants a small always-on peer that `host()`s them — that's
   a *relay*, a five-minute Node deployment. When you reach that point,
-  the [Services Guide](Axona-Services-Guide-v4.16.1.md) is yours; not
+  the [Services Guide](Axona-Services-Guide-v4.22.0.md) is yours; not
   before.
 
 ## 9. Under the hood — *optional*
@@ -521,10 +523,15 @@ relays), so no node ever serves more than a bounded number directly.
 **Durability.** The root continuously copies its cache to the peers next
 in line; when a root vanishes (a laptop closes), a warm backup notices
 within a minute and takes over, and every subscriber's periodic renewal
-re-attaches automatically. Your app sees, at worst, a brief pause. Your
-messages are also retried by your own peer until it observes them
-delivered. All of this is why the guide keeps saying *you don't manage
-the network* — it manages itself, aggressively.
+re-attaches automatically. A peer that leaves *gracefully* hands every
+topic it was coordinating to an heir before it goes. And whenever a
+topic's coordinator changes hands, the old and new holders reconcile to
+the **union** of their history — so a newcomer asking for "everything"
+gets the whole timeline, not whichever half its node happened to hold.
+Your app sees, at worst, a brief pause. Your messages are also retried by
+your own peer until it observes them delivered. All of this is why the
+guide keeps saying *you don't manage the network* — it manages itself,
+aggressively.
 
 **Regions.** The first byte of every ID is one of 192 real geographic
 cells, so a region's topics naturally live on that region's peers —
@@ -546,9 +553,9 @@ nothing in the app API — it rebuilt reliability underneath (single-root
 axon trees, cohort replication, cold-publish burst, nearest-replica
 reads). `unpub` was removed and `touch` retired (re-publish to refresh a
 message instead). If a symbol you remember is missing from the
-[API Reference](Axona-API-Reference-v4.16.1.md), it didn't survive v3 —
+[API Reference](Axona-API-Reference-v4.22.0.md), it didn't survive v3 —
 the reference is the source of truth.
 
 ---
 
-*Axona Programmer Guide · kernel 4.16.1 · testnet · 2026-07-02*
+*Axona Programmer Guide · kernel 4.22.0 · testnet · 2026-07-14*
