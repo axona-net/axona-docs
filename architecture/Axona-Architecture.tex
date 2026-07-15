@@ -248,6 +248,24 @@ is XOR, compared as unsigned integers; the region byte's position makes
 same-region ids numerically close, so proximity in the keyspace loosely
 tracks proximity on the planet.
 
+The S2 cube yields 192 cells, but roughly half are open ocean or near-empty
+land where no peers live. Minting an id there would be a mistake: a topic
+anchored in empty water has no local population, so the nodes nearest its
+region byte --- a boundary sliver of the closest real region --- would absorb
+\emph{every} topic anchored anywhere in that ocean, a hotspot.\marginnote{Sim
+A/B (2{,}100 nodes, 2{,}000 ocean-anchored topics): the fold cuts peak
+per-node load $2.7\times$ and busiest-1\% share $1.9\times$.} So every id is
+minted through \texttt{canonicalRegion()}, which \emph{folds} each ocean or
+sparse cell onto its nearest \textbf{major} (populated) region --- 84 of them.
+A node in mid-Pacific and a topic anchored there both resolve to Hawaii's
+region and spread across its full node population. The fold is deterministic,
+carried in the id itself (no coordinator), and wire-compatible: every populated
+region keeps its exact byte. Regions are labelled with neutral in-range
+\emph{animal} names (\texttt{osprey}, \texttt{chinkara}, \texttt{penguin})
+rather than country names --- a country name on a border-spanning cell is
+needlessly political, and the label is presentation only (the id carries the
+numeric code, never the name).
+
 \subsection{Node identity (where routing can reach you)}
 
 \texttt{createNodeIdentity(\{lat, lng\})} generates an Ed25519 keypair
@@ -286,9 +304,11 @@ topicId = regionByte
 \noindent with the region byte resolved by rule: an explicit
 \texttt{region} wins; otherwise, if \texttt{owner} is present, the region
 is \emph{derived from the owner key} (\texttt{keyDerivedRegion}: hash the
-authorId into the list of populated land regions) so an author's topics
+authorId into the list of canonical regions) so an author's topics
 are discoverable from the authorId alone; otherwise the derivation
-throws (\texttt{TOPIC\_REGION\_REQUIRED}). Because the write policy is
+throws (\texttt{TOPIC\_REGION\_REQUIRED}). Whichever rule fires, the
+resulting byte passes through \texttt{canonicalRegion()}, so a topic can
+never be anchored at an unpopulated cell. Because the write policy is
 folded into the hash, a topic's policy is not mutable state --- a root
 recomputes the id from the signed descriptor and enforces
 \texttt{write:'owner'} statelessly.

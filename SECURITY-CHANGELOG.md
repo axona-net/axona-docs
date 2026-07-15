@@ -16,6 +16,34 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.23.0 — 2026-07-15 (testnet) — no region can be made a hotspot by anchoring topics in empty water
+
+**What's protected:** the **even distribution of load across the network**, and
+with it resistance to a cheap concentration/denial-of-service pattern. Axona
+places a topic in the keyspace by a region byte at the top of its id. Roughly
+half of the 192 geographic cells are open ocean or near-empty land where no
+peers live. A topic anchored at one of those cells has no local population, so
+the nodes responsible for it are simply the few peers nearest that empty byte in
+id space — and **every** topic anchored anywhere in that ocean lands on the same
+small set. An adversary (or just careless clients) could pile unbounded topic
+load onto a handful of unlucky nodes by anchoring in water. The kernel now
+**folds every ocean / sparse cell onto its nearest populated region** when an id
+is minted — both node identities and topic ids — so an anchor in empty water
+resolves to a real region and its load spreads across that region's whole node
+population instead of a boundary sliver. Measured in simulation (2,100 nodes,
+2,000 ocean-anchored topics): peak per-node load **2.7× lower**, and the share
+carried by the busiest 1% of nodes **1.9× lower**. The fold is deterministic and
+carried in the id itself — no coordinator, no registry. It is also
+wire-compatible: the region byte is unchanged for every populated region, so no
+existing topic or node id moves.
+
+*(This release also renames the human-readable region labels to neutral
+in-range animal names, removing country names from border-spanning cells. That
+is a presentation change with no protocol effect — the id carries only the
+numeric region code, never the label.)*
+
+---
+
 ## Kernel v4.22.0 — 2026-07-15 (testnet + production) — a topic's full history survives a change of root
 
 **What's protected:** the **completeness of published history across a root
