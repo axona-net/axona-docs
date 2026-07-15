@@ -16,6 +16,30 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.22.0 — 2026-07-15 (testnet + production) — a topic's full history survives a change of root
+
+**What's protected:** the **completeness of published history across a root
+transition**. When the node responsible for a topic (its root) changes — a
+root leaves, or a better-placed node takes over — the cached timeline
+previously split in two: the new root held the messages published after the
+handover, and the old heir held those before it. A fresh subscriber arriving
+afterward and asking for the full backlog (`since:'all'`) could be answered
+by only one side and recover half the timeline. Roots now **union-ingest** the
+history replicated to them rather than discarding it, and a subscriber
+advertises the oldest message it holds so the root **pulls forward** any older
+half it is missing. The two halves reconcile into one complete timeline, so a
+cold subscriber recovers every message published across the transition, not
+just those on one side of it. The reconciliation is **self-quenching**: once a
+node has unioned a peer's range it does not re-request it, and a companion
+hardening (v4.22.1) bounds the pull to fire once per advertised low-water mark
+so a persistently-missing tombstone cannot drive a repeated-pull storm —
+protecting the **availability** of a busy root under churn. Validated by a
+dedicated split-history repro suite (previously recovered 6 of 12 messages
+across a transition; now 12 of 12) and an overnight soak showing a flap-free
+backbone with full-timeline recovery.
+
+---
+
 ## Kernel v4.19.5 — 2026-07-13 (testnet + production) — a burst publisher's topic history survives its departure
 
 **What's protected:** the **durability of published history across a
@@ -1577,4 +1601,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-07-13.*
+*Last updated: 2026-07-15.*
