@@ -16,6 +16,28 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.24.0 — 2026-07-15 (testnet) — a topic's history survives root formation and graceful departure
+
+**What's protected:** the **availability of a topic's full, verified history**
+across the two membership events that used to lose it silently. First, a
+subscriber whose subscribe terminates at itself — making it the topic's new
+root with an empty cache — now actively **pulls the history forward** from its
+nearest peers and the lookup path before serving reads, re-verifying every
+publisher signature and honoring tombstones on ingest (the same authenticated
+union-ingest path as the v4.22 split-history reconciliation; nothing enters a
+cache unverified). Previously that empty root would answer `since:'all'` with
+nothing for as long as it held the role, while a node one hop away held the
+complete timeline — measured in the field as the dominant cause (82%) of
+unrecoverable read misses. The pull is bounded (delayed birth probe, ≤3 tries,
+fan-out 4) and self-quenching, so it cannot be turned into a request
+amplifier. Second, a gracefully departing node's **handoff of its cached
+topics is now acknowledged and retried**, with a replication fallback to the
+K-closest cohort for any heir that never confirms — a departing node can no
+longer take the last copy of a topic's history with it because one routed
+message went unanswered. Both mechanisms strengthen the network's standing
+guarantee that history a publisher signed remains retrievable, by exactly the
+peers entitled to it, without any central store.
+
 ## Kernel v4.23.0 — 2026-07-15 (testnet) — no region can be made a hotspot by anchoring topics in empty water
 
 **What's protected:** the **even distribution of load across the network**, and
