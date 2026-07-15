@@ -1,10 +1,11 @@
 # Team Update — Split-history reconciliation lands in production (kernel v4.22.1) — 2026-07-15
 
 **Headline:** the last cold-attach residual from Howard's field cluster is
-fixed, soaked, and promoted to production. Live as **kernel 4.22.1 · bridge
-2.75.0 · peer 3.51.1 (site v0.93.0)**. A subscriber that arrives *after* a
-topic changes root now recovers the topic's **complete** history, not half of
-it. Testnet and production are identical again.
+fixed, soaked, and promoted to production. Live across the whole fleet as
+**kernel 4.22.1 · bridge 2.75.0 · relay 0.51.1 · peer 3.51.1 (site v0.93.0)**.
+A subscriber that arrives *after* a topic changes root now recovers the topic's
+**complete** history, not half of it. Testnet and production are identical
+again.
 
 ---
 
@@ -67,9 +68,19 @@ did.
 
 ## Verified in production
 
-Both bridges report `kernelVersion: 4.22.1` at `/healthz` (bridge 2.75.0);
-axona.net serves the vendored kernel 4.22.1; a live publish → `since:'all'`
-replay round-trips 1/1 through the freshly-deployed bridges.
+Both bridges report `kernelVersion: 4.22.1` at `/healthz` (bridge 2.75.0); the
+9-relay backbone (3 droplets × 3 regions) runs relay 0.51.1 on kernel 4.22.1
+with all units active; axona.net serves the vendored kernel 4.22.1; a live
+publish → `since:'all'` replay round-trips 1/1 through the freshly-deployed
+fleet. The relay tier matters especially for this release: relays are the
+primary topic roots, which is exactly where the union-ingest and lw-pull
+mechanisms run.
+
+**Deploy hygiene fix found during promotion:** the prod relay droplets were
+tracking the `testnet` branch rather than `main` (stale at 0.50.0/4.21.0 —
+they had missed the point where testnet moved ahead). They now track `main`,
+so future testnet-only work can never reach production relays through a stray
+pull; promotion to the relay tier is explicitly `push testnet:main` + pull.
 
 ## Still open (non-gating)
 
@@ -80,4 +91,4 @@ replay round-trips 1/1 through the freshly-deployed bridges.
 
 ---
 
-*Live: kernel 4.22.1 · bridge 2.75.0 · peer 3.51.1 · site v0.93.0.*
+*Live: kernel 4.22.1 · bridge 2.75.0 · relay 0.51.1 · peer 3.51.1 · site v0.93.0.*
