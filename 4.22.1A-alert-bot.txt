@@ -1,0 +1,736 @@
+howardstearns@Howards-M5 alert-bot % npm start -- --regions 80                                                                                                                                
+
+> alert-bot@1.1.0 start
+> node ./index.js --regions 80
+
+10:13:38 AM 804c848c681b5506d748416c168ea01fda09a4b14b23a4797857e15e504d1cdd63 Created network node for kernel 4.22.1 region 0x80.
+10:13:38 AM 804c848c681b5506d748416c168ea01fda09a4b14b23a4797857e15e504d1cdd63 Connected 4 connections through wss://bridge.axona.net in 755 ms.
+10:13:38 AM Waiting 0 seconds before publishing.
+
+10:13:39 AM https://civildefense.io/?lat=35.96516459958856&lng=-115.50095066717604&sub=59ace8edb117a2d9911a5b76048403b713af192b1b259e544952079fbdc4256e&tags=%25F0%259F%258E%25B8%2520classic%2520rock
+10:13:41 AM https://civildefense.io/?lat=34.05134604809088&lng=-118.2466220855713&sub=65785dd50892638ed4e45df3077d4b14a19436fb0ea7214bfbcef2c381538ad0&tags=%25F0%259F%258E%25BC%2520classical
+10:13:42 AM https://civildefense.io/?lat=38.5019160992132&lng=-122.9974901676178&sub=463226c416a955093f01529ac3122122731a1c9403e001f2f09e60e98308114b&tags=%25F0%259F%25A4%25A0%2520country
+10:13:43 AM https://civildefense.io/?lat=36.16626134331835&lng=-115.15012048956368&sub=ba9f992adf7bf116dbcd6d9be685def1aa6ec0ecb907e3cbfce19ac0a4aa2eef&tags=%25F0%259F%258E%25A7%2520edm
+10:13:44 AM https://civildefense.io/?lat=36.600682171913725&lng=-121.87685843403946&sub=dff3ceb6efc14d3ac426a3140017095633573ed735275715e394efb1432042cd&tags=%25F0%259F%258E%25B7%2520jazz
+10:13:45 AM https://civildefense.io/?lat=33.78116952791262&lng=-118.1055110692978&sub=2fe20111add8e3845f5451765ae1b25713403675119c92d1910883d46acea4f0&tags=%25F0%259F%258E%25B7%2520jazz
+10:13:47 AM https://civildefense.io/?lat=36.59110826888709&lng=-121.86343631404624&sub=1e4ff2376f730b748b430d7ddf0c7ba5bb05c4b5858c58d1dd5c0e329895905f&tags=%25F0%259F%258E%25B7%2520jazz
+10:13:48 AM https://civildefense.io/?lat=34.05589721073465&lng=-118.24284553527832&sub=8458109297c0ee749cc64a3201d9768ebeb749e294404b1d1be474f3c63e33cb&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+10:13:50 AM https://civildefense.io/?lat=37.77462410180895&lng=-122.45304680084638&sub=143e0a872604b7d34f915d3d589f00c0d6a1f5a758577df89c69e832190d0242&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+10:13:51 AM https://civildefense.io/?lat=38.34974582619075&lng=-120.77500909566882&sub=44805451cf967dae5baaf139b79464f3040da6cb82af9c2b61703122b1433da5&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+10:13:52 AM https://civildefense.io/?lat=32.642665651234104&lng=-115.47463417053224&sub=fe0a540d27295f17d0c332fde55282a2ab773ff133640271040a060aadb0b1ad&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+10:13:54 AM https://civildefense.io/?lat=38.54472849828922&lng=-121.5087890625&sub=d79cc27a835667618065db08a8d64e5f8ebd5ec2afcda64f60af3085eba88a5c&tags=%25F0%259F%258E%2599%25EF%25B8%258F%2520news
+10:13:55 AM https://civildefense.io/?lat=32.64213037169736&lng=-115.47763824462892&sub=f874260f768faa2e871677751a2866f77e73c5426cc6cc356fc4c8e8f8b05fee&tags=%25F0%259F%258E%25B5%2520pop
+10:13:56 AM https://civildefense.io/?lat=32.533721180216965&lng=-117.02035903930664&sub=c13f16368ccce0557e0ae217c2961508f8f3d2066be0fed109ecabdef83ae5db&tags=%25F0%259F%258E%25B5%2520pop
+10:14:01 AM https://civildefense.io/?lat=32.53314228463888&lng=-117.01898574829104&sub=a282d1e6d3a7a19411b40193d1a0aac9a50e8b5d9de2e9623b24f9d3cdb79777&tags=%25F0%259F%258E%25B5%2520pop
+10:14:04 AM https://civildefense.io/?lat=32.53227393427615&lng=-117.0176124572754&sub=6613ad6cef21178eef6f4316fbc852a0bacbb0add2e474f67e2c764db4297bbe&tags=%25F0%259F%258E%25B5%2520pop
+10:14:10 AM https://civildefense.io/?lat=33.74623838508807&lng=-117.82613754272462&sub=1988ae94ee2fa596b27e7e2357acc05ee0dee43f26784435337177821f47ee62&tags=%25F0%259F%258E%25B5%2520pop
+10:14:40 AM https://civildefense.io/?lat=31.867464714798444&lng=-116.60279273986818&sub=1ede3e2db80a302b6fc28ce0bdb056caa6b836a7ec4fd03ed689bf814a5d7d44&tags=%25F0%259F%258E%25B5%2520pop
+10:14:48 AM https://civildefense.io/?lat=32.50266811708983&lng=-116.96791648864748&sub=943e1ac47755810d00192799a4315b9c34999ccecc67d4cce5508d0d85a0f672&tags=%25F0%259F%258E%25B5%2520pop
+10:17:43 AM https://civildefense.io/?lat=32.62419552674645&lng=-115.44116020202638&sub=a2164f73d4510f4d8e989aa0236c593fe2919679fddaaf5cb300397b17b42744&tags=%25F0%259F%258E%25B5%2520pop
+10:17:47 AM https://civildefense.io/?lat=31.86711733073316&lng=-116.60420894622804&sub=8f83ae7d456dbdccc3611695d89594887b9abad5930491ce057a44311e3dccd3&tags=%25F0%259F%258E%25B5%2520pop
+10:17:53 AM https://civildefense.io/?lat=37.453500359600035&lng=-122.27911949157715&sub=7a1e073037afe48dcd19b53c537db5d1f650c1552538bd090e13bfaa47e92c2c&tags=%25F0%259F%2594%25A5%2520fire
+10:17:57 AM https://civildefense.io/?lat=37.464503586118525&lng=-122.2788190841675&sub=fe0665b680221f17e870dba44178433c1d84c84f6217d71a059e9e41d9d64cac&tags=%25F0%259F%2594%25A5%2520fire
+10:18:02 AM https://civildefense.io/?lat=37.46777358281261&lng=-122.27748870849611&sub=3deca964c30fb5ac7728071f55ab47f75db9b6cec5fd85d1478e024e8cdede80&tags=%25F0%259F%2594%25A5%2520fire
+10:18:07 AM https://civildefense.io/?lat=37.471626715651524&lng=-122.271526157856&sub=901124c6d7d8337346c1bc3368a05d15c91590194cc76c23b729b65350d4e39d&tags=%25F0%259F%2594%25A5%2520fire
+10:18:12 AM https://civildefense.io/?lat=37.472563358818114&lng=-122.26354122161867&sub=8fa60f945e48ef09a83d5c032a00bc19bb8587cd07aebaac92005ef2eda58ce3&tags=%25F0%259F%2594%25A5%2520fire
+10:18:18 AM https://civildefense.io/?lat=37.47179275779608&lng=-122.26040840148927&sub=c8c11d783ed8fde209c6004a4d100aa20dab87865965a63f87f1025043e05593&tags=%25F0%259F%2594%25A5%2520fire
+10:18:22 AM https://civildefense.io/?lat=37.467603274015495&lng=-122.26244688034059&sub=8a1c68aa784bbb74427a066a78ca847334b8701355d4f48c68f8575e2e3c0044&tags=%25F0%259F%258C%258A%2520flood
+10:18:26 AM https://civildefense.io/?lat=37.48380854647693&lng=-122.24404960870746&sub=dfbb887a3f79bf193d34bc3fc351501ddd1b72cf69550fd91a244dce49484811&tags=%25F0%259F%25A7%258A%2520ice
+10:18:28 AM https://civildefense.io/?lat=37.482867787390276&lng=-122.24594324827197&sub=e7b97143c4601d0c256c40a0d647d36438aca4434dbbb735c48760b00204bec2&tags=%25F0%259F%25A7%258A%2520ice
+10:18:30 AM https://civildefense.io/?lat=37.48134594614139&lng=-122.24717438220979&sub=cfd18029da33619cdcbc0e80162c665496ce439b4ccb559a07d46df0f3ba68f4&tags=%25F0%259F%25A7%258A%2520ice
+10:18:31 AM https://civildefense.io/?lat=37.48033278708841&lng=-122.24909484386446&sub=55070b54ea72d4fb1c15519a6189f198eb456c6ef6ef3c0c6331a9e2103aa28a&tags=%25F0%259F%25A7%258A%2520ice
+10:18:41 AM https://civildefense.io/?lat=37.47896627769895&lng=-122.25022137165071&sub=ce5fc3ac7a54c32d667b19668341c43a6d9b568c6f59ef88306b472e4bbae9e2&tags=%25F0%259F%25A7%258A%2520ice
+
+10:18:42 AM Deleted 0 previous publications and then posted 33 alerts with 706 publications in 370 topics, in 304,649 ms.
+10:18:42 AM Waiting 0 seconds before disconnecting the publishing node.
+roots: [
+  '804f2ecdff320496c1891ca41e7507d83774bc1094c31355068ff57e0abe680d9d',
+  '8049fea460fb279a79b6ac8997d70b42a1fcfb0ec58defdab648636aefcc5dbd30',
+  '804dcc004dd2047972a6f530490388b72a77e43ee71d399400762c649cf1e5db1a',
+  '804c14ab23ed27afb59a8ca8bac234b70605869e0a4f66686d6caaf3f9d2068b06',
+  '8049d2f99445169f6d8ee0f6f19c257abf6e866210f6b14ecff5a9d922ce479ed6',
+  '8048a1f7dd5562f62bc97ec7d829aa5d4fb81182f86e8db120bb3d47032398d7ab',
+  '805e20690fa7102d649272f73c3235e1aa3acb2a9757077f8a8dd88854270236c8',
+  '805b8540826a23614c73c1e8e3d99aea617a4da3f2e05677c27881b8dc4f061645',
+  '804d8b89e475aae6db28282507656647b1a5900bd73278fb1b4c79b13dd026d513',
+  '804da30a9316c018589aaf71e925fb6c9f95d592b8daf4e469d1634178c57a2705',
+  '804c1e548538e0935755c10a7a1a76eceb9a9df27da5fae8bd7c8b8a4b79a09ae1',
+  '804c0e54543bb2edc5191e1bdf9ef3c9b196d2b96fe79b554177aab41d377c2158',
+  '8058999ea566e3e8284cffb9918f2131e85177608a378542091c18fa59b9f18437',
+  '804b4eed44427073da87803a3979eafcaff1e65ebb26c187ed2419beb22123b67e',
+  '8058650e9d3efa122f9a6d93ca66e384da997f9274efa886992936052eb6ffd8b2',
+  '805c74a471a2af861e64776377d877b7f1bee64bcc6088615e3efe8c8a88df6893',
+  '805a8811b25a71703829f205081caf13444220a919cf9e54d0d447873459d27b96',
+  '804968a08021a8dc03afde651a6bd15f7f33c02526e8741f025d342dc40bc2f56e'
+]
+10:18:47 AM 804c848c681b5506d748416c168ea01fda09a4b14b23a4797857e15e504d1cdd63 disconnected with 10 connections and 470 axons.
+
+10:18:47 AM Waiting 0 seconds before creating new node to confirm delivery.
+10:18:48 AM 8054b83a6a28292f4a80550990d323e665f6458a8779eac37f76a47eb50a0e9752 Created network node for kernel 4.22.1 region 0x80.
+10:18:48 AM 8054b83a6a28292f4a80550990d323e665f6458a8779eac37f76a47eb50a0e9752 Connected 4 connections through wss://bridge.axona.net in 904 ms.
+10:18:48 AM Waiting 0 seconds before subscribing with this new node.
+10:18:48 AM Subscribing to 370 topics.
+10:18:48 AM Waiting up to 65 seconds for subscriptions to fire.
+10:19:54 AM FAILED to receive all events.
+10:19:54 AM Topic {"name":"civildefense.io:4:9279860202646011904:classic rock","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9295429630892703744:classical","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9260561162238427136:country","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9260561195188879360:country","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9279882055439613952:edm","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9279882094094319616:edm","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9279882095168061440:edm","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9263310697222111232:jazz","region":128} published 2 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9263311002164789248:jazz","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9263311005050470400:jazz","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9281918832010592256:jazz","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9285578006707830784:jazz","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9285648375452008448:jazz","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9285628859120615424:jazz","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9285628786106171392:jazz","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9285628785032429568:jazz","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9281918832010592256:news","region":128} published 2 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9278193686615687168:news","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9278196985150570496:news","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9278196227692822528:news","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"8458109297c0ee749cc64a3201d9768ebeb749e294404b1d1be474f3c63e33cb","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9263904433501110272:news","region":128} published 3 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9260526733780582400:news","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9260953344292159488:news","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9260956642827042816:news","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9260956986424426496:news","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9260956980250411008:news","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9260956980451737600:news","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9284025496289411072:news","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9284024121899876352:news","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9266949028443062272:news","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9277415232383221760:pop","region":128} published 9 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9284023970703605760:pop","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9285507637963653120:pop","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9285525230149697536:pop","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9285538218130800640:pop","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9285538269670408192:pop","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9284326240368459776:pop","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9284013126783598592:pop","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9295429630892703744:fire","region":128} published 6 but received 5!
+10:19:54 AM Topic {"name":"civildefense.io:4:9263622958524399616:fire","region":128} published 6 but received 5!
+10:19:54 AM Topic {"name":"civildefense.io:4:9263800512472416256:fire","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9263802178919727104:fire","region":128} published 2 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9263803089452793856:fire","region":128} published 2 but received 0!
+10:19:54 AM Topic {"name":"c8c11d783ed8fde209c6004a4d100aa20dab87865965a63f87f1025043e05593","region":128} published 2 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9263803278431354880:flood","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9263803278431354880:ice","region":128} published 5 but received 10!
+10:19:54 AM Topic {"name":"civildefense.io:4:9263801285566529536:ice","region":128} published 4 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9263801305699188736:ice","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"civildefense.io:4:9263803058314280960:ice","region":128} published 1 but received 0!
+10:19:54 AM Topic {"name":"26fc57fa-3c7a-43d0-81dc-539b88536db3","region":128,"owner":"5a12889c94e14b4e7bff94824685a666e11747ceea6a68a53b81cd0631312d1b"} published 2 but received 18!
+10:19:54 AM Topic {"name":"public:4:avatar-5a12889c94e14b4e7bff94824685a666e11747ceea6a68a53b81cd0631312d1b","region":128,"owner":"5a12889c94e14b4e7bff94824685a666e11747ceea6a68a53b81cd0631312d1b"} published 1 but received 0!
+10:19:54 AM Topic {"name":"public:4:handle-d9980054573d559bd65459426a2ffd64ac384fb9de5fa2d2eb1334f1dbd9ab20","region":128,"owner":"d9980054573d559bd65459426a2ffd64ac384fb9de5fa2d2eb1334f1dbd9ab20"} published 1 but received 2!
+10:19:54 AM Topic {"name":"public:4:avatar-d9980054573d559bd65459426a2ffd64ac384fb9de5fa2d2eb1334f1dbd9ab20","region":128,"owner":"d9980054573d559bd65459426a2ffd64ac384fb9de5fa2d2eb1334f1dbd9ab20"} published 1 but received 0!
+10:19:54 AM Topic {"name":"public:4:handle-66ae6f79c7458e5393c2d80c3cb6dabf614e3e7085dbfd3dd388d5a4d0b5171b","region":128,"owner":"66ae6f79c7458e5393c2d80c3cb6dabf614e3e7085dbfd3dd388d5a4d0b5171b"} published 1 but received 4!
+10:19:54 AM Topic {"name":"public:4:avatar-66ae6f79c7458e5393c2d80c3cb6dabf614e3e7085dbfd3dd388d5a4d0b5171b","region":128,"owner":"66ae6f79c7458e5393c2d80c3cb6dabf614e3e7085dbfd3dd388d5a4d0b5171b"} published 1 but received 3!
+roots: [
+  {
+    topic: '8052cc07e038b124f611b525e236dd263406ad914b10eae6334c283c8cd4f35c11',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80424d613c7174cdbdf591a669ad4bf4213e9cfcf9ee08d4fbea614132dc308033',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '804f2ecdff320496c1891ca41e7507d83774bc1094c31355068ff57e0abe680d9d',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '8045285f5d9e2cb57b3b656d6b5976cf04b199aa7afb6d4d85af05ba657393f0d4',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '8049fea460fb279a79b6ac8997d70b42a1fcfb0ec58defdab648636aefcc5dbd30',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80563b7d3e4ed14166d14987676adfde218a8a3bce335feb61049af9dcb4987210',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '8044e330e777058cc5339975091316656751cb3322870363dcddfd0631823d7afd',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '804dcc004dd2047972a6f530490388b72a77e43ee71d399400762c649cf1e5db1a',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '804277fcc139429c63f3df3a2f1ddaa084b38200321dce755555c1e7cd62c4cfde',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80419202c8f2c9650b0f1049d0538b18c1230b0935e36aff8ce49820cb37fd2af9',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '804c14ab23ed27afb59a8ca8bac234b70605869e0a4f66686d6caaf3f9d2068b06',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '8049d2f99445169f6d8ee0f6f19c257abf6e866210f6b14ecff5a9d922ce479ed6',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '8055024ba6bddf05184d03fd0919827f6f0a3f1056454b2c57e5528a25c7a42ee2',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '8048a1f7dd5562f62bc97ec7d829aa5d4fb81182f86e8db120bb3d47032398d7ab',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '805e20690fa7102d649272f73c3235e1aa3acb2a9757077f8a8dd88854270236c8',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '804443971b0d14f11950a1aba00cb760f0c02daf51acb67aa0f0dc1959094de0b8',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '805b8540826a23614c73c1e8e3d99aea617a4da3f2e05677c27881b8dc4f061645',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '8042e1b88fefb4d95e3ab39dde995e44a446daa5523b1ea32e0517622f39073827',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '804d8b89e475aae6db28282507656647b1a5900bd73278fb1b4c79b13dd026d513',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '804198b41c514014320c0df0988da8953a404ab0e85cfa4b56a19f0faa0cb9846c',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '805170087421b8bbbb39af2e5f6edbe288f27454d4dfe0a100a4eed0ba3eef12c0',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '804da30a9316c018589aaf71e925fb6c9f95d592b8daf4e469d1634178c57a2705',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '8041db3d78b8752b5f412f675f48acf9ebcedce2d314eda4d443883023cd03d27a',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '8053992793f9a51d315644ff81d7e3aa24ac62ea12d7f9fccbdb5eadafa273e52f',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '805304c9b287c341dbf1b4c4e623478c71c3377e25029457f1d3605498a4982d53',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '804c0e54543bb2edc5191e1bdf9ef3c9b196d2b96fe79b554177aab41d377c2158',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '805358e52d777b9a14f33edea4a0a327fd170ff2537af6495e682c17e0450b73a7',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '8058999ea566e3e8284cffb9918f2131e85177608a378542091c18fa59b9f18437',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '804b4eed44427073da87803a3979eafcaff1e65ebb26c187ed2419beb22123b67e',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80553f22f4eac5ce9fb3b003ab8f9ceaf49e29711317fa0e0f358137895a244d34',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80442d23480d2d6964ce1bff5d5d0f00a1daf15e82483a842547e0e217d506ce24',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '8047be6d506379bac1c929fab100ec2bab0549c07b234b1f1720f26791c8d4fe3e',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '8058650e9d3efa122f9a6d93ca66e384da997f9274efa886992936052eb6ffd8b2',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80506d8851c7b0ea84004e0212df7c40e37424377b1f1e3a8f35c0b664eec5c67f',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '805c74a471a2af861e64776377d877b7f1bee64bcc6088615e3efe8c8a88df6893',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80545062ed3eb9c051f075c7e24e2ca41c20d1678097b9970f2de0e6f56982db81',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '805a8811b25a71703829f205081caf13444220a919cf9e54d0d447873459d27b96',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '804400110aeee05ff655d2e0d3b7c2460a351b03b9197a500be99027d1950b0dc1',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '8040152d2de71b45da548a49e601c77c3f234652dce417ba63e1c5f9d0c9b98ff8',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '804968a08021a8dc03afde651a6bd15f7f33c02526e8741f025d342dc40bc2f56e',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '8054f8f2d592a7c98a849ba6434a2c3bc8f5d219edcf3f4302bdb82740e641d7c7',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80d622e64592676fafa7dc2d8528a13ff963f9016b52ecbba3e0637e64a87809eb',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80dded0b31292e02722e75f3bb7e8365b1e0f61b7e39b942b553356fb92e95da39',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80debfc05094d5561ed2e959ea414bb381c83385dea0acb33c991271a6e1a9ca18',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80df10e25f541ed420dce2db8be1fc9fd8acebe1c3595e08d85f029127fdc506e8',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80d03af3e96367bef8740584aa36d6c90fb9396c742221efb464dbadfdb0bf959c',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80d287e46d418a7aef3ee8e15cb5fb8c2287340ba1ee681ffe03491dbc46fc0fa6',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80de8270ad9e73668f0cdae9faf19d1c3569f62fcf6cb0bc92c53f5af026edc6a4',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80d3fccda59e1f6c33adcf53d73558f84fc7c4240bef2426547cbf52d886bff547',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80dd2b4033e82619580d0fd5cfe0b5fb83728162a55f4d675606c918a66cdbf817',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80d3b0f4568ca2b9565ece0839aff91ce82538082ff85f9764ff0c2d2652279dc5',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80db5269fa9a20181b7a725827a7f77b217f8f1abae9a17d59a7c7adee73e44fc4',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80d05e4796ffe8cbe32c7e35d7d6a85c6e082e21c6e867f954405ae5a34a52482d',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80dc0be5f5a4a4d0806ead45a34559636b0bb8ecf10506a71d6f95ae70f8273ec7',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80dc763129b6e982a3b87802959c8d580c2bcdc1f8aa5eb3566586727845c4cd44',
+    isRoot: true,
+    children: 0,
+    cacheSize: 7
+  },
+  {
+    topic: '80dd4dd94da6b247ef977da55e154decf87c483be572a47c21cfc8965a57d059a7',
+    isRoot: true,
+    children: 0,
+    cacheSize: 3
+  },
+  {
+    topic: '80d8e57ecf2b5317f057c754ec034524096db00dd401c5aad3edcb5281023e1eae',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80d5a5c528cb2786797f6a120f85378bfb95ce5910f9b2c97088e59dd298cb1afc',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80d25a320a69c234fe4a84c68efaf3e30c27f8fb7a727b96979a88d4d655ac21b2',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80d7a6e04886d12d702a2e76d687fd41f32edd8ed9e631c54236d9c5e3d489dd73',
+    isRoot: true,
+    children: 0,
+    cacheSize: 2
+  },
+  {
+    topic: '80de71a6a19dd029c4b9bde6e3ded3bdf196d6c7c8e589ff25ce9440fe52170cca',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80d94f85dc58499c742cf2b90986c91f021f15a9734ff8a07c15dc18b85be0cb9b',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80dc4e47e00418b5ef8acc91794b1ba1547e7cb8f44f60cf316a9eaec0dedd908c',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80d276f4593e2556b9e333b7e6e585ad9dd3f993a11c8d7d874840153070c31859',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80d41dd286980ca7bf0823b5e87de60d61f602443931a3790567176aa38d81c5aa',
+    isRoot: true,
+    children: 0,
+    cacheSize: 2
+  },
+  {
+    topic: '80ddbb453715f2a267446917adcc13a82c4d8b24475dad6a83f980c8acef079039',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '8051553f0d4689c3b58087c683a72b78da4810577b869e0074291c0193ccc31326',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80de880f89581535c673acefe9fccab6b9c5b74fbc95706f24ae44ab7a42af372b',
+    isRoot: true,
+    children: 0,
+    cacheSize: 43
+  },
+  {
+    topic: '80db55a0d90de37fedfc079e12bd458f9a79b76a54141f1f7d35b4d79ed5cc7d07',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80d55a9270d4c9a74d2267d61ee5cad0e04a1a4b96242e23a8acbf866eab5ac0fa',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80dfeb19c1969cea78b9e298bd84f3e6cfec204d113cd6f0e73a570a953436e3dd',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80dc0a281220274c133b0956d5f77c36ae73434c56fab243fb8bae1cb5889b7509',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80d2b82583a1e70cdd3d4d729bd57b025afeaf4ed07dea77c5879759f1b653bbb2',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80d1761587461034fa73e73c645bd9467cb1da77b03ed67353533cb16584c93ce3',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80ddf9948e8caf5ffa03c9d610882c34e554b66286bca84077853cc2422d1c827b',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80da723099fb209faabf30ffd83bc81ee07647f062dfc0c70aaff38223fde9c9a5',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80d55a9f7c1dddbc2a44272529b38a95db43ad2c8c6857151323ca6450ada2cb68',
+    isRoot: true,
+    children: 0,
+    cacheSize: 12
+  },
+  {
+    topic: '80d4591bad6a8ac591d5ec82eb09f8f20e0efcaaf271ddb148722bf3cf48da1158',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80dbf0cffd6c94541958e78d104e2aa5eea43d2cdd89725cde09fcf7a69d6f476c',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80d0e24ee3fb9cae39faddd5215fc68d107b03fb1ce60e611fce389969b8e7d72a',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80d43edfdbf50c35e39af5d8a0ea89e7e6f34b478c844315a26efd5f4ebd32381d',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80d6695f348725a7eaf95647d12c4b798c032181accfa95e64b629074eb6cd5735',
+    isRoot: true,
+    children: 0,
+    cacheSize: 4
+  },
+  {
+    topic: '80d8e48b0f2d234b4b22fa3fcbce017eb66adac09a52cb094930e744d31b299dd4',
+    isRoot: true,
+    children: 0,
+    cacheSize: 2
+  },
+  {
+    topic: '80d27d5614927564d202a20590e404c962c8df68228765bd9f2e51fa310ba87010',
+    isRoot: true,
+    children: 0,
+    cacheSize: 3
+  },
+  {
+    topic: '80db4f687dd6722b1680226d2fb8652259cdeb84773484be43fc3b2f5b9d734454',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80dbcf4a95e613ed69f2d0cf29f8068abfd7aa8f996feea001c5f9cb2e4ff7c65c',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80d6acd10c8396b612f2086611ca5d5b37ee21b1b15b0ca5cd500e45e14ffe82fd',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80dc5c326be7dea172d043cfb912e80052e022892bd57197b071dd2f3391d719e6',
+    isRoot: true,
+    children: 0,
+    cacheSize: 0
+  },
+  {
+    topic: '80d15ce0bbfd386a0e64e92a88b84ec70010f5c7bf398833d8cfe6fde28ce8300e',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80d8b71a5704cc4aff11189a689f96440d43d70653bc4c2f029bd50ac0c20ff262',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80d59972adb6b73b4e89a91aaa64baa91191f60430ce82dbb3a32dec3f9b555902',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80e39304e7477db0f9101e52b68797bc160216c3d48db72afb32cf6c4744ba039d',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80bc696f9b5355fdcbc844e3bda2b0f650257d9c97992a00e035ecca39dce50df5',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80f5c31efb17f1679569c86c9c2f8957c6c4f6b510de4785f686365438ed0aff6c',
+    isRoot: true,
+    children: 0,
+    cacheSize: 6
+  },
+  {
+    topic: '80c488ee3fbcc8f0223b2e5a0f3a656f248f6973e1f465c5ff2700456fba341f12',
+    isRoot: true,
+    children: 0,
+    cacheSize: 6
+  },
+  {
+    topic: '80cdc5eda2de18b265f46fc76af643adee79ffc91827a036b7635300de042ea6b9',
+    isRoot: true,
+    children: 0,
+    cacheSize: 4
+  },
+  {
+    topic: '80b52642444e48df50f7cbc9a6ebc44e14bf5583161418433d93dc14dbd7e98e2a',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80c61935e3ea6c548bb8ae27bf3764a915c1557069ddfa503d47474883656a42d3',
+    isRoot: true,
+    children: 0,
+    cacheSize: 2
+  },
+  {
+    topic: '80b7a522e9b0194f2d2ed7dfe36f94555e0a4b842fe46e20da65e8ba9e6f50feb2',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  {
+    topic: '80f897a563363a76498ef09122f2826eb2b42908ea37c86830a9249ead65fde46c',
+    isRoot: true,
+    children: 0,
+    cacheSize: 1
+  },
+  ... 19 more items
+]
+10:19:54 AM 8054b83a6a28292f4a80550990d323e665f6458a8779eac37f76a47eb50a0e9752 disconnected with 10 connections and 702 axons.
+10:19:54 AM Done.
+howardstearns@Howards-M5 alert-bot % 

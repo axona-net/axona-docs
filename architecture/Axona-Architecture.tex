@@ -69,8 +69,8 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v4.21.0 \quad 2026-07-13\par}
-{\footnotesize\itshape describes kernel 4.21.0 as deployed on testnet;
+{\small An Axona Architecture Note \quad v4.24.1 \quad 2026-07-16\par}
+{\footnotesize\itshape describes kernel 4.24.1 as deployed on testnet;
 written for human readers and AI implementers alike\par}
 \end{center}
 \vfill
@@ -185,6 +185,20 @@ retried idempotently rather than acknowledged; caches converge by
 anti-entropy rather than consensus. The protocol has no leader, no
 quorum, and no distributed lock anywhere.
 
+The bet has a boundary, and the boundary was paid for in
+production:\marginnote{The 4.24.0 release let a departing node plant
+replica state on its cohort as a durability fallback --- locally
+reasonable, and it collapsed the testnet backbone twice in one night.
+The post-mortem is Kernel-Refactor-Analysis v0.2 \S1.} the optimism
+applies to \emph{claims} --- statements that evidence can cheaply
+revoke --- never to \emph{standing state}. A wrong claim costs its
+holder one demotion; wrong standing state costs whoever must maintain
+or evict it, forever if no one does. So claims are optimistic, but
+state obeys two laws stated as invariants below: it is bounded by
+demand, never by churn history (I-10), and it may be planted on
+another node only by a principal alive to maintain it (the
+principal-liveness rule, \S\ref{sec:pubsub}).
+
 % =====================================================================
 % III. THE STACK
 % =====================================================================
@@ -217,11 +231,11 @@ as the concept map of this document:
 Module (\texttt{src/pubsub/}) & Lines & Owns \\
 \midrule
 \texttt{AxonaManager.js} & $\sim$500 & fa\c{c}ade: state, public API, routing egress \\
-\texttt{wireHandlers.js} & $\sim$700 & routed handlers + axon-tree mechanics \\
-\texttt{repairPlane.js} & $\sim$400 & the tick scheduler, retries, replication, departure \\
+\texttt{wireHandlers.js} & $\sim$760 & routed handlers + axon-tree mechanics \\
+\texttt{repairPlane.js} & $\sim$550 & the tick scheduler, retries, replication, departure \\
 \texttt{rootElection.js} & $\sim$290 & beacons, root hints, self-verification, liveness \\
 \texttt{rootClaim.js} & $\sim$240 & the \texttt{isRoot} state machine (\S\ref{sec:roots}) \\
-\texttt{constants.js} & $\sim$170 & every tunable + wire types (\S\ref{sec:timing}) \\
+\texttt{constants.js} & $\sim$210 & every tunable + wire types (\S\ref{sec:timing}) \\
 \texttt{topicStore.js} & $\sim$150 & cache, tombstones, exactly-once app delivery \\
 \texttt{envelope.js / post.js / kill.js} & --- & signing, canonical form, ids \\
 \bottomrule
@@ -428,7 +442,7 @@ Two version axes ride the hello frames. \texttt{WIRE\_VERSION} (currently
 \texttt{4.0}) partitions hermetically on its major --- wire-3.x and
 wire-4.x reject each other at both the bridge gate and the peer-peer
 handshake, because 4.x changed convergence and replay semantics.
-\texttt{KERNEL\_VERSION} (currently \texttt{4.21.0}) is informative and
+\texttt{KERNEL\_VERSION} (currently \texttt{4.24.1}) is informative and
 surfaced at every runtime surface (healthz, welcome, UI) --- an
 observability rule, not a gate; wire-compatible kernels interoperate
 freely, and deploys are staggered on exactly that property.
@@ -487,7 +501,7 @@ Pub/sub message types (normative; payload schemas in
 \toprule
 Type & Routed toward & Meaning \\
 \midrule
-\texttt{pubsub:sub} & topic (or via) & subscribe / renew; carries since, hw \\
+\texttt{pubsub:sub} & topic (or via) & subscribe / renew; carries since, hw, lw \\
 \texttt{pubsub:unsub} & topic (or via) & explicit unsubscribe \\
 \texttt{pubsub:pub} & topic (or via) & publish; unstamped envelope \\
 \texttt{pubsub:deliver} & subscriber & stamped messages (and del markers) \\
@@ -495,7 +509,8 @@ Type & Routed toward & Meaning \\
 \texttt{pubsub:pullup} & holder & ``you are ahead of me --- replay up'' \\
 \texttt{pubsub:replayup} & parent & stamped cache delta, upward \\
 \texttt{pubsub:handoff} & heir & departing root pushes history \\
-\texttt{pubsub:replicate} & cohort member & root pushes cache+tombstones \\
+\texttt{pubsub:handoffack} & leaver & heir confirms receipt (quenches retry/fallback) \\
+\texttt{pubsub:replicate} & cohort member & \emph{live} root pushes cache+tombstones (or empty keepalive) \\
 \texttt{pubsub:rootbeacon} & neighbours & soft-state root advertisement \\
 \texttt{pubsub:kill} & topic (or via) & signed retraction \\
 \texttt{pubsub:pull} & topic (or via) & one-shot read; \texttt{pullresp} returns \\
@@ -537,14 +552,47 @@ there are no direct pub/sub connections, no root sets, no K-closest
 fan-out at publish time. One rule generates the whole design: \emph{the
 peer where a topic-addressed message terminates acts for the topic}.
 
-\subsection{Roles and per-topic state}
+\subsection{Roles, natures, and per-topic state}
 
 A peer holding any responsibility for a topic keeps a \texttt{role}:
 \texttt{\{topicId, isRoot, subscribers (map subHex $\to$ \{since,
 lastRenewed\}), children (set of child-relay ids), cache (ascending by
-stamp), tombstones, replicas, seq, lastTs, metricsOn\}}. \texttt{isRoot}
-is the root-claim state machine's state and changes \emph{only} through
-it (\S\ref{sec:roots}).
+stamp), cacheIds, tombstones, seq, lastTs, replicas, replSig,
+replLastFull, backupOf, lastReplicaAt, pulledLw, probeTries, probeAt,
+metricsOn\}}. \texttt{isRoot} is the root-claim state machine's state
+and changes \emph{only} through it (\S\ref{sec:roots}); the remaining
+fields are the convergence plane's per-topic memory
+(\S\ref{sec:pubsub}, ``Convergence'') --- each is named where its
+mechanism is described.
+
+A role acts in exactly one of four \textbf{natures}. Each nature
+carries \emph{obligations} (work the node performs while in it) and a
+named \emph{eviction path} (how the role ends). This table is
+normative, and its discipline is invariant I-10: standing state
+without an evictor is a leak; obligations without a live principal are
+a storm.
+
+\begin{table*}[h]
+\scriptsize
+\begin{tabular}{@{}llll@{}}
+\toprule
+Nature & Marked by & Obligations & Evicted by \\
+\midrule
+ROOT & \texttt{isRoot} & stamp, beacon, verify, replicate, serve & demotion / idle sweep \\
+CHILD & in parent's \texttt{children} & renew upstream, re-fan down once & subscriber loss + idle sweep \\
+BACKUP & \texttt{backupOf} set & hold warm copy; subscribe as election standby & principal gone + re-homed + 60\,s \\
+HOLDER & hosted / app-subscribed & renew; advertise \texttt{hw} & unhost / unsub / TTL \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+The natures compose (a HOLDER may be ROOT; a BACKUP is also a CHILD
+while its principal lives), but every write of a role onto a node must
+identify which nature it creates and therefore which evictor applies.
+The one production collapse this system has suffered was precisely a
+nature nobody had modeled --- a BACKUP whose principal was already
+gone, created by a departing node, whose subscribe obligation ran
+forever with no eviction path in sight (\S\ref{sec:invariants}, I-10).
 
 \subsection{Subscribe: attach, renew, re-home}
 
@@ -603,33 +651,101 @@ idempotent throughout because roots dedup by msgId. Cold publishers
 (\S\ref{sec:timing}) --- each send both integrates the newcomer and gets
 a fresh shot at the true root.
 
-\subsection{Durability: cohort, replay-up, handoff}
+\subsection{Convergence: one operation, many policies}
 
-Three migration paths keep history alive, and every one carries
-tombstones alongside bodies (invariant I-8 --- migrating a cache without
-its deletions resurrects killed messages):
+Everything that moves topic data in this system is \emph{one operation}
+wearing different policy: $\mathrm{sync}(a, b, T)$ --- \textbf{make two
+nodes' views of the topic's stamped set converge}. A view is summarized
+by four numbers already carried on the wire: message count, high-water
+(\texttt{hw}, newest stamp), low-water (\texttt{lw}, oldest stamp), and
+tombstone count. Two views whose summaries match exchange nothing ---
+the universal quench. The transfer rides the existing verbs
+(\texttt{deliver}, \texttt{pullup}/\texttt{replayup},
+\texttt{replicate}, \texttt{handoff}), and the ingest side is a single
+function regardless of which verb delivered the bytes: re-verify every
+author signature (B-4), dedup by msgId, apply tombstones \emph{before}
+bodies (I-8), never re-stamp (a timestamp once assigned is never
+reassigned), and yield to the event loop every 16 messages so bulk
+adoption cannot starve liveness (I-11).
 
-\begin{enumerate}
-\item \textbf{Cohort replication} --- each root pushes its full
-  cache+tombstones to its 2 topic-closest reachable non-bridge peers
-  (\texttt{pubsub:replicate}), every tick and eagerly on every stamp and
-  kill. Receivers become \emph{backups}: warm, verifying copies that
-  also subscribe toward the topic like ordinary child relays --- so on
-  root churn, \emph{election is just subscription}: the closest backup's
-  renewal terminates at itself and it promotes with the history already
-  in hand; the rest re-home under it. Idempotent full-state push doubles
-  as anti-entropy: co-holding roots converge to the union.
-\item \textbf{Replay-up} --- a root behind a cache-bearing attacher
-  (\texttt{hw} says so) pulls the difference up
-  (\texttt{pullup}/\texttt{replayup}) and adopts it \emph{without
-  re-stamping} (a timestamp once assigned is never reassigned), advancing
-  \texttt{lastTs}/\texttt{seq} so new stamps continue above.
-\item \textbf{Graceful handoff} --- \S\ref{sec:lifecycle}.
-\end{enumerate}
+The policies --- who syncs with whom, and when:
+
+\begin{table*}[h]
+\scriptsize
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Policy & Between & Trigger & Moves & Quench / bound \\
+\midrule
+fan-out & root $\to$ subscribers & on stamp & the new message & exactly-once dedup \\
+replay-on-seat & relay $\to$ subscriber & seat / renewal & since-floor delta + all live dels & since floor \\
+replay-up (hw) & child $\to$ root & SUB says $hw > \mathrm{mine}$ & the newer delta & hw catches up \\
+split-union (lw) & child $\to$ root & SUB says $lw < \mathrm{mine}$ & child's full range & once per (child, lw) \\
+empty-root probe & cohort+path $\to$ root & root born empty & any history & first ingest; $\le$3 tries \\
+cohort replication & root $\to$ 2 closest & change / new member / 60\,s & full state, else \emph{keepalive} & signature match \\
+handoff & leaver $\to$ heir & \texttt{leave()} & full state & \textsc{ack}; 2 rounds + 1 fallback \\
+union-at-root & root $\gets$ any root & REPLICATE arrives & the sender's state & idempotent merge \\
+pull & replica $\to$ reader & on demand & one message & one answer \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Four of these policies were bought by named incidents and their reasons
+are normative:
+
+\begin{itemize}
+\item \textbf{Split-union (lw)} --- after a root transition the timeline
+  splits: the new root holds the post-transition half, the demoted heir
+  the pre-transition half, invisible to the hw rule because it sits
+  entirely \emph{below} the new root's high-water. The child advertises
+  its low-water; a root seeing older history pulls the full range and
+  unions it. \emph{One-shot per (child, lw)}: a refused pull (the
+  child's oldest is tombstoned here, or beyond retention) must not
+  re-fire on every renewal --- unguarded, this re-pulled a full cache
+  every 5\,s and storm-flapped the testnet relays (4.22.0).
+\item \textbf{Empty-root probe} --- a cold subscriber whose SUB
+  terminates at itself becomes a root with an \emph{empty} cache while
+  a live holder one hop away has everything; nothing reliably tells the
+  holder about the new closer root, so the emptiness is sticky. The
+  fix inverts the flow: an empty root \emph{pulls}
+  (\texttt{pullup sinceHw:0}) from its cohort and its own lookup path
+  (the runner-up closest is usually the prior holder), bounded at 3
+  tries and quenched by the first ingest. This was 82\% of the field
+  read-misses (4.24.0).
+\item \textbf{Delta-gated replication} --- the cohort push sends full
+  state only when the summary signature changed, a new cohort member
+  needs seeding, or a 60\,s anti-entropy backstop elapses; every other
+  tick sends an \emph{empty keepalive} that refreshes the backup's
+  liveness clock and nothing else. The earlier behavior --- full
+  cache+tombstones to the whole cohort \emph{every tick} --- reads as
+  cheap idempotent anti-entropy and is exactly what this document used
+  to claim; under a role-bloat storm it was the bandwidth fuel that
+  collapsed the backbone (4.24.1). Convergence is unharmed: any
+  divergence changes the diverged root's own signature and re-arms one
+  full push.
+\item \textbf{Acknowledged handoff} --- \S\ref{sec:lifecycle}.
+\end{itemize}
+
+\textbf{The principal-liveness rule} (normative; the generalization the
+collapse paid for):
+
+\begin{quote}
+Standing state on another node may be planted only by a principal
+alive to maintain it. \texttt{replicate} creates a durable
+relationship --- the receiver becomes a BACKUP whose obligations run
+until evicted --- so \emph{a departing node never sends
+\texttt{replicate}}: it transfers ownership (\texttt{handoff}) or does
+nothing. Every new sync policy must state which nature (\S above) it
+creates on the receiving node and which eviction path applies; a
+policy that cannot name both is rejected in review.
+\end{quote}
 
 Replayed stamps more than 5 minutes in the future are dropped (the
 bad-clock rule). Caches are bounded (1024 messages / 16\,MB per role)
-and expire at 24\,h from stamp.
+and expire at 24\,h from stamp. On root churn, \emph{election is just
+subscription}: backups renew toward the topic every tick like any
+child, so the closest backup's renewal terminates at itself and it
+promotes with the history already in hand --- the same probe-protected
+machinery every subscriber uses, never a bespoke local vote.
 
 \subsection{Kill: creator-only retraction}
 
@@ -771,13 +887,24 @@ promises, each bought by an incident:
   are empty --- a confirmed publish departs instantly, an unconfirmed one
   gets the caller's full window (never a hidden cap). Internal waits are
   ref'd timers: Node must not exit mid-leave.
-\item \emph{Hand off every rooted topic}: for each rooted, cache-bearing
-  topic, resolve an heir --- local K-closest first, falling back to the
-  \emph{iterative} lookup when the leaver's table is thin (the fresh
-  burst-publisher case) --- with 8 resolutions in flight, all raced
-  against the timeout; push \texttt{pubsub:handoff \{topicId, msgs,
-  dels, from\}}. \texttt{from} names the leaver so the heir purges the
-  leaver's ghost beacon and never defers its new claim back to it.
+\item \emph{Hand off every rooted topic, confirmed}: for each rooted,
+  cache-bearing topic, resolve an heir \emph{and a runner-up} --- local
+  K-closest first, falling back to the \emph{iterative} lookup when the
+  leaver's table is thin (the fresh burst-publisher case) --- with 8
+  resolutions in flight; then send \texttt{pubsub:handoff \{topicId,
+  msgs, dels, from\}} in \emph{acknowledged rounds}: all unacked heirs
+  per round, one shared 700\,ms ack window, two rounds. The heir
+  replies \texttt{handoffack}; fire-and-forget silently dropped a
+  topic's last copy whenever the one send didn't land (diagnosed in the
+  field as 40/40 confirmation failures). A topic still unacked after
+  the rounds gets \emph{one} fallback \texttt{handoff} to the runner-up
+  --- worst case two proper holders whose caches union --- and
+  \emph{never} a \texttt{replicate}: acks are a race against load, so
+  ``unacked'' usually means ``acked late,'' and a departing node
+  spraying replica state plants backups of a dead principal (the
+  principal-liveness rule; violating it collapsed the backbone twice).
+  \texttt{from} names the leaver so the heir purges the leaver's ghost
+  beacon and never defers its new claim back to it.
 \item \emph{Then silence}: notify peers in parallel (they run the death
   sweep immediately), stop the tick, clear all retry state. A peer that
   has left sends nothing --- and the network stops listening for it.
@@ -815,6 +942,9 @@ tick & 5\,s & must be $\le$ the renewal floor \\
 \texttt{BEACON\_FANOUT} / layers & 6 / 2 & basin $\approx$ 42 nodes \\
 verify first / steady / batch & 6\,s / 45\,s / 3 & fresh-topic race; steady re-check; no lookup storm \\
 \texttt{ROOT\_REPLICAS} & 2 & cohort size (singleton-root durability) \\
+replicate full-push backstop & 60\,s & delta gate: keepalives between; anti-entropy floor \\
+handoff ack window / rounds & 700\,ms / 2 & confirmed departure inside \texttt{leave()}'s bound \\
+empty-root probe & 800\,ms, 5\,s, $\le$3, fan 4 & delay / re-try / cap / fanout; quench on ingest \\
 pending TTL / tries & 30\,s / 6 & bounded retry; $\mathrm{loss}^7$ negligible at 30\% \\
 cold burst & $5\times200$\,ms $+\,5\times400$\,ms & integrate-and-retry while the table warms \\
 first-publish re-send & 200\,ms & catch a tree formed microseconds before \\
@@ -863,6 +993,15 @@ violates one is wrong even if it benchmarks well.
 \item[\textbf{I-9}] Publish confirmation is observation, not
   acknowledgment; nothing may add an ack channel that discloses the
   publisher's location.
+\item[\textbf{I-10}] Standing state is bounded by demand, never by
+  churn history: per-topic state anywhere is $O(\mathrm{subscribers} +
+  \mathrm{cohort})$; no mechanism may create state that accumulates
+  with join/leave \emph{events}; every write of standing state onto
+  another node names its eviction path in the same change. Corollary:
+  the principal-liveness rule (\S\ref{sec:pubsub}).
+\item[\textbf{I-11}] Bulk work never starves liveness: unbounded batch
+  ingest/emission yields to the event loop at a fixed stride; a node is
+  never evicted by its peers \emph{because} it was absorbing history.
 \end{enumerate}
 
 % =====================================================================
@@ -887,6 +1026,20 @@ violates one is wrong even if it benchmarks well.
 \item[A publish strands.] The greedy walk hit a local minimum; the
   pending retry re-sends toward the refreshed hint each tick (bounded);
   cold publishers burst. The retrying is idempotent end-to-end.
+\item[A cold reader becomes an empty root.] Its SUB terminated at
+  itself while a live holder kept the history --- the sticky read-miss
+  class. The birth probe pulls from the cohort and the lookup path
+  within a second; the tick re-probes while empty, bounded at 3; the
+  first ingest quenches. The reader serves history, not emptiness.
+\item[A burst publisher churns out under load.] Its \texttt{leave()}
+  hands off in acknowledged rounds; acks lost to load trigger one
+  fallback handoff to the runner-up --- never a replica spray. Worst
+  case two holders whose caches union; the fleet's role population is
+  unchanged (I-10).
+\item[History arrives in bulk.] A joiner adopting thousands of cached
+  messages yields to its event loop every 16; heartbeats interleave;
+  its mesh peers do not evict it for absorbing what they sent it
+  (I-11).
 \item[Two roots exist transiently.] Near-miss terminals can claim while
   evidence is thin --- by design. Beacons reconcile within the basin;
   self-verification reconciles across it; cohort anti-entropy keeps the
@@ -1021,22 +1174,31 @@ order, testing each layer before the next:
   renewals (adaptive), pending retries, replication, eviction, expiry,
   beacon/verify cadence; the constants table verbatim; complete
   teardown on stop.
-\item \textbf{Durability + lifecycle} (\S\ref{sec:pubsub},
-  \S\ref{sec:lifecycle}): cohort replication with union anti-entropy;
-  replay-up; kills with provisional authorship; leave with
-  evidence-drain, parallel handoff, and silence.
+\item \textbf{The convergence plane} (\S\ref{sec:pubsub},
+  \S\ref{sec:lifecycle}): one sync operation, the policy table
+  verbatim --- delta-gated cohort replication with keepalives,
+  replay-up (hw) and split-union (lw) with the one-shot guard, the
+  empty-root probe, kills with provisional authorship, and leave with
+  evidence-drain, \emph{acknowledged} handoff, and silence.
 \item \textbf{Prove the invariants} (\S\ref{sec:invariants}): write the
-  nine as executable tests before tuning anything; then characterize on
-  a live mesh --- healed delivery after a renewal cycle is the headline
-  number, single runs are noise (REPS $\ge$ 5), and no verdict comes
-  from a seconds-old client.
+  eleven as executable tests before tuning anything; then characterize
+  on a live mesh --- healed delivery after a renewal cycle is the
+  headline number, single runs are noise (REPS $\ge$ 5), and no verdict
+  comes from a seconds-old client.
 \end{enumerate}
 
-Two traps this document exists to prevent: forgetting the
-waypoint-pop rule (you will wrongly predict deadlocks and ``fix'' them
-into churn storms), and adding a ninth root-claim site instead of a
-guard in the one decision table (you will recreate the
-patch-interaction bug class this architecture was refactored to kill).
+Four traps this document exists to prevent. \emph{Forgetting the
+waypoint-pop rule}: you will wrongly predict deadlocks and ``fix'' them
+into churn storms. \emph{Adding a root-claim site instead of a guard in
+the one decision table}: you will recreate the patch-interaction bug
+class the 4.20 refactor killed. \emph{Adding a data-movement mechanism
+instead of a sync-policy row}: every mechanism you add carries its own
+trigger, quench, and guard, and interacts with all the others --- the
+4.22--4.24 incident chain, including two backbone collapses, was
+exactly this trap sprung four times. \emph{Letting a departing or
+transient node plant standing state}: replicate-from-a-leaver reads as
+a cheap durability win and is a cascade seed; the principal-liveness
+rule exists because the cheap win collapsed a fleet.
 
 % =====================================================================
 % APPENDIX: THE LIFE OF A MESSAGE
@@ -1065,17 +1227,27 @@ $T=\{$region:\,useast, owner:\,null, name:\,'lobby', write:\,'open'$\}$.
   cohort updated eagerly. A later \texttt{since:'all'} joiner replays
   survivors only.
 \item $R$ leaves: drain (nothing pending), handoff of $T$'s
-  cache+tombstones to heir $H$ (\texttt{from:\,R}), notify, silence.
-  $H$ purges $R$'s beacon, keeps the claim, beacons; renewals re-seat
-  everyone under $H$ within one fast cycle. Total order continues above
-  the inherited \texttt{lastTs}.
+  cache+tombstones to heir $H$ (\texttt{from:\,R}); $H$ acknowledges
+  (\texttt{handoffack}) inside the first round, so no retry and no
+  fallback fire; notify, silence. $H$ purges $R$'s beacon, keeps the
+  claim, beacons; renewals re-seat everyone under $H$ within one fast
+  cycle. Total order continues above the inherited \texttt{lastTs}.
+\item Late that night a cold reader $C$ subscribes from a fresh node
+  that happens to sit closer to $T$ than $H$: $C$'s SUB terminates at
+  itself and it becomes root --- empty. The birth probe pulls $T$'s
+  history from the cohort and from $H$ (on $C$'s lookup path) within a
+  second; $C$ serves the full timeline. $H$ re-homes under $C$ as a
+  child; its \texttt{lw} advertisement confirms nothing older is
+  stranded. No mechanism special-cased $C$'s newness --- the same
+  policies that run everywhere ran here (I-7).
 \end{enumerate}
 
 \vspace{1.5em}
 \noindent\textcolor{inkmuted}{\footnotesize\itshape
-Axona Architecture v4.21.0 --- 2026-07-13. Versioned to the kernel
+Axona Architecture v4.24.1 --- 2026-07-16. Versioned to the kernel
 release deployed on testnet that it describes; re-version on the release
 that next changes protocol behavior. Companions: Root-Management-v4.20.1,
-INVARIANTS.md, Kernel-Refactor-Analysis-v0.1, Soak-Framework-Overview-v4.21.0.}
+INVARIANTS.md (eleven invariants), Kernel-Refactor-Analysis-v0.2 (the
+convergence-plane program), Soak-Framework-Overview-v4.21.0.}
 
 \end{document}

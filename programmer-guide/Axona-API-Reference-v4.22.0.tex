@@ -146,6 +146,7 @@
 % dropping to tofu). Only maps chars actually used — leaves → alone (it renders).
 \usepackage{newunicodechar}
 \newunicodechar{≈}{\ensuremath{\approx}}
+\newunicodechar{≠}{\ensuremath{\neq}}
 \newunicodechar{≥}{\ensuremath{\geq}}
 \newunicodechar{≤}{\ensuremath{\leq}}
 \newunicodechar{×}{\ensuremath{\times}}
@@ -1862,10 +1863,13 @@ Every topic's replay queue is bounded:
 \begin{itemize}
 \tightlist
 \item
-  \textbf{Max messages} --- default 100, max 256. When full, the
-  lowest-ordered message (by signed \texttt{seq}) is evicted
-  deterministically. A max of 1 is a \emph{retained/latest-value} slot;
-  pair it with \texttt{peer.pull(null,\ …)}.
+  \textbf{Max messages} --- up to \texttt{CACHE\_MAX} (\textbf{1024})
+  per topic, also bounded by a 16 MB byte ceiling on the cache. When
+  full, the lowest-ordered message (by signed \texttt{seq}) is evicted
+  deterministically. (Configurable per peer via the
+  \texttt{replayCacheSize} constructor option; a value of 1 is a
+  \emph{retained/latest-value} slot --- pair it with
+  \texttt{peer.pull(null,\ …)}.)
 \item
   \textbf{Hold time} --- default 24 h, hard ceiling 48 h. A message past
   its hold is swept (stops being delivered or pulled). A \texttt{pull}
