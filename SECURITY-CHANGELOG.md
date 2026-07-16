@@ -16,6 +16,26 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.26.0 — 2026-07-16 (testnet) — role state is bounded and every role transition is observable
+
+**What's protected:** the **boundedness of per-topic role state** on
+infrastructure nodes, and an operator's ability to **see** what every node
+believes its responsibilities are. A node's pub/sub nature (root, backup, or
+plain subscriber, plus the orthogonal holder flag) is now derived from ground
+facts at the moment it is read — never stored separately, so it cannot drift
+from reality — and every entry into or exit from the backup nature passes
+through a single audited transition with a structured log line. A backup that
+is promoted to root now sheds its backup state completely (previously a
+promoted node could retain standing obligations toward a departed principal
+indefinitely — unbounded stale state on long-lived infrastructure), and stale
+backup state for topics that have re-homed elsewhere is evicted on a fixed
+60-second window that never fires while the backup could still legitimately
+win the election. Role natures are exposed at the inspection surface, so a
+node accumulating responsibilities it shouldn't hold is visible at a glance
+rather than discoverable only by log archaeology.
+
+---
+
 ## Kernel v4.24.0 — 2026-07-15 (testnet) — a topic's history survives root formation and graceful departure
 
 **What's protected:** the **availability of a topic's full, verified history**
@@ -1651,4 +1671,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-07-15.*
+*Last updated: 2026-07-16.*

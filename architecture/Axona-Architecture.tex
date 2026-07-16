@@ -69,8 +69,8 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v4.24.1 \quad 2026-07-16\par}
-{\footnotesize\itshape describes kernel 4.24.1 as deployed on testnet;
+{\small An Axona Architecture Note \quad v4.26.0 \quad 2026-07-16\par}
+{\footnotesize\itshape describes kernel 4.26.0 as deployed on testnet;
 written for human readers and AI implementers alike\par}
 \end{center}
 \vfill
@@ -442,7 +442,7 @@ Two version axes ride the hello frames. \texttt{WIRE\_VERSION} (currently
 \texttt{4.0}) partitions hermetically on its major --- wire-3.x and
 wire-4.x reject each other at both the bridge gate and the peer-peer
 handshake, because 4.x changed convergence and replay semantics.
-\texttt{KERNEL\_VERSION} (currently \texttt{4.24.1}) is informative and
+\texttt{KERNEL\_VERSION} (currently \texttt{4.26.0}) is informative and
 surfaced at every runtime surface (healthz, welcome, UI) --- an
 observability rule, not a gate; wire-compatible kernels interoperate
 freely, and deploys are staggered on exactly that property.
@@ -944,6 +944,7 @@ verify first / steady / batch & 6\,s / 45\,s / 3 & fresh-topic race; steady re-c
 \texttt{ROOT\_REPLICAS} & 2 & cohort size (singleton-root durability) \\
 replicate full-push backstop & 60\,s & delta gate: keepalives between; anti-entropy floor \\
 handoff ack window / rounds & 700\,ms / 2 & confirmed departure inside \texttt{leave()}'s bound \\
+backup eviction (re-homed idle) & 60\,s & bounds set growth only; never fires while electable \\
 empty-root probe & 800\,ms, 5\,s, $\le$3, fan 4 & delay / re-try / cap / fanout; quench on ingest \\
 pending TTL / tries & 30\,s / 6 & bounded retry; $\mathrm{loss}^7$ negligible at 30\% \\
 cold burst & $5\times200$\,ms $+\,5\times400$\,ms & integrate-and-retry while the table warms \\
@@ -1244,7 +1245,7 @@ $T=\{$region:\,useast, owner:\,null, name:\,'lobby', write:\,'open'$\}$.
 
 \vspace{1.5em}
 \noindent\textcolor{inkmuted}{\footnotesize\itshape
-Axona Architecture v4.24.1 --- 2026-07-16. Versioned to the kernel
+Axona Architecture v4.26.0 --- 2026-07-16. Versioned to the kernel
 release deployed on testnet that it describes; re-version on the release
 that next changes protocol behavior. Companions: Root-Management-v4.20.1,
 INVARIANTS.md (eleven invariants), Kernel-Refactor-Analysis-v0.2 (the
