@@ -206,39 +206,60 @@ public API and wire unchanged, full suite + churn smoke + axonSpec + one soak
 pass identically per phase, one phase per release. *Refactor under test,
 never rewrite.*
 
-- **Phase 5 — Contract & doc refresh (S, no code).** INVARIANTS.md gains
-  I-10/I-11 (this document's §6). Architecture doc revised per §5: sync model
-  + policy table, role lifecycle + principal-liveness rule, S-1/S-2 fixed,
-  M-1…M-5 added, philosophy section corrected, re-versioned to the deployed
-  testnet kernel, PDF re-rendered and archived. *Output: a doc that would have
-  prevented #333.*
+- **Phase 5 — Contract & doc refresh (S, no code). ✅ DONE 2026-07-16.**
+  INVARIANTS.md gained I-10/I-11; the architecture doc was revised per §5
+  (sync model + policy table, role natures + principal-liveness rule,
+  S-1/S-2 fixed, M-1…M-5 added, philosophy bounded, traps 2→4), re-versioned
+  to v4.24.1, rendered, archived. *Writing it also re-sequenced the phases
+  below: making every element load-bearing exposed that the policy table is
+  TYPED BY ROLE NATURES — so natures must exist in code before the engine
+  that declares policies over them, and the hot delivery path doesn't belong
+  in the engine's first cut at all.*
 
-- **Phase 6 — Small consolidations with outsized surface (M).**
+- **Phase 6 — Small consolidations + coherence guards (M).**
   (a) The three publish-retry mechanisms ([10]+[11]+[12] in Appendix A: pending
   retry, cold burst, first-publish resend) become one retry policy over
   `_pendingPub` with a variable schedule — three timers become one.
   (b) The three per-role guard fields (`pulledLw`, `probeTries/probeAt`,
-  `replSig/replLastFull`) merge into one per-(peer,topic) **sync ledger** —
-  the seed of the Phase-7 engine, extracted first because the guards are where
-  quench bugs (4.22.0 storm) live. Behavior-preserving; suite is the arbiter.
+  `replSig/replLastFull`) merge into one per-(peer,topic) **sync ledger**
+  implemented with the engine's semantics from the start (per-pair summary +
+  signature quench) — the guards are where quench bugs (4.22.0 storm) live.
+  (c) **Doc↔code coherence guards** (added by Phase 5's lesson — the doc
+  rotting into a bug-generator was the root failure): an emission-site lint
+  asserting `REPLICATE` is sent from exactly one path (the live-root
+  replication sweep — a reintroduced departure spray fails CI, not a fleet),
+  and a normative-constants smoke asserting the doc's timing table matches
+  `constants.js`. Behavior-preserving; suite is the arbiter.
 
-- **Phase 7 — The sync engine (L, the payoff).** One `sync(peer, topic,
-  policy)` operation implementing summary-exchange over the existing verbs;
-  the 11 mechanisms of §3 become rows in a policy table; emission-side logic
-  deleted as each row proves equivalent under the suite. Includes engine-level
-  per-pair rate bounds and the signature quench. Mostly behavior-preserving
-  (identical wire traffic in steady state; storm-case traffic strictly lower).
-  Gate: full suite + `smoke_churn_amplification` + axonSpec + soak A/B vs
-  4.24.1.
+- **Phase 7 — Explicit role natures (M; was Phase 8a).** `role.state ∈
+  {ROOT, CHILD, BACKUP, HOLDER}` with the obligation/eviction table now
+  normative in the architecture doc §VIII; rootClaim's transition table
+  extended to cover all four natures. Sequenced BEFORE the engine because
+  the engine's policy rows are typed by nature (each row names the nature it
+  creates on the receiver + its evictor, per the principal-liveness rule) —
+  building the engine on the five-field smear would rebuild on the diagnosed
+  fault.
 
-- **Phase 8 — Explicit role lifecycle (M).** `role.state ∈ {ROOT, CHILD,
-  BACKUP, HOLDER}` with the §4 obligation/eviction table; rootClaim's
-  transition table extended to cover all four states; the #332 hardening
-  (mesh re-bootstrap after mass eviction, ingest admission caps) lands here
-  as per-state obligations rather than more free-floating mechanisms.
+- **Phase 8 — The sync engine, repair side (L, the payoff; was Phase 7,
+  narrowed).** One `sync(peer, topic, policy)` operation implementing
+  summary-exchange over the existing verbs, consolidating the SIX
+  repair/durability policies: replay-up (hw), split-union (lw), empty-root
+  probe, cohort replication, handoff, union-at-root. The hot delivery path
+  (fan-out, replay-on-seat) is explicitly OUT of the first cut: it is
+  high-rate, latency-sensitive, its quench machinery (exactly-once dedup,
+  since floors) is already unified in topicStore, and no incident has ever
+  lived there — it joins later only if it earns its way in. Engine-level
+  per-pair rate bounds + signature quench. Gate: full suite +
+  `smoke_churn_amplification` + axonSpec + soak A/B vs 4.24.1.
 
-- **Phase 9 — v0.1's deferred Phases 3–4** (AxonaPeer diet + two-transports
-  unification; constants → policy groups), unchanged in scope, now sequenced
+- **Phase 9 — #332 hardening as per-state obligations (M; was Phase 8b).**
+  Mesh re-bootstrap after mass eviction and ingest admission caps land as
+  obligations of the natures they protect (a BACKUP/CHILD absorbing bulk
+  history; a node whose peers evicted en masse) rather than free-floating
+  mechanisms — which is only possible once Phase 7's natures exist.
+
+- **Phase 10 — v0.1's deferred Phases 3–4** (AxonaPeer diet + two-transports
+  unification; constants → policy groups), unchanged in scope, sequenced
   last because the data-plane risk is retired first.
 
 Sequencing note: the 4.24.1 promotion decision (pending its soak verdict) is
