@@ -119,5 +119,65 @@ Node 24), and a `TimeoutNaNWarning` fires at startup.
 - Howard: axonSpec is green on 4.26.0; alert-bot app-side items above; testnet may
   see one more backbone restart today when the A/B concludes.
 
-*Written 2026-07-17 ~12:00Z. Evidence: `axona-stress/results/soak-axon-4250.jsonl`,
-`soak-axon-4260.jsonl`, `axona-relay/captures/phase7-degradation-20260717/`.*
+---
+
+## Appendix: Q&A — is this a capacity problem?
+
+**Q (David): Would you say we are starving the region with too many topics and
+messages across too few nodes?**
+
+**A:** Half yes — but the half that's wrong matters for the fix.
+
+**"Too many topics across too few nodes" — yes, that concentration is real.**
+Region 0x80 has zero dedicated relays, so its entire keyspace falls to the
+nearest neighbors — the three uswest relays. Every one of the ~400 alert-bot
+topics plus the soak's topics landed on those same three nodes (975–1,140 roles
+each, versus ~50–500 elsewhere). The design assumes infrastructure roughly
+proportional to demand per region; the alert-bot pattern — publish durably,
+then leave — creates demand with no accompanying presence, so nothing shares
+the load. Three nodes carry a region's worth of state.
+
+**"Too many messages / starving" — no, and this is the important correction.**
+The data volume is trivial: most of these topics hold 2–10 small messages; a
+thousand roles is a few megabytes against a 16MB cache budget. The relays are
+not starving for memory, bandwidth, or CPU in steady state — the restored
+backbone sat at 8–10 mesh peers *while holding 977 roles*, perfectly healthy.
+
+What actually breaks is not capacity but **unpaced obligations**. A role isn't
+just data — it carries standing work: beacon emission, verification, cohort
+keepalives, and backup renewals every tick ("infrastructure never backs off,"
+by design). That work scales linearly with role *count*, not message volume.
+Two mechanisms then turn linear cost into collapse:
+
+1. **The join cliff (the acute killer):** a joining relay receives the region's
+   whole role mass at once, and the bulk ingest starves the event loop — so its
+   mesh keepalives miss, peers drop it, and it never finishes joining. That's a
+   straight I-11 violation ("bulk work never starves liveness"), and it's why a
+   *fresh* fleet died faster than a warm one.
+2. **Churn amplification:** every root transition among those thousand roles
+   triggers handoffs, elections, and backup re-principaling across the same
+   three nodes — the ~17,000 nature-transitions-per-night we logged. Under soak
+   churn that obligation traffic compounds; without churn it idles fine.
+
+So the accurate statement is: **we concentrated a region's worth of role
+obligations onto three nodes, and the obligation machinery doesn't pace itself
+when arriving or degrade gracefully under churn.** A node with 1,000 roles
+should be slower to converge, not dead.
+
+That framing points at two complementary fixes:
+
+- **#332 (mechanism):** pace the join-time ingest and prioritize mesh liveness
+  over role transfer — makes any role count survivable. The near-term blocker
+  fix.
+- **Load-proportional placement (architecture):** a node shouldn't silently
+  accept unbounded rootship. This is exactly what the shelved *Load-Aware Root
+  Placement* note proposed — an overloaded closest node defers rootship down
+  the K-closest ladder — and today's data is the first live evidence that it
+  addresses a real regime, not a hypothetical. Worth revisiting after #332,
+  with the sim-first discipline the note already prescribes.
+
+---
+
+*Written 2026-07-17 ~12:00Z; A/B verdict and appendix added ~13:15Z. Evidence:
+`axona-stress/results/soak-axon-4250.jsonl`, `soak-axon-4260.jsonl`,
+`soak-axon-4250b.jsonl`, `axona-relay/captures/phase7-degradation-20260717/`.*
