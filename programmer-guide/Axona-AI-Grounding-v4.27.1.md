@@ -1,8 +1,8 @@
-# Axona AI Grounding — kernel 4.22.0
+# Axona AI Grounding — kernel 4.27.1
 
 This file is the complete, self-contained grounding for an AI system building
 an application on the Axona protocol. It matches the network it targets:
-**kernel 4.22.0 / wire 4.0, deployed on testnet (`wss://testnet.axona.net`)**.
+**kernel 4.27.1 / wire 4.0, deployed on testnet (`wss://testnet.axona.net`)**.
 Everything below is exact and current; nothing outside this file is required.
 If this version does not match the bridge you are connecting to, request the
 matching grounding file.
@@ -42,10 +42,14 @@ central server, message broker, or database.
    identical payload from the same author yields the SAME msgId and refreshes
    the hold (an upsert; subscribers are not re-notified). Axona is a live
    messaging fabric, not permanent storage.
-8. **`kill` is the only retraction**, must be signed by the same author key
-   that signed the original, and is best-effort (receivers already holding
-   the plaintext keep it). Anonymous messages cannot be killed.
-   `unpub` and `touch` do not exist in 4.x — do not call them.
+8. **`kill` is the only retraction** and its signature is
+   `peer.kill(topic, msgId, { signWith })` — the **descriptor comes first**,
+   exactly like `pub`. `peer.kill(msgId)` (omitting the topic) is the most
+   common mistake observed in the field and throws. The kill must be signed
+   by the same author key that signed the original, and is best-effort
+   (receivers already holding the plaintext keep it). Anonymous messages
+   cannot be killed. `unpub` and `touch` do not exist in 4.x — do not call
+   them.
 9. **Persist the author key if user identity should survive restarts.**
    `createAuthorIdentity({ persistAs: 'myapp:author' })` (browser
    localStorage). Everything else (node identity, subscriptions) can be
@@ -58,7 +62,7 @@ central server, message broker, or database.
 ## Install
 
 ```bash
-npm install github:axona-net/axona-protocol#v4.22.0
+npm install github:axona-net/axona-protocol#v4.27.1
 ```
 
 `package.json` must contain `"type": "module"`.
@@ -317,6 +321,41 @@ descriptor, so a message cannot be replayed onto a different topic.
 `pull` returning `null` and `kill` resolving `{ ok:false }` are normal
 outcomes (missing/expired message; nothing to retract) — not errors.
 
+## Field-observed mistakes — every one of these has shipped in a real app
+
+Check generated code against ALL of these before calling it done.
+
+1. **`peer.kill(msgId)` — topic omitted.** Every content operation takes the
+   **descriptor first**: `kill(topic, msgId, { signWith })`, exactly like
+   `pub(topic, …)` / `sub(topic, …)`. There is no id-only form of anything.
+2. **Reconnecting the peer to switch users/personas.** WRONG: tearing down
+   the connection when the active author changes (it churns the mesh and
+   drops live WebRTC links mid-ICE). One peer serves ANY number of authors —
+   authorship is chosen per call via `{ signWith }`. Reconnect only when the
+   bridge URL changes.
+3. **Sharing a topic without its full descriptor.** An invite, directory ad,
+   QR code, or link that transmits only `name` (or name + region) sends the
+   recipient to a DIFFERENT topic whenever the original has an `owner` —
+   `{region, owner, name, write}` ALL fold into the topic id (HARD RULE 1).
+   Always transmit the complete descriptor.
+4. **Deriving presence/recency from arrival time.** A `since:'all'` (or
+   `'latest'`) subscription replays history: a message that arrives NOW may
+   have been published hours ago. Recency logic (online lists, "last seen")
+   must read `env.ts` (publish time), never the local clock at delivery.
+   For ephemeral signals like heartbeats, subscribe with `since` omitted
+   (live-only) — replaying stale heartbeats is pure noise.
+5. **Faking encryption with public inputs.** The protocol signs messages; it
+   does NOT encrypt them, and it provides NO encrypt-to-author primitive. An
+   author ID is **public** (it is `env.signerPubkey` on every signed
+   message) — any scheme that derives a decryption key from it is plaintext
+   with extra steps. Confidentiality needs a real app-layer key exchange
+   (e.g. keys delivered out-of-band, or a proper ECDH scheme); if you cannot
+   do that, say so in the UI rather than shipping theater.
+6. **Inventing a fallback when derivation fails.** If `deriveTopicId` (or any
+   kernel call) throws, surface the error. Substituting a locally-made-up id
+   "so the UI keeps working" silently diverges that client from every other
+   peer on the topic — the failure mode is invisible no-delivery (HARD RULE 1).
+
 ## Troubleshooting rules
 
 - **Connected but nothing arrives** → publisher and subscriber derived
@@ -338,7 +377,7 @@ outcomes (missing/expired message; nothing to retract) — not errors.
 - Browser: HTTPS only. Node: v20+; the same `webTransport` connects to the
   bridge over WSS (the WebRTC mesh is browser-side; Node peers converse via
   the bridge and routing).
-- The testnet bridge is `wss://testnet.axona.net` (kernel 4.22.0, wire 4.0) —
+- The testnet bridge is `wss://testnet.axona.net` (kernel 4.27.1, wire 4.0) —
   the network this grounding targets. Production (`wss://bridge.axona.net`)
   runs the same wire-4 line, typically one release behind; the two are
   wire-compatible but SEPARATE networks (a peer joins one or the other).

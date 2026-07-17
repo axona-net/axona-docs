@@ -12,8 +12,8 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-VERSION="v4.22.0"
-DATE="2026-07-14"
+VERSION="v4.27.1"
+DATE="2026-07-17"
 
 DOCS=(
   "Quick-Start-$VERSION"

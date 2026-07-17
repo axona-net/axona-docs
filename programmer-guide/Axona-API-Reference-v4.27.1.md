@@ -1,24 +1,24 @@
 # Axona API Reference
 
-Reference for every public symbol exported from `@axona/protocol` v4.22.0.
+Reference for every public symbol exported from `@axona/protocol` v4.27.1.
 
 Organized by what application developers reach for first (identity, peer
 lifecycle, pub/sub, direct messaging, introspection), then the
 transport/protocol surface, then low-level utilities. Every signature
-below is verified against the v4.22.0 kernel source.
+below is verified against the v4.27.1 kernel source.
 
 > **Which network?** Both live networks run the 4.x line (wire 4.0).
-> **Testnet** (`wss://testnet.axona.net`) tracks the newest kernel — v4.22.0,
+> **Testnet** (`wss://testnet.axona.net`) tracks the newest kernel — v4.27.1,
 > the version this reference describes. **Production** (`wss://bridge.axona.net`
 > east + `wss://bridge-west.axona.net` west) runs the most recently promoted
 > kernel, typically one release behind while changes soak. The API surface below
 > is identical on both; point wherever you deploy. Install
-> `github:axona-net/axona-protocol#v4.22.0`.
+> `github:axona-net/axona-protocol#v4.27.1`.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v4.22.0.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v4.22.0.md) — mental model +
+- [Quick Start](Quick-Start-v4.27.1.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v4.27.1.md) — mental model +
   worked example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects.
@@ -39,7 +39,7 @@ but most apps only need the main barrel.
 > surface** (§§10–16) and **Low-level utilities** (§§17–23) exist for
 > transport authors, tooling, and the curious. Building with an AI
 > assistant? Hand it the
-> [AI Grounding](Axona-AI-Grounding-v4.22.0.md) file — the application
+> [AI Grounding](Axona-AI-Grounding-v4.27.1.md) file — the application
 > surface distilled to rules and patterns.
 
 ---
@@ -906,6 +906,11 @@ const id = await peer.pub({ region: 'useast', name: 'lobby' }, { text: 'oops' },
 await peer.kill({ region: 'useast', name: 'lobby' }, id, { signWith: me });
 ```
 
+> **Common mistake (seen in the field):** `peer.kill(msgId, { signWith })` —
+> omitting the topic. A kill routes to the topic's roots, so it needs the
+> descriptor exactly like `pub`/`sub` do; there is no id-only form. The
+> descriptor is always the first argument.
+
 > Best-effort redaction, not a cryptographic un-send: a subscriber who
 > already has the plaintext can keep it; an anonymous message has no
 > provable creator and **cannot** be killed.
@@ -1372,7 +1377,7 @@ import { webTransport } from '@axona/protocol/transport/web/index.js';
 const transport = webTransport({
   bridgeUrl:   'wss://testnet.axona.net',  // or wss://bridge.axona.net (production)
   identity:    node,                       // from createNodeIdentity — signs the handshake
-  peerVersion: '4.22.0',                   // your app version (gated by the bridge)
+  peerVersion: '4.27.1',                   // your app version (gated by the bridge)
   reconnect:   true,
 });
 await transport.start();                  // resolves after the bridge handshake
@@ -1623,7 +1628,7 @@ introduces no keyspace skew.
 
 ```js
 WIRE_VERSION         // '4.0'      — wire format major.minor (bridges gate on this)
-KERNEL_VERSION       // '4.22.0'   — kernel semver (npm release tag)
+KERNEL_VERSION       // '4.27.1'   — kernel semver (npm release tag)
 AUTH_PROTO           // 'axona/5'  — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426       — WebSocket close code for a version mismatch
 ENVELOPE_DOMAIN      // 'axona:pubsub-envelope:v2'
@@ -1651,6 +1656,28 @@ await peer.pub({ region: 'useast', name: 'lobby' }, msg, { signWith: ANONYMOUS }
 
 *(Only relevant if you have code from an earlier kernel line. New
 readers: skip.)*
+
+### What changed in v4.23.0–v4.27.1 (2026-07-17 roll; v4.27.1 promoted to production)
+
+**No API change** — the whole span is internal: region naming, role
+lifecycle, and load hardening.
+
+- **Canonical regions (v4.23.0).** Ocean/uninhabited region codes fold to
+  their nearest populated cell (`canonicalRegion`), and regions carry
+  human-readable animal names. Descriptor-visible behavior unchanged — any
+  region you could name before still resolves.
+- **Acked leave-handoff (v4.24.0–v4.24.1).** A departing root's history
+  hand-off is now acknowledged and retried (was fire-and-forget), with a
+  cohort-spray fallback.
+- **Explicit role natures (v4.25.0–v4.26.0).** Internal refactor phases: a
+  node's per-topic role (ROOT / CHILD / BACKUP / HOLDER) is explicit and
+  audited, and per-node role state is bounded (backup eviction).
+- **Join-storm hardening (v4.27.0–v4.27.1).** A (re)joining relay is seeded
+  with role state gradually (sender pacing + bounded time-sliced ingest) and
+  a node whose mesh dissolves re-bootstraps from the bridge. Fixes the
+  production failure where a rejoining infrastructure node was firehosed into
+  event-loop starvation and evicted. Invariant I-11: *bulk work never starves
+  liveness.*
 
 ### What changed in v4.17.0–v4.22.0 (2026-07-14 roll; v4.21.0 promoted to production)
 

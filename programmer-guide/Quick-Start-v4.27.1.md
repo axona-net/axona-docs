@@ -1,21 +1,21 @@
 # Axona Quick Start
 
 Get a working pub/sub roundtrip in **under five minutes** on the current
-`@axona/protocol` **v4.22.0** API (kernel 4.22.0). One Node process connects
+`@axona/protocol` **v4.27.1** API (kernel 4.27.1). One Node process connects
 to the live **testnet** bridge, subscribes to an open topic, publishes a signed
 message, and logs what comes back.
 
 > **Two live networks, one line.** Both run the 4.x kernel: **testnet**
-> (`wss://testnet.axona.net`) tracks the newest release — 4.22.0, which this
+> (`wss://testnet.axona.net`) tracks the newest release — 4.27.1, which this
 > Quick Start pins — and **production** (`wss://bridge.axona.net`) runs the most
 > recently promoted release. This Quick Start uses testnet; swap the bridge URL
 > to target production.
 
 Companion documents:
 
-- [Programmer Guide](Axona-Programmer-Guide-v4.22.0.md) — the five ideas + recipes for real apps.
-- [API Reference](Axona-API-Reference-v4.22.0.md) — every exported symbol.
-- [AI Grounding](Axona-AI-Grounding-v4.22.0.md) — building with an AI assistant? Hand it this file.
+- [Programmer Guide](Axona-Programmer-Guide-v4.27.1.md) — the five ideas + recipes for real apps.
+- [API Reference](Axona-API-Reference-v4.27.1.md) — every exported symbol.
+- [AI Grounding](Axona-AI-Grounding-v4.27.1.md) — building with an AI assistant? Hand it this file.
 
 ## Prerequisites
 
@@ -30,7 +30,7 @@ No build step, no DB, no local bridge — the testnet bridge is the entry point.
 mkdir my-axona-demo && cd my-axona-demo
 npm init -y
 npm pkg set type=module
-npm install github:axona-net/axona-protocol#v4.22.0
+npm install github:axona-net/axona-protocol#v4.27.1
 ```
 
 ## 2. Two identities, one rule
@@ -90,7 +90,7 @@ Save this as `index.js` — it mirrors how `apps/axona-minimal` wires a peer:
 import { deriveTopicId, KERNEL_VERSION } from '@axona/protocol';
 import { connect } from '@axona/protocol/connect.js';
 
-const BRIDGE = 'wss://testnet.axona.net';           // live testnet bridge (kernel 4.22.0)
+const BRIDGE = 'wss://testnet.axona.net';           // live testnet bridge (kernel 4.27.1)
 const HERE   = { lat: 38.0, lng: -77.0 };           // your real location (us-east here)
 const TOPIC  = { region: 'useast', name: 'quick-start-demo' };   // open topic
 
@@ -139,7 +139,7 @@ You should see the counter climb, one tick per second, until you stop it with
 **Ctrl+C**:
 
 ```
-kernel v4.22.0 — connecting…
+kernel v4.27.1 — connecting…
 mesh ready (4 peers, 1200ms)
 topic id: 89a1b2c3…
 [pub ] tick #1 (msgId 8e9d4b1a30c2…)
@@ -189,8 +189,8 @@ descriptor fields. That ID-matching is the rule you can't break — same
 | Own a feed only you can write | `{ region, owner: me.authorId, name: 'profile' }` (write defaults to `'owner'`) |
 | Share a read-only handle | `await deriveTopicId(descriptor)` -> hand out the 66-hex ID; `sub`/`pull`/`metrics` accept it |
 | Run against production | set `BRIDGE = 'wss://bridge.axona.net'` (same 4.x line; a separate network from testnet) |
-| See the full mental model | [Programmer Guide](Axona-Programmer-Guide-v4.22.0.md) |
-| Look up a specific symbol | [API Reference](Axona-API-Reference-v4.22.0.md) |
+| See the full mental model | [Programmer Guide](Axona-Programmer-Guide-v4.27.1.md) |
+| Look up a specific symbol | [API Reference](Axona-API-Reference-v4.27.1.md) |
 
 ## Troubleshooting
 
@@ -215,7 +215,7 @@ once the routing mesh is warm. On the public bridge this takes a few seconds.
 fallback to a local process; the demo needs the bridge to find peers.
 
 **`UPGRADE_REQUIRED` close code (4426)** — a wire/version mismatch. The testnet
-bridge runs kernel 4.22.0 (wire 4.0); install
-`github:axona-net/axona-protocol#v4.22.0`. Production runs the same wire-4 line
+bridge runs kernel 4.27.1 (wire 4.0); install
+`github:axona-net/axona-protocol#v4.27.1`. Production runs the same wire-4 line
 (one release behind), so 4426 there means a genuinely stale pin — upgrade to the
 bridge's kernel version (shown at its `/healthz`).

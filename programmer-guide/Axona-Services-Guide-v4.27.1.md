@@ -1,6 +1,6 @@
 # Axona Services Guide
 
-*(kernel 4.22.0 · testnet — versioned with the protocol it describes)*
+*(kernel 4.27.1 · testnet — versioned with the protocol it describes)*
 
 The other programmer-guide documents teach the **library** — how to build your
 own peer with `@axona/protocol` and speak pub/sub. This guide covers the
@@ -11,18 +11,18 @@ together, and the **PoW collector**. If you are operating an Axona deployment,
 wiring an agent into the network, or just want a topic to stay alive when no
 browser tab is open, this is the document for you.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v4.22.0)
-- **Wire version**: 4.0 (`WIRE_VERSION`); kernel version 4.22.0 (`KERNEL_VERSION`)
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v4.27.1)
+- **Wire version**: 4.0 (`WIRE_VERSION`); kernel version 4.27.1 (`KERNEL_VERSION`)
 - **Live networks**: both run the 4.x line. **Testnet** (`wss://testnet.axona.net`)
-  tracks the newest kernel — 4.22.0, the version this guide describes. The
+  tracks the newest kernel — 4.27.1, the version this guide describes. The
   **production** federated pair (`wss://bridge.axona.net` east +
   `wss://bridge-west.axona.net` west) runs the most recently promoted kernel
   (4.21.0 at press time), typically one release behind while changes soak on
   testnet. The two networks are wire-compatible but *separate* — a peer joins
   one or the other; pick with `RELAY_NETWORK`/`BRIDGE_URL` (§3).
 - **Companion docs**:
-  - [Quick Start](Quick-Start-v4.22.0.md) · [Programmer Guide](Axona-Programmer-Guide-v4.22.0.md) · [API Reference](Axona-API-Reference-v4.22.0.md) — the library.
-  - [AI Grounding](Axona-AI-Grounding-v4.22.0.md) — building with an AI assistant.
+  - [Quick Start](Quick-Start-v4.27.1.md) · [Programmer Guide](Axona-Programmer-Guide-v4.27.1.md) · [API Reference](Axona-API-Reference-v4.27.1.md) — the library.
+  - [AI Grounding](Axona-AI-Grounding-v4.27.1.md) — building with an AI assistant.
   - [Architecture](../architecture/Axona-Architecture.tex) — how the bridge + transport work under the hood.
 
 > **Library vs. services.** A *peer* is the unit the library gives you: an
@@ -119,7 +119,7 @@ or, with the repo checked out:
 cd /opt/axona-bridge
 docker compose build        # builds first; the old container keeps serving
 docker compose up -d        # fast swap; Caddy keeps its certificate
-curl https://bridge.example.net/healthz     # → {"status":"ok","version":…,"kernelVersion":"4.22.0"}
+curl https://bridge.example.net/healthz     # → {"status":"ok","version":…,"kernelVersion":"4.27.1"}
 ```
 
 Full provisioning options (the installer, the Docker bundle, and a manual
@@ -418,9 +418,9 @@ any other peer that takes on the same role.
 
 ## Where to go next
 
-- **[Programmer Guide](Axona-Programmer-Guide-v4.22.0.md)** — build the peer that
+- **[Programmer Guide](Axona-Programmer-Guide-v4.27.1.md)** — build the peer that
   talks to these services.
-- **[API Reference](Axona-API-Reference-v4.22.0.md)** — `host()` / `unhost()`,
+- **[API Reference](Axona-API-Reference-v4.27.1.md)** — `host()` / `unhost()`,
   `metricTopic()`, and the rest of the public surface.
 - **`axona-bridge/deploy/INSTALL.md`** — provision a bridge (installer, Docker,
   or manual).
