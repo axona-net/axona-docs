@@ -16,6 +16,27 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.27.0 — 2026-07-17 (testnet) — a node stays alive while it converges (join-storm hardening)
+
+**What's protected:** the **liveness of infrastructure nodes under bulk state
+transfer** — whether that bulk arrives from legitimate convergence (a relay
+rejoining a busy region receives every topic's full state at once) or from a
+deliberate flood. Three complementary bounds, all normative (architecture doc
+§XI, enforced by the constants coherence guard): a root now paces its
+full-state replication to at most a fixed budget of topics per repair tick
+(a newly joined cohort member is seeded progressively instead of being
+firehosed); a receiver drains verification-heavy pushes through a bounded,
+time-sliced queue so signature-checking CPU can never monopolize the event
+loop (mesh keepalives keep their share; queue overflow is dropped-and-logged
+and re-healed by anti-entropy, bounding memory against a malicious sender);
+and a node whose mesh has dissolved now detects the starvation and re-runs
+its self-integration instead of remaining silently isolated forever. The
+failure this closes was reproduced live on two kernel versions: a rejoining
+relay bulk-ingesting ~1,000 roles starved its own heartbeats, was evicted by
+every peer, and the regional backbone dissolved without self-healing.
+
+---
+
 ## Kernel v4.26.0 — 2026-07-16 (testnet) — role state is bounded and every role transition is observable
 
 **What's protected:** the **boundedness of per-topic role state** on
@@ -1671,4 +1692,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-07-16.*
+*Last updated: 2026-07-17.*
