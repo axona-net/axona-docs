@@ -1,10 +1,14 @@
 # Soak Update — 2026-07-17 — v4.25.0 / v4.26.0 (testnet)
 
 **TL;DR: Phase 6 (v4.25.0) looks solid. Phase 7 (v4.26.0) shipped last night with all
-gates green, but the overnight soak shows progressive network degradation — 100% in
-hour one decaying to ~30–50% by morning. An A/B against v4.25.0 is running now to
-determine whether Phase 7 caused it. Prod promotion is ON HOLD; prod remains on
-4.22.1 and is unaffected.**
+gates green, but the overnight soak showed progressive network degradation — 100% in
+hour one decaying to ~30–50% by morning. UPDATE 12:55Z — the A/B verdict is in and
+EXONERATES Phase 7: a fresh all-4.25.0 fleet decayed faster still (33% in its first
+hour). The cause is environmental: ~1,000 standing roles concentrated on one region's
+relays (from durable test topics planted last night) trigger the known join-storm
+failure (#332) — bulk role ingest on relay join starves the event loop and the mesh
+never self-heals. #332 is now the active promotion blocker, with a reliable live
+reproduction. Prod promotion is ON HOLD; prod remains on 4.22.1 and is unaffected.**
 
 ---
 
@@ -95,14 +99,19 @@ Node 24), and a `TimeoutNaNWarning` fires at startup.
 
 - **Prod promotion: ON HOLD.** No part of the 4.23→4.26 line promotes on today's
   evidence. Prod remains on 4.22.1 (unaffected and stable).
-- **A/B running now** (started 11:52Z): identical soak against the same backbone
-  rolled back to the v4.25.0 vendor, same accumulated-topic load. If 4.25.0 decays
-  too → the cause is environmental (role accumulation / #332 dynamics), and Phase 7
-  is exonerated. If 4.25.0 holds ≥90% → Phase 7 is the regression; we bisect its two
-  behavioral changes and fix or revert before it goes anywhere near prod. Verdict
-  expected ~15:00Z; testnet stays fully usable meanwhile.
-- **If Phase 7 is exonerated**, the promotion candidate becomes "4.25.x now or 4.26.x
-  after a clean overnight" — user's call with the A/B data in hand.
+- **A/B COMPLETE (12:55Z): Phase 7 exonerated.** A fresh all-4.25.0 fleet under the
+  same role load decayed to 33% within its first hour — worse than 4.26.0's overnight
+  onset. The degradation is load-triggered and kernel-version-independent. Testnet is
+  restored to the 4.26.0 fleet.
+- **#332 (join-storm) is now the active blocker** and has a reproduction recipe:
+  plant a few hundred durable topics in one region, restart that region's relays,
+  and watch the mesh dissolve as they bulk-ingest the role mass. Recommendation:
+  pull the #332 hardening (Phase 9 per-nature obligations + invariant I-11, "bulk
+  work never starves liveness") forward ahead of Phase 8 — it gates prod promotion
+  of the entire 4.2x line.
+- **Soak paused** until #332 mitigation lands or the planted test topics expire
+  (~Jul 18 evening) — under the current regime the soak measures #332, not the
+  kernel line, so further hours add no promotion evidence.
 - Queued kernel/bridge work, unchanged priority: #338 (bridge admit-then-kick),
   #339 (transport fail-loud, from Howard's report), #340 (dead-heir handoff delay),
   #341 (unhosted-region durability + kill replay — feeds the Phase 8 sync-engine
