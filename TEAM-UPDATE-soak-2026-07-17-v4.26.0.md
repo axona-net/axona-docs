@@ -182,6 +182,96 @@ That framing points at two complementary fixes:
 
 ---
 
-*Written 2026-07-17 ~12:00Z; A/B verdict and appendix added ~13:15Z. Evidence:
-`axona-stress/results/soak-axon-4250.jsonl`, `soak-axon-4260.jsonl`,
-`soak-axon-4250b.jsonl`, `axona-relay/captures/phase7-degradation-20260717/`.*
+## Part 2 — the fix and its validation (v4.27.0 / v4.27.1, evening 2026-07-17)
+
+**TL;DR: the join-storm (#332) is fixed and live-validated. On the exact
+reproduction conditions that collapsed both 4.25.0 and 4.26.0, kernel 4.27.1
+held a 96% idle-machine delivery rate over 3.5 hours with the backbone never
+once dissolving. #332 is closed. 4.27.1 is the recommended prod-promotion
+candidate — user-gated. Prod remains on 4.22.1, which sits in the unfixed
+failure regime and will re-degrade within days.**
+
+### What was tested
+
+The #332 fix shipped in two kernel releases and was validated against the
+*same* conditions that produced the morning's collapse — the fleet was
+restarted directly into the standing region-0x80 role mass (~hundreds of
+durable topics concentrated on the uswest relays), then soaked for 3.5 hours
+(17:09→20:47Z) under the full scenario suite. Live stack: kernel **4.27.1**,
+bridge 2.81.0, relays 0.55.1, peer 3.55.1.
+
+The fix has three legs (architecture doc §XI, all normative, enforced by the
+constants coherence guard):
+1. **Sender pacing** — a root does at most 32 full-state replications per
+   repair tick with a round-robin cursor, so a joining relay is seeded over
+   a couple of minutes instead of firehosed in one tick.
+2. **Receiver protection** — REPLICATE/REPLAYUP ingest drains through a
+   bounded, time-sliced queue (a hybrid inline fast-path for light traffic),
+   so signature-verification CPU can never monopolise the event loop; overflow
+   drops-and-logs and anti-entropy re-heals.
+3. **Mesh re-warm** — a relay whose mesh dissolves now detects the starvation
+   and re-runs self-integration; 4.27.1 adds a bridge peer-list re-request
+   (`requestPeerIntroductions`), because a dissolved mesh has an empty routing
+   table and self-lookup finds nobody. (4.27.0's re-warm fired 59× uselessly
+   against the empty table — the live gate caught it, and 4.27.1 fixed it.)
+
+### Results
+
+**Idle-machine verdict (the trustworthy kernel signal): 27/28 = 96%.**
+Overall was 80% (64/80), but load-segmented it's clear the residual failures
+are the undersized soak machine saturating under its own load, not the kernel:
+
+| Load bucket | Result |
+|---|---|
+| idle (loadPerCore < 1) — trustworthy | **96%** (27/28) |
+| busy (1–2) | 79% |
+| saturated (≥ 2) | 57% |
+
+15 of 16 total failures occurred while the machine was under load; exactly one
+under idle. **The backbone stayed fully healthy the entire 3.5 hours** — every
+relay at 14–25 mesh peers fully bound, roles bounded (0–348), **zero
+ingest-overflow, zero new mesh-rewarm events. The mesh never dissolved once.**
+
+Contrast with the failing kernels at the same age:
+
+| Kernel | idle-machine verdict | backbone |
+|---|---|---|
+| 4.25.0 (A/B) | 33% in hour 1 | dissolved |
+| 4.26.0 (overnight) | 55% | dissolved (peers → 1–2) |
+| 4.27.0 (rewarm broken) | ~67% | dissolved despite 59 rewarm attempts |
+| **4.27.1** | **96%** | **never dissolved** |
+
+### What we learned
+
+- **The join-storm is a solved problem, not a masked one.** The collapse
+  signature was always mesh dissolution (relays isolating to peers=1–3) driving
+  systematic all-scenario failure. On 4.27.1 that never happened — the pacing
+  kept the mesh healthy enough that the re-warm safety net was never even
+  needed (0 firings). The fix addresses the mechanism (I-11: bulk work never
+  starves liveness), not the symptom.
+- **The 4.27.0 → 4.27.1 iteration is the value of live gating.** The sender and
+  receiver legs worked on the first try, but the mesh-rewarm leg failed live
+  (empty routing table) in a way no unit test would have caught. One live-soak
+  iteration found and fixed it same-session.
+- **The idle-vs-load split remains the only honest read of this soak.** Overall
+  delivery % on the shared laptop is dominated by machine load, exactly as the
+  deploy-state runbook warns. 96% idle is the number that means something.
+
+### Actions
+
+- **#332 CLOSED.** Fixed and validated.
+- **Recommendation: promote 4.27.1 to prod** — it is the candidate that closes
+  the failure regime prod currently sits in. **User-gated.** The morning's prod
+  backbone restart bought days, not a fix: prod (4.22.1) predates every join-storm
+  mitigation and will re-degrade. Promotion carries the whole 4.23→4.27 line
+  (Phases 6+7 + join-storm) in one move.
+- Soak continues overnight on 4.27.1 to extend the evidence; watch drops to a
+  lighter cadence.
+- Unblocked-but-separate follow-ups remain: #338 (bridge admit-then-kick),
+  #339 (fail-loud transport), #340 (dead-heir handoff), #341 (unhosted-region
+  durability), #343/#344 (TURN: node-datachannel REST username + TCP fallback).
+
+*Part 1 written ~12:00Z; Part 2 (fix + validation) written ~20:50Z. Evidence:
+`soak-axon-4250.jsonl`, `soak-axon-4260.jsonl`, `soak-axon-4250b.jsonl`,
+`soak-axon-4270.jsonl`, `axona-relay/captures/phase7-degradation-20260717/`;
+kernel tags v4.27.0 / v4.27.1; `test/smoke_join_storm.mjs`.*
