@@ -33,7 +33,9 @@ idle-machine runs.
 **External evidence in the same window:**
 - Howard's **axonSpec**: 11/11 against both 4.25.1-local and live 4.26.0.
 - Howard's new **alert-bot** (fresh checkout, kernels 4.25.1 and 4.26.0): publishes
-  topics in region 0x80 — a region with **no relay coverage** — disconnects the
+  topics in region 0x80 (grizzly — hosted by the three uswest relays as their
+  own keyspace; **correction to an earlier draft that called this region
+  relay-less**) — disconnects the
   publisher, then verifies a fresh subscriber receives everything.
 
 **Unusual about the window:** the Jul 16 incident response (nginx ws:// fix,
@@ -129,13 +131,15 @@ messages across too few nodes?**
 **A:** Half yes — but the half that's wrong matters for the fix.
 
 **"Too many topics across too few nodes" — yes, that concentration is real.**
-Region 0x80 has zero dedicated relays, so its entire keyspace falls to the
-nearest neighbors — the three uswest relays. Every one of the ~400 alert-bot
-topics plus the soak's topics landed on those same three nodes (975–1,140 roles
+*(Corrected 2026-07-17 pm: an earlier draft said region 0x80 had no relay
+coverage. Wrong — the three uswest relays ARE region 0x80/grizzly; hosting
+that keyspace is their job.)* Every one of the ~400 alert-bot topics plus the
+soak's topics landed on those same three in-region nodes (975–1,140 roles
 each, versus ~50–500 elsewhere). The design assumes infrastructure roughly
 proportional to demand per region; the alert-bot pattern — publish durably,
-then leave — creates demand with no accompanying presence, so nothing shares
-the load. Three nodes carry a region's worth of state.
+then leave — creates demand with no accompanying presence, so nothing beyond
+the fixed trio shares the load. Three nodes carry a region's worth of state —
+by design, but with no headroom mechanism when demand concentrates.
 
 **"Too many messages / starving" — no, and this is the important correction.**
 The data volume is trivial: most of these topics hold 2–10 small messages; a

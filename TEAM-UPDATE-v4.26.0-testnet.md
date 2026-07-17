@@ -88,7 +88,8 @@ caused by the release, all now addressed or filed:
 The first heavy soak of the new stack decayed from 100% to ~40% overnight. An
 A/B the next morning **exonerated Phase 7** — a fresh all-4.25.0 fleet decayed
 *faster* under the same conditions. The cause is environmental and now fully
-characterized: ~400 durable topics planted in one relay-less region (by
+characterized: ~400 durable topics planted in one region (0x80/grizzly — served
+by the three uswest relays as their own keyspace) (by
 alert-bot testing) concentrate ~1,000 roles on the three nearest relays, and a
 (re)joining relay bulk-ingests that role mass at once, starving its event loop
 until its mesh dissolves. Not a capacity problem — a few megabytes of data —
