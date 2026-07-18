@@ -740,6 +740,15 @@ Check generated code against ALL of these before calling it done.
   \textbf{Works on localhost, fails deployed} → page not HTTPS
   (\texttt{crypto.subtle} unavailable).
 \item
+  \textbf{Firefox only: ``ICE failed, your TURN server appears to be
+  broken'' repeating, peers stuck at \textasciitilde1, no delivery} →
+  the dev server is bound to IPv6 loopback (\texttt{::1}) --- Vite's
+  default. Firefox gathers ZERO ICE candidates on a \texttt{::1}-origin
+  page, so every mesh dial fails; Chromium is unaffected. Fix:
+  \texttt{server:\ \{\ host:\ \textquotesingle{}127.0.0.1\textquotesingle{}\ \}}
+  in \texttt{vite.config.js} (or serve on an IPv4 address). The TURN
+  server is fine --- do not debug it.
+\item
   \textbf{Large message silently missing for some receivers} → over the
   15 KB reliable floor. Use \texttt{std/chunk}.
 \item

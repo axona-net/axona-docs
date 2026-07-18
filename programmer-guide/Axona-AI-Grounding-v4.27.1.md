@@ -366,6 +366,12 @@ Check generated code against ALL of these before calling it done.
   (and `connect()` avoids the question entirely).
 - **Works on localhost, fails deployed** → page not HTTPS (`crypto.subtle`
   unavailable).
+- **Firefox only: "ICE failed, your TURN server appears to be broken" repeating,
+  peers stuck at ~1, no delivery** → the dev server is bound to IPv6 loopback
+  (`::1`) — Vite's default. Firefox gathers ZERO ICE candidates on a
+  `::1`-origin page, so every mesh dial fails; Chromium is unaffected. Fix:
+  `server: { host: '127.0.0.1' }` in `vite.config.js` (or serve on an IPv4
+  address). The TURN server is fine — do not debug it.
 - **Large message silently missing for some receivers** → over the 15 KB
   reliable floor. Use `std/chunk`.
 - **User identity resets every reload** → author not persisted. Use
