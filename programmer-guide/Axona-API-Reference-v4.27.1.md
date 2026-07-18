@@ -172,6 +172,14 @@ What `peer.sub` delivers and `peer.pull` returns.
 }
 ```
 
+> **`ts` is publish time, and it is the only legitimate input to recency
+> logic.** A subscription with `since` replays history, so an envelope that
+> *arrives* now may have been *published* hours ago — "last seen" / online /
+> freshness features must compare against `env.ts`, never the local clock at
+> delivery, and must keep the latest `ts` per author (replay order is not
+> guaranteed). Field bug: arrival-time stamping resurrected a full day of
+> departed users as "online" on every app launch.
+
 A **retraction** (see `peer.kill`) is delivered to your `sub` handler as
 a marker instead of a full envelope:
 
@@ -610,7 +618,7 @@ Publish a message to a topic. **Returns** the 64-char hex `msgId`.
 |---|---|---|
 | `topic` | `TopicDescriptor` | **must be a descriptor** — a bare id is rejected (the storing node needs the descriptor to verify the write policy). |
 | `message` | `any` | JSON-serializable payload. |
-| `opts.signWith` | `AuthorIdentity \| ANONYMOUS` | **required** — name a signer, or pass the `ANONYMOUS` sentinel to publish unsigned. There is no default author. |
+| `opts.signWith` | `AuthorIdentity \| ANONYMOUS` | **required** — name a signer, or pass the `ANONYMOUS` sentinel to publish unsigned. There is no default author. Authorship is **per call**: one peer serves any number of authors/personas by varying `signWith` — switching the active user of an app must never reconnect the peer. |
 
 ```js
 import { createAuthorIdentity, ANONYMOUS } from '@axona/protocol';

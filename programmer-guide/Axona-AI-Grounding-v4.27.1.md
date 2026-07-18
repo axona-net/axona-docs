@@ -7,6 +7,15 @@ Everything below is exact and current; nothing outside this file is required.
 If this version does not match the bridge you are connecting to, request the
 matching grounding file.
 
+**Division of authority.** You will usually build from an application design
+document *plus* this file. The design document is the authority on **what** to
+build; this file is the sole authority on **how every protocol call is
+shaped.** When a design document names a protocol operation in prose ("issues
+a kill for that message", "subscribes to the feed"), that prose never licenses
+a guessed signature — the call shape comes from here, exactly. The most
+expensive bug yet observed in a generated Axona app came from inferring an
+API's arguments from design-doc prose.
+
 Axona is a serverless peer-to-peer pub/sub network. Every participant is a
 peer. Topics are addresses derived from descriptors; messages route to an
 emergent per-topic root and fan out through a distribution tree. There is no
@@ -341,7 +350,9 @@ Check generated code against ALL of these before calling it done.
 4. **Deriving presence/recency from arrival time.** A `since:'all'` (or
    `'latest'`) subscription replays history: a message that arrives NOW may
    have been published hours ago. Recency logic (online lists, "last seen")
-   must read `env.ts` (publish time), never the local clock at delivery.
+   must read `env.ts` (publish time), never the local clock at delivery —
+   and must keep the LATEST publish time per author (never let an older
+   replayed record overwrite a fresher one; replay order is not guaranteed).
    For ephemeral signals like heartbeats, subscribe with `since` omitted
    (live-only) — replaying stale heartbeats is pure noise.
 5. **Faking encryption with public inputs.** The protocol signs messages; it
@@ -355,6 +366,33 @@ Check generated code against ALL of these before calling it done.
    kernel call) throws, surface the error. Substituting a locally-made-up id
    "so the UI keeps working" silently diverges that client from every other
    peer on the topic — the failure mode is invisible no-delivery (HARD RULE 1).
+
+## Verify with two clients — the single-client illusion
+
+Do not declare an Axona app working from one client. **Every mistake in the
+list above renders perfectly on a single screen** — the app connects, the UI
+looks right, your own messages appear (your client shows you your own state,
+not the network's). Distributed defects are only visible between two clients.
+The minimum gate before "done", in order:
+
+1. **Delivery.** Two clients (separate browsers or profiles), same topic: a
+   message sent from A renders on B within seconds.
+2. **Retraction propagates.** A kills its own message → it disappears on B
+   via the `{ deleted: true }` marker — not merely locally on A.
+3. **Share through your own surface.** A shares a topic through whatever your
+   app uses (invite, directory ad, QR, link) and B joins through it. B must
+   see **A's content**. A clean-looking but empty topic on B means the shared
+   descriptor was partial (mistake 3) — this is the test that catches it.
+4. **Recency honesty.** After history has accumulated, a freshly-started
+   client's presence/"last seen" surface shows only currently-active parties
+   — replayed history must not resurrect the departed (mistake 4).
+5. **Persona switch is free.** Switching the active user/author must not
+   reconnect the peer — watch the connection state while switching
+   (mistake 2).
+6. **Failure is loud.** Feed one malformed topic descriptor: a visible error
+   and no subscription — never a silently invented topic (mistake 6).
+7. **Both engines.** Run the gate in a Chromium browser AND in Firefox —
+   real environment differences exist (see Troubleshooting).
 
 ## Troubleshooting rules
 
@@ -383,6 +421,15 @@ Check generated code against ALL of these before calling it done.
 - Browser: HTTPS only. Node: v20+; the same `webTransport` connects to the
   bridge over WSS (the WebRTC mesh is browser-side; Node peers converse via
   the bridge and routing).
+- **Bundlers (Vite/webpack): alias `node-datachannel` and
+  `node-datachannel/polyfill` to an empty stub module** (`export default {}`)
+  for browser builds. It is the kernel's Node-only WebRTC dependency; the
+  browser never executes that import path, but the bundler must still be able
+  to resolve it.
+- **After changing the kernel pin, clear the bundler's dependency cache**
+  (Vite: delete `node_modules/.vite`) and restart the dev server. The
+  stale-cache failure mode — the old kernel silently served under the new
+  version number — has repeatedly cost real debugging time.
 - The testnet bridge is `wss://testnet.axona.net` (kernel 4.27.1, wire 4.0) —
   the network this grounding targets. Production (`wss://bridge.axona.net`)
   runs the same wire-4 line, typically one release behind; the two are

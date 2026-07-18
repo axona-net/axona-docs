@@ -442,6 +442,17 @@ What \texttt{peer.sub} delivers and \texttt{peer.pull} returns.
 \end{Highlighting}
 \end{Shaded}
 
+\begin{quote}
+\textbf{\texttt{ts} is publish time, and it is the only legitimate input
+to recency logic.} A subscription with \texttt{since} replays history,
+so an envelope that \emph{arrives} now may have been \emph{published}
+hours ago --- ``last seen'' / online / freshness features must compare
+against \texttt{env.ts}, never the local clock at delivery, and must
+keep the latest \texttt{ts} per author (replay order is not guaranteed).
+Field bug: arrival-time stamping resurrected a full day of departed
+users as ``online'' on every app launch.
+\end{quote}
+
 A \textbf{retraction} (see \texttt{peer.kill}) is delivered to your
 \texttt{sub} handler as a marker instead of a full envelope:
 
@@ -1253,7 +1264,10 @@ descriptor to verify the write policy). \\
 \texttt{opts.signWith} &
 \texttt{AuthorIdentity\ \textbackslash{}\textbar{}\ ANONYMOUS} &
 \textbf{required} --- name a signer, or pass the \texttt{ANONYMOUS}
-sentinel to publish unsigned. There is no default author. \\
+sentinel to publish unsigned. There is no default author. Authorship is
+\textbf{per call}: one peer serves any number of authors/personas by
+varying \texttt{signWith} --- switching the active user of an app must
+never reconnect the peer. \\
 \end{longtable}
 }
 

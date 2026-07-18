@@ -320,6 +320,15 @@ const online = [...here].filter(([, t]) => Date.now() - t < 90_000);
 Presence is just a topic everyone heartbeats into. Messages age out of the
 cache on their own; nobody cleans up.
 
+Two details of this recipe are deliberate, and both have been gotten wrong
+in a shipped app: the subscription is **live-only** (no `since` — replaying
+hours of stale heartbeats is noise), and recency reads **`env.ts`** — the
+*publish* time — never the local clock at delivery. If you do replay history
+on a presence-like topic, a heartbeat that *arrives* now may have been
+*published* hours ago; stamping arrival time resurrects everyone who was
+online in the last day. Keep the latest `env.ts` per author and compare
+against that.
+
 ### 4.5 Taking it back (kill)
 
 ```js
@@ -427,7 +436,9 @@ bots (and AI-built apps!) should use it.
 
 ## 5. Things that will bite you
 
-Learn these five here rather than in production.
+Learn these here rather than in production. The first five are the classic
+protocol traps; the last five have each already bitten a real, shipped
+Axona application.
 
 **1. Two descriptors, one character apart, are two different topics.**
 No error, no warning — just silence. The classic: publisher says
@@ -456,6 +467,41 @@ want kept warm).
 **5. 15 KB.** Above it, real-world WebRTC channels start dropping frames
 even though the hard cap is 256 KB. `std/chunk` exists so you never think
 about this again.
+
+**6. Delivery time is not publish time.** A subscription with `since` replays
+history: a message that arrives *now* may have been published hours ago.
+Any recency logic — "last seen", online lists, freshness sorting — reads
+`env.ts` (the publish time), never `Date.now()` at delivery. The observed
+failure: an app stamped arrival time on replayed heartbeats, and every
+user from the past day appeared "online" for 90 seconds after each launch.
+
+**7. Switching users is not reconnecting.** One peer serves any number of
+authors — authorship is per-call (`{ signWith }`), and swapping the active
+persona should touch *nothing* about the connection. The observed failure:
+an app tore down and rebuilt its peer on every persona switch, churning the
+mesh and killing live connections mid-negotiation for zero benefit.
+
+**8. Sharing a topic means sharing the whole descriptor.** An invite, a
+directory advertisement, a QR code, a pasted link — whatever carries a
+topic to another user must carry `{ region, owner, name, write }`
+*complete*. The observed failure: a discovery ticker advertised owned
+topics by name and region only; joiners derived a different (ownerless)
+topic ID and landed in a working-looking, permanently empty room.
+
+**9. When derivation fails, fail.** If the kernel rejects a descriptor,
+show the error and skip the topic. The observed failure: an app caught the
+throw and substituted a locally invented ID "so the UI kept working" —
+which converted a visible error into invisible, permanent non-delivery
+that no log would ever explain.
+
+**10. Local dev: bind the dev server to IPv4.** Vite's default `localhost`
+binding lands on IPv6 `::1`, and Firefox gathers **zero** ICE candidates on
+a page served from a `::1` origin — every mesh dial fails with a misleading
+"your TURN server appears to be broken" console error, while Chromium works.
+One line ends it: `server: { host: '127.0.0.1' }`. (Bundler note: alias
+`node-datachannel` and `node-datachannel/polyfill` to an empty stub for
+browser builds, and clear the bundler's dependency cache after changing the
+kernel pin.)
 
 ## 6. Errors, when they happen
 
@@ -493,6 +539,15 @@ and `kill()` resolving `{ ok: false }` (nothing to retract).
   against testnet; deploy against production. A genuinely mismatched kernel
   is refused loudly (close 4426) — match your kernel pin to your bridge.
 - **HTTPS is mandatory** in the browser (`crypto.subtle`).
+- **Prove it with two clients before you call it done.** A distributed app
+  can pass every single-client test while being completely wrong — your own
+  client shows you your own state, not the network's. The minimum gate: two
+  clients in one topic exchanging messages; a kill on one disappearing on
+  the other; a topic shared through your app's own invite/ad/QR surface
+  opening with *content* (not a clean-looking empty room — that's a partial
+  descriptor); a fresh client's presence view showing only the currently
+  active; and the whole gate run in both a Chromium browser and Firefox.
+  Every field failure in §5's entries 6–10 was invisible to one client.
 - **Surface your versions.** Show the kernel version somewhere findable
   (`KERNEL_VERSION` import) — future-you debugging a mixed fleet will be
   grateful.
