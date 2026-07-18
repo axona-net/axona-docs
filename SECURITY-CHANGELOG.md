@@ -16,6 +16,22 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.28.1 — 2026-07-18 (testnet) — root self-verification active on every peer
+
+Every node that claims a topic's root role now periodically verifies that claim
+against the live network — an iterative lookup confirms it is genuinely the
+closest node, and a claim that isn't yields to the true root automatically. This
+protection existed in the kernel but was inert on standalone peers (browsers,
+relays, embedded peers) because the peer's routing adapter answered the
+verification query in a shape the verifier could not read; v4.28.1 aligns the
+adapter with the verifier's contract. PROTECTED: a topic's serialization point
+converges to a single, network-confirmed node — a stale, mistaken, or
+deliberately minted competing root claim is detected and demoted within seconds
+instead of persisting and silently absorbing a topic's traffic. A new contract
+test pins the adapter/verifier shape so the two cannot drift apart again.
+
+---
+
 ## Kernel v4.27.0 — 2026-07-17 (testnet) — a node stays alive while it converges (join-storm hardening)
 
 **What's protected:** the **liveness of infrastructure nodes under bulk state
@@ -1692,4 +1708,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-07-17.*
+*Last updated: 2026-07-18.*
