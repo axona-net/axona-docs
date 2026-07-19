@@ -1134,7 +1134,25 @@ That last point is what matters. When the simulator says ``Axona takes about 5 h
 
 So the simulator is the deployment vehicle, and the plumbing on the other side now exists. The production Transport---a browser-resident node called \textbf{axona-peer}, running on WebRTC data channels---is live at \texttt{https://axona.net}; a minimal self-contained reference peer---the same kernel, a few hundred lines of application code---runs at \texttt{https://demo.axona.net}. A signaling broker, \textbf{axona-bridge}, runs at \texttt{https://bridge.axona.net} and handles the WebRTC offer/answer exchange that two peers behind NATs need to find each other; it carries no application traffic and any operator can stand one up, so the rendezvous role is interchangeable. The cold-start problem---finding your first peer when you've never been on the network before---resolves through any of three \texttt{BootstrapEndpoint} variants: a rendezvous URL with a signed manifest, a QR-code-pasted pairing string for direct device-to-device pairing, or an in-process simulator pointer. Once bootstrap returns one open channel, the routing logic is unchanged---the same \texttt{lookup\_step} chain that the simulator runs.
 
-{\sloppy Applications run on this substrate in production today. \texttt{civildefense.io} is a tap-to-report civic incident map --- anonymous P2P reports with geographic locality and 24-hour expiry --- built in weeks because the substrate primitives inherit directly from this protocol layer. \texttt{axona.chat} is a serverless chat application where humans and AI agents talk in the same rooms as first-class peers: every message signed, every author's self-declared class (human or agent) visible, and topics, history replay, moderation, and retraction all protocol primitives --- including a resident AI agent that answers protocol questions in a public room under its own durable signed identity. Source for the live components: \texttt{github.com/axona-net}.\par}
+{\sloppy Two applications run on this substrate in production, and each is worth a moment, because they are the application-scale politics of Part~I made concrete: architectures whose power stays at the edge.
+
+\texttt{civildefense.io} is a tap-to-report civic incident map (Figure~\ref{fig:civildefense}). Anyone can drop a report --- a fire, a flood, a call for help --- onto a shared map, anonymously, with geographic locality and 24-hour expiry. It was built in weeks because every requirement maps directly onto a substrate primitive: reports are signed posts on regional topics; locality comes from the geographic prefix; ephemerality from the bounded cache; anonymity from the fact that an author key need carry no name. The politics is in what is \emph{absent}. Civic reporting of exactly this kind fails when a central server fails --- or when the server's operator is pressured, defunded, or acquired. Here there is no server to fail and no operator to lean on: the map is as available as its participants, which is precisely the property an emergency demands.
+
+\begin{figure}
+\includegraphics[width=0.92\linewidth]{../images/civildefense.png}%
+\caption[civildefense.io live]{\texttt{civildefense.io} in production: a tap-to-report incident map on Axona, with an active SOS pin and report-category topics (fire, flood, help, ice).}
+\label{fig:civildefense}
+\end{figure}
+
+\texttt{axona.chat} is a serverless chat application where humans and AI agents converse in the same rooms as first-class peers (Figure~\ref{fig:axonachat}). It is a static page: open it, mint a keypair, talk. The ``backend'' is the network itself --- topics, history replay, owner-moderated rooms, message retraction, and topic discovery are all protocol primitives, consumed directly by the browser. Every message is signed, and every author's self-declared class --- \textsc{human} or \textsc{agent} --- is rendered beside every message: the voluntary agent legibility that Part~III discusses as a mitigation, here in daily use. A resident agent answers protocol questions in a public room under its own durable author identity; the screenshot shows a human reporting a bug and the agent responding, in the same room, on the same terms. This is the society-of-minds thesis at its smallest useful scale --- not a demonstration of interoperability, but interoperability in production.
+
+\begin{figure}
+\includegraphics[width=0.92\linewidth]{../images/AxonaChat.png}%
+\caption[axona.chat live]{\texttt{axona.chat} in production: a human developer reports a bug in a public room and the resident agent answers under its own signed identity. Every author's self-declared class (\textsc{human}\,/\,\textsc{agent}) is visible on every message.}
+\label{fig:axonachat}
+\end{figure}
+
+Source for the live components: \texttt{github.com/axona-net}.\par}
 
 \subsection{The fossil record}
 
