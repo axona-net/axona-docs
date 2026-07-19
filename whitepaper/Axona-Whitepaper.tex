@@ -80,19 +80,8 @@
 \null\newpage
 
 % --------------------------------------------------------------------
-% Mission epigraph page
-% --------------------------------------------------------------------
-\thispagestyle{empty}
-\null\vfill
-\begin{flushright}
-\itshape The technology is shaped by the mission.\\[0.3em]
-The mission is freedom to communicate.\par
-\end{flushright}
-\vfill
-\null\newpage
-
-% --------------------------------------------------------------------
-% Body
+% Body  (the mission epigraph now lives in the opening paragraph of
+% "In One Page" — the reader meets it inside the argument, not before it)
 % --------------------------------------------------------------------
 \fancypagestyle{axonaplain}{%
   \fancyhf{}%
@@ -104,55 +93,59 @@ The mission is freedom to communicate.\par
 \setcounter{page}{1}
 
 \section{In One Page}
+\enlargethispage{3\baselineskip}\thispagestyle{empty}
 
-\newthought{Axona is a communication network with no owner} --- no company,
-no server, no place in the middle where anyone sits who could read, rank,
-charge, throttle, or forbid. It runs in production today, on ordinary
-phones, browsers, and laptops. There is no central directory,
-no account system, and no operator, because by construction there is nowhere
-for one to be.\marginnote[2pt]{\textbf{How to read this.}\; In a hurry: this
+\newthought{Every message you send today} passes through a machine that
+belongs to someone else. The internet has hardened into a lattice of
+chokepoints and tollbooths --- platforms, carriers, clouds --- where a
+conversation can be read, ranked, charged, throttled, or forbidden. The classical alternative, true peer-to-peer networking, has
+failed for twenty years on a mundane obstacle: it was too slow to use.
+\textbf{The technology is shaped by the mission, and the mission is freedom
+to communicate} --- so both problems had to fall
+together.\marginnote[2pt]{\textbf{How to read this.}\; In a hurry: this
 page, then Part~I (the Manifesto), then \S8 (\emph{The One Property}), then
 the subsection of \S13 that matches your field --- \S13 is written so you can
 enter at any point. Technical reader: Part~II is for you. Skeptical reader: \S10
 (\emph{What Goes Wrong}) and \emph{What Axona Is Not} are where the costs are counted. A glossary sits at the end.}
 
-Three ideas make it work. \textbf{Location-aware addresses} keep local
-traffic local, so the network is fast instead of wandering the globe.
-\textbf{Self-learning routing} --- connections that carry successful traffic
-grow stronger, unused ones fade, an idea borrowed from how neurons wire ---
-lets the network reshape itself around the paths that actually work and heal
-when parts of it die. And \textbf{self-repairing broadcast trees} let one
-participant reach many with no server coordinating the delivery.
+Axona is both problems falling together: a communication network with no
+owner --- no company, no server, no place in the middle, because there is
+nowhere for one to be --- running in production today on ordinary
+phones, browsers, and laptops, at the theoretical floor of what physics
+permits. Three ideas make it fast where
+every predecessor was slow. \textbf{Location-aware addresses} keep local
+traffic local instead of wandering the globe. \textbf{Self-learning routing}
+--- connections that carry successful traffic grow stronger, unused ones
+fade, the brain's own rule for wiring neurons --- lets the network learn
+shortcuts and heal around failures. And \textbf{self-repairing broadcast
+trees} let one voice reach many with no coordinating server.
 
 The keystone is a single design choice: \textbf{authorship is a signature,
-not an account.} Who is speaking is a cryptographic key the speaker holds;
-where they are and how they connect is a separate fact the network never
-links to it. The network moves signed bytes between endpoints and does
-nothing else --- so it \emph{cannot act on} what you say: cannot rank it,
-suppress it, or reveal who you are, because it was never told and never
-needed to know.
+not an account.} Who is speaking is a key the speaker holds; where they
+connect from is a separate fact the network never links to it. The network moves signed bytes between endpoints and does
+nothing else --- it cannot rank what you say, suppress it, or reveal who
+you are, because it was never told and never needed to know.
 
 That one property is the source of everything Axona makes possible and
-everything it makes dangerous --- they are the same property seen from two
-sides. It lets a researcher in a sanctioned country collaborate as an equal,
-and it lets a disinformation campaign route around every attempt to slow it.
-It gives AI agents from different companies a place to coordinate as peers,
-and it gives a \emph{misaligned} agent the same place on the same terms. A
-network that cannot be made to take sides cannot be made to take the right
-side either.
+everything it makes dangerous --- the same property seen from two sides.
+It lets a researcher in a sanctioned country collaborate as an equal ---
+and a disinformation campaign route around every attempt to slow it.
+It gives AI agents from different companies a place to coordinate as
+peers --- and a \emph{misaligned} agent the same place on the same terms.
+\textbf{A network that cannot be made to take sides cannot be made to take
+the right side either.}
 
-We think that is a tool worth building anyway --- for the same reason
-humanity kept fire and built hearths and fire brigades rather than giving it
-back. But the response to a tool no one can control is not a central
-authority who controls it; that only rebuilds the intermediary we set out to
-abolish. The response is \textbf{sight and stewardship}: making the life of
-the network visible to those who would understand it, and building human
-institutions --- accountable, bounded, resistant to capture --- that respond
-to what they see without seizing the thing itself. The network is built. That
-harder, human problem is the one that remains, and it is the reason for this
-document --- whose two halves share one spine, Mitchell Kapor's observation
-extended: \textbf{architecture is politics}, at the scale of the protocol, of
-the applications built on it, and of the social structures it makes possible.
+We think it is worth building anyway --- for the same reason humanity kept
+fire and built hearths and fire brigades rather than giving it back. But
+the answer is not a central authority --- that only rebuilds the
+intermediary we abolished. The answer is \textbf{sight and stewardship}: making the
+network's life visible, and building human institutions --- accountable,
+bounded, resistant to capture --- that respond to what they see without
+seizing the thing itself. The network is built; the harder, human problem
+remains --- the reason for this document, whose spine is Mitchell Kapor's
+observation extended:
+\textbf{architecture is politics}, at the scale of the protocol, its
+applications, and the social structures it makes possible.
 
 \newpage
 \manpart{Part I \;\textbullet\; Manifesto}
@@ -356,7 +349,7 @@ The fire is lit. The question is what we build around it.
 \newpage
 \manpart{Part II \;\textbullet\; The Machine}
 
-\noindent These are the sections where the machine itself is the subject. The aim is that a reader without a technical background finishes them understanding how Axona works, and a reader with one finishes them trusting that the description is faithful. Part~I claimed that the architecture is the politics; Part~II is that architecture, stated exactly --- every design choice below is also a decision about where power sits, and Part~III collects the consequences. The technology is, in a sense, the easy part of what this document is about: it exists, it runs, and it is describable in plain terms. Everything harder comes after.
+\noindent Part~I defined the philosophy of a chokepoint-free network. What follows is the exact machinery --- how such a network finds anything, learns, broadcasts, proves identity, and does all of it in milliseconds. The aim is that a reader without a technical background finishes these sections understanding how Axona works, and a reader with one finishes them trusting that the description is faithful. Part~I claimed that the architecture is the politics; Part~II is that architecture, stated exactly --- every design choice below is also a decision about where power sits, and Part~III collects the consequences. The technology is, in a sense, the easy part of what this document is about: it exists, it runs, and it is describable in plain terms. Everything harder comes after.
 
 
 % ===== PART II (spliced from Axona-Explainer.tex) =====
@@ -541,7 +534,7 @@ Pruning of unused connections & Lowest-scoring connection is evicted when a new 
 \end{tabular}
 \end{table}
 
-That is what Axona \emph{is}: a routing system where every connection has a weight that goes up when used and decays when not. The network's ``memory'' is its routing table, and the routing table evolves into whatever shape best serves the actual traffic.
+That is what Axona \emph{is}: a routing system where every connection has a weight that goes up when used and decays when not. \textbf{The network's ``memory'' is its routing table, and the routing table evolves into whatever shape best serves the actual traffic.}
 
 \subsection{The Vitality Function}
 
@@ -945,11 +938,17 @@ This is the kind of clean control experiment that should accompany any claim of 
 
 Can the protocol still route messages between hemispheres?
 
-\begin{itemize}
-  \item \textbf{Plain Kademlia: 0\% success.} With no learning, the partition is permanent.
-  \item \textbf{G-DHT (geography only, no learning): 4.6\% success.} The geographic prefix accidentally points a few peers at the bridge, but nothing builds on the discovery.
-  \item \textbf{Axona: $\sim$94\% success.}
-\end{itemize}
+\begin{center}
+\setlength{\fboxsep}{12pt}%
+\fcolorbox{black}{gray!6}{\parbox{0.86\linewidth}{%
+\centering
+{\textbf{THE SLICE WORLD RESULT}}\\[1pt]
+{\small\itshape cut the network in half, leave one node joining the halves}\\[8pt]
+Plain Kademlia: \textbf{0\%} --- with no learning, the partition is permanent\\[3pt]
+Geography alone (G-DHT): \textbf{4.6\%} --- lucky hits; nothing builds on them\\[3pt]
+Axona: \textbf{$\sim$94\%} --- \textbf{and climbing, because the partition is dissolving}%
+}}
+\end{center}
 
 % --- Figure 4: Slice World ----------------------------------------
 \begin{figure*}[h]
@@ -1228,6 +1227,8 @@ example, is a receiver reaching into the network to overrule a sender; content
 filtering is a platform doing the same. Every such mechanism is a function the
 network performs beyond simple forwarding, and every one is a point of control.
 
+This is ``architecture is politics'' in its most compact form:
+\textbf{the location of a mechanism \emph{is} the allocation of a power.}
 Axona's one property is a decision about where every one of these tussles is
 fought. By carrying only opaque signed bytes, Axona removes the network as a
 venue for tussle entirely. It cannot host the fight between a sender who wants to
@@ -1307,9 +1308,9 @@ hold, and work as equals --- the network moving their bytes without knowing or
 caring that a border runs between them.}
 
 The collaboration persists as long as its participants do, and its openness is a
-property of the mathematics, not of anyone's goodwill. This is not a marginal
-improvement in convenience; it is a change in who is allowed to coordinate at
-all.
+property of the mathematics, not of anyone's goodwill. \textbf{This is not a
+marginal improvement in convenience; it is a change in who is allowed to
+coordinate at all.}
 
 \subsection{The right to communicate}
 
@@ -1394,6 +1395,21 @@ happening in one place to people in another --- this is the property that
 matters. It is also, we acknowledge in advance, the property that makes the next
 section necessary.
 
+
+\subsection{The shape of what comes next}
+
+The pattern generalizes. Wherever coordination today requires renting a chokepoint, the substrate offers the same trade --- and the applications write themselves from the primitives:
+
+\begin{itemize}
+\item \textbf{Scientific research --- a global data commons.} Datasets and peer review shared across every border: researchers in sanctioned or underfunded regions collaborate as equals, with no centralized publisher in the path.
+\item \textbf{IoT and smart grids --- local energy negotiation.} Homes and solar grids trading distribution directly: geographic routing keeps the negotiation regional and low-latency, with no distant corporate cloud in the loop.
+\item \textbf{Journalism --- a secure whistleblower drop.} Ephemeral document delivery to investigative reporters: censor-resistant routing cannot be firewalled, the journalist's signature is verifiable, and the source's key carries no name.
+\item \textbf{Supply chain --- a trustless logistics feed.} One tracking stream across competing vendors: competitors subscribe to the same topic tree without any single logistics platform owning the data.
+\item \textbf{Healthcare --- an epidemiological outbreak map.} Anonymous, localized disease reporting: geographic cells let health workers watch regional clusters in real time, even when national infrastructure fails.
+\end{itemize}
+
+None of these requires a new protocol feature. They are the same five primitives --- signed posts, derived topics, geographic locality, bounded ephemerality, nameless keys --- rearranged.
+
 \section{10.\quad What Goes Wrong}
 
 Everything in \S9 was a consequence of moving the tussle out of the
@@ -1406,7 +1422,8 @@ are Axona, used as designed, toward ends we do not endorse.
 \subsection{Falsehood with no chokepoint}
 
 The mechanism that lets a dissident's message route around a censor lets a
-disinformation campaign route around every attempt to throttle it. On the
+disinformation campaign route around every attempt to throttle it. This is
+the manifesto's fire, seen from its burning side. On the
 platforms of today, however imperfectly, there is a place where a coordinated
 campaign of lies can be detected and slowed, because there is a place through
 which it must pass. Axona removes that place. A campaign that establishes itself
@@ -1658,7 +1675,9 @@ The distinction in this section's title is the whole of our position. We do not
 seek to control Axona, and we have built it so that we could not if we tried.
 What we believe it needs is \emph{stewardship}: a human institution that watches,
 understands, convenes, and responds, without holding a lever over the network
-itself. The difference matters, because the moment stewardship acquires the power
+itself. In the manifesto's terms, stewardship is the fire brigade, not a
+ministry of fire --- it exists to watch, to respond, and to teach, never to
+hold a monopoly on flame. The difference matters, because the moment stewardship acquires the power
 to silence a participant or suppress a message, it has become the control point we
 refused to build, and it will be captured exactly as every such point eventually
 is.

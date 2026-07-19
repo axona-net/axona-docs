@@ -5,21 +5,17 @@
 
 ---
 
-*The technology is shaped by the mission. The mission is freedom to communicate.*
-
----
-
 ## In one page
 
-Axona is a communication network with no owner — no company, no server, no place in the middle where anyone sits who could read, rank, charge, throttle, or forbid. It runs in production today, on ordinary phones, browsers, and laptops. There is no central directory, no account system, and no operator, because by construction there is nowhere for one to be.
+Every message you send today passes through a machine that belongs to someone else. The internet has hardened into a lattice of chokepoints and tollbooths — platforms, carriers, clouds — where a conversation can be read, ranked, charged, throttled, or forbidden. The classical alternative, true peer-to-peer networking, has failed for twenty years on a mundane obstacle: it was too slow to use. **The technology is shaped by the mission, and the mission is freedom to communicate** — so both problems had to fall together.
 
-Three ideas make it work. **Location-aware addresses** keep local traffic local, so the network is fast instead of wandering the globe. **Self-learning routing** — connections that carry successful traffic grow stronger, unused ones fade, an idea borrowed from how neurons wire — lets the network reshape itself around the paths that actually work and heal when parts of it die. And **self-repairing broadcast trees** let one participant reach many with no server coordinating the delivery.
+Axona is both problems falling together: a communication network with no owner — no company, no server, no place in the middle, because there is nowhere for one to be — running in production today on ordinary phones, browsers, and laptops, at the theoretical floor of what physics permits. Three ideas make it fast where every predecessor was slow. **Location-aware addresses** keep local traffic local instead of wandering the globe. **Self-learning routing** — connections that carry successful traffic grow stronger, unused ones fade, the brain's own rule for wiring neurons — lets the network learn shortcuts and heal around failures. And **self-repairing broadcast trees** let one voice reach many with no coordinating server.
 
-The keystone is a single design choice: **authorship is a signature, not an account.** Who is speaking is a cryptographic key the speaker holds; where they are and how they connect is a separate fact the network never links to it. The network moves signed bytes between endpoints and does nothing else — so it *cannot act on* what you say: cannot rank it, suppress it, or reveal who you are, because it was never told and never needed to know.
+The keystone is a single design choice: **authorship is a signature, not an account.** Who is speaking is a key the speaker holds; where they connect from is a separate fact the network never links to it. The network moves signed bytes between endpoints and does nothing else — it cannot rank what you say, suppress it, or reveal who you are, because it was never told and never needed to know.
 
-That one property is the source of everything Axona makes possible and everything it makes dangerous — they are the same property seen from two sides. It lets a researcher in a sanctioned country collaborate as an equal, and it lets a disinformation campaign route around every attempt to slow it. It gives AI agents from different companies a place to coordinate as peers, and it gives a *misaligned* agent the same place on the same terms. A network that cannot be made to take sides cannot be made to take the right side either.
+That one property is the source of everything Axona makes possible and everything it makes dangerous — the same property seen from two sides. It lets a researcher in a sanctioned country collaborate as an equal — and a disinformation campaign route around every attempt to slow it. It gives AI agents from different companies a place to coordinate as peers — and a *misaligned* agent the same place on the same terms. **A network that cannot be made to take sides cannot be made to take the right side either.**
 
-We think that is a tool worth building anyway — for the same reason humanity kept fire and built hearths and fire brigades rather than giving it back. But the response to a tool no one can control is not a central authority who controls it; that only rebuilds the intermediary we set out to abolish. The response is **sight and stewardship**: making the life of the network visible to those who would understand it, and building human institutions — accountable, bounded, resistant to capture — that respond to what they see without seizing the thing itself. The network is built. That harder, human problem is the one that remains, and it is the reason for this document — whose two halves share one spine, Mitchell Kapor's observation extended: **architecture is politics**, at the scale of the protocol, of the applications built on it, and of the social structures it makes possible.
+We think it is worth building anyway — for the same reason humanity kept fire and built hearths and fire brigades rather than giving it back. But the answer is not a central authority — that only rebuilds the intermediary we abolished. The answer is **sight and stewardship**: making the network's life visible, and building human institutions — accountable, bounded, resistant to capture — that respond to what they see without seizing the thing itself. The network is built; the harder, human problem remains — the reason for this document, whose spine is Mitchell Kapor's observation extended: **architecture is politics**, at the scale of the protocol, its applications, and the social structures it makes possible.
 
 > **How to read this.** In a hurry: this page, then Part I (the Manifesto), then §8 (*The One Property*), then the subsection of §13 that matches your field — §13 is written so you can enter at any point. Technical reader: Part II is for you. Skeptical reader: §10 (*What Goes Wrong*) and *What Axona Is Not* are where the costs are counted. A glossary sits at the end.
 
@@ -110,7 +106,7 @@ The fire is lit. The question is what we build around it.
 
 # Part II — The Machine
 
-These are the sections where the machine itself is the subject. The aim is that a reader without a technical background finishes them understanding how Axona works, and a reader with one finishes them trusting that the description is faithful. Part I claimed that the architecture is the politics; Part II is that architecture, stated exactly — every design choice below is also a decision about where power sits, and Part III will collect the consequences. The technology is, in a sense, the easy part of what this document is about: it exists, it runs, and it is describable in plain terms. Everything harder comes after.
+Part I defined the philosophy of a chokepoint-free network. What follows is the exact machinery — how such a network finds anything, learns, broadcasts, proves identity, and does all of it in milliseconds. The aim is that a reader without a technical background finishes these sections understanding how Axona works, and a reader with one finishes them trusting that the description is faithful. Part I claimed that the architecture is the politics; Part II is that architecture, stated exactly — every design choice below is also a decision about where power sits, and Part III will collect the consequences. The technology is, in a sense, the easy part of what this document is about: it exists, it runs, and it is describable in plain terms. Everything harder comes after.
 
 ## 1. The Problem: Finding Things on a Network Without a Boss
 
@@ -215,7 +211,7 @@ The brain's mechanism translates *literally* to peer-to-peer routing — no meta
 | Synaptic tagging (protection window) | Recently used connections are protected for a window of time |
 | Pruning unused connections | The lowest-scoring connection gets evicted when a new one wants in |
 
-That is what Axona *is*: a routing system where every connection has a weight that goes up when used and decays when not. The network's "memory" is its routing table, and the routing table evolves into whatever shape best serves the actual traffic.
+That is what Axona *is*: a routing system where every connection has a weight that goes up when used and decays when not. **The network's "memory" is its routing table, and the routing table evolves into whatever shape best serves the actual traffic.**
 
 ### The vitality function
 
@@ -360,9 +356,10 @@ The sharpest demonstration is the **Slice World** test. The network gets cut alm
 
 Can the protocol still route messages between hemispheres?
 
-- **Plain Kademlia: 0% success.** With no learning, the partition is permanent. Messages can't find the bridge.
-- **G-DHT (geography only, no learning): 4.6% success.** The geographic prefix accidentally points a few peers at the bridge, but nothing builds on the discovery.
-- **Axona: ~94% success.**
+> **THE SLICE WORLD RESULT — cut the network in half, leave one node joining the halves:**
+> **Plain Kademlia: 0%.** With no learning, the partition is permanent — messages can't find the bridge.
+> **Geography alone (G-DHT): 4.6%.** The prefix accidentally points a few peers at the bridge; nothing builds on the discovery.
+> **Axona: ~94% — and climbing, because the partition is dissolving.**
 
 The bridge becomes a **seed crystal**. After just 10 lookups through the partition, hop caching has installed cross-hemisphere edges in many intermediate nodes. Triadic closure creates direct connections between peers that keep meeting through the bridge. By 500 lookups, hundreds of cross-hemisphere connections exist. The partition has effectively dissolved.
 
@@ -447,7 +444,7 @@ Before the consequences, the cause. Almost everything this document has to say a
 
 David Clark's framework is the right one for seeing what this means. Clark observes that networks are composed of actors whose interests are not aligned — senders and receivers, users and platforms, citizens and states, the honest and the malicious — and he calls the working-out of those misaligned interests *tussle*. His central insight is that tussles can be fought in different places: inside the network, or at the endpoints, or in the courts and institutions of society. Where a tussle is fought is itself a design decision, made by whoever built the architecture, and it determines who holds power. A firewall, in his example, is a receiver reaching into the network to overrule a sender; content filtering is a platform doing the same. Every such mechanism is a function the network performs beyond simple forwarding, and every one is a point of control.
 
-This is "architecture is politics" in its most compact form: the location of a mechanism *is* the allocation of a power. Axona's one property is a decision about where every one of these tussles is fought. By carrying only opaque signed bytes, Axona removes the network as a venue for tussle entirely. It cannot host the fight between a sender who wants to speak and a receiver or authority who wants to stop them, because it has no mechanism to take either side. The contest does not disappear; it moves. It moves to the endpoints, where a recipient chooses what to read, what to verify, whom to trust, and what to ignore. It moves to the reputational and social layer, where authors build or lose standing in the eyes of those who listen. And it moves, ultimately, to the institutions of society — to law, to norms, to the slow human machinery of holding people accountable for what they do.
+This is "architecture is politics" in its most compact form: **the location of a mechanism *is* the allocation of a power.** Axona's one property is a decision about where every one of these tussles is fought. By carrying only opaque signed bytes, Axona removes the network as a venue for tussle entirely. It cannot host the fight between a sender who wants to speak and a receiver or authority who wants to stop them, because it has no mechanism to take either side. The contest does not disappear; it moves. It moves to the endpoints, where a recipient chooses what to read, what to verify, whom to trust, and what to ignore. It moves to the reputational and social layer, where authors build or lose standing in the eyes of those who listen. And it moves, ultimately, to the institutions of society — to law, to norms, to the slow human machinery of holding people accountable for what they do.
 
 This relocation is the whole story, and it is why the two sections that follow are not really two stories but one. When we describe what goes right, we are describing the consequences of moving the tussle out of the network. When we describe what goes wrong, we are describing the same move, from the other side. A network that cannot be made to take sides cannot be made to take the right side either. We ask the reader to hold both halves of that sentence at once, because Axona does.
 
@@ -465,7 +462,7 @@ On Axona, a group is a set of topics that the participants themselves derive and
 
 > *A physicist in a well-funded lab and a collaborator in a sanctioned country want to share a working dataset and a discussion. Today, every tool that would host them can be told to cut one of them off. On Axona they derive a shared topic from a name only they know, encrypt what they exchange with a key only they hold, and work as equals — the network moving their bytes without knowing or caring that a border runs between them.*
 
-The collaboration persists as long as its participants do, and its openness is a property of the mathematics, not of anyone's goodwill. This is not a marginal improvement in convenience; it is a change in who is allowed to coordinate at all.
+The collaboration persists as long as its participants do, and its openness is a property of the mathematics, not of anyone's goodwill. **This is not a marginal improvement in convenience; it is a change in who is allowed to coordinate at all.**
 
 ### The right to communicate
 
@@ -493,13 +490,27 @@ The same holds for the ordinary, unglamorous coordination of commerce and civic 
 
 Underlying all of the above is a single effect: information on Axona flows to wherever there are participants who want it, and stops nowhere in between, because there is nowhere in between that can stop it. For the free movement of knowledge — scientific results, journalism, the plain human exchange of what is happening in one place to people in another — this is the property that matters. It is also, we acknowledge in advance, the property that makes the next section necessary.
 
+### The shape of what comes next
+
+The pattern generalizes. Wherever coordination today requires renting a chokepoint, the substrate offers the same trade — and the applications write themselves from the primitives:
+
+| Domain | What gets built | Why the substrate enables it |
+|---|---|---|
+| **Scientific research** | A global data commons — datasets and peer review shared across every border | Researchers in sanctioned or underfunded regions collaborate as equals, with no centralized publisher in the path |
+| **IoT & smart grids** | Local energy negotiation — homes and solar grids trading distribution directly | Geographic routing keeps the negotiation regional and low-latency, with no distant corporate cloud in the loop |
+| **Journalism** | A secure whistleblower drop — ephemeral document delivery to investigative reporters | Censor-resistant routing cannot be firewalled; the journalist's signature is verifiable while the source's key carries no name |
+| **Supply chain** | A trustless logistics feed — one tracking stream across competing vendors | Competitors subscribe to the same topic tree without any single logistics platform owning the data |
+| **Healthcare** | An epidemiological outbreak map — anonymous, localized disease reporting | Geographic cells let health workers watch regional clusters in real time, even when national infrastructure fails |
+
+None of these requires a new protocol feature. They are the same five primitives — signed posts, derived topics, geographic locality, bounded ephemerality, nameless keys — rearranged.
+
 ## 10. What Goes Wrong
 
 Everything in §9 was a consequence of moving the tussle out of the network. Everything here is the same move, seen from the other side. We take these risks seriously, and we think a reader is right to weigh this section as heavily as the last. A network that cannot be made to take the right side cannot be made to take any side, and the harms below are not misuse of Axona — they are Axona, used as designed, toward ends we do not endorse.
 
 ### Falsehood with no chokepoint
 
-The mechanism that lets a dissident's message route around a censor lets a disinformation campaign route around every attempt to throttle it. On the platforms of today, however imperfectly, there is a place where a coordinated campaign of lies can be detected and slowed, because there is a place through which it must pass. Axona removes that place. A campaign that establishes itself among enough participants propagates by the same self-reinforcing routing that serves any popular content, and there is no operator to appeal to, because there is no operator. The recipient's own judgment, and whatever reputational and social tools grow up at the endpoints, are the only defenses, because they are the only place the defense can now live.
+The mechanism that lets a dissident's message route around a censor lets a disinformation campaign route around every attempt to throttle it. This is the manifesto's fire, seen from its burning side. On the platforms of today, however imperfectly, there is a place where a coordinated campaign of lies can be detected and slowed, because there is a place through which it must pass. Axona removes that place. A campaign that establishes itself among enough participants propagates by the same self-reinforcing routing that serves any popular content, and there is no operator to appeal to, because there is no operator. The recipient's own judgment, and whatever reputational and social tools grow up at the endpoints, are the only defenses, because they are the only place the defense can now live.
 
 ### Coordination of harm
 
@@ -579,7 +590,7 @@ The governance problem, stated in full, is therefore this. Axona has, deliberate
 
 ## 12. Stewardship, Not Control
 
-The distinction in this section's title is the whole of our position. We do not seek to control Axona, and we have built it so that we could not if we tried. What we believe it needs is *stewardship*: a human institution that watches, understands, convenes, and responds, without holding a lever over the network itself. The difference matters, because the moment stewardship acquires the power to silence a participant or suppress a message, it has become the control point we refused to build, and it will be captured exactly as every such point eventually is.
+The distinction in this section's title is the whole of our position. We do not seek to control Axona, and we have built it so that we could not if we tried. What we believe it needs is *stewardship*: a human institution that watches, understands, convenes, and responds, without holding a lever over the network itself. In the manifesto's terms, stewardship is the fire brigade, not a ministry of fire — it exists to watch, to respond, and to teach, never to hold a monopoly on flame. The difference matters, because the moment stewardship acquires the power to silence a participant or suppress a message, it has become the control point we refused to build, and it will be captured exactly as every such point eventually is.
 
 Clark's *fundamental tussle* names the tension we are inside: any network design must take a stance on the contest between an open architecture and the desire of some actor to control or monetize it, and the stance is unavoidable — to build is to choose. Axona tilts as far toward the open pole as the architecture permits. The consequence, which we accept, is that governance cannot be a feature of the system; it must be a social arrangement *around* the system, because anything built into the system becomes a point of control. Stewardship is our name for governance that stays outside. If architecture is politics at every scale, stewardship is the scale at which the architecture is made of people — and it must be designed with the same care against capture that the protocol was.
 
