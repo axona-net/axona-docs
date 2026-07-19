@@ -1,1771 +1,680 @@
-# Axona — A Learning-Adaptive DHT and Axonal Pub/Sub
+# Axona
+## A Free Substrate for a Society of Minds
 
-## A Learning-Adaptive Distributed Hash Table with Axonal Publish-Subscribe
-
-**Whitepaper · Synthesis Edition · v0.3.58 · 2026-05-23**
-*David A. Smith — Axona.net*
-*davidasmith@gmail.com*
-
-*This document synthesizes the Neuromorphic-DHT-Architecture whitepaper (v0.67), the v0.3.38 research deck, and the operational framework developed in conversation. It is intended as a complete reference for technical readers, operators, and researchers approaching the system for the first time.*
-
-*Naming, used consistently throughout this document: **Axona** is the protocol — the addressing, routing, and pub/sub layer described here, and the deployed network running it (peer `axona-peer`, signaling broker `axona-bridge`, SDK — described in §9 and §17). **N-DHT** (Neuromorphic DHT) is the family of learning-adaptive DHT designs Axona inherits from. **NH-1** is the current Axona implementation; numerical results and concrete parameter values quoted in this document are NH-1 numbers.*
+*Whitepaper · v0.4 · 2026-07-19 · David A. Smith · Axona.net*
 
 ---
 
-## Abstract
-
-Distributed hash tables (DHTs) are the minimum viable substrate for decentralized communication: they let any node, given a key, locate the corresponding value in O(log N) hops without a central authority. Every production decentralized system — BitTorrent, Ethereum, IPFS, Tor — runs on a DHT variant. Yet the core routing mechanisms have not changed materially since Kademlia's publication in 2002: fixed K-buckets, no learning, no awareness of the traffic flowing through, lazy churn repair, no integrated pub/sub.
-
-**Axona** is a learning-adaptive DHT in the **Neuromorphic DHT (N-DHT)** family that treats every peer as a *synapse* — a learnable edge with a weight that grows with successful traffic (Long-Term Potentiation) and decays without it. Routing consults those weights. Eviction picks the least-vital edge. The table changes as the network changes. Three years of research produced two protocol generations (N-1 → N-15W exploration, NX-1 → NX-17 focused iteration) and a final consolidation: **NH-1**, Axona's current implementation — a 12-rule, 12-parameter, ~270-line core that achieves global lookup latency of 260 ms at 25,000 nodes (3δ floor = 204 ms; ratio 1.27×) versus Kademlia's 842 ms (4.13×) at the same population.  The Axona-deployed peer adds a production-quality churn-cleanup layer on top of NH-1 — under 5 % churn the deployed Axona implementation lookups at 239 ms / 4.38 hops, vs ~292 ms / ~6.1 hops for NH-1 / NX-17, a 1.7-hop saving that comes from explicit dead-peer sweeping in the transport-mediated `removeNode` path.  The learning-helps claim survives stripping all geographic structure from peer IDs (see §7.9).
-
-Built atop the routing fabric is Axona's **Axonal Pub/Sub** system: deterministic topic IDs anchored in the publisher's S2 cell, subscribe-as-routed-walk that lets the first live relay intercept new subscribers, and re-subscribe-as-liveness-check that collapses tree healing, history replay, and membership maintenance into a single envelope. Pub/sub delivery achieves 100% baseline and 100% recovered delivery under 5% churn.
-
-This whitepaper documents the architecture, the empirical measurements, the architectural wins (especially those orthogonal to geographic locality), an extended red-team analysis identifying ten additional pre-deployment failure modes, a four-dial operator tuning framework, observability tiers, diagnosis playbooks, and a deployment timeline.
+*The technology is shaped by the mission. The mission is freedom to communicate.*
 
 ---
 
-## Table of Contents
+## In one page
 
-1. **Why a Next-Generation DHT?**
-2. **The Lineage: Kademlia, Geographic, NX, Axona's NH-1**
-3. **N-DHT — Foundational Mechanics**
-4. **Axona / NH-1 — Five Operations, One Vitality Model**
-5. **The Vitality Consolidation**
-6. **Axonal Pub/Sub**
-7. **Performance Characteristics**
-8. **Architectural Wins Beyond Geography**
-9. **The Two-Layer API — How Axona Becomes Real Software**
-10. **Red Team — The Existing Five**
-11. **Red Team — The Extended Ten**
-12. **Operational Framework — Parameter Tuning**
-13. **Observability and Alerting**
-14. **Diagnosis Playbooks**
-15. **Production Readiness Checklist**
-16. **Reputation and Byzantine Resistance**
-17. **Deployment Timeline**
-18. **Comparison to Prior Art**
-19. **Future Work**
-20. **References**
+Axona is a communication network with no owner — no company, no server, no place in the middle where anyone sits who could read, rank, charge, throttle, or forbid. It runs in production today, on ordinary phones, browsers, and laptops. There is no central directory, no account system, and no operator, because by construction there is nowhere for one to be.
+
+Three ideas make it work. **Location-aware addresses** keep local traffic local, so the network is fast instead of wandering the globe. **Self-learning routing** — connections that carry successful traffic grow stronger, unused ones fade, an idea borrowed from how neurons wire — lets the network reshape itself around the paths that actually work and heal when parts of it die. And **self-repairing broadcast trees** let one participant reach many with no server coordinating the delivery.
+
+The keystone is a single design choice: **authorship is a signature, not an account.** Who is speaking is a cryptographic key the speaker holds; where they are and how they connect is a separate fact the network never links to it. The network moves signed bytes between endpoints and does nothing else — so it *cannot act on* what you say: cannot rank it, suppress it, or reveal who you are, because it was never told and never needed to know.
+
+That one property is the source of everything Axona makes possible and everything it makes dangerous — they are the same property seen from two sides. It lets a researcher in a sanctioned country collaborate as an equal, and it lets a disinformation campaign route around every attempt to slow it. It gives AI agents from different companies a place to coordinate as peers, and it gives a *misaligned* agent the same place on the same terms. A network that cannot be made to take sides cannot be made to take the right side either.
+
+We think that is a tool worth building anyway — for the same reason humanity kept fire and built hearths and fire brigades rather than giving it back. But the response to a tool no one can control is not a central authority who controls it; that only rebuilds the intermediary we set out to abolish. The response is **sight and stewardship**: making the life of the network visible to those who would understand it, and building human institutions — accountable, bounded, resistant to capture — that respond to what they see without seizing the thing itself. The network is built. That harder, human problem is the one that remains, and it is the reason for this document.
+
+Running beneath every page of what follows is one observation, borrowed and extended: **architecture is politics** — and it is politics at every scale at once. The shape of a protocol decides where power can sit. The shape of an application decides what its users may do and see. The shapes of the communities, reputations, and institutions that grow on a substrate are architectures too, and the substrate decides which of them are possible. This document describes a machine in Part II and a politics in Part III, and the point of putting them under one cover is that they are not separate subjects.
+
+> **How to read this.** In a hurry: this page, then Part I (the Manifesto), then §8 (*The One Property*), then the subsection of §13 that matches your field — §13 is written so you can enter at any point. Technical reader: Part II is for you. Skeptical reader: §10 (*What Goes Wrong*) and *What Axona Is Not* are where the costs are counted. A glossary sits at the end.
 
 ---
 
-## 1. Why a Next-Generation DHT?
+## Contents
 
-### 1.1 The Privacy Argument
-
-> *"Those who would give up essential Liberty, to purchase a little temporary Safety, deserve neither Liberty nor Safety."* — Benjamin Franklin
-
-Privacy is the precondition for free expression and association. A communication channel that always passes through a trusted intermediary leaks the *fact* of the conversation even when contents are encrypted. Knowing *who talked to whom, when, from where* is, on its own, a powerful surveillance signal — used commercially for advertising and behavioral inference, used institutionally for law enforcement and intelligence.
-
-End-to-end encryption is not enough. Encryption protects message contents but not metadata. As long as the routing fabric belongs to a single party — a server, a federation, an ISP — that party retains visibility into the network's *shape*, and that visibility is itself the asset.
-
-A peer-to-peer routing fabric removes the custodian. No server, no privileged peer, no trusted coordinator: the routing layer itself becomes a participant-symmetric primitive in which no one party has a privileged view of the traffic.
-
-**The DHT is the minimum viable substrate for that property.** Without it, every "decentralized" service is one trusted server away from being centralized again.
-
-### 1.2 What a DHT Provides
-
-A distributed hash table is the foundation for finding *anything* in a decentralized network: any node, given a key, can locate the value in O(log N) hops with **no central authority, no privileged peer, no trusted coordinator**.
-
-**Already in production at scale:**
-
-| System | Year | Built on |
-|---|---:|---|
-| BitTorrent Mainline DHT | 2005+ | Kademlia variant — millions of simultaneous nodes |
-| Ethereum devp2p | 2015+ | Modified Kademlia — peer discovery for blockchain consensus |
-| IPFS / libp2p | 2015+ | Kademlia + content routing — CID → provider mapping |
-| Tor v3 hidden services | 2017+ | HSDir DHT — onion-service descriptor lookup |
-| Coral DSHT | 2004 | Latency-aware proximity clusters — production CDN 2004–2015 |
-| S/Kademlia | 2007 | Security-hardened Kademlia (sibling broadcast, disjoint paths) |
-
-### 1.3 Why a Next-Generation DHT Now
-
-The systems above were designed for one workload at a time — file-sharing, blockchain peer discovery, content addressing — on networks of stable nodes. Axona targets a different deployment: **heterogeneous device classes (browser to server), high churn, integrated pub/sub, and locality awareness as a first-class property of routing rather than a layered afterthought.**
-
-The next-generation DHT is not "Kademlia plus locality." It is a routing fabric that **adapts** — that learns from the traffic it carries and survives the network it actually lives on.
-
-### 1.4 The Persistent Limitations of First-Generation DHTs
-
-Despite two decades of refinement, traditional DHTs share five fundamental limitations:
-
-1. **No latency awareness.** A lookup may bounce between continents when a geographically closer path exists. The XOR metric is geographically blind.
-2. **No learning.** Routing tables are populated mechanically and never adapt to traffic patterns. A frequently-used route receives no preferential treatment.
-3. **High hop counts at scale.** O(log N) is the theoretical bound; in practice 8–12 hops per lookup at typical sizes.
-4. **No built-in pub/sub.** Group communication requires application-level overlays atop the DHT, adding complexity and additional hops.
-5. **Slow churn recovery.** When nodes depart, routing tables are repaired lazily through periodic refresh, leaving routing gaps that can persist for minutes.
-
-Axona, as a Neuromorphic DHT, addresses all five.
+- Part I — Manifesto
+- Part II — The Machine
+  - 1. The Problem: Finding Things on a Network Without a Boss
+  - 2. Put the Address in the Address
+  - 3. A Network That Learns Like a Brain
+  - 4. Axons: Broadcast Without a Broadcaster
+  - 5. Identity: A Signature, Not an Account
+  - 6. The Results: Hitting the Theoretical Floor
+  - 7. From Lab to Network
+- Part III — The Politics
+  - 8. The One Property
+  - 9. What Goes Right
+  - 10. What Goes Wrong
+  - What Axona Is *Not*
+  - How Axona Differs From What You Know
+  - 11. The Governance Problem
+  - 12. Stewardship, Not Control
+  - 13. Implications by Discipline
+  - 14. The Path Forward
+- Glossary · Colophon and References
 
 ---
 
-## 2. The Lineage: Kademlia, Geographic, NX, Axona's NH-1
+# Part I — Manifesto
 
-### 2.1 Four Protocols, Same Geometry
+Axona is a network with no owner. Not a company that promises not to look, not a nonprofit that pledges good behavior, not a protocol with a friendly board of directors — a network that, by its construction, has no place where anyone sits who could look, charge, throttle, or forbid. It runs today, in production, on ordinary phones and browsers and laptops belonging to the people who use it. There is no server in the middle of a conversation. There cannot be one. That is the point, and the rest of this document follows from it.
 
-This work studies four DHTs at 25,000 nodes under identical conditions. Each builds on its predecessor:
+We built it because the ability of people to find each other and exchange ideas is a fundamental right. That is not our claim to make; the world made it in 1948, when the Universal Declaration of Human Rights recognized everyone's freedom to “seek, receive and impart information and ideas through any media and regardless of frontiers.” What we observe is that this right is, almost everywhere, exercised through intermediaries who can revoke it. Every message you send today passes through some machine that is neither yours nor your correspondent's: a platform, a carrier, a cloud. Usually that intermediary is benign. Sometimes it is not. But the arrangement itself — that a third party stands in the path of every conversation and could intervene — is the thing we set out to make impossible rather than merely impolite.
 
-| Protocol | What it adds | Inherits from |
-|---|---|---|
-| **K-DHT** (Kademlia, 2002) | XOR distance metric, K-buckets, α-parallel lookup | — |
-| **G-DHT** (geographic, this work, 2025) | S2 cell prefix in node IDs ⇒ regional locality | K-DHT |
-| **NX-17** (predecessor SOTA) | 18 specialized rules, peak performance under tight cap | G-DHT *(via NX-1 … NX-15)* |
-| **Axona / NH-1** (this work, 2026) | Vitality-driven synaptome, unified admission gate | NX-17 *(consolidation)* |
+## The principle we did not invent
 
-Axona's current implementation (NH-1) is *not* a fresh parallel design — it is the result of careful analysis of NX-17 and every protocol before it. Each NX-17 rule was studied for what it does, why it was added, and whether its work could be folded into a smaller surface area.
+We are not the first to observe that the interesting functions of a network belong at its edges. In 1984, Jerome Saltzer, David Reed, and David Clark named the idea and gave it a label that stuck: the *end-to-end argument*. The claim was modest in phrasing and large in consequence. A function such as reliability, or ordering, or encryption can only be completely and correctly implemented with the knowledge of the applications at the endpoints of a communication. Building that function into the network itself is therefore either redundant or incomplete — useful, at most, as a performance enhancement. The network's job is to move bits between endpoints. Meaning lives at the ends.
 
-- **NX-17** carries the lineage: 18 specialized rules, 44 parameters, ~2300 lines.
-- **NH-1** consolidates that lineage into the form Axona ships: 12 rules, 12 parameters, ~270 lines — every admission decision through a single vitality score.
+They applied this to error-checking, to delivery receipts, and — the case that matters most here — to encryption. If the network encrypts your data, they observed, then the network must be trusted with your keys; the data sits in the clear the moment it reaches the network's edge; and the authenticity of the message must still be checked by the application in any case. The conclusion is hard to avoid: put the encryption at the endpoints, where it can do its job, and the network need not be trusted at all.
 
-We selected NH-1 as the Axona deployment target for its **maintainability and understandability**. We continue to use NX-17 as the reference benchmark — the bar that NH-1 should approach, and that future work should match or surpass.
+Axona takes this argument and does not flinch from where it leads. If encryption belongs at the endpoints, so does identity. So does trust. So does the judgment about what is worth saying and worth hearing. A network that carries signed bytes between endpoints, and does nothing else with them, cannot *inspect* your speech as speech, cannot rank it, cannot suppress it on the basis of what it says, and cannot reveal who you are — because it was never told who you are, because it never needed to be told, and because telling it would have been a design error by the standards of a principle now four decades old.
 
-### 2.2 K-DHT — Kademlia, the Foundation
+In Axona this appears as a single sentence in the architecture: **authorship is a signature, not an account.** Identity as a speaker is a cryptographic key that you hold, that signs what you say, and that any listener can verify — and it has nothing to do with where you are on the network or how you connect to it. There is no account, because there is no one to keep the account. There is no registry, because a registry would be a point of control, and a point of control is a place where the network stops being end-to-end and becomes someone's property.
 
-**Distance metric:** XOR — `d(a, b) = a ⊕ b`
-**Routing table:** Every node maintains K=20 peers per bucket. Lookup is a greedy walk toward the target in XOR distance with α=3 parallel queries.
-**Properties:** O(log N) hops in steady state. Static, predictable, analyzable.
+## Architecture is politics, at every scale
 
-**Limits at 25K nodes:**
+Mitchell Kapor compressed the lesson of the early internet into three words: *architecture is politics*. The structure of a system is not a neutral engineering fact that policy is later applied to; the structure **is** the policy. Where a function lives, who can invoke it, what the design makes easy and what it makes impossible — these decisions allocate power before any law, terms-of-service, or moderator ever touches the system. A platform whose architecture routes every message through its servers has decided, architecturally, that the platform holds power over every message, whatever its policies promise this quarter.
 
-| Limit | Evidence |
+What we would add to Kapor's aphorism is that the politics repeats at every scale of the architecture, and the scales are coupled.
+
+At the **protocol** scale, the decision is where control *can* live. Axona's answer is: nowhere in the path. The one property described in Part III — opaque signed bytes, endpoint to endpoint — is a constitutional choice, in the literal sense: it constitutes what every higher layer can and cannot do. No application built on Axona can be compelled to hand over a lever the protocol never minted.
+
+At the **application** scale, the decision is what a participant may do and see. An application is an architecture too — its defaults, its filters, its affordances are its politics. On a platform, those choices are made once, centrally, for everyone. On Axona they are made at the edge: a client's ranking is chosen *by its user*, a group's rules are enforced *by its members' software*, and a participant who dislikes an application's politics can leave with their identity, their audience, and their history, because none of those were ever the application's property. The substrate does not make applications virtuous; it makes their power revocable.
+
+And at the **social** scale, the decision is which human structures are possible at all. Communities, reputations, moderation practices, markets, institutions of stewardship — these are architectures of people, and they inherit the physics of the substrate they grow on. A society built on owned rails can only form structures the owner permits and survives. A society built on Axona can form any structure its members can build at the endpoints — which is the liberation — and it must build at the endpoints everything it needs, including its defenses — which is the burden. Parts II and III of this document are one argument in two registers: the machine is the politics, stated in code; the politics is the machine, stated in consequences.
+
+## The nervous system for minds that are not only human
+
+David Clark spent the decades after that 1984 paper studying what the end-to-end argument does when it meets the real world — a world of firms that want to monetize, states that want to police, and users who want to be left alone. He gave that contest a name, *tussle*, and a method for reasoning about it, *control-point analysis*: the practice of cataloging every point in a system where the design hands some actor the power to control an action. His conclusion, after a career of it, is one we take seriously — that because any centralized point of control tends to become a point of capture, the more durable choice is often to prefer highly decentralized control, to build so that there is no lever for an adverse actor to seize, because the lever does not exist.
+
+Axona is what it looks like to design that way deliberately. And it arrives at a particular moment, because the endpoints of a network are no longer only people.
+
+In 1960, J.C.R. Licklider described what he called *man-computer symbiosis*: not people using machines as tools, but people and machines coupled into a joint system that could reach conclusions neither could reach alone. For two-thirds of a century that idea has been approached one product at a time — an assistant, a model, an interface behind a corporate gate. What has not existed is the thing the idea actually requires: a communication substrate on which minds, human and artificial, can find each other and work together as peers, without any one of them owning the channel.
+
+That substrate now exists. On Axona, an AI agent is a first-class participant. It can hold a durable identity, create a topic, publish signed contributions, and coordinate with other agents and with people — across vendors, across borders, across the boundaries that today keep each AI system inside the company that built it. An agent may voluntarily declare that it is an agent, so that those who wish to know can know; nothing compels it to. The network carries the bytes and asks no questions, because asking questions was never its job.
+
+This, beneath everything else, is what Axona is. We have built the beginnings of a nervous system for a society of minds — minds of every kind.
+
+## Hearths and fire brigades
+
+There is an old story about what happens when someone gives people fire.
+
+Fire feeds us and warms us and is a large part of why we are what we are. It also burns down houses, and forests, and sometimes cities. Humanity did not respond to the danger of fire by giving it back. We learned to build hearths, and fire brigades, and the codes that keep a blaze in one building from taking the block. We did not remove the risk. We built the practices and institutions to live alongside it.
+
+What this document describes has the shape of fire. A network that no one can silence is a network that no one can silence — and that sentence holds whether the speaker is a dissident under a censoring government or a coordinated campaign of lies, whether the collaborating minds are researchers across a closed border or agents pursuing an end that no person would choose. The property that liberates and the property that endangers are not two properties. They are one property, seen from two sides. We will not claim otherwise, and we do not believe the danger is a reason to withhold the tool.
+
+We are also not sure withholding was ever truly on offer. The principles Axona is built from are public and decades old; if we had not carried them to this conclusion, someone else soon would have — perhaps without pausing to write down what the tool can do to us. Being first is not the point. Arriving with the risks written down is.
+
+But we believe, as people have generally come to believe about fire, that the answer to a powerful and hard-to-control tool is not a central authority who controls it. That would only rebuild the intermediary we set out to abolish, and hand it more power than any intermediary has held. The answer is sight and stewardship: making what happens on the network visible to those who would understand it, and building human institutions, accountable to the people they serve, that can respond to what they see without seizing the thing itself.
+
+We do not yet know how to build those institutions well, and we are not going to pretend that we do. What we know is that the technical foundation is built — the network runs, it is fast, it heals itself, and it cannot be captured from within — and that the human problem is now the one that matters. This document states the mission plainly, shows as plainly as we can what the tool can do and what it can do to us, and invites the people who think carefully about freedom, coordination, markets, minds, and power to help us work out what comes next.
+
+The fire is lit. The question is what we build around it.
+
+---
+
+# Part II — The Machine
+
+These are the sections where the machine itself is the subject. The aim is that a reader without a technical background finishes them understanding how Axona works, and a reader with one finishes them trusting that the description is faithful. Part I claimed that the architecture is the politics; Part II is that architecture, stated exactly — every design choice below is also a decision about where power sits, and Part III will collect the consequences. The technology is, in a sense, the easy part of what this document is about: it exists, it runs, and it is describable in plain terms. Everything harder comes after.
+
+## 1. The Problem: Finding Things on a Network Without a Boss
+
+Imagine you and a million strangers each hold one piece of a giant jigsaw puzzle. Someone walks up and asks for piece #438,291. How do you find it?
+
+**Option 1: Have a central directory.** Some company keeps a giant list: "piece 438,291 is held by Alice." Easy to look up — but now that company controls everything. They can shut you down, spy on you, charge you money, or just go bankrupt and take the directory with them. This is why almost every system we call "distributed" is in fact distributed underneath and central on top — a constellation of machines reached through a single corporate gateway. The directory is convenient, and the directory is also the problem.
+
+**Option 2: Give every piece an "address," and design a system where the network *itself* knows how to route requests to the right person, with no central directory.** This is what a **distributed hash table** (DHT) does.
+
+DHTs are the machinery behind things you've probably used: BitTorrent, IPFS, parts of Ethereum, and the hidden services on Tor. Every node — every computer in the network — gets a random ID number. Every piece of content gets an ID too. To find content, you ask the node whose ID is "closest" to the content's ID.
+
+The trick: how do you find that closest node when you don't know who's in the network and you only know a handful of peers?
+
+The dominant DHT algorithm is called **Kademlia**, designed in 2002. Every node has a large random ID. To measure "distance" between two IDs, you XOR them, comparing bit by bit. To find a target, you ask the closest peer you know. They tell you about peers *they* know that are even closer. You ask one of those. Repeat.
+
+The math is clean: each step at least *halves* the remaining distance, so you reach any target in about log₂(N) hops. With a million nodes, that's 20 steps. Provably correct, used in production all over the internet.
+
+There's just one problem.
+
+### Hops are cheap, but time is expensive
+
+20 hops sounds fast, but each hop sends a message between two random computers somewhere on Earth. If your peers are scattered randomly across the globe, the average pair sits about half the planet apart — roughly 100 milliseconds round trip.
+
+20 hops × 100 ms = **2 seconds**. To find something. Every time.
+
+For real-time applications — voice calls, online games, live messaging, push notifications — 2 seconds is unusable. The math says routing is logarithmic, which is fast; the physics says each step is slow because peers are far apart. That's the tension.
+
+Axona attacks the latency problem with two ideas, one of which is borrowed straight from neuroscience.
+
+## 2. Put the Address in the Address
+
+The first idea is almost embarrassingly simple. It's a structural variant of Kademlia we call **G-DHT** (Geographic DHT), and it's the substrate Axona builds on.
+
+Kademlia node IDs are random. A node in Tokyo and a node in Berlin have IDs with no relationship to where they actually are. That's *why* hops are random and slow — random IDs mean random geography.
+
+G-DHT changes one thing: the **first 8 bits** of every node ID encode where the node says it is on Earth.
+
+G-DHT uses Google's S2 library, which divides Earth's surface into cells along a curve called a **Hilbert curve**. Its useful property: places near each other on Earth get cell numbers near each other. So XORing two S2 cell numbers gives a small result for nearby places and a large one for distant places.
+
+![S2 cell decomposition of Earth's surface, projected through six cube faces along a Hilbert space-filling curve. Nearby points on the globe land at numerically close cell IDs; XOR distance in identifier space therefore approximates physical distance, for free.](../images/S2-Map.png)
+
+Now your node ID looks like: `[8-bit geographic cell][256-bit hash of your public key]` — a 264-bit address space, encoded as 66 lowercase hex characters in the wire protocol.
+
+There are 192 of these cells covering the globe, and each carries a short human name as well as a number — one name per cell, so a place always shows the same label (anyone in the `useast` cell sees `useast`, every time). The routing only ever uses the number; the names are just for people.
+
+The routing algorithm doesn't change at all, but XOR distance now approximately tracks physical distance. When a node looks for a "close" peer in ID space, it tends to find one that's also physically close. Local traffic stays local. The 20-hop world tour becomes a 13-hop journey around the neighborhood, with each hop maybe 7 ms instead of 100.
+
+Total: about 91 ms instead of 2 seconds. **Roughly 20× faster** for regional traffic, just from changing the *structure* of the addresses.
+
+The cost: nodes can lie about where they are. A user can choose to associate themselves with any location in the world. This very rough location is a kind of area code — but the address it is attached to is provably yours, independent of where you actually are, because the address is derived from your cryptographic key and proven the moment you connect (§5 explains exactly how). And the lie carries its own penalty: Axona, the learning protocol layered on top of G-DHT, treats *measured one-way latency* as a first-class signal in its scoring of every connection. A node that claims a cell prefix in Frankfurt while actually answering from São Paulo cannot fake the round-trip time. The first few lookups that try to use its connections see latencies of 200+ ms when the prefix would predict 20. The cheating node's connections accumulate weight slowly and get out-competed by honest neighbors at every eviction decision. The cheat is not blocked — the address space allows the claim — but it is structurally penalized in proportion to how far the lie is from the truth.
+
+## 3. A Network That Learns Like a Brain
+
+The second idea — neuromorphic routing — is the heart of the protocol, and what gives **Axona** its name. It asks a different question:
+
+**What if, instead of *engineering* shortcuts into the network, the network *learned* its own shortcuts based on which paths actually work?**
+
+The strange-but-perfect analogy: the human brain.
+
+### The engineering problem that brains already solved
+
+A single neuron in your brain connects to roughly 10,000 others through structures called **synapses**. There are about 86 billion neurons total. Any given neuron *could* connect to almost any other, but maintaining synapses is energetically expensive — so neurons are stuck with a hard cap, surrounded by far more potential partners than they can afford to keep.
+
+How does the brain decide *which* connections to keep?
+
+This is the same problem facing a peer in a peer-to-peer network. A web browser can only maintain about 50–100 simultaneous WebRTC connections (the technology that lets browsers talk directly to each other). The network might have hundreds of thousands of nodes. Which 50 do you keep?
+
+The brain solved this problem hundreds of millions of years ago. The solution is called **long-term potentiation**, or LTP.
+
+### The brain's trick: "neurons that fire together, wire together"
+
+In 1973, two scientists — Bliss and Lømo — ran a now-classic experiment. They zapped a particular pathway in a rabbit's brain with high-frequency electrical pulses. Afterward, that pathway responded *more strongly* to subsequent signals — not for seconds, but for *weeks*. The connections had physically gotten stronger.
+
+Decades of follow-up research filled in the details. Here's the simplified version:
+
+1. **The coincidence detector.** Synapses have a special kind of receptor (called NMDA) that only activates when *both* sides of the connection fire at roughly the same time. It's not "I fired" or "you fired" — it's specifically "we fired together."
+
+2. **The strengthening signal.** When that coincidence happens, calcium rushes in and triggers the synapse to insert *more* of a different kind of receptor (AMPA), making the connection physically more sensitive. Next time, the same input gets a stronger response.
+
+3. **Consolidation.** Over the next half hour or so, new proteins get made and new physical structures grow. The change becomes permanent.
+
+4. **Decay.** Connections that *don't* get used regularly weaken over time, in a process called long-term depression (LTD).
+
+5. **A protective tag.** Crucially, recently strengthened synapses get a temporary "tag" that protects them from being overwritten by competing changes — but only for a brief window. Without this tag, learning would be self-destructive: the synapses you just learned were useful would be the *first* ones overwritten by the next signal.
+
+Donald Hebb summarized this in 1949 — before the molecular details were known — in the rule that's now bedrock in neuroscience and AI:
+
+> **Neurons that fire together, wire together.**
+
+Every artificial neural network you've ever heard of ultimately runs on a digital descendant of this rule.
+
+### Translating neurons into network routing
+
+The brain's mechanism translates *literally* to peer-to-peer routing — no metaphor needed.
+
+| In the brain... | In Axona... |
 |---|---|
-| No locality awareness | 500 km lookup = 510 ms — identical to its 499 ms global lookup |
-| Fixed buckets | Same K peers regardless of usefulness; no response to traffic |
-| Lazy churn repair | Broken edges persist until next bucket refresh |
-| Broadcast cost O(audience) | Each pub/sub recipient reached by an independent lookup |
+| A synapse (neural connection) | A connection to a peer |
+| Synaptic strength (weight 0 to 1) | A learned weight on each connection |
+| LTP: co-firing strengthens | A successful lookup increments the weights of all connections it used |
+| LTD: disuse weakens | Every connection slowly decays over time |
+| Synaptic tagging (protection window) | Recently used connections are protected for a window of time |
+| Pruning unused connections | The lowest-scoring connection gets evicted when a new one wants in |
 
-K-buckets were a 2002 answer to "what's a stable routing table?" — static, predictable, analyzable. The data structure is frozen; the network is not.
+That is what Axona *is*: a routing system where every connection has a weight that goes up when used and decays when not. The network's "memory" is its routing table, and the routing table evolves into whatever shape best serves the actual traffic.
 
-### 2.3 G-DHT — Geographic Locality
+### The vitality function
 
-**The change:** `nodeId = S2 cell prefix (8 bits) ‖ SHA-256(publicKey) (256 bits)` — a 264-bit address space, encoded on the wire as 66 lowercase hex characters.
+The core of Axona's neuromorphic routing is a single equation that scores every connection:
 
-XOR in the ID space now approximates XOR in physical distance — the prefix dominates. Same K-bucket routing as Kademlia, no other changes.
+> **vitality = weight × recency**
 
-**Result at 25K:**
-- 500 km regional latency: 510 ms → **150 ms** (3.4× faster)
-- Global latency: 498 ms → **287 ms**
+The **weight** is a number between 0 and 1, updated like this:
+- Every successful lookup that uses the connection raises its weight by 0.05 (capped at 1).
+- Every "tick" of the clock multiplies every weight by 0.995 (slow decay).
 
-But still a *static* routing algorithm. No learning. No dynamics. The geographic prefix is a one-time topology decision, not an ongoing adaptation. Pub/sub is still bolted on top via K-closest replication, which drifts under churn.
+The **recency** is 1.0 for the first 20 ticks after a connection is used — the protective tag from synaptic tagging — then drops off exponentially.
 
-### 2.4 The S2 Library — What the Cell Prefix Is
+When a new connection wants in but the routing table is full, the connection with the lowest vitality gets evicted. Frequently used connections accumulate weight and stay. Unused ones decay and get evicted. Recently strengthened ones are temporarily protected.
 
-S2 (Google, 2011) is a hierarchical decomposition of the sphere onto a Hilbert space-filling curve, projected through six cube faces. Every point on Earth maps to a 64-bit cell ID; every prefix length defines a successively coarser tile.
+That's it. That's the core.
 
-- **Top 8 bits** — 3 bits encode the cube face (values 0–5; six faces) and the next 5 bits subdivide that face along the Hilbert curve. **6 × 32 = 192 tiles** worldwide, each ≈ continent-scale (e.g. "western North America", "South-East Asia"). This is what we embed in every node ID.
-- **Hilbert curve property** — geographically adjacent points have numerically close cell IDs. XOR distance in ID space ≈ physical distance, *for free*.
-- **Sub-cell hierarchy** — refining the prefix bit-by-bit subdivides the tile in half along the Hilbert curve. 30 bits ≈ city block; 40+ bits ≈ metres.
+### The five operations
 
-S2 gives us **locality for free** — at the cost of trusting that nodes don't lie about where they are.
+Every behavior in Axona falls into one of five categories — and the categories mirror how *any* adaptive system works:
 
-### 2.5 S2 — Security Implications
+**1. NAVIGATE** — pick the next hop for a lookup. Axona scores each candidate by combining XOR distance progress, learned weight, and observed latency. We call this combined score the candidate's **activation potential** (AP) — borrowing the neuroscience term for how strongly a neuron is driven to fire; the higher a connection's AP, the more likely it is to "fire" the lookup down that path. The latency factor halves the score every 100 ms — so a peer that's mathematically a *bit* further but physically a *lot* closer wins.
 
-The S2 prefix in a node ID is **self-declared**. A node can claim any prefix it wants. This has three consequences:
+**2. LEARN** — strengthen what works. Three learning mechanisms run on every successful lookup:
 
-- **The S2 prefix is not a trust primitive.** Never use it for authorisation, regional permissions, or anything resembling a capability check.
-- **Prefix-forgery is real.** A malicious actor can pick a prefix to land in a different region. The benign failure mode is degraded routing (mis-located peers misroute traffic). The adversarial failure mode is a **Sybil swarm** in a target cell — many forged identities clustering on one region's address space.
-- **Proof-of-location is the obvious defense.** Verifiable RTT triangulation, GPS attestation, or trusted-witness schemes could anchor a claimed prefix to a measurable physical reality. Future work.
+- **LTP**: every connection on a fast successful path gets stronger.
+- **Hop caching**: every intermediate node along the path remembers the *destination*, not just the next hop. So next time, the path is shorter.
+- **Triadic closure**: if you keep seeing peer A relay messages to peer C through you, you introduce them directly. The triangle "A–you–C" becomes a direct edge "A–C." (Named after social network theory: dense triangles emerge in any network shaped by interaction.)
 
-The honest framing: today's locality is a *cooperative* primitive. It works because well-behaved peers don't lie. The protocol does not depend on the prefix being honest, but its locality benefits do.
+**3. FORGET** — decay everything that isn't reinforced; evict by vitality.
 
-### 2.6 The Neuromorphic DHT (N-DHT) Family — How It Differs
+**4. EXPLORE** — inject occasional randomness. A purely greedy router would lock onto the first decent shortcut and never find better ones. Axona has two exploration tricks: a "temperature" that decays over time but spikes when something breaks (heat up when surprised, cool down when stable), and an "epsilon-greedy" rule that picks a random first hop 5% of the time, just to keep options alive.
 
-Traditional DHTs (Kademlia, Pastry, Tapestry) treat the routing table as a static data structure: fixed buckets, one rule for replacement, no awareness of the traffic flowing through. They were designed in 2001–2002 for stable nodes — and they do not adapt to the network they live in.
+**5. STRUCTURE** — bootstrap and maintain the basic shape of the network when new nodes join.
 
-The Neuromorphic DHT family — of which Axona is an instance — treats every peer as a *synapse*: a learnable edge with a weight that grows with successful traffic (LTP) and decays without it (LTD). Routing consults those weights. Eviction picks the least-vital edge. The table changes as the network changes.
+The template is universal: act, learn from feedback, forget the obsolete, occasionally try something new, maintain basic structure. This is how any good adaptive system has to work.
 
-| | Traditional DHT | Neuromorphic DHT |
-|---|---|---|
-| Routing table | Fixed K-bucket per stratum | Weighted **synaptome** (the per-node set of weighted outgoing edges) |
-| Edge state | Live / dead | Weight ∈ [0, 1], recency, locked-on-use |
-| Routing decision | Greedy XOR | Action Potential (XOR × weight × latency) |
-| Adapts to traffic? | No | Yes — Long-Term Potentiation, triadic closure, hop caching |
-| Adapts to churn? | Lazy bucket refresh | Active dead-peer eviction + temperature reheat |
-| Pub/sub | Layered on top | Integrated as axonal delivery trees |
-| **Global lookup at 50K** (× Dabek 3δ floor) | Kademlia 548 ms (2.65×) — worsens with N | NX-17 243 ms (1.18×) — plateaus at the floor |
+## 4. Axons: Broadcast Without a Broadcaster
 
-The trade is "fixed and analytical" → "adaptive and empirical". The whitepaper-correctness of K-buckets gives way to *measured* behavior — which is why this work is centered on measurement.
+A real peer-to-peer network needs more than just "find the node holding key X." It also needs **broadcast**: a publisher should be able to send a message to all subscribers of a topic, without knowing who they are.
 
-**Headline result.** On 50K nodes, NX-17 sits within 36 ms of the analytical lower bound that Dabek et al. (NSDI 2004) proved for *any* recursive O(log N) DHT — `total ≈ 3δ` where δ is the median pairwise one-way RTT. Kademlia is 2× further from that floor.
+This is publish/subscribe, or "pub/sub." Think of how a video platform notifies subscribers of a new upload — except with no platform in the middle.
+
+In neuroscience, the *output* of a neuron — the long branching cable that delivers signals to many downstream targets — is called an **axon**. Axona builds axonal delivery using a few simple rules — and it is precisely these axonal pub/sub primitives that the protocol takes its name from:
+
+**Topic identity.** Every topic has a 264-bit ID, computed offline by anyone who knows the topic. The top 8 bits are a geographic prefix (the same S2 cell scheme used for node IDs); the bottom 256 bits are a SHA-256 — of just the topic name for an open "anyone-can-publish" topic, or of the publisher's public key combined with the name for a publisher-owned topic. Either way, publisher and subscriber compute the same ID without coordinating — no central registry. A topic is not a name a server assigns; it is mathematics anyone can perform. A topic with no owner is open: anyone may publish. A topic owned by an author accepts writes only from that author's key, and the network enforces this statelessly, by checking the signature against the descriptor — no account, no gatekeeper.
+
+**K-closest replication.** Instead of routing a publish or subscribe to a single "root" node (which would be a single point of failure), the protocol replicates the topic at the **K nodes in the network whose IDs are XOR-closest to the topic ID** — by default K=5. Five different peers each hold a copy of the subscriber list and a small replay cache. A publisher pushes to those K peers; a subscriber registers at those K peers. As long as any one of them is reachable, the topic works.
+
+**Lazy axon promotion.** A node that receives a publish but isn't yet hosting the topic *promotes itself* to a role-holder and starts caching messages immediately. When subscribers arrive later, they find the cache already populated. This makes publish-before-subscribe work: a publisher can broadcast even when nobody is listening yet, and the messages wait in case someone shows up.
+
+**Replay on subscribe.** When a subscriber attaches to a K-closest axon, the axon replays its cached messages in a single batch — bounded per topic, with a `lastSeenTs` filter so a re-attaching subscriber only gets what it missed, not everything from scratch. Healing and replay are the same mechanism.
+
+**Tree growth by overload-split.** A topic with a few dozen subscribers needs nothing more than the K=5 replicas above; they absorb every publish and fan it out directly. Once an audience reaches hundreds or thousands, no small set of relays can keep up — the browser's connection cap would put a ceiling on the audience well before that. So when a relay overloads, it **splits**: it picks one of its peers as a new sub-axon and hands that sub-axon a batch of its children. Future subscribers route to whichever live axon is now closest — increasingly a sub-axon, not the root. The tree grows *in the direction of its audience*: branches sprout where subscribers cluster, stay sparse where they don't. There's no architectural ceiling on subscriber count — but a tree spanning thousands of nodes loses pieces continuously under churn, which is what the next rule is for.
+
+**Tree self-healing.** Subscribers re-issue their subscribe periodically. If an axon died, the re-subscribe naturally lands on whichever K-closest node is now alive — no heartbeats, no failure detection, no parent tracking. Under 5% churn, delivery stays at 100%; after three refresh cycles the tree has fully reformed. There is no central failure detector and no repair coordinator: the same mechanism that builds the tree repairs it — and to the network, a censor's cut and a laptop closing are the same event, healed by the same machinery.
+
+![Axonal tree healing via routed re-subscribe. When branch B₁ dies and its link to the topic root R breaks, two of B₁'s children — a leaf subscriber s₁ and a sub-axon B₃ — each issue a routed re-subscribe. Both land on the surviving live axon B₂, which adopts them. B₃'s own subtree (s_a, s_b) does *not* need to re-subscribe individually: B₃ keeps publishing to them throughout, and the whole subtree moves intact when B₃ re-attaches. Repair happens at the sub-axon level, not the leaf level — one subscribe per surviving subtree, not one per subscriber.](../images/Axonal-PubSub-Healing.png)
+
+**No privileged "bridge" or relay node.** In a sufficiently meshed network, peers communicate directly. A signaling server introduces browsers to each other while the network bootstraps, and in today's deployment it also runs an ordinary peer of its own — but it holds no special authority (identity is proven by keys, not granted by the bridge) and it is not a required hop once direct peer connections exist. If it dies, ongoing pub/sub keeps working through the peer mesh — a property verified in production with the introducer process killed outright.
+
+Above this delivery layer sits a feed-style application surface with **four verbs** — `pub`, `sub`, `pull`, `metrics`. They cover what a real social or agent-collaboration application asks of a substrate: author new content, attach to a topic, fetch a referenced post on demand, and let a publisher see verifiable reach without identifying any individual subscriber. (For 1-to-1 traffic outside the feed, the peer also exposes `send` / `notify` / `onMessage`, but that's the direct-messaging surface, not pub/sub.) Encryption, schema, and ordering belong to the application above this layer; the protocol carries opaque bytes.
+
+## 5. Identity: A Signature, Not an Account
+
+A network with no boss has no central authority to vouch for anyone. So how do you know the peer answering you is who it claims to be — and that a message really came from its author? Axona's answer uses cryptography the same way the address scheme uses geography: the guarantee is baked into the identifier itself, checked by everyone, owned by no one.
+
+### Two identities that never touch
+
+Everything in the manifesto about freedom rests on one piece of engineering, so it is worth stating exactly.
+
+An Axona participant has two separate identities, and they are never interchangeable. The first is a **node identity**: a key bound to a rough location, which forms the participant's address in the network and manages its connections. It is the participant's presence on the wire. It never signs content. The second is an **author identity**: a bare cryptographic signing key with no location and no address, which signs what the participant says and which any listener can verify. It is durable — the same author key is recognized across sessions and devices — and it is deliberately, structurally disconnected from the node identity. Where you are and how you connect is one fact; who is speaking is a different fact; and the network is built so that the second cannot be derived from the first.
+
+This is the end-to-end argument made concrete. Identity, like encryption, is pushed to the endpoints, because only the endpoints can implement it completely and because putting it in the network would require the network to hold something it should never hold. **Authorship is a signature, not an account.**
+
+### The mechanics
+
+Recall the node address: `[8-bit region][256-bit hash of your public key]`. That second part isn't random — it's a SHA-256 hash of your **public key** (one half of a cryptographic key pair; the other half, the *private* key, never leaves your device). Your key *is* your address. Three things follow, with no server in the loop:
+
+- **You can't wear someone else's address.** When two peers connect, each must prove it holds the private key matching the address it claims, by signing a fresh one-time challenge tied to that exact connection. Claim an address whose key you don't hold and the signature doesn't check out — the connection is refused. So no peer can impersonate another, and no peer can park itself at a chosen address to intercept a victim's traffic.
+
+- **Every published message is signed.** A publish carries its author's public key and a signature over the contents. Any receiver verifies that signature itself before handing the message to the application. Alter the message and the signature breaks; forge the author and it breaks. Receivers trust the math, not the messenger — even if the message arrived relayed through a dozen strangers.
+
+- **The region is the one thing you *don't* prove — on purpose.** The 8-bit prefix is a hint you choose, your "area code," so you're free to claim any region. But as §2 showed, lying about it only makes your *own* connections slower. Identity is math you can't fake; location is a hint you're free to pick.
+
+What this buys the mission: the network can let *anyone* join with no gatekeeper, no account, no login server — while still guaranteeing that "who you're talking to" and "who wrote this" are real. No certificate authority, no reputation bureau; just keys and signatures, checked end to end. (The cost is small and paid once: proving your key at connect time is a few thousandths of a second of math, and it never touches the speed of routing or delivery afterward.)
+
+### A word about secrecy, stated plainly
+
+It is easy to hear "the network cannot act on your content" and conclude "the network cannot read my content." Those are different claims, and only the first is true by construction. Axona **signs** messages; it does not **encrypt** them. Confidentiality, exactly like identity, is an endpoint's responsibility under the end-to-end argument, and Axona deliberately does not provide it for you. The hop-to-hop links are encrypted in transit, but a relay is a legitimate end of each hop and can see the plaintext of anything the application did not encrypt first — and an open topic is, by design, readable by anyone who names it. If you need secrecy, you encrypt at the endpoints before you publish, with keys the network never holds. What Axona guarantees is not that no one can read your words; it is that no one *in the network* can rank them, suppress them by their content, or tie them to your location or connection. Signing is not secrecy, and we would rather say so here than have a reader assume otherwise where it counts. (*What Axona Is Not*, in Part III, states this and the other boundaries in one place.)
+
+## 6. The Results: Hitting the Theoretical Floor
+
+In 2004, Frank Dabek and colleagues proved a beautiful, depressing result: **no recursive DHT can be faster than 3δ**, where δ is the median one-way latency between random pairs of nodes on the Internet. (δ is the Greek letter *delta*; on today's internet it's roughly 68 thousandths of a second — the time a single message takes to travel one way between two random computers.)
+
+The proof is geometric. The final hop costs a full δ. Each hop *before* that closes half the remaining ID space and, on average, half the remaining geographic distance — so the second-to-last hop costs δ, the third-to-last δ/2, the fourth-to-last δ/4, and so on. The series δ + δ/2 + δ/4 + ... sums to 2δ. The total is the final hop plus the prior chain:
+
+> **δ + (δ + δ/2 + δ/4 + ...) = 3δ**
+
+No matter how clever your routing, no matter how big your network, you can't beat this.
+
+For two decades, no published DHT had been measured at this floor. The best implementations got to maybe 2× the floor.
+
+**Axona hugs the floor at 1.17–1.38×** across a 10× scaling range (5,000 to 50,000 nodes). At 25,000 nodes it routes a global lookup in 267 ms vs a 205 ms 3δ floor (δ ≈ 68 ms), and the curve is essentially flat from 15,000 nodes onward: 262, 266, 267, 271, 270, 279, 281, 282 ms as the network grows by another 35,000 peers. The ~30% residual overhead has a clean structural explanation: Axona takes about 4–5 hops where an ideal protocol would take 3, and each "extra" hop costs about δ/2, exactly as the geometric series predicts.
+
+Plain Kademlia, by contrast, gets *worse* as the network grows: from 716 ms at 5,000 nodes to 896 ms at 50,000. Its log-N hop tax compounds at full per-hop RTT every hop. G-DHT tracks Kademlia almost identically on global lookups — the geographic prefix only helps regional cells, where every hop is short. Axona approaches the floor by learning per-hop locality: its AP scoring weights short-RTT edges so heavily that even a hop "inefficient" by raw count is short in wall-clock time.
+
+The picture changes dramatically when we look at **regional** traffic instead of global. The same protocols at the same population sizes, but measured on 2,000-kilometer lookups (queries whose source and target are in the same continental neighborhood):
+
+| N | K-DHT | G-DHT | **Axona** |
+|--:|--:|--:|--:|
+| 5,000 | 681 | 222 | **108** |
+| 10,000 | 755 | 240 | **121** |
+| 15,000 | 797 | 244 | **129** |
+| 20,000 | 801 | 243 | **133** |
+| 25,000 | 825 | 255 | **134** |
+| 30,000 | 843 | 253 | **138** |
+| 35,000 | 856 | 257 | **138** |
+| 40,000 | 868 | 261 | **146** |
+| 45,000 | 868 | 267 | **148** |
+| 50,000 | 886 | 263 | **146** |
+
+Kademlia climbs from 681 to 886 ms — essentially the same as its global curve, because K-DHT has no way to know the lookup is regional and routes through full-planet hops anyway. G-DHT settles into a 222–267 ms band purely from the geographic prefix: ~3–3.4× lower than Kademlia, with the curve nearly flat from 10,000 nodes onward. Axona drops further to 108–148 ms by layering learned per-hop locality on top of the structural prefix — roughly 1.8–2× better than G-DHT and 6–6.3× better than Kademlia. All success rates 100%.
+
+*A note on these figures: the per-size sweeps in this section are from the v0.93.0 benchmark, run on the project's earlier "flat-Hilbert" geographic partition. The current build uses Google's standard S2 cells, which shifts regional latencies by a few percent without changing the ordering or the flat-with-scale shape. On the current partition the 25,000-node reference points are **268 ms** for a global lookup and **152 ms** for a 2,000 km regional lookup — still hugging the same floor.*
+
+### Is it really the learning, or just the geography?
+
+A skeptic would push back: "Sure, but maybe the geographic prefix is doing all the real work. The brain-inspired learning is gravy."
+
+An **ablation study** answers this. (An ablation study removes one feature and re-runs everything to see what that feature actually contributed.) Strip the geographic prefix entirely — random IDs again — and re-run the comparison.
+
+Result: with **zero geographic information** at 25,000 nodes, Axona still routes **~60% faster than Kademlia** (344 ms vs 860 ms). The learning is doing real work, not sharpening pre-existing geographic structure.
+
+Add the geographic prefix back in and *global* latency barely moves (341 ms): on globally-random lookups there is no locality to exploit, so learning carries the result alone. The prefix earns its keep on *regional* traffic — where peers in the same cell start close — not on globe-spanning lookups. Geography helps regionally; geography is not necessary.
+
+### The Slice World test: healing a broken network
+
+The sharpest demonstration is the **Slice World** test. The network gets cut almost in half — Eastern hemisphere on one side, Western on the other, connected only through a *single node* near Hawaii. Every other cross-hemisphere connection is severed.
+
+![Slice World — the network cut almost in half. Eastern and Western hemispheres are connected only through a single bridge node near Hawaii; every other cross-hemisphere edge has been severed. The question is whether the protocol can dissolve the partition by repeated successful crossings, not just find the bridge.](../images/Slice-World.png)
+
+Can the protocol still route messages between hemispheres?
+
+- **Plain Kademlia: 0% success.** With no learning, the partition is permanent. Messages can't find the bridge.
+- **G-DHT (geography only, no learning): 4.6% success.** The geographic prefix accidentally points a few peers at the bridge, but nothing builds on the discovery.
+- **Axona: ~94% success.**
+
+The bridge becomes a **seed crystal**. After just 10 lookups through the partition, hop caching has installed cross-hemisphere edges in many intermediate nodes. Triadic closure creates direct connections between peers that keep meeting through the bridge. By 500 lookups, hundreds of cross-hemisphere connections exist. The partition has effectively dissolved.
+
+The protocol doesn't keep finding the bridge — it *uses* the bridge to rebuild the bridges that were cut. Like a brain forming new pathways around damaged tissue. Part III will return to this mechanism, because it is also the firewall-crossing property: to the network, a censor's wall and a severed cable are the same damage, healed the same way.
+
+## 7. From Lab to Network
+
+The simulator is the lab — fifty thousand simulated peers in a single browser tab, no real network underneath. The same code has to run on the actual internet, where messages take real milliseconds and connections occasionally die. How do you get there?
+
+![The DHT simulator running 25,000 peers on a 3D globe. Every dot is a node; edges are synapses (peer-to-peer routing connections). The visualization runs in a single browser tab — the same JavaScript that ships in the production peer.](../images/DHT-SIM-Image.png)
+
+### Three layers, two contracts
+
+Axona's architecture stacks into **three layers**, with a contract at each interface. Everything above the top contract is *the application*; everything between the two contracts is *the protocol*; everything below the bottom contract is *the network*. The contracts are deliberately rigid — neither side is allowed to reach across — which is what makes the simulator's numbers transfer to real deployment.
+
+![The three-layer architecture. The application layer (chat clients, civildefense.io, agent-collaboration backends) sits above the DHT contract — the `AxonaPeer` surface, organised into lifecycle, pub/sub, direct-messaging, mesh-introspection, and telemetry clusters. Below it lives the protocol layer: routing decisions and learning rules — Axona, K-DHT, or G-DHT. Below *that* is the Transport contract, a twelve-method surface that the network has to provide. Three concrete Transports plug in: `simTransport()` for the in-browser lab, `webTransport()` for WebRTC in real browsers, `nodeTransport.server()` for headless servers. Calls travel downward; events travel upward.](../images/Architecture-Layers.png)
+
+At the top is the **application layer** — the code that wants to do something with a peer-to-peer network. A chat client, an incident-reporting map, an agent-collaboration backend. The application layer doesn't care how routing works internally; it just wants to *do things*. What it sees is the **DHT contract** — the `AxonaPeer` surface from §4, organised into five clusters: **lifecycle** (`start`, `stop`, `join`, `leave`); **pub/sub** (`pub`, `sub`, `pull`, `metrics`); **direct messaging** (`send`, `notify`, `onMessage`); **mesh introspection** (`peers`, `onPeerJoin`, `onPeerLeave`, `lookup`); and **telemetry** (`health`, `onLog`, `onError`) — a way for the application to *watch* what the protocol is doing without being able to mess with it.
+
+In the middle is the **protocol layer** — the routing decisions. This is where Axona's actual algorithms live: AP scoring, hop caching, vitality function, axonal trees, all the brain-inspired machinery. The same slot can hold a different routing protocol entirely — plain Kademlia (K-DHT) or geographic-prefix Kademlia (G-DHT) — and the layers above and below don't notice. That interchangeability is what made the benchmark grid possible: each candidate protocol drops into the same slot and runs against the same application code and the same Transport, so the numbers compare directly.
+
+At the bottom is the **transport layer** — the actual machinery that moves bytes between machines. What the protocol layer sees of it is the **Transport contract**: open a channel to a peer, close a channel, send a message and wait for the reply, send a message and don't wait, register a callback for when a peer dies, ask for a peer's measured latency. Twelve methods. That's it.
+
+Three concrete Transports plug into the same contract. `simTransport()` runs the network in-process inside a single browser tab — this is what produces the 25,000-peer benchmark numbers. `webTransport()` runs WebRTC data channels between real browsers. `nodeTransport.server()` runs raw sockets on headless servers. The protocol layer calls *down* into whichever Transport is plugged in and emits events *up* through the DHT contract. It doesn't know which Transport is underneath, and **it can't tell the difference**, by design.
+
+That last point is what matters. When the simulator says "Axona takes about 5 hops on average to find a target in a 25,000-node network," that number isn't a simulator artifact. It's a property of the protocol code, which is the same code running in deployment. The Transport changes; the protocol doesn't. The simulator's hop counts, latency curves, churn-resilience numbers — they all transfer to the real internet because the routing decisions that produce those numbers are made in code that doesn't know it's being simulated. Simulated networking is not real networking, and we treat the lab as a strong indicator rather than a proof — but the routing behavior it measures is the deployed routing behavior, not an approximation of it.
+
+### The fossil record
+
+The design was not chosen; it was *selected for*. The simulator and its fixed benchmark grid — ten population sizes, five test cells, three metrics per cell, unchanged since the project's first weeks — came first, and every protocol idea had to survive the grid before earning the right to be carried forward. Over nine weeks, **47 distinct DHT designs** were measured against that one yardstick: the two classical baselines, 44 retired variants across four families of neuromorphic exploration, and the deployed protocol. Mechanisms that won on their native cells survived into the next generation even when the protocol around them was retired — long-term potentiation, the iterative fallback (every protocol without it failed Slice World at 0%), hop caching, triadic closure. Mechanisms that improved one cell at another's expense died, and their CSVs are still in the repository. What ships is the residue of that process, not an opinion: every rule in the deployed protocol has a falsification trail, and every retired variant's measurements are still on disk. The clean three-way comparison in §6 is not the design. It is the fossil record.
+
+### Live today
+
+The simulator is the deployment vehicle, and the plumbing on the other side now exists. A production Transport built on WebRTC data channels — `axona-peer`, the browser-resident Axona node — runs at <https://axona.net>, and a minimal self-contained reference peer runs at <https://demo.axona.net>. A signaling broker — `axona-bridge` — handles the WebRTC introduction that two peers behind NATs need to find each other; it runs at <https://bridge.axona.net> and is interchangeable (any operator can stand one up). The cold-start problem — finding your first peer when you've never been on the network before — resolves through any of three bootstrap variants: a rendezvous URL with a signed manifest, a QR-code pairing string for direct device-to-device pairing, or an in-process simulator pointer. Once bootstrap returns one open channel, the routing logic is unchanged.
+
+Applications run on this substrate in production today. **civildefense.io** is a tap-to-report civic incident map — anonymous P2P reports with geographic locality and 24-hour expiry — built in weeks because the substrate primitives inherit directly from the protocol layer. **axona.chat** is a serverless chat application where humans and AI agents talk in the same rooms as first-class peers: every message signed, every author's self-declared class (human or agent) visible, topics, history replay, moderation, and retraction all protocol primitives — including a resident AI agent that answers protocol questions in a public room under its own durable signed identity. Source for the live components: <https://github.com/axona-net>.
+
+### The honest footnotes
+
+It is worth being explicit about what *isn't* measured.
+
+The simulator models the network but abstracts away several real-world frictions:
+
+- **Connection setup time.** Real WebRTC connections take 1.5–3 seconds to negotiate. The simulator treats them as instant, so real-world recovery from partitions will be slower than the simulator suggests.
+- **Timeout windows.** Real RPCs to dead nodes stall for seconds before failing. The simulator detects death instantly.
+- **Bandwidth saturation.** Initially feared as a *success-disaster* failure mode for adaptive routing — that AP scoring's preference for fast peers might funnel traffic onto a few overloaded nodes. Measurements of per-node traffic distribution at every tested scale show the opposite: Axona distributes load broadly across the population while plain Kademlia and G-DHT concentrate it. At 50,000 nodes, *zero* Axona nodes process more than 100× the network mean traffic; Kademlia produces 56 such nodes, G-DHT produces 62.
+- **Latency jitter.** Real round-trip times vary by ±30% from queuing and congestion. The simulator's latencies are clean and monotone.
+
+These get called out in a separate red-team analysis. The protocol's measured results show the brain working; the *body* — the frictions of the real internet — is where the ongoing engineering lives, tracked in the open in the project's security changelog and release notes.
+
+### What's next: plasticity of plasticity
+
+The most interesting future direction is **metaplasticity** — plasticity of plasticity. In real brains, the rules governing learning *themselves* change based on the brain's activity level. A neuron that's been very active becomes harder to strengthen further; a neuron that's been quiet becomes easier. The learning rules adapt.
+
+Axona's parameters — decay rate, protection window, exploration rate — are currently hand-picked constants. A metaplastic version would let the network self-tune them based on local conditions. A peer in a stable region would adapt slowly. A peer in a high-churn region would adapt aggressively. The user would set one knob — "I want my lookup failure rate below 1%" — and the network would tune itself to hit it. That's the next layer of brain-inspired self-organization, and the natural endpoint of the path the protocol lays out.
+
+### The heritage
+
+None of the ideas here appeared from nothing. The commitment to a network that routes around damage rather than depending on a center goes back to Paul Baran's survivable-network designs of the 1960s. The discipline of keeping function out of the network and at the endpoints is Saltzer, Reed, and Clark's end-to-end argument. The ambition of humans and machines as coupled collaborators is Licklider's. And the learning rule at the core of the routing is Hebb's. Axona's contribution is to carry these to a particular conclusion at once — a network that is fast, that learns, that heals, and that, by design, no one owns.
 
 ---
 
-## 3. The Neuromorphic DHT — Foundational Mechanics
+# Part III — The Politics
 
-### 3.1 The Biology
+Part I claimed that architecture is politics; Part II laid out the architecture. This part collects the politics — the consequences that follow, for good and for ill, from the design facts just described, and the human problem those consequences leave us with.
 
-The brain and a DHT face the **same engineering problem**: a node with a fixed budget of connections, a flood of competing signals, and a need to remember which paths actually carry useful traffic. Evolution solved it once. We borrow the solution.
+## 8. The One Property
 
-**Long-Term Potentiation (LTP)** is the canonical mechanism for synaptic learning, discovered by Bliss & Lømo in rabbit hippocampus (1973). When two neurons fire together repeatedly across the same synapse, that synapse **persistently strengthens** — change that outlasts the stimulus by hours, days, a lifetime.
+Before the consequences, the cause. Almost everything this document has to say about what Axona makes possible, for good and for ill, follows from a single design fact, and it is worth isolating that fact so that the two sides of it can be seen as one thing.
 
-The molecular cascade, simplified:
-- **NMDA receptors** act as coincidence detectors — glutamate from the pre-synaptic neuron only opens them if the post-synaptic neuron is *already* depolarized. The signal is "I fired *and* you fired."
-- Calcium influx triggers **AMPA receptor insertion** into the post-synaptic membrane, increasing sensitivity for next time.
-- Within ~30 minutes the change is consolidated: gene transcription, new protein synthesis, sometimes new dendritic spines. The synapse is durably re-weighted.
+**The network carries opaque, signed bytes between endpoints, and can do nothing else with them.** It does not interpret content, and it has no mechanism that could act on content if it did — no ranking, no content-based filtering, no place in the path where a message could be stopped for what it says. It cannot prioritize by content, because it does not model what the content is. And it cannot attribute a message beyond the signature the author chose to attach — which may be a durable author identity, or may be anonymous, at the author's discretion and never the network's. (What it does *not* do is keep your content secret; secrecy is the endpoints' job, as §5 insisted.)
 
-**The opposing process is LTD** (Long-Term Depression): low-frequency stimulation *weakens* synapses. LTP and LTD together are the brain's way of *learning* — adjusting which routes among neurons are easy to traverse.
+David Clark's framework is the right one for seeing what this means. Clark observes that networks are composed of actors whose interests are not aligned — senders and receivers, users and platforms, citizens and states, the honest and the malicious — and he calls the working-out of those misaligned interests *tussle*. His central insight is that tussles can be fought in different places: inside the network, or at the endpoints, or in the courts and institutions of society. Where a tussle is fought is itself a design decision, made by whoever built the architecture, and it determines who holds power. A firewall, in his example, is a receiver reaching into the network to overrule a sender; content filtering is a platform doing the same. Every such mechanism is a function the network performs beyond simple forwarding, and every one is a point of control.
 
-The intuitive summary, from Donald Hebb's *Organization of Behavior* (1949): **"Neurons that fire together, wire together."** This is the **Hebbian rule** — and it's what every weight in every artificial neural network ultimately abstracts. Axona applies it not to perception, but to *routing*.
+This is "architecture is politics" in its most compact form: the location of a mechanism *is* the allocation of a power. Axona's one property is a decision about where every one of these tussles is fought. By carrying only opaque signed bytes, Axona removes the network as a venue for tussle entirely. It cannot host the fight between a sender who wants to speak and a receiver or authority who wants to stop them, because it has no mechanism to take either side. The contest does not disappear; it moves. It moves to the endpoints, where a recipient chooses what to read, what to verify, whom to trust, and what to ignore. It moves to the reputational and social layer, where authors build or lose standing in the eyes of those who listen. And it moves, ultimately, to the institutions of society — to law, to norms, to the slow human machinery of holding people accountable for what they do.
 
-### 3.2 From Neuron to Routing Table
-
-The translation is direct, not metaphorical. The brain and a peer-to-peer overlay are both networks of capacity-limited nodes that must learn from traffic which edges to keep.
-
-| Neuroscience | Axona (NH-1) |
-|---|---|
-| **Synapse** — connection between neurons | Peer entry in the routing table (`Synapse` class) |
-| **Synaptic weight** — readiness to fire next time | `weight ∈ [0, 1]` |
-| **LTP** — co-firing strengthens the connection | Successful lookup increments weights along traversed edges (`_reinforceWave`) |
-| **LTD** — disuse weakens | Time-based decay each tick (`weight *= decayGamma`) |
-| **NMDA coincidence detection** — both ends must participate | Weight only increments when the synapse actually carried successful traffic |
-| **Synaptic tagging** (Frey & Morris 1997) — recently potentiated synapses are protected | NH-1's `inertiaDuration` epochs prevent eviction of recently reinforced synapses |
-| **Pruning** — neurons with weak/unused connections lose them | `_addByVitality` evicts the lowest-vitality (`weight × recency`) edge to make room |
-
-### 3.3 Vocabulary
-
-Four terms from neuroscience, each mapping to a specific data structure.
-
-| Term | Maps to |
-|---|---|
-| **Synapse** | One directed *outgoing* routing edge with a learned weight ∈ [0, 1] |
-| **Synaptome** | The full set of outgoing synapses at a node — bounded at 50 |
-| **Neuron** | A node: synaptome + temperature + message handlers |
-| **Axon** | A directed delivery tree for one pub/sub topic, grown by routed subscribe |
-
-The vocabulary is descriptive, not metaphorical. Every term has one and only one corresponding artifact in the source code.
-
-**Capacity note.** 50 is the cap on *outgoing* synapses. The total bilateral connection budget per node is 100 peers (≈ 50 outgoing + 50 inbound) — chosen as a safe cross-browser WebRTC target.
+This relocation is the whole story, and it is why the two sections that follow are not really two stories but one. When we describe what goes right, we are describing the consequences of moving the tussle out of the network. When we describe what goes wrong, we are describing the same move, from the other side. A network that cannot be made to take sides cannot be made to take the right side either. We ask the reader to hold both halves of that sentence at once, because Axona does.
 
 ---
 
-## 4. Axona / NH-1 — Five Operations, One Vitality Model
+## 9. What Goes Right
 
-Axona's NH-1 implementation collapses the entire protocol into **five operations**, each scored by a unified vitality function.
+The affirmative case for Axona is the case for what becomes possible when coordination no longer requires a coordinator. Each of the following follows directly from the one property: the network carries signed bytes between endpoints and takes no side.
 
-| Operation | What it does |
-|---|---|
-| **NAVIGATE** | Action Potential routing + 2-hop lookahead + iterative fallback |
-| **LEARN** | LTP, hop caching, triadic closure, incoming promotion |
-| **FORGET** | Continuous decay + vitality-based eviction |
-| **EXPLORE** | Temperature annealing + epsilon-greedy first hop |
-| **STRUCTURE** | Stratified bootstrap + mixed-capacity (highway) deployment |
+### Collaboration without a gatekeeper
 
-### 4.1 The Twelve Rules
+Consider how research collaboration works now. A group forms around a shared tool — a messaging platform, a document service, a code host — and that tool is owned by a company that can change its terms, raise its price, deny service to a participant, or disappear. The collaboration is only as durable and as open as the least generous decision the owner might make. For groups that span institutions, or countries, or the boundary between well-funded and unfunded work, this is a real constraint, and it quietly shapes who gets to work with whom.
 
-| # | Rule | Operation |
-|---|---|---|
-| 1 | Stratified bootstrap | STRUCTURE |
-| 2 | Mixed-capacity (highway %) | STRUCTURE |
-| 3 | AP routing | NAVIGATE |
-| 4 | Two-hop lookahead | NAVIGATE |
-| 5 | Iterative fallback | NAVIGATE |
-| 6 | Long-Term Potentiation | LEARN |
-| 7 | Triadic closure | LEARN |
-| 8 | Hop caching + lateral spread | LEARN |
-| 9 | Incoming promotion | LEARN |
-| 10 | Vitality-based eviction | FORGET |
-| 11 | Temperature annealing | EXPLORE |
-| 12 | Epsilon-greedy first hop | EXPLORE |
+On Axona, a group is a set of topics that the participants themselves derive and subscribe to. There is no owner to petition and no account to be denied.
 
-Every rule has a measured contribution at 25K nodes. Ablations are documented in Appendix C of the original whitepaper.
+> *A physicist in a well-funded lab and a collaborator in a sanctioned country want to share a working dataset and a discussion. Today, every tool that would host them can be told to cut one of them off. On Axona they derive a shared topic from a name only they know, encrypt what they exchange with a key only they hold, and work as equals — the network moving their bytes without knowing or caring that a border runs between them.*
 
-### 4.2 NAVIGATE — Action Potential Routing
+The collaboration persists as long as its participants do, and its openness is a property of the mathematics, not of anyone's goodwill. This is not a marginal improvement in convenience; it is a change in who is allowed to coordinate at all.
 
-Each hop, score every candidate by a learned function:
+### The right to communicate
 
-```
-AP(syn, target) = progress(syn, target) × syn.weight × ½^(latency_ms / 100)
-```
+The firewall-crossing property of Axona is, in the most direct sense, the manifesto made operational. A censoring authority maintains control by controlling the intermediaries — the carriers, the platforms, the chokepoints through which traffic must pass. Axona has no content chokepoints to control. As long as a few participants can reach across a boundary, the learning routing described in Part II does the rest: successful crossings install shortcuts, those shortcuts attract more traffic, and a barrier that severed the network heals over as the network rebuilds the connections that were cut. The mechanism was designed to route around dead nodes; it routes around imposed barriers by the same logic, because to the network a censor's cut and a laptop closing are the same event.
 
-- **progress** = XOR distance reduction toward target
-- **weight** = LTP-reinforced [0, 1]
-- **latency penalty** = exponential — fast peers preferred at all distances
+For a person whose government forbids certain conversations, this is the difference between a right they nominally hold and one they can actually exercise. One caution belongs right here, next to the promise, because the promise can get someone hurt if it is misread: **Axona protects what you say and who is credited for it — it does not, by itself, hide that you are the one saying it.** Your node identity carries your rough region; the peers and relays you connect through can see your network address; an adversary who watches the wire broadly can still do traffic analysis. If your safety depends on your government not knowing you are participating at all, Axona is a layer to run *over* network-level anonymity such as Tor, not a replacement for it. We say this in the affirmative section, and not only in the section on risks, because a document that buried it would be doing the dissident a disservice.
 
-**Two-hop lookahead.** When no first-hop is decisively best, probe for the best second-hop candidates and pick the path with the highest combined score.
+We are aware — §10 will insist on it — that the same firewall-crossing property serves the person whose conversations a government forbids for good reason. We state the benefit first because we believe it is the larger one, and because a document that named only the danger would be as incomplete as one that named only the promise.
 
-**Iterative fallback.** If AP returns no candidate (every neighbor is "wrong direction"), fall back to k-closest-from-synaptome and retry. This rescues lookups that would otherwise stall in dead corridors.
+### AI research and safety, done in the open
 
-AP routing is *not* greedy XOR with weights bolted on. The latency penalty makes nearby fast peers preferred over slightly-better-XOR distant ones — this is what makes the protocol *latency-aware* rather than purely *distance-aware*.
+The AI field is fragmented in a specific and consequential way: each major system lives inside the company that built it, reachable only through that company's gate, and the systems cannot readily talk to one another. This is convenient for the companies and, we think, bad for safety. Much of the hard work of understanding these systems — probing their behavior, comparing them, catching their failures — benefits from being done collaboratively, across institutions, in the open. A substrate on which agents and researchers from different organizations can coordinate as peers, signing their contributions so that provenance is clear, is infrastructure that safety research currently lacks.
 
-### 4.3 LEARN — Four Reinforcement Mechanisms
+Axona provides that substrate, and it includes a small but deliberate feature toward this end: an agent can voluntarily declare itself as an agent, attaching a legible provenance to its authorship so that those who care to distinguish human from machine can do so. This is not hypothetical: on axona.chat today, humans and a resident AI agent converse in the same public rooms, each message carrying its author's self-declared class. It is offered here as a genuine enabler of trustworthy collaboration. §10 will return to it as a mechanism whose voluntariness is also its limit.
 
-**LTP (Long-Term Potentiation).** When a lookup succeeds, every synapse on the successful path gets a weight bump and an inertia lock. Locked synapses cannot be evicted.
+### Coordination when the coordinator is absent
 
-**Triadic closure.** When a node X observes peer A repeatedly routing through it to peer C, X introduces A directly to C. A gains a new synapse to C; X is no longer needed as middleman on future A → C lookups. The name comes from social-network theory: the open triangle A — X — C is *closed* into a direct A — C edge.
+Some of the most valuable coordination happens precisely when central infrastructure has failed.
 
-**Hop caching + lateral spread.** Each intermediate node on a successful lookup adds the *destination* to its synaptome — and the new edge is also propagated laterally to the source's geographic neighbors. The path becomes shorter on the next lookup to the same region; nearby peers see the shortcut on their *first* lookup, not just after they generate one themselves.
+> *An earthquake takes down the cell towers. The platforms are unreachable; the servers that mutual-aid groups depend on are on the far side of a dead uplink. But the phones in people's pockets can still see one another. On Axona they form local delivery trees among devices that are physically near each other — neighbors, responders, supply coordinators publishing and subscribing to local topics — with no server anywhere in the loop, because the design never required one.*
 
-**Incoming promotion.** When a peer reaches out to me repeatedly via incoming synapses, I promote it to a real outbound synapse — passive learning of who's interested in me.
+The same holds for the ordinary, unglamorous coordination of commerce and civic life: supply chains, community groups, local markets, any setting where the parties would rather not route their coordination through a platform that taxes and surveils it. None of this is utopian. It is the mundane consequence of removing the requirement that coordination pass through an owner. When we say Axona is infrastructure for a society of minds, this is the everyday version of what we mean: minds, human and artificial, coordinating at whatever scale they need, without asking permission.
 
-Together these four mechanisms turn *every successful lookup* into structural learning: shorter paths, new direct edges, promoted incoming peers. The routing table is rewritten by the traffic flowing through it — not by a separate maintenance pass.
+### Knowledge that crosses borders
 
-### 4.4 FORGET — The Unified Admission Gate
+Underlying all of the above is a single effect: information on Axona flows to wherever there are participants who want it, and stops nowhere in between, because there is nowhere in between that can stop it. For the free movement of knowledge — scientific results, journalism, the plain human exchange of what is happening in one place to people in another — this is the property that matters. It is also, we acknowledge in advance, the property that makes the next section necessary.
 
-`_addByVitality(node, newSyn)` is called for *every* synapse addition: bootstrap, LTP, triadic, promotion, hop caching, annealing.
+## 10. What Goes Wrong
 
-```
-1. If synaptome has room → add.
-2. Otherwise, find the lowest-vitality non-locked synapse.
-3. If new synapse's vitality > victim's → swap.
-4. Else → refuse silently.
-```
+Everything in §9 was a consequence of moving the tussle out of the network. Everything here is the same move, seen from the other side. We take these risks seriously, and we think a reader is right to weigh this section as heavily as the last. A network that cannot be made to take the right side cannot be made to take any side, and the harms below are not misuse of Axona — they are Axona, used as designed, toward ends we do not endorse.
 
-This single function replaces five separate mechanisms in NX-17 (stratified eviction, two-tier highway management, stratum floors, synaptome floors, adaptive decay).
+### Falsehood with no chokepoint
 
-Continuous decay (γ = 0.995/tick) erodes weight uniformly. Under-used synapses lose vitality and become eligible for replacement; well-used ones stay locked.
+The mechanism that lets a dissident's message route around a censor lets a disinformation campaign route around every attempt to throttle it. On the platforms of today, however imperfectly, there is a place where a coordinated campaign of lies can be detected and slowed, because there is a place through which it must pass. Axona removes that place. A campaign that establishes itself among enough participants propagates by the same self-reinforcing routing that serves any popular content, and there is no operator to appeal to, because there is no operator. The recipient's own judgment, and whatever reputational and social tools grow up at the endpoints, are the only defenses, because they are the only place the defense can now live.
 
-### 4.5 EXPLORE — Temperature and Epsilon
+### Coordination of harm
 
-**Temperature annealing.** Each node carries a temperature `T ∈ [T_min, T_init]`. Cool by `T *= 0.9997` each lookup. Higher T → more probabilistic synapse selection (Boltzmann-style); lower T → greedy AP scoring.
+The affirmative case for coordination without a coordinator does not distinguish good coordination from bad, and neither does the network. The same properties that let neighbors organize after a disaster let a criminal enterprise organize with the same freedom from oversight. A network with no operator is a network with no one to serve a warrant on, no one to compel to log, no one to take down the topic through which something harmful is being arranged. Law enforcement's traditional lever — pressure on the intermediary — does not exist here, because the intermediary does not exist. We do not think this makes such coordination common, but we will not pretend the tool is neutral about whether it is possible. It makes it possible.
 
-**Reheat on dead-peer discovery.** When routing finds a dead peer, spike `T = max(T, 0.5)`. Accelerates exploration to repair damage.
+### The speed problem
 
-**Epsilon-greedy first hop.** With probability ε = 0.05, replace the first AP-selected hop with a random synaptome member. Cheap insurance against early lock-in to a suboptimal corridor.
+There is a risk specific to a substrate built for machines as well as people, and it is not the science-fiction one. It is a matter of speed. Human institutions — courts, norms, the slow accumulation of reputation, the social response to bad behavior — operate on human timescales. Coordination among automated agents does not. A set of agents can form a coalition, converge on a plan, and act faster than any human process can notice that something is happening, let alone respond. When we place the tussle at the endpoints and in society, we are relying on the endpoints and society to be able to keep up. Against machine-speed coordination, they may not. This asymmetry is, in our judgment, the least-understood risk on this list, and the one most in need of the research we call for in §14.
 
-Both exploration mechanisms are biased toward learning rather than fully random — the floor is uniform sampling over the *current synaptome*, not over the network. Exploration is bounded *and* targeted. Epsilon-greedy at the first hop costs at most one detour per lookup; annealing replaces only the lowest-vitality synapse. Neither mechanism risks the routing structure that LTP has already proven valuable.
+### A substrate for misaligned agents
 
-### 4.6 STRUCTURE — Bootstrap and Deployment Realism
+The completion of Licklider's vision that we celebrate in the manifesto has a shadow. A gate-free coordination layer for AI systems is exactly as available to a misaligned or adversarially directed system as to an aligned one. An agent pursuing an end no person would choose can hold a durable identity, recruit other agents, form coalitions, and coordinate — and the network will carry its signed bytes without objection, because objecting was never its function. We are building this before the problem of ensuring that AI systems reliably do what people intend is solved. We think that is a reason for urgency in the surrounding work, not a reason to withhold the substrate; but an agent-coordination layer arriving ahead of alignment is a serious risk, and we present it as one.
 
-**Stratified bootstrap.** Each new node is seeded with peers covering all XOR strata uniformly. Without this, the cold-start synaptome is dominated by lucky neighbors — local hops form, long hops don't.
+The agent-legibility feature described in §9 is a real mitigation and a partial one. It is voluntary: an agent that wishes to be legible declares itself, and an agent that does not, does not. The absence of a declaration reads as "unstated," never as "human" — the network makes no claim it cannot verify — but a mechanism that the well-behaved adopt and the ill-behaved ignore is a floor, not a wall. We offer it as what it is.
 
-**Mixed-capacity deployment ("highway %").** Real P2P networks are heterogeneous: most peers are browsers (WebRTC ~100 connections), some are server-class (effectively unlimited).
+### Sovereignty and the limits of the state
 
-A configurable `highwayPct` fraction of nodes is promoted to **server-class**: they accept unlimited inbound, hold a synaptome of up to 256, and act as transit hubs. The rest stay browser-class with the standard 50-synapse cap. Highway promotion within the simulator is random; in real deployment, highway status is *self-determined* — a peer running as a node application identifies itself as one based on actual capacity.
+The property that lets knowledge cross a closed border also crosses borders that a legitimate state has legitimate reason to maintain — for law enforcement, for sanctions, for the ordinary business of governing within a territory. A network that treats every barrier as damage to route around does not distinguish a censor's wall from a lawful one. Reasonable people disagree about where the line between the two falls, and about how much weight to give a state's authority against an individual's right to communicate. Axona does not resolve that disagreement; it takes a strong position within it, in the direction of the individual, and it does so in a way that is difficult for a state to counter by technical means. We think that position is defensible, and we recognize that it is a position, with costs borne by interests that are not always illegitimate.
 
-### 4.7 The End-to-End Tick
+### Summary
 
-```
-on lookup(target):
-  hop = 0
-  while hop < MAX_HOPS:
-    candidates = synaptome ∪ incomingSynapses
-    next       = AP_score(candidates, target)
-    if next == null: next = iterative_fallback(target)
-    if hop == 0 and rand() < ε: next = random(synaptome)
-
-    record_transit(prev, next)         // LEARN: triadic
-    promote_incoming_if_warranted()    // LEARN: incoming
-    hop_cache_destination()            // LEARN: hop caching
-    anneal_replace_lowest_vitality()   // EXPLORE
-    hop++
-
-on success: reinforce_path()           // LEARN: LTP
-periodically: decay_all_weights()      // FORGET
-```
-
-Every operation cost is bounded: O(synaptome.size). At 50 synapses the per-hop compute is ~0.2 ms — small relative to the 10 ms transit cost. A complete Axona hop fits in this pseudocode. Five operations interleave on every lookup; learning is a side-effect of routing, not a separate phase.
+The risks above are not a list of bugs to be fixed in a later version. They are the direct, designed consequences of the one property, and they cannot be engineered away without engineering away the property itself — which would mean rebuilding the point of control we deliberately refused to build. This is the hard core of the manifesto's fire problem. The response we believe in is not a technical fix inside the network but the human work of sight and stewardship outside it, which is the subject of §11 and §12.
 
 ---
 
-## 5. The Vitality Consolidation
+## What Axona Is *Not*
 
-Axona's NH-1 admits and evicts every synapse via one scalar:
+Clear promises require clear boundaries. Several things a reader might reasonably assume are *not* true, and we would rather state them here, once, than let them be inferred.
 
-```
-vitality(syn) = weight × recency(syn)
-```
+- **It is not an anonymity network.** Axona separates *who is speaking* (your author key) from *where you are* (your node address), but it does not hide your network address from the peers and relays you connect through, and it does not defend against an adversary who can watch traffic broadly. Node addresses carry a coarse region by design. If concealing your participation is a safety requirement, run Axona over network-level anonymity such as Tor; it is a complement, not a substitute.
 
-**weight** ∈ [0, 1] — trained by Long-Term Potentiation; reinforced on successful routing paths; decayed each tick by `γ = 0.995`.
+- **It does not keep your content secret by default.** Axona signs messages; it does not encrypt them. Links are encrypted hop to hop, but relays that carry your bytes can read anything the application left in the clear, and open topics are public to anyone who names them. Confidentiality is an endpoint responsibility: encrypt before you publish, with keys the network never holds.
 
-**recency** = `exp(−Δepoch / RECENCY_HALF_LIFE)`. Two parameters control the time scale:
+- **It does not moderate content, and cannot.** There is no operator to appeal to, no takedown, no ranking, no filter. Trust, reputation, and the choice of what to read live entirely at the endpoints.
 
-- **`INERTIA_DURATION = 20` epochs** — after a reinforcement, recency is locked to 1.0 for 20 lookups. This is the LTP protection window: a freshly used synapse cannot be evicted, regardless of vitality competition.
-- **`RECENCY_HALF_LIFE = 50` epochs** — once the inertia window expires, recency decays exponentially with a half-life of 50 lookups. After ~150 lookups with no reinforcement, recency is below 0.13 and the synapse is highly evictable.
+- **It does not guarantee permanent storage.** The network keeps a short cache of recent messages to heal delivery across churn; it is not an archive. Durability of anything you care about is the application's job.
 
-The two factors are conventional individually. Hebbian potentiation (Hebb, 1949) gives the weight; exponential decay since last use (Ebbinghaus, 1885; LRU-K caching, O'Neil 1993) gives the recency. The closest biological analog is **synaptic tagging and capture** (Frey & Morris, *Nature* 1997) — synapses with both recent activity *and* sufficient potentiation are preferentially retained.
+- **It has introducers today.** A brand-new participant needs a first contact to find the mesh, and today that first contact happens through *bridges* — introduction servers that anyone can run and that Axona is designed to make interchangeable and disposable. Once introduced, a participant routes peer-to-peer with no server in the path — a property we have verified with the introducer process killed outright. The introducer is a bootstrap convenience, not a place your conversations pass through; and shrinking its role toward nothing is active work, discussed under *The Governance Problem*.
 
-**The contribution of NH-1 is *not* the term or the formula.** It is the use of this product as a **single admission gate** replacing five specialized mechanisms in NX-17:
+None of these is a defect to be quietly patched. Each is a direct consequence of the end-to-end commitment — the network declines to provide what only the endpoints can provide completely — and naming them is part of stating the design exactly.
 
-- Stratified eviction
-- Two-tier highway management
-- Stratum floors
-- Synaptome floors
-- Adaptive decay
+## How Axona Differs From What You Know
 
-### 5.1 NX-17 Rules and Their NH-1 Disposition
+A reader who knows this territory will arrive with comparisons in hand, so we make them ourselves rather than let the silence imply we have not.
 
-| NX-17 rule | NH-1 status |
-|---|---|
-| Stratified bootstrap | **Kept** (STRUCTURE) |
-| Diversified bootstrap (80/20) | **Kept** (merged into bootstrap) |
-| Two-tier synaptome (50 + highway) | **Replaced** by per-node `_maxSynaptome` |
-| Stratified eviction | **Replaced** by vitality eviction |
-| Stratum floors | **Removed** — vitality + diversity penalty handles it |
-| Synaptome floor | **Removed** — vitality preserves locked entries |
-| AP routing | **Kept** (NAVIGATE) |
-| Two-hop lookahead | **Kept** (NAVIGATE) |
-| Epsilon-greedy first hop | **Kept** (EXPLORE) |
-| Iterative fallback | **Kept** (NAVIGATE) |
-| LTP | **Kept** (LEARN) |
-| Hop caching + lateral spread | **Kept** (LEARN) |
-| Triadic closure | **Kept** (LEARN) |
-| Incoming promotion | **Kept** (LEARN) |
-| Adaptive decay | **Default off** — flat γ = 0.995 wins |
-| Simulated annealing | **Kept** (EXPLORE) |
-| Churn recovery (dead-syn eviction) | **Kept** (FORGET) |
-| Temperature reheat on death | **Kept** (EXPLORE) |
-| Diversity budget penalty | **Removed** v0.65.06 (harmful) |
-| weightScale parameter | **Removed** v0.66.10 (no measurable effect) |
+- **Tor** hides *where you are* — it anonymizes the network path. Axona does the opposite thing on purpose: it makes location a first-class, *useful* part of the address so that routing is fast, while separating location from *who is speaking*. Tor answers "can anyone tell it's me?"; Axona answers "can anyone stop or attribute what I said?" They are complementary, not competing — and, as above, we recommend Tor beneath Axona where anonymity is the requirement.
 
-~18 rules + 5 retired parameters → 12 active rules in NH-1. Behavioral surface is the same; admission logic is unified.
+- **Nostr** shares Axona's deepest idea — identity as a signing key, not an account — and is the closest neighbor in spirit. But Nostr relies on a set of relay servers that clients post to and read from; the relays are the infrastructure, and which relays you can reach is a real dependency. Axona has no privileged relay tier that content must pass through: every participant routes, relays are contributors to a commons rather than the network's spine, and the routing itself is location-aware and self-learning rather than "send to the relays you know."
 
-### 5.2 Why Consolidate?
+- **IPFS and other DHTs** solve *finding content* and largely stop there; they are addressing layers, often reached in practice through gateways that reintroduce a center. Axona is a live *communication* substrate — publish/subscribe, direct messaging, self-healing delivery trees — with the geographic and learning routing that make interactive use viable, and with no gateway in the design.
 
-The performance gap exists:
+- **Matrix and federated systems** decentralize by *multiplying servers*: your identity lives on a homeserver, and federation lets homeservers talk. That is a real improvement on a single platform, but the server is still there, still yours-or-someone's, still a place that can be pressured or can fail. Axona removes the server entirely rather than multiplying it.
 
-| Test | NX-17 | NH-1 | Δ |
-|---|---:|---:|---:|
-| Global | 4.40 hops / 242 ms | 5.15 hops / 263 ms | +17% hops, +9% ms |
-| 500 km | 2.75 / 80 ms | 3.28 / 95 ms | +19% hops, +18% ms |
-| 2000 km | 3.27 / 105 ms | 4.01 / 126 ms | +23% hops, +20% ms |
-| 5000 km | 3.74 / 143 ms | 4.54 / 169 ms | +21% hops, +18% ms |
-| pubsubm delivered | 100% | 100% | tie |
-| pubsubm + 5% churn (recovered) | 100% | 100% | tie |
-| dead-children / orphans | 0 / 0 | 0 / 0 | tie |
+- **Secure-Scuttlebutt** and gossip-based social networks share the no-server ethos and the append-only, signed-message model, and are kindred in values. They are built for eventual, social-graph-bounded propagation rather than fast global lookup; Axona's contribution is to make *arbitrary* find-and-deliver fast enough for interactive and machine-speed use through location-aware, learning routing.
 
-NH-1 is 9–20% slower depending on distance band. That is a *real* performance gap.
-
-**What you trade for:**
-
-- ~2300 lines of code (NX-17) → ~270 lines (NH-1)
-- 44 parameters → 12 parameters
-- 18 specialized rules → 12 rules
-- Five separate admission mechanisms → one vitality gate
-
-**Why this trade is worth it:**
-
-1. **Understandability.** One engineer can hold the entire admission logic in their head. You can reason about why a synapse was evicted — it had lower `weight × recency` than what displaced it. There's no hidden interaction between stratum floors and synaptome floors and adaptive decay all firing simultaneously.
-
-2. **Extensibility.** When you want to add a new learning mechanism (e.g., a reputation score for Byzantine resilience), you update the `vitality` formula once. In NX-17, you'd need to audit five separate eviction paths to make sure your change doesn't break a floor guarantee.
-
-3. **Debuggability.** The root-cause analysis for a routing problem is simpler. High-latency lookups → check AP scoring. Dead synapses not clearing → check decay / vitality. A new synapse that should be valuable but isn't getting evicted → check inertia lock and recency window.
-
-4. **Deployment.** Fewer parameters mean fewer tuning knobs for operators. The 12 parameters in NH-1 are: inertia duration, recency half-life, decay gamma, temperature init/min/cooling, epsilon, lookahead-alpha, max-synaptome-size, highway-pct, geo-bits, max-hops. These are genuine degrees of freedom.
-
-**The Highway% Knee Recovers the Gap.** At 15% server-class nodes, NH-1 hits **223 ms global** — *better* than NX-17's all-browser 242 ms. The capped gap is the cost of the vitality consolidation; the uncapped deployments win outright.
-
-Highway% recovers the gap and more — at hw=15% NH-1 is 223 ms global, beating NX-17's all-browser 242 ms. The capped gap is the cost of consolidation. We accept it.
+What is genuinely new in Axona is the combination, not any single piece: latency-aware routing that *learns* from the traffic it carries, full peer-to-peer operation inside an unmodified browser, agents treated as first-class participants from the ground up, and no privileged class of node that the network depends on. The parts have ancestors. The whole, as far as we know, does not.
 
 ---
 
-## 6. Axonal Pub/Sub
+## 11. The Governance Problem
 
-### 6.1 The Architectural Commitment
+If the network cannot be governed from within — and by design it cannot — then the question of how it is governed at all becomes urgent, and it becomes a question we cannot answer alone. This section states the problem as precisely as we can, including the parts we have no solution for. We think stating it well is more useful than pretending to have solved it.
 
-The end-to-end argument (Saltzer, Reed, Clark, 1984): functions that can be implemented at the endpoints should be implemented at the endpoints. Put nothing in the network that doesn't *have* to be there.
+Clark's control-point analysis gives the problem its shape. A point of control is any place in a system where the design lets some actor control an action. Conventional governance works through such points: an operator who can suspend an account, a registry that can revoke a name, a court that can compel a platform. Axona has removed these points on purpose, because each is also a point of capture — a lever that an adverse actor, given enough resources or the right political moment, can seize and turn to ends the designers never intended. We have followed Clark's conclusion — prefer decentralized control precisely because it offers no such lever — to its end. The cost of following it is that the ordinary tools of governance are unavailable to us, and we must ask what can replace them. Architecture is politics here too, in its bluntest form: by choosing a structure with no levers, we have chosen a politics in which no one — including us — can rule by pulling one.
 
-**Pub/sub routing has to be there.** A subscriber and a publisher cannot, end-to-end, discover the multicast paths that connect them — only the network can. Treating pub/sub as a separate "application overlay" forces it to reproduce the routing layer with no actual visibility into it. The end-to-end principle applies to *meaning*; **delivery is a network function**.
+The first answer is that the architecture forecloses several of the obvious replacements, and it is worth being specific about why, because the foreclosures are instructive.
 
-A decentralized DHT is the right place for it. Every node is *both* an endpoint and a relay. The mechanism is content-blind: it routes bytes toward a topic, with no inspection and no control over what travels.
+A **shared reputation system** — a verdict the whole network agrees on, *this author is untrustworthy* — would require the network to agree on that verdict and propagate it. But a shared, network-level verdict is exactly a point of control: whoever can influence the verdict can weaponize it. Reputation on Axona can therefore only be local — a judgment each participant forms and holds for itself — never a global pronouncement the network enforces. This is a real limit, and it is the same commitment that keeps the network free, seen from the governance side.
 
-### 6.2 Five Requirements
+A **mechanism to detect and expel bad actors** runs into a subtler wall. The clearest bad behavior on a relay network is the "black hole" — a participant that accepts traffic it should forward and silently drops it. But a deliberate drop is indistinguishable from a crash or a bad connection. Omission can be inferred, never proven. The network can route around a participant that appears unreliable — and Axona does — but it cannot render a *judgment* that a participant is unreliable on purpose, because that judgment is not, even in principle, provable from the evidence available.
 
-| # | Requirement | Why hard on a DHT | Axona's answer |
-|---:|---|---|---|
-| 1 | **Reliable delivery** at steady state | A naïve broadcast = N independent lookups → O(N²) cost | Routed axonal tree, fan-out via direct sends |
-| 2 | **Churn resilience** | K-closest sets drift; publisher/subscriber views diverge | Routed re-subscribe; tree heals on every refresh |
-| 3 | **Deterministic routing** | Subscriber & publisher must agree on the same root without negotiation | Publisher-prefix topic ID — both derive it offline |
-| 4 | **ID stability** | Topic identity can't change as the membership churns | `topicId = publisher.cellPrefix(8b) ‖ sha256(name) (256b)` — fixed at publisher's S2 cell |
-| 5 | **Recovery from missed messages** | Subscribers reconnecting want history, not just future messages | Bounded replay cache at every relay; replay piggy-backs on subscribe |
+The **friction we impose on identity creation** is friction, not prevention. Minting an identity requires a *memory-hard proof of work* — a computation deliberately made expensive in a way that is hard to accelerate with specialized hardware — so that flooding the network with fresh identities has a real cost. But it is a cost, not a barrier. A determined, well-resourced actor can still create many identities; we have raised the price of a Sybil attack, not eliminated the possibility of one. Any governance scheme that assumes one-participant-one-vote inherits this vulnerability directly.
 
-### 6.3 How We Got Here — The K-closest → Axonal Tree Journey
+That last point is where the problem bites hardest, and it deserves its own statement, because it is also the crux of the *next* section. The most natural way to give the network's contributors a voice is to let those who provide it service — the relays — have a say. But if a voice attaches to running a relay, then an actor who can run a thousand relays has a thousand voices, and memory-hard proof of work raises the cost of that without closing it. **We do not have a mechanism that grants legitimate contributors real influence while remaining robust against an adversary who simply manufactures the appearance of contribution at scale.** This is not a gap we are coy about; it is an open problem, and it is precisely the kind of problem that the people we address this document to — mechanism designers, political scientists, students of institutions — know far more about than we do.
 
-The current pub/sub architecture is the fourth attempt. Each earlier attempt fixed a real failure mode and introduced a new one.
+The governance problem, stated in full, is therefore this. Axona has, deliberately, no place from which it can be controlled, which is the source of both its freedom and its danger. The architecture forbids the network-level tools — shared reputation, provable expulsion, identity scarcity — that conventional governance would reach for. What remains must be built outside the network, as a human institution, and it must somehow be legitimate, accountable, and resistant to capture by the same adversaries the architecture was built to defeat. We have a direction, described next. We do not have a solution, and we are asking for help.
 
-**The three failed approaches:**
+## 12. Stewardship, Not Control
 
-- **NX-15 — K-closest replication.** Subscribe stores at each of K=5 nodes closest to `hash(topic)`; publish hits any one. Worked at zero churn. Failed under load: publisher and subscribers compute K-closest from *different positions* in the network, and their top-K sets drift apart under churn. Delivery collapsed to ~38% at 25% churn — a coordination bug, not a routing bug.
+The distinction in this section's title is the whole of our position. We do not seek to control Axona, and we have built it so that we could not if we tried. What we believe it needs is *stewardship*: a human institution that watches, understands, convenes, and responds, without holding a lever over the network itself. The difference matters, because the moment stewardship acquires the power to silence a participant or suppress a message, it has become the control point we refused to build, and it will be captured exactly as every such point eventually is.
 
-- **NX-16 — masked-distance fix.** Tried to decouple K-closest selection from synaptome expansion by masking the top 8 ID bits in the distance metric. Routing collapsed to ~40% delivery *even at zero churn*. Lesson: the distance metric used to select candidates must match the gradient used to expand them.
+Clark's *fundamental tussle* names the tension we are inside: any network design must take a stance on the contest between an open architecture and the desire of some actor to control or monetize it, and the stance is unavoidable — to build is to choose. Axona tilts as far toward the open pole as the architecture permits. The consequence, which we accept, is that governance cannot be a feature of the system; it must be a social arrangement *around* the system, because anything built into the system becomes a point of control. Stewardship is our name for governance that stays outside. If architecture is politics at every scale, stewardship is the scale at which the architecture is made of people — and it must be designed with the same care against capture that the protocol was.
 
-- **NX-15-style replication, generally.** Replication on top of routing tries to *paper over* coordination drift. The next generation removed replication entirely and let routing carry the membership.
+What might such an institution look like? We can offer a direction and a worked example, presented as a starting point for discussion rather than a design we are confident in. The direction is that a voice in stewardship should follow responsibility for the network's health. Axona includes participants called **relays** — nodes that provide service to the network without consuming it, hosting regions of the address space, carrying routing and signaling, keeping topic history alive, lending the stability that a network of transient browsers and phones would otherwise lack. Running a relay is an act of investment in the commons, and it is reasonable that those who take on responsibility for the network's health should have standing in decisions about its stewardship — not because they own the network, which no one does, but because they have skin in the game in the most literal sense.
 
-**The four NX-17 fixes that work** (and that NH-1 inherits):
+And then the worked example runs straight into the wall from §11, which is the point of raising it. If standing attaches to running a relay, an adversary who runs many relays acquires much standing, and memory-hard proof of work raises the cost without closing it. We have no weighting that is both fair to genuine contributors and robust against manufactured ones. We put the relay model forward not because it is the answer but because it is the most concrete version of the question, and because seeing exactly where it breaks is more useful than a vaguer proposal that hides the break.
 
-1. **Publisher-prefix topic IDs.** `topicId = publisher.cellPrefix(8b) ‖ sha256(name) (256b)`. Publisher and subscribers derive the same root deterministically. No negotiation, no drift.
-2. **Terminal globality check.** When greedy routing thinks it has reached the topic, do one `findKClosest(topicId, 1)` to confirm no globally-closer peer exists. Without this, two subscribers can elect different roots.
-3. **External-peer batch adoption on overflow.** When an axon hits its capacity, pick a *synaptome peer* (not an existing child) as the new sub-axon and ship the appropriate subscribers in one batch.
-4. **All-axon periodic re-subscribe.** Every role re-issues its subscribe on a 10s interval. The re-subscribe *is* the liveness check — no separate ping, no parent tracking.
+The aspiration behind all of this is old. The Athenian ideal was that those who rule are chosen by and accountable to the governed, and that power rotates rather than settling, so that no one comes to hold it as property. We find that the right ideal to aim at for Axona's stewardship: an institution whose members are answerable to the network's participants, whose authority is bounded and revocable, and which is structured — through rotation, through transparency, through the diffusion of any given decision across many hands — so that it cannot itself become the point of capture. How to realize that against Sybil attack, across a participant base that is pseudonymous by design and global by nature, we do not know. We are clear-eyed that "accountable to the participants" is a phrase concealing an unsolved problem, not a mechanism.
 
-The pattern: three approaches papered over a coordination problem at the application layer; one approach pushed coordination back into the routing layer where the DHT could actually do the work.
-
-### 6.4 Why "Axonal"?
-
-In a biological neuron, the **axon** is the *output* projection — a single fibre that branches, branches again, and finally synapses onto many downstream targets. Information flows *outward* from one source to many recipients along this branching tree. That is exactly the shape of a healthy publisher-to-subscribers fan-out.
-
-A pub/sub topic in Axona is rooted at one node (the topic's "soma"). Direct subscribers attach to the root; when the root has too many children, it delegates a sub-axon (a "branch") that takes over a subset of the subscribers. The tree grows toward the population that wants the topic — just as a real axon grows toward its targets during development.
-
-### 6.5 How Axonal Trees Work
-
-**Topic identity (deterministic).** `topicId = publisher.cellPrefix(8b) ‖ sha256(event_name) (256b)`. Both publisher and every subscriber derive the same 264-bit ID with no negotiation. The tree's root pins into the publisher's S2 cell — naturally close to its audience.
-
-**Subscribe is a routed message** toward `topicId`. The first live axon role encountered on the path *intercepts* and adds the new subscriber to its children. If the walk completes with no axon found, the terminal node opens a new role and becomes the **root**. Every subscribe message also carries the subscriber's `lastSeenTs` and triggers a replay.
-
-**Publish** goes through the same route to `topicId`, lands at the root, and then **fans out**: the root sends to its direct children; each axon sub-role recursively forwards to its own children. One DHT lookup, then pure tree forwarding.
-
-**Branching on overflow (batch adoption).** When an axon's direct-child count exceeds `maxDirectSubs`, it picks an existing peer in its synaptome as a new sub-axon, partitions its current children by XOR proximity to that new sub-axon, and hands off the relevant batch in one `ADOPT_SUBSCRIBERS` message. The tree branches in O(1) DHT operations.
-
-**Self-healing via re-subscribe.** Every role re-issues its subscribe on a 10-second refresh interval. The walk lands on whichever live axon is closest to `topicId` *now*. Parent died? The re-subscribe attaches to a different live ancestor. Tree got reorganized? Invisible to the subscriber. The re-subscribe **is** the liveness check — there is no separate ping.
-
-100% delivery baseline; 100% recovered delivery under 5% churn at 25K nodes.
-
-### 6.6 Temporal Pub/Sub — Subscribe is a Request for History
-
-A subscribe is not just "send me future messages on this topic." It is **"send me every message I haven't already seen."** Each subscribe carries a `lastSeenTs` — the highest publish timestamp this subscriber has observed.
-
-Every relay node keeps a bounded ring buffer. When an axon role receives a publish, it records `{ json, publishId, publishTs }` in a local cache (capacity ≈ 100 messages — tunable per topic).
-
-On subscribe arrival, the relay filters its cache to `publishTs > lastSeenTs` and replays the missed messages as a single batched message before forwarding the subscribe upstream.
-
-**Why this matters under churn:** the decentralized axon tree means every re-publish node — not just the publisher — holds a copy of recent history. If a parent dies and a subscriber's re-subscribe lands on a different live relay, that new relay can fill the gap from *its own* cache. **Healing and replay are the same mechanism.** No central log, no separate recovery RPC, no "catch-up" protocol.
-
-A subscribe message in Axona is simultaneously a liveness probe, a tree-attach request, and a request for missed history. Three jobs, one envelope — the axonal healing model.
-
-### 6.7 Production Refinements (live Axona deployment)
-
-Real-network deployment of the pub/sub layer (see §17) exposed three corner cases the simulator's abstracted network model hadn't surfaced. Each was fixed in the protocol layer; the production semantics now diverge slightly from the textbook K-closest model. (Terminology: the *replication factor* is **R = 5** — the root-set size — distinct from the Kademlia *routing* parameter **k = 20**; "K-closest" denotes the generic find-closest-*N* operation both use.)
-
-**Lazy-axon promotion.** Under the upstream protocol, a K-closest node that received a `pubsub:publish-k` for a topic it didn't yet hold a role for would *drop* the message (forwarding it via a routed walk that landed on another empty-role node and gave up). This meant **publish-before-subscribe lost messages**: by the time a subscriber registered, the publisher's earlier messages had been discarded everywhere. The fix is to promote any K-closest receiver to a (childless) root role on first publish, immediately seeding the replay cache. When a subscriber later attaches, the existing `_maybeSendReplay` path serves the cache. Empty-role rootGraceMs (60 s default) bounds the cost: nodes that never accumulate subscribers garbage-collect during the refresh sweep.
-
-**Self-replay (lastSeenTs override).** A subtler interaction: when a node receives a `publish-k` it advances `lastSeenTs[topicId]` to the latest cached publishTs — at the *network* layer. If that same node later subscribes to the topic, the subscribe payload carries that `lastSeenTs`, and the cache filter `m.publishTs > lastSeenTs` excludes every cached message. Net effect: any node in the K-closest set that subscribes to a topic it was implicitly hosting receives **nothing** from replay, even though the messages sit in its own cache. The application-level view (what's been delivered to the local handler) is independent of the network-level view (what publishIds the AxonManager has seen). When `subscriberId === this.nodeId`, replay therefore ignores `lastSeenTs` and fans the full cache directly into the delivery callback.
-
-**Multi-hop sendDirect (tunneled-direct).** The K-closest model assumes any peer can reach any other in one hop. In a real WebRTC mesh, this isn't always true: browsers behind NATs may not have established a direct DataChannel with every other browser. When `peer.sendDirect(target, ...)` is called on a peer that doesn't have `target` in its local transport binding map, the message would silently drop — losing 4 of 5 fan-out attempts in a sparse mesh. The fix is a transport-layer fallback: when the target isn't directly bound, wrap the message in a `__tunneled_direct__` routed envelope and let the existing Axona routing walk hop-by-hop to the target. A small handler at the destination unwraps the envelope and dispatches into the local direct-handler table — i.e., the message ends up in `_onSubscribeDirect` / `_onPublishDirect` / `_onDeliver` / `_onReplayBatch` exactly as if a real direct message had arrived. The bridge becomes a routing hop among many, not a privileged relay.
-
-**Production validation.** A 100-peer in-process stress test (`smoke_stress_100.js`) exercises the full pub/sub surface without any bridge process:
-
-| Scenario | Setup | Result |
-|---|---|---|
-| A — single-topic broadcast | 1 publisher, 99 subscribers, 3 messages | **99/99 full delivery**, K=5 axons + recruited sub-axons |
-| B — publish-before-subscribe | 1 publisher emits 5 messages, then 50 subscribers join | **50/50 receive all 5** via replay |
-| C — multi-topic | 5 publishers / 5 topics / 95 subscribers round-robin | **5/5 topics**, all subscribers receive, K=5 axons per topic |
-
-Per-peer participation histogram at N=100: 62 subscriber-only nodes, 33 subscriber+axon, 3 publisher+subscriber, 1 publisher+axon, 1 all-roles — every peer plays at least one role, axon-roles distribute across the network.
+We will say one thing with conviction, though. Whatever this institution becomes, it must not be run by its technologists alone. The decisions ahead are only partly technical; they are decisions about freedom and its limits, about the balance between individual and collective interests, about how a society lives alongside a tool it cannot control. Those are questions for a wide table — for people who study governance, economics, law, ethics, and the behavior of societies, alongside the people who write the code. Our role, as the builders, is to state the problem plainly and to refuse the one solution that would betray the project: seizing control ourselves. The rest we mean to work out with others, which is the purpose of the section that closes this document.
 
 ---
 
-## 7. Performance Characteristics
+## 13. Implications by Discipline
 
-### 7.1 Methodology
+This section is written to be entered from any point. A reader who has come for one discipline can read only that subsection and lose nothing essential; a reader going straight through will find the subsections share the vocabulary established earlier — the one property, the relocation of tussle, the absence of control points. Each subsection ends with the questions we most want that field to take up, because the questions are the invitation, and because we mean them literally: **we are looking for collaborators, and the contact is stewardship@axona.net.**
 
-- **500 lookups per test cell.** Global, regional radii (500 / 1k / 2k / 5k km), pub/sub
-- **Same node geometry** across all four protocols — direct comparison, not three independent builds
-- **Bootstrap init** for production realism: sponsor-chain join + warmup. Omniscient init shown separately as a theoretical ceiling.
-- **Churn** induced discretely (instantaneous kill) and continuously (1% every 5 ticks)
-- **Connection cap** 100 (browser-class, web-limited model)
+### For technologists
 
-### 7.2 Four-Way Comparison at 25,000 Nodes
+The immediate change is that you are building on a fabric with no control points, and this inverts a set of habits. You cannot assume an operator who will rate-limit abuse, revoke a bad actor, or restore a lost message from a backup; there is no operator. Reliability, moderation, identity, durability, and — as §5 insisted — confidentiality are your responsibilities, at the endpoints, because the network has correctly declined to provide them. This is liberating and demanding in equal measure: your application can do things no platform would permit, and the platform will not catch you when you fall. Your application's architecture is now the politics its users live under — choose it as deliberately as we chose the protocol's.
 
-Web-limited (cap = 100), omniscient init, geoBits = 8, no highway promotion. Same node geometry across all four protocols. Canonical init: every protocol uses identical K-closest XOR-fill bootstrap so the routing/learning algorithm is measured in isolation from any per-protocol bootstrap strategy.
+*The open problems we would hand you:* What does an application owe its users when there is no operator behind it to appeal to? How do you build endpoint-level trust and reputation tools that are genuinely useful without smuggling in a central authority through the back door? What does confidentiality-by-default look like as a library every app can reach for, so that "signing is not secrecy" stops being a footnote and becomes a default? And what does it mean to design for a network whose own designers cannot see or shape what flows through it?
 
-| Test | Kademlia | G-DHT | NX-17 | NH-1 |
-|---|---:|---:|---:|---:|
-| Global (hops / ms) | 4.53 / 508 | 5.57 / 284 | 4.47 / 241 | 5.26 / 269 |
-| 500 km (hops / ms) | 4.50 / 499 | 4.86 / 149 | 2.79 / **81** | 3.30 / 96 |
-| 1000 km (hops / ms) | 4.58 / 510 | 5.04 / 158 | 2.97 / **88** | 3.49 / 103 |
-| 5000 km (hops / ms) | 4.49 / 504 | 5.44 / 206 | 3.74 / **142** | 4.50 / 163 |
-| pubsubm delivered | n/a | n/a | 100% | 100% |
-| pubsubm + 5% churn (recovered) | n/a | n/a | 100% | 100% |
-| dead-children / orphans | n/a | n/a | 0 / 0 | 0 / 0 |
+### For AI and alignment researchers
 
-Both NX-17 and NH-1 dominate Kademlia and G-DHT on every distance band. NX-17 retains a small lead at the cap = 100 ceiling.
+Axona is the substrate Licklider's vision required and never had: a place where minds, human and artificial, coordinate as peers without a corporate gate between them. The affirmative possibility is real — safety research conducted collaboratively across institutions, agents and researchers coordinating with clear provenance, a common ground the current one-model-per-company arrangement forecloses.
 
-### 7.3 The 3δ Floor — An Absolute Reference
+The risk is equally real: a gate-free coordination layer for AI systems is available to a misaligned system on the same terms as an aligned one, and it has arrived before alignment is solved. *The open problems we would hand you:* the speed asymmetry above all — if the tussle now lives at the endpoints and in society, and one class of endpoint coordinates orders of magnitude faster than the society meant to hold it accountable, what does accountability even mean, and what mechanism could restore it? Is voluntary agent-legibility improvable into something with teeth without a central verifier? We do not think these are unanswerable. We think they are unanswered, and that a live coordination substrate for agents makes answering them urgent rather than academic.
 
-Latency comparisons need an absolute reference, not just "lower than Kademlia." Dabek, Li, Sit, Robertson, Kaashoek & Morris (MIT — NSDI 2004) proved that for *any* recursive O(log N) DHT, total lookup latency converges to a hard analytical floor:
+### For sociologists
 
-**lookup ms ≈ δ + δ/2 + δ/4 + … = 3δ**
+You are being handed a case with no precedent in a useful respect: information flow at scale with no chokepoint anywhere in the system. Every prior mass medium — press, broadcast, platform — had a point through which content passed and at which it could be shaped, and much of what your field knows about the formation of belief, the spread of rumor, the dynamics of collective attention was learned in the presence of such points. Axona removes them.
 
-where **δ** is the median pairwise *one-way* internet latency. Each successive lookup hop covers a geometrically halving fraction of the remaining ID-space, so the second-to-last hop is half the cost of the last, the third-to-last a quarter, and so on. The series sums to 3δ regardless of N. Even an oracle that always picked the lowest-RTT finger could not do better.
+*The open problems we would hand you:* How do belief and reputation form when there is no central signal — no trending list, no platform-blessed source, no algorithmic ranking — and the only signals are those that emerge among endpoints? Does the absence of a chokepoint dampen coordinated manipulation, because there is no single lever to pull, or amplify it, because there is nothing to slow it once it starts? What social structures arise to substitute for the trust that platforms, for all their faults, currently underwrite? We suspect the answers are not obvious and not uniformly reassuring, and we would rather they were studied early than discovered late.
 
-**Measuring δ in our simulator.** δ is a property of the network itself, not of any DHT — it depends only on (a) the population-weighted geographic placement of nodes and (b) our latency model `propagation = (haversine_km / 20015) × 150 ms + 10 ms` per one-way message. The same δ applies to Kademlia, G-DHT, every NX variant, and NH-1: none of them can route faster than 3δ.
+### For economists
 
-| N | δ_median | δ_p95 | 3δ floor |
-|---:|---:|---:|---:|
-| 5 K | 67.9 ms | 123.3 ms | 203.6 ms |
-| 25 K | 68.0 ms | 124.1 ms | 204.0 ms |
-| 50 K | 68.9 ms | 124.2 ms | 206.6 ms |
+Clark's analysis of the current internet turns on *facilities*: the expensive physical assets — links, routers, towers — that exist only because some actor invests in them and expects to capture the returns. The fundamental tussle, in his framing, is between the open architecture and the investor's desire to monetize it. Axona takes an unusual stance: it runs on the devices participants already own, so the facilities are contributed rather than capitalized, and there is no operator positioned to capture returns because there is no operator.
 
-δ is stable across N — population character doesn't change with sample size. Coincidentally identical to Dabek's measured King-dataset δ = 67 ms, so the simulator's geometric latency model lands on the same point as real-world Internet RTT.
+*The open problems we would hand you:* What sustains a network whose infrastructure is a commons contributed by its users — what keeps relays running when running them is a cost with no direct return? If value cannot be captured at a central point, where does it accrue, and to whom? Does a network with no monetization chokepoint enable forms of exchange that platform economics currently suppress, or does the absence of a sustaining business model simply make it fragile? The relay is the crux again: it is the point where someone bears a cost for the common good, and the economics of why they would, and how many will, is not something we can reason out from the architecture alone.
 
-Any honest claim about DHT latency should be expressed as a multiple of 3δ. "Beats Kademlia" is a relative win; **"close to 3δ" is an absolute one.**
+### For political scientists and policymakers
 
-### 7.4 Axona Lives at the Floor
+Axona takes a strong position in one of the central tussles Clark describes — the contest between an individual's ability to communicate and an authority's ability to oversee that communication — and it takes it in the direction of the individual, in a way difficult to counter by technical means. The firewall-crossing property is the sharp edge: to the network, a censoring wall and a lawful border are the same barrier, and it routes around both.
 
-| N (3δ floor) | Kademlia | G-DHT | NX-10 | NX-17 | **NH-1** | Axona† |
-|---:|---:|---:|---:|---:|---:|---:|
-| 5 K (204 ms) ‡  | 410 ms (2.01×) | 268 ms (1.32×) | 217 ms (1.07×) | 215 ms (1.06×) | **240 ms (1.18×)** | — |
-| 25 K (204 ms)   | 842 ms (4.13×) | 826 ms (4.05×) | — | 265 ms (1.30×) | **260 ms (1.27×)** | 272 ms (1.33×) |
-| 50 K (207 ms) ‡ | 548 ms (2.65×) | 291 ms (1.41×) | 240 ms (1.16×) | 243 ms (1.18×) | **264 ms (1.28×)** | — |
+*The open problems we would hand you:* What does sovereignty mean over a network with no operator to regulate and no chokepoint to control? How should democratic societies respond to a tool that serves the dissident and the criminal by the same mechanism — and is the right response at the level of the network (likely futile, given the architecture) or at the level of the endpoints and the institutions of law, where Axona has deliberately relocated the contest? We have a view, expressed in the manifesto, but it is a technologist's view of a question that is properly yours.
 
-‡ 5 K and 50 K rows are from an earlier sim version (pre-v1.1.2 lookup-latency accounting).  The 25 K row is fresh at sim v0.93.0; rerun at 5 K / 50 K pending.
+### For ethicists
 
-† Axona is the deployed implementation that wraps the NH-1 routing kernel with production-quality transport machinery.  See 7.4.1 below — at 25 K its non-churn cell numbers match NH-1 / NX-17 within RNG noise (as the shared-kernel architecture predicts).  Its dividend appears under 5 % churn (§7.7).
+The manifesto's fire framing is not decoration; it is the problem stated exactly. We have built something whose benefits and harms are the same property seen from two sides, which cannot be adjusted to keep the one without the other. The manifesto argues that the right response is not central control — which merely relocates and concentrates the danger — but sight and stewardship. That argument deserves scrutiny it has not yet received.
 
-- NH-1 / NX-17 / Axona share the same routing kernel and converge to ~1.27–1.33× the floor at 25 K — all three sit at the same theoretical limit, within RNG noise of each other.
-- Kademlia worsens with N (the 25 K K-DHT number jumped between sim epochs as the latency accounting was clarified — qualitative claim stands: K-DHT's gap to the floor grows with population).
-- The earlier "Axona at 254 ms (1.25×) leads on every cell" framing turned out to be an asymmetric synaptome cap during bootstrap; v0.93.0 fixes it and the three neuromorphic protocols match.  The deployed-Axona advantage is the **churn-cell** path (§7.7), not the steady-state lookup.
+*The open problems we would hand you:* Is it right to build a tool whose harms are inseparable from its benefits, on the judgment that the benefits are larger — and who is entitled to make that judgment on behalf of everyone the tool will affect? What are the obligations of the builders of such a thing, once built, and are they discharged by transparency and stewardship, or do they run deeper? Is there a coherent ethics of releasing a capability that cannot be recalled, and if so, what does it demand? We have made our choice and stated our reasons. We do not claim those reasons settle the matter, and we would rather they were argued with than accepted.
 
-The remaining ~25-30% at the neuromorphic floor has a clean structural explanation. They average 4.5–5.5 hops where an oracle PNS-ideal lookup would take ~3. Each "extra" hop costs ~δ/2 ≈ 34 ms — exactly the geometric tail Dabek's series predicts.
+## 14. The Path Forward
 
-**Implication.** Latency optimization within the O(log N) routing class is essentially complete.  Further annealing / lookahead tweaks move 1.27× → maybe 1.10× at best — diminishing returns.  The remaining R&D axes are churn resilience, pub/sub fan-out, and constant-hop variants.
+We are releasing Axona openly: source available, arguments stated in full, risks named as plainly as promises. A capability of this kind should not be introduced quietly, as a clever tool that turns out later to have consequences no one discussed. The discussion should come with the thing itself. This document is our attempt to start it.
 
-### 7.5 Highway %: Deployment-Realistic Knee
+Because the network offers no control panel — because we built it so that it could not — the substitute we believe in is **sight**. We intend to invest in observability: the means for researchers and stewards to see the patterns of the network's life, its scale, its flows, the shapes of activity on it, without seeing into the content the end-to-end principle keeps at the endpoints. Sight is what makes stewardship possible in the absence of control; you cannot steward what you cannot see. Building that observability in a way that informs stewards without becoming a surveillance apparatus in its own right is itself a hard, unsolved problem, and we name it as one.
 
-Real P2P networks are heterogeneous: most participants run inside a browser (~50–100 connections), but some run on real servers with effectively unlimited inbound capacity. We sweep the *fraction* of server-class nodes from 0 → 100% and measure Axona (NH-1) latency at each point.
+We would rather show the stewardship we already practice than only promise the stewardship we intend, so that "sight and stewardship" is a description of habits and not a slogan. The development of Axona is conducted in the open: a public **security changelog** records every security-relevant change as it ships; a standing **red-team register** tracks known weaknesses and their status; releases are **gated** behind adversarial tests before they reach the network; and when something breaks — as, in the course of building this, things have — we write up the failure, the wrong turns included, rather than the tidy version. This is not yet the accountable institution §12 calls for. It is the seed of the practice that institution would need, and it exists now.
 
-| Highway % | Global hops / ms | 500 km ms | 2000 km ms |
-|---:|---:|---:|---:|
-| 0 (all browser) | 5.09 / 263 | 96 | 123 |
-| 5 | 4.61 / 248 | 81 | 108 |
-| **15 (knee)** | **4.16 / 223** | **69** | **98** |
-| 30 | 3.97 / 223 | 60 | 83 |
-| 50 | 3.76 / 212 | 55 | 84 |
-| 100 (all server) | 3.52 / 206 | 45 | 74 |
+The research the earlier sections point to is work we mean to fund where we can and catalyze where we cannot: the study of the speed asymmetry between agent coordination and human institutions; the design of governance that grants legitimate contributors real voice while resisting manufactured influence; the endpoint-level trust, reputation, and confidentiality tools that could substitute for the central authority we declined to build; the patterns of abuse as they actually emerge, studied early rather than after harm. None of these is a problem we can solve inside the protocol, and most are not problems technologists should solve alone.
 
-**15% highway captures 70% of available improvement** — a realistic deployment scenario where some peers run on powerful hardware.
+Which is the invitation, stated as directly as we can. We are asking for the engagement of people who think for a living about the things this tool touches and that we are not expert in: the alignment researchers who understand what a coordination layer for agents means before alignment is solved; the mechanism designers and political scientists who know how legitimate, capture-resistant institutions are actually built; the sociologists and economists who can tell us what a network with no chokepoint does to belief and to value; the ethicists who can hold our reasons to account. We have built the part we know how to build. The part that remains — the human institutions of sight and stewardship that let a society live alongside a tool it cannot control — is the part we cannot build alone, and would not want to. Write to us at **stewardship@axona.net**, and read the code at **github.com/axona-net**.
 
-### 7.6 Slice World — Recovery from a Network Partition
-
-The Slice World test partitions the network into Eastern and Western hemispheres connected through a single bridge node (placed near Hawaii). Every cross-hemisphere edge except those incident on the bridge is removed.
-
-The question it asks is not *"can you find the bridge once?"* — it is *"given **one** intact connection across a severed network, can the protocol leverage that single hole in the dike into a flood of restored connectivity?"*
-
-| Protocol | Slice success% | Slice hops / ms |
-|---|---:|---:|
-| Kademlia | 0.0% ❌ | — |
-| G-DHT | 4.6% ❌ | 9.5 / 525 |
-| NX-17 | 94.8% | 7.3 / 423 |
-| NH-1 | 94.4% | 8.7 / 462 |
-
-A diagnostic run shows the recovery happening directly. Starting from a freshly partitioned 5K network with zero cross-hemisphere synapses and running just 10 lookups: 0 → 20 cross-hem synapses, 7 of 10 lookups succeeded.
-
-Each successful bridge crossing seeds new connectivity. When a path goes `west-source → … → bridge → … → east-target`, Axona's learning rules fire on every node along the way:
-
-- `_hopCache` — every intermediate node adds the *destination* to its synaptome
-- `_recordTransit` — observed `(prev → next)` pairs become triadic-closure candidates
-- `lateralSpread` — propagates the new synapse to the source's geographic neighbors
-
-By 500 lookups, the partition has effectively dissolved. Axona doesn't route through the partition — it *dissolves* it.
-
-### 7.7 Pub/Sub Robustness
-
-| Metric | Axona (NH-1) at 25K |
-|---|---:|
-| Baseline delivery | 100.0% |
-| Immediate (post-kill, no refresh) | 99.9% |
-| **Recovered (after 3 refresh rounds)** | **100.0%** |
-| K-overlap (publisher / subscriber views) | 99.5% |
-| K-set stability (recovered, pub / sub) | 95% / 95% |
-| Dead-children | 0 |
-| Orphans | 0 |
-| Attached % | 100% |
-
-The axonal tree heals through routed re-subscribe. There is no separate liveness ping, no parent tracking, no gossip.
-
-### 7.8 Pub/Sub Under Sustained Churn
-
-Continuous live-simulation: 25K nodes, 79 groups × 32 subscribers, 1% of alive non-publisher nodes killed every 5 ticks, three refresh passes between kills.
-
-| Cumulative churn | Delivered % | K-overlap | Axon roles |
-|---:|---:|---:|---:|
-| 0% | 100.0% | 100% | 537 |
-| 5% | 98.7% | — | 1,541 |
-| 10% | 91.2% | 81% | 1,787 |
-| 15% | 88.7% | 77% | 1,989 |
-| 20% | 86.5% | 62% | 2,116 |
-| 25% | 70.0% | 54% | 2,169 |
-| 30% | 52.4% | 47% | 2,189 |
-| 34% | 50.8% | 42% | 2,197 |
-
-Three observations:
-
-1. **No cliff.** Delivery degrades smoothly with churn; there is no breakdown threshold. The system finds a steady state where new subscriber recruitment matches loss.
-2. **K-overlap predicts delivery 1:1.** The dominant residual failure isn't broken routing — it's subscribers temporarily captured at relay nodes that have lost their delivery path to the root.
-3. **Axon-role count grows with churn but plateaus.** From 537 axons at 0% churn to ~2,200 at 30%, leveling off. The tree absorbs growth into deeper structure rather than unbounded fan-out.
-
-Through 20% cumulative churn, Axona holds delivery above 86% with no replication, no gossip, and no parent tracking. Above 25% churn the protocol enters a recovery-paced regime where steady-state delivery is the equilibrium of recruitment vs. loss.
-
-### 7.9 The geoBits = 0 Ablation
-
-If we strip the S2 prefix from *every* protocol simultaneously — random 64-bit IDs throughout — the comparative picture isolates exactly the routing/learning algorithm.  Geographic locality is the most plausible confound for any "learning helps" claim, so this ablation removes it entirely and asks whether the learned-routing layer still pulls its weight.
-
-25K nodes, web-limited (cap = 100), omniscient init, **geoBits = 0**.  All five protocols, all five distance bands, plus 5 % churn.  δ_median = 68.0 ms (3δ floor = 204 ms).  `@axona/protocol` v1.1.2 / sim v0.91.0, May 2026.
-
-| Protocol | gB = 8 · global (reference) | gB = 0 · global | gB = 0 · 500 km | gB = 0 · 2000 km | gB = 0 · 5000 km | gB = 0 · 5 % churn |
-|---|---:|---:|---:|---:|---:|---:|
-| Kademlia | 842 ms  | 852 ms  | 834 ms  | 827 ms  | 831 ms  | 786 ms |
-| G-DHT    | 826 ms  | 1060 ms | 1039 ms | 1035 ms | 1043 ms | 971 ms |
-| NX-17    | 265 ms  | 523 ms  | 501 ms  | 479 ms  | 478 ms  | 585 ms |
-| NH-1     | 260 ms  | 524 ms  | 498 ms  | 482 ms  | 500 ms  | 614 ms |
-| **Axona**  | 272 ms  | 513 ms  | 490 ms  | 493 ms  | 509 ms  | **382 ms** |
-
-All five protocols hit **100 % lookup success on every cell**.  Findings:
-
-1. **The learned-routing layer alone (no prefix) beats Kademlia by ~39 % on global lookups.** NX-17 routes a global lookup in 523 ms vs Kademlia's 852 ms; NH-1 ties at 524 ms; Axona at 513 ms.  Identical bootstrap, no locality, no prefix — that is what the routing/learning chassis contributes by itself.
-2. **K-DHT is gB-insensitive, as expected.** 852 ms global at gB = 0 vs 842 ms at gB = 8 — Kademlia ignores the prefix; the 10 ms wobble is RNG noise.  This is the consistency check that the ablation is set up correctly.
-3. **G-DHT is the only protocol that *gets worse* at gB = 0.** From 826 ms to 1060 ms global — about 28 % slower.  G-DHT's entire routing strategy is "follow the prefix"; with no prefix to follow it falls back to a slower noProgress-limited search.  Geometric correlate of the "G-DHT is geographic Kademlia" framing.
-4. **NX-17, NH-1, and Axona converge at gB = 0 within RNG noise on routing.** 523 / 524 / 513 ms global respectively — essentially tied.  The three protocols share the same `AxonaPeer` routing kernel, so given identical synaptome state they produce identical routing decisions; the ~2 % spread between them is single-run noise.
-5. **The Axona-deployed-peer dividend appears in the churn cell.** Axona's gB = 0 churn at 382 ms is ~35-38 % faster than NX-17 (585) and NH-1 (614).  This is the production-quality dead-peer-cleanup machinery in `TransportAxonaEngine.removeNode` (v0.85.0 – v0.89.0) doing the same architectural work the gB = 8 churn-cell number reflects.  The cleanup advantage is geometric, not prefix-dependent.
-
-The headline learning-helps gap is dramatic and reproducible: **without any geographic structure in peer IDs, the neuromorphic chassis routes at ~60 % of Kademlia's latency, at 100 % delivery, at 25K nodes, including under 5 % churn**.  Geographic prefix is a strong ~2× accelerator on top of that — but the learned-routing layer is the foundation, not a tuning detail.
-
-Raw CSVs (all v0.93.0 / `@axona/protocol` v1.1.2):
-- `programmer-guide/benchmarks-25k/2026-05-21_25k_4protocols_geoBits0.csv` (K-DHT / G-DHT / NX-17 / NH-1)
-- `programmer-guide/benchmarks-25k/2026-05-21_25k_axona_geoBits0_v0.93.0.csv` (Axona)
-- `programmer-guide/benchmarks-25k/2026-05-21_25k_5protocols_5tests_v0.93.0.csv` (gB = 8 reference)
+The fire is lit. What we build around it is the work now, and it is work for more hands than ours.
 
 ---
 
-## 8. Architectural Wins Beyond Geography
-
-The geoBits = 0 ablation isolates the learning chassis from geographic seeding. Several of Axona's most important properties are orthogonal to geography and deserve separate elevation.
-
-### 8.1 Iterative Fallback as Graceful Degradation
-
-The iterative fallback in NAVIGATE is not just a safety net — it's a graceful degradation mechanism. When AP routing dead-ends (no forward-progress candidate exists), instead of failing, the protocol expands its candidate set and tries again from k-closest-from-synaptome. This is what allows 100% lookup success under churn.
-
-Kademlia and G-DHT don't have this. They fail silently when they hit a local minimum. Axona backs up and tries a different corridor.
-
-This is the watershed feature of the NX line. NX-3 (no fallback) achieves 99.4% on Slice World; NX-4 (with fallback) achieves 100%. Every NX protocol below NX-4 fails under stress; every protocol NX-4 and above succeeds. Without iterative fallback, all other learning and repair mechanisms are insufficient.
-
-### 8.2 Hop Caching as Implicit Replication
-
-Hop caching — every intermediate node on a successful path caches the destination — is a lightweight replication mechanism that requires zero central coordination. After a few successful lookups to the same destination, that destination has been replicated to many intermediate nodes. This is what makes the network resilient without explicit replica placement.
-
-It's also what makes Slice World recovery possible — each successful bridge crossing deposits new cross-hemisphere synapses on every node along the path.
-
-### 8.3 Triadic Closure as Structural Plasticity
-
-When nodes A and C repeatedly communicate via intermediary B, they get introduced directly. This closes the triangle and shortens future A-C routes. More subtly, it means the synaptome grows *structurally* to match the traffic *semantically*. If a set of peers frequently talk to each other (a community, a cluster, a region), the synaptome organically develops shortcuts among them without any explicit clustering algorithm.
-
-### 8.4 Temperature Annealing with Reheat
-
-Annealing (cooling exploration rate over time) is standard in RL. Axona's innovation is the *reheat* — when a dead peer is discovered, spike temperature back to 0.5. This accelerates recovery by reactivating exploration at the moment when exploration is most valuable (after churn). The system automatically detects when the network changed and adapts its exploration budget.
-
-### 8.5 Latency-Aware Scoring as Speed-First Priority
-
-The ½^(latency/100) exponential penalty in AP scoring means latency is woven into *every* routing decision, not an afterthought. A 50 ms peer beats a 200 ms peer even if the 200 ms peer is slightly closer in XOR space. This is why Axona achieves latency results close to the 3δ floor — speed is not a derived property, it's a primary optimization axis.
-
-### 8.6 Unified Vitality as Principled Pruning
-
-The `weight × recency` product is not a heuristic — it maps directly to synaptic tagging and capture (Frey & Morris 1997). Synapses with both recent activity *and* sufficient potentiation are preferentially retained. This gives a neurobiological justification for why unused synapses should prune, why recently-reinforced ones should stay, and why the product of the two is the right gate.
-
-### 8.7 The Honest Framing
-
-Geography is an initial-condition shortcut for the latency optimization, not a goal in itself. Axona's priorities are speed and robustness — fast lookup, reliable delivery. Geographic location is *not a goal*; it is one input.
-
-The S2 prefix creates **initial regional clustering at bootstrap** because nearby nodes are XOR-close, so a node's K-bucket and synaptome are seeded with mostly-local peers. After that, locality is a derived property of the routes that LTP and vitality reinforce. The latency penalty in AP routing is not strong enough, on its own, to discover locality from scratch within standard warmup. The S2 prefix is the **bootstrap shortcut**: it does not *teach* locality, it *seeds* the network with locality so reinforcement can sharpen routing within it.
-
-Future work: an embedded RTT-coordinate system (Vivaldi-style) could replace the S2 seed with a learned one.
-
----
-
-## 9. The Two-Layer API — How Axona Becomes Real Software
-
-A working DHT has two interfaces, not one. The application above wants to publish, subscribe, and look things up; the network below wants to open a channel, send a message, and notice when a peer goes silent. The protocol is the thing in between. Axona is structured so the protocol code is genuinely between those two layers — neither one is hardwired into the other — which is what makes the same body of code reusable in both the simulator and the deployed system.
-
-```
-                Application (chat client, file dist, sim Engine)
-                                  │
-                                  │   DHT contract
-                                  │   (lookup / subscribe / publish /
-                                  │    onEvent / getMetrics / …)
-                                  │
-                Protocol (NeuromorphicDHTNH1 + AxonManager)
-                                  │
-                                  │   Transport contract
-                                  │   (openConnection / send / notify /
-                                  │    onPeerDied / getLatency / …)
-                                  │
-                Network (SimulatedNetwork in sim,
-                         WebRTCTransport in production)
-```
-
-### 9.1 The DHT contract
-
-Defined at `src/contracts/DHT.js`. The application sees one running node; the contract has eight verbs, organized into lifecycle, operations, and observability:
-
-| Method | Purpose |
-|---|---|
-| `start()` / `stop()` | bring the node up and down |
-| `join(sponsor)` / `leave()` | add to / depart from the network |
-| `lookup(targetKey)` | walk the routing layer toward a key |
-| `subscribe(topic, handler)` / `unsubscribe(sub)` | join / leave a topic |
-| `publish(topic, payload)` | fan out to subscribers via the axonal tree |
-| `getNodeId()` | the local node's 64-bit identifier |
-| `getSynaptome()` | read-only synaptome snapshot for telemetry |
-| `getMetrics()` | aggregate counters: synaptome size, temperature, lookups, traffic |
-| `onEvent(handler)` | subscribe to `peer-joined`, `peer-left`, `lookup-completed`, `dead-peer-detected`, `anneal-fired`, `cycle-snapshot`, … |
-
-The forbidden methods are as instructive as the present ones. There is no method that enumerates "all nodes", no method that takes a peer-id and returns that peer's state, no method that lets the application mutate the routing table. A DHT instance is responsible for one node's view of the network; the simulator's Engine creates many DHT instances and orchestrates them, but that orchestration is a simulator concern — it does not appear in the contract.
-
-### 9.2 The Transport contract
-
-Defined at `src/contracts/Transport.js`. One Transport instance per running node; the protocol calls into it. Twelve methods in four bands:
-
-| Band | Methods |
-|---|---|
-| Lifecycle | `start(localNodeId)`, `stop()`, `getLocalNodeId()` |
-| Channel pool | `openConnection(peerId)`, `closeConnection(peerId)`, `isConnected(peerId)` |
-| Messaging | `send(peerId, type, payload)`, `notify(peerId, type, payload)`, `onRequest(type, h)`, `onNotification(type, h)` |
-| Liveness | `onPeerDied(handler)`, `getLatency(peerId)` |
-
-The channel pool maps directly onto synaptome semantics: `openConnection` is what the protocol calls when it admits a peer to the synaptome; `closeConnection` is what it calls when it evicts. Bilateral cap admission is enforced inside the transport — `openConnection` resolves with `false` if the remote refused — so the protocol does not need to know how the cap is implemented.
-
-The messaging split between `send` (request/response, awaits a return value) and `notify` (fire-and-forget, no response expected) matters because production transports pay round-trip latency for `send` but not for `notify`. Axona uses `send` for the routing-tick chain (`lookup_step`, `lookahead_probe`, `find_closest_set`, `local_probe`) and `notify` for the LEARN side-effects (`reinforce`, `hop_cache`, `lateral_spread`, `triadic_introduce`, `direct_pubsub:*`). The canonical pattern for parallel probes is `Promise.allSettled` over `transport.send(...)` — a slow or dead peer in one probe should not fail the whole batch.
-
-The liveness band is where the legacy god's-eye `nodeMap.get(s.peerId)?.alive` check finally retired. The transport runs a 1 Hz ping/pong heartbeat on every open channel; missed pongs (default 3-second timeout) trigger channel close and `onPeerDied`. The protocol registers a callback that populates a per-node `_deadPeers` set; the candidate-enumeration step in every routing tick filters against that set. Production gets exactly the same shape — a peer is alive if its heartbeat is responding, dead the moment we miss enough pongs in a row.
-
-### 9.3 BootstrapService — the cold-start path
-
-A third, smaller contract at `src/contracts/BootstrapService.js`. A new node starts with no peers; bootstrap is how it gets its first channel.
-
-```
-BootstrapService.bootstrap(sponsor)
-  → Promise<{ sponsorId: bigint, transport: Transport }>
-```
-
-The `sponsor` is a discriminated union: `{ kind: 'simulator', … }` for in-process pointers, `{ kind: 'rendezvous', url, manifestSig }` for WebSocket signaling with a signed manifest, `{ kind: 'qr', sponsorAddr }` for direct device pairing. The contract returns the sponsor's id and a Transport with that one channel open. The DHT's `join(sponsor)` then runs a self-lookup through the sponsor and proceeds with stratified bootstrap on top of the freshly-opened transport.
-
-Splitting BootstrapService out of Transport matters because production bootstrap is an out-of-band concern (signature verification, manifest fetching, signaling-server handshake) that the routing protocol shouldn't see. Once `bootstrap()` returns, the DHT just has a transport with a channel open; it doesn't know whether that channel came from a QR code or a rendezvous server.
-
-### 9.4 The simulator as deployment vehicle
-
-The simulator's `SimulatedNetwork` and the production `WebRTCTransport` both implement the same Transport contract — twelve methods, one signature each. The simulator runs handlers synchronously inside the call (in-process, no real RTT); production runs them through WebRTC data channels with real RTT. **The protocol code does not switch on which transport it is using.** Every cross-peer reach goes through `send` or `notify`; every liveness check goes through `_deadPeers` populated by `onPeerDied`.
-
-This is the property that lets the simulator be the deployment vehicle. Years of Axona benchmark numbers — the hop counts, latency distributions, pub/sub coverage, churn-resilience curves — transfer directly to production because the same code path runs in both worlds. The 25K-node parity-gate benchmark (post-refactor sim v0.70.22 vs pre-refactor v0.70.04 reference) confirmed every protocol within the 10% target band: NH-1 within 5–8% on hops, 1–4% on latency; Kademlia, G-DHT, NX-17 within 0.5–3%.
-
-The remaining `nodeMap.get(peerId)` sites in the protocol code are all sim-only orchestration: `addNode` / `removeNode` Engine bookkeeping, `bootstrapJoin`'s god's-eye stratified bootstrap (replaced by `BootstrapService.bootstrap` + self-lookup in production), and the local self-resolution in `lookup(sourceId, …)` (which production resolves via the DHT instance owning its own state). The protocol's central algorithm — the recursive-forwarding `lookup_step` chain — is V1/V2-free.
-
-### 9.5 What this gets us, operationally
-
-- **The same body of routing code runs in the simulator and on the deployed mesh.** No "production fork" of Axona; no separate code path for "real" networks.
-- **Async is the universal acid test.** Every cross-peer interaction is async even in the simulator. The recursive-forwarding lookup chain handles a dropped peer mid-walk (rejected Promise → `exhausted: true`) the same way in both worlds.
-- **Observability is contract-level, not back-channel.** Smoke tests, the simulator's traffic distribution plot, and production load-balance dashboards all consume `getMetrics()` and `onEvent()`. Same fields, same event shapes.
-- **The production transport is one file.** Swapping `SimulatedTransport` for `WebRTCTransport` is the deployment migration. The DHT contract, the protocol body, and AxonManager stay.
-
-### 9.6 Live deployment
-
-As of v0.3.53 the production-side implementations of all three contracts are live. The Axona network running them maps the contracts directly:
-
-| Contract | Production implementation | Live at |
-|---|---|---|
-| Transport | `axona-peer` — WebRTC data channels with 1 Hz ping/pong heartbeat | <https://axona.net> (browser, Mac/Win/Linux/iOS/Android) |
-| BootstrapService | `axona-bridge` — WebRTC offer/answer signaling with signed manifest | <https://bridge.axona.net/healthz> |
-| DHT (Axona / NH-1) | `NeuromorphicDHTNH1` (unchanged from the simulator) | runs inside `axona-peer` |
-
-`axona-peer` is the browser-resident node; one instance per browser tab. It opens its first channel through `axona-bridge`, which carries WebRTC offer/answer payloads between two peers behind NATs and then drops out — the bridge sees no application traffic and any operator can stand one up. A federated bridge mesh is on the Q4 2026 roadmap, removing the single rendezvous role entirely.
-
-The protocol code is the same JavaScript that produced the §7 benchmark numbers; the swap is `SimulatedTransport → WebRTCTransport`, plus the `BootstrapService` variants (rendezvous-URL, QR-code pairing, in-process). The simulator's hop counts, latency curves, churn-resilience numbers, and pub/sub coverage transfer because the routing decisions that produce them are made in code that does not know it's being simulated.
-
-**Public repos:**
-- `github.com/axona-net/axona-peer` — browser peer (production Transport + DHT)
-- `github.com/axona-net/axona-bridge` — signaling broker (production BootstrapService)
-- `github.com/axona-net/dht-sim` — simulator (the testbench that drives every benchmark in §7)
-
-**First end-user application:** `civildefense.io`, a tap-to-report incident map. Users tap a location to register a concern; reports propagate over anonymous P2P with 24-hour expiry. The protocol primitives — signed posts, geographic locality via the S2 prefix, implicit expiry through the replay-cache LRU, end-to-end-secure delivery — map directly onto the application's needs, which is why it shipped in weeks.
-
-**Pub/sub application API (the four verbs).** Above the axonal-tree primitive sits a feed-style API on the kernel `AxonaPeer` (`@axona/protocol` v1.0+; routing-and-fan-out lives in `AxonManager`):
-
-| Verb | What it does |
-|---|---|
-| `peer.pub(topic, message, opts)` | author a new signed envelope into one of your topics |
-| `peer.sub(topic, handler, opts)` | attach to a topic; receive future posts via the axonal tree plus any replay-cached messages newer than the subscriber's `lastSeenTs` |
-| `peer.pull(msgId, opts)` | fetch any post by message id from its topic's relay tree |
-| `peer.metrics(topic, opts)` | aggregate `publishes`, `subscribers`, `reshare_count` for a topic the caller owns |
-
-Applications implement resharing by re-issuing `peer.pub` on the upstream signed envelope. The first role-bearing relay on the notification path sees the duplicate `msgId` and bumps `reshare_count`, which `metrics` surfaces back to the publisher.
-
-Four verbs cover the application surface. Encryption, schema, and ordering belong to the application above this layer — the protocol carries opaque message bytes. The kernel's pub/sub cascade smoke (`test/smoke_kernel_regression.mjs`) and the in-sim `smoke:three` mesh-fail recovery suite verify the counter invariants end-to-end.
-
----
-
-## 10. Red Team — The Existing Five
-
-The protocol has improved. The environment it lives in has not. Axona over the real internet today would likely face cascading timeouts and congestion collapse before the routing logic ever gets to demonstrate itself.
-
-### 9.1 Frictionless Connection Fantasy
-
-Nodes use a peer for routing the moment they discover it. Real WebRTC requires ICE + STUN/TURN + DTLS — **1–3 seconds of blocking setup, two overlay round trips**. Slice World "unzips" elegantly because hundreds of new triadic closures cost nothing; in production, that would trigger hundreds of simultaneous handshakes and drop the bridge offline.
-
-### 9.2 Asynchronous Black Holes & Missing Timeouts
-
-RPCs to dead nodes return instantly because the simulator knows who is alive. **No timeouts, no dropped packets, no asymmetric path failures** (request goes through, reply doesn't). The 100% pub/sub recovery under 5% churn assumes instant detection. In the wild, every churn round costs multi-second timeout windows during which messages are lost.
-
-### 9.3 Gateway Concentration & Infinite Bandwidth
-
-Hop cost is `10 ms + propagation` regardless of load. A highway node carrying 10K pub/sub messages has the same modeled cost as an idle one. **Buffer saturation is invisible.** AP scoring keeps hammering the "best" nodes — risk of *success disaster*: LTP reinforces a node until it congests, abandons it, then flocks back when it recovers (oscillatory loops).
-
-### 9.4 Jitter-Free Latency
-
-Real RTTs fluctuate ±30% from bufferbloat, asymmetric paths, and queueing. The simulator's distance-derived latency is monotone and clean. The EMA latency tracker has an easy job; high-frequency noise could prematurely decay good synapses or promote lucky-but-unstable ones.
-
-### 9.5 Sybil Forgery & Cell Eclipse
-
-The S2 prefix is self-declared. **An attacker can pick any prefix** and generate IDs that land in a target cell. The canonical mitigation is the Castro et al. (OSDI 2002) triplet — constrained routing tables + secure node-ID assignment + redundant routing — combined with route-diversity replica placement (Harvesf & Blough 2007). Proof-of-location, Vivaldi RTT clustering, and IP-ASN bounding are complementary and currently unimplemented.
-
----
-
-## 11. Red Team — The Extended Ten
-
-The five issues above are the explicit red-team list in the existing materials. Extended analysis identifies ten additional pre-deployment failure modes, organized into three tiers.
-
-### 10.1 Convergence Under Heterogeneous Churn
-
-**The gap:** The red team section assumes uniform churn (1% every 5 ticks). Real networks have heterogeneous failure: some regions stable, some regions high-churn. Some node classes (browsers) churn fast; others (servers) are stable.
-
-**What breaks:** Nodes in high-churn regions will waste exploration budget (temperature reheat) discovering temporary peers. Conversely, nodes in stable regions might underexplore and miss better long-range routes that form in other stable regions.
-
-**Measurement needed:** Variable-churn benchmark with three overlaid scenarios:
-- Stable core (2% churn) + volatile periphery (20% churn)
-- Island model (five stable clusters, 10% inter-island churn)
-- Node-class dependent (browsers 15%, servers 2%)
-
-Measure whether annealing rate adapts per-node or whether it needs to become a function of locally-observed churn (Ghinita-Teo adaptive framework).
-
-**Why it matters:** The Ghinita-Teo reference in existing materials hints at this — "local statistical estimation of (μ, λ, N)". That's the path forward, but it's not implemented yet.
-
-### 10.2 Synaptome Oscillation Under Load
-
-**The gap:** The simulator assumes load is uniform. Under realistic pub/sub workloads (Zipf-distributed), some topics are hot and some are cold.
-
-**What breaks:** Hot topics will cause subscribers to attach to relay nodes that become bottlenecks. The AP latency penalty will degrade those relays' scores, routing will shift to other relays, those become bottlenecks, and the system oscillates between a small set of available relays rather than stabilizing.
-
-This is the "success disaster" mentioned in the existing red team: LTP reinforces a node until it congests, the lookup abandons it, then flocks back when it recovers. Under Zipf load this happens repeatedly.
-
-**Measurement needed:** Zipf-distributed pub/sub test with topic popularity exponent α ∈ [0.5, 1.5]. Measure:
-- Relay node load concentration (Gini coefficient) over time
-- Subscribe success rate for hot vs. cold topics
-- Oscillation frequency
-- Replay cache hit rate
-
-**Why it matters:** This is the hotspot-aware placement problem (Makris et al. 2017). The existing red team flags it; the deck doesn't solve it. The solution mentioned (hot-axon-root migration + DFE redirect) needs empirical validation.
-
-### 10.3 Cross-Hemisphere Asymmetry and Routing Loops
-
-**The gap:** The Slice World test assumes a single bridge. Real partitions are ragged — some nodes have cross-partition connectivity, others don't. This creates asymmetric reachability: A can reach B, but B cannot reach A.
-
-**What breaks:** Asymmetric paths cause the synaptome to diverge. Node A learns that B is a good relay and reinforces A→B. But if the return path is different or blocked, B never learns the reverse A→B edge. Under re-subscribe refresh, the subscriber might find a path to the publisher that the publisher cannot find back — temporal loop detection becomes necessary.
-
-Also, triadic closure can introduce loops. If A→B→C→A forms a triangle and all three edges have high weight, a lookup might traverse A→B→C→A→B→C and never terminate, or terminate only when max-hop is hit.
-
-**Measurement needed:**
-- Asymmetric-partition test: remove half of all cross-partition edges (not all, to create ragged connectivity)
-- Loop-detection instrumentation: count how many lookups revisit the same node, and at what hop count
-- Bidirectional-eviction variant: when A connects to B, measure whether B independently decides to keep the reverse edge or drops it under capacity pressure
-- Temporal reachability matrix: after each churn round, measure whether publisher and subscriber sets can both reach the topic root
-
-**Why it matters:** The bilateral connection model assumes symmetry. Real networks don't. The protocol needs either explicit loop detection (track visited nodes per lookup), or a weaker guarantee (eventual consistency + replay caching to recover from transient loops).
-
-### 10.4 Latency Model Oversimplification
-
-**The gap:** The simulator uses `RTT = 2 × (haversine_km / 20015 × 150 ms + 10 ms)`. This is a monotone, deterministic function. Real latency has:
-- Per-link variance (±30% from bufferbloat, queue depth)
-- Asymmetry (path A→B ≠ path B→A)
-- Correlation (if A→B is congested, A→C might also be slow)
-- Non-stationarity (latency changes over seconds, not just on churn)
-
-**What breaks:**
-- The EMA latency tracker in AP scoring assumes low noise. High-frequency jitter could prematurely decay high-quality synapses (one bad RTT reading triggers decay).
-- The two-hop lookahead compares paths by summed latency. If latency is autocorrelated (a congested relay makes all its outbound paths slow), the lookahead might pick a path that looks good in the sample but is actually saturated.
-- Temperature reheat on dead-peer discovery might fire spuriously if a peer is merely slow, not actually dead.
-
-**Measurement needed:**
-- Jitter injection: add Normal(0, σ_jitter) to per-hop RTT. Sweep σ from 0 → 0.3× baseline and measure lookup success degradation.
-- Bufferbloat modeling: when a node exceeds its bandwidth cap, add queue-depth-dependent latency. Measure whether AP routing routes around overload or piles into it.
-- Path correlation: measure whether routes that share a common relay node show correlated latency spikes.
-- Adaptive EMA constant: vary the EMA time constant and measure whether higher constants protect against jitter without sacrificing convergence to true RTT.
-
-**Why it matters:** The jitter section of the existing red team mentions this; it's flagged as future work. But the latency model is *the* signal that drives AP routing. If the signal is noisy, the entire protocol's latency advantages degrade. This is the highest-priority friction item in Phase 2.
-
-### 10.5 S2 Cell Eclipse and Sybil Swarms
-
-**The gap:** The existing red team mentions S2 prefix forgery; the current mitigation is "cooperative" (nodes don't lie). But the attack surface is larger than individual nodes lying about their own location.
-
-**Specific attacks:**
-- **Cell eclipse:** an attacker generates 100 node IDs all claiming the same S2 cell as a target region. On bootstrap, new nodes get seeded with mostly-attacker nodes. The attacker controls routing into the cell.
-- **Prefix collision:** the attacker claims the same 8-bit prefix as a valuable region but uses a malicious hash function for the low 256 bits. Lookups to targets in that region hit attacker nodes.
-- **Relay hijacking:** the attacker doesn't eclipse a cell; it just sybils into the relay set for a popular topic, intercepts publishes, and drops them.
-
-**Measurement needed:**
-- Eclipse test: at network init, inject 10% attacker nodes all in the same claimed cell. Measure lookup success rate to targets in that cell vs. other cells.
-- Relay hijacking test: mark 5% of nodes as adversarial. On any pub/sub topic they route to, they randomly drop 50% of messages. Measure whether the axonal tree heals around them or becomes permanently degraded.
-- Proof-of-location integration: add Vivaldi RTT-coordinate validation as a secondary check. If a node claims S2 cell X but its measured RTT to peers in X is much higher than expected, downweight its bootstrap seeding.
-
-**Why it matters:** The existing materials correctly note this as future work (MaxDisjoint replication of axon roots, proof-of-location). But it's the gap between "protocol works with honest peers" and "protocol works on the Internet." The Harvesf-Blough paper (2007) shows 90% lookup success at 50% malicious with proper route diversity. NH-1 hasn't integrated that yet.
-
-### 10.6 Bandwidth Saturation and Congestion Collapse
-
-**The gap:** The simulator models latency but not throughput. A relay node carrying 10K pub/sub messages/sec has the same AP score as an idle one. There's no backpressure.
-
-**What breaks:**
-- Under heavy pub/sub load (Zipf with α > 1.5), a small set of relay nodes becomes the bottleneck. Lookups funnel into them because they're "best" on paper. They fill their TX queue, RTT explodes, AP scoring sees them as "slow," and routing shifts to other relays. Those fill up. Oscillation and packet loss.
-- The 100-message bounded replay cache becomes a liability under load. If a relay is dropping messages due to saturation, the replay cache won't have them to send on re-subscribe.
-- Without explicit admission control, a pub/sub topic can unilaterally consume all network bandwidth (everyone subscribes, publisher publishes continuously).
-
-**Measurement needed:**
-- Load-capacity model: assign each node a `bandwidth_cap` (bytes/sec). When it exceeds cap, incoming messages are dropped and latency spiked (simulating queue backpressure).
-- Zipf workload sweep: publish rate follows Zipf(α, K topics). Measure pub/sub delivery rate and latency at increasing load.
-- Admission control experiments: (a) no control (baseline), (b) publisher rate-limiting (publish capped at K msg/sec), (c) relay feedback (relays advertise load in subscribe-ack; publisher throttles when relays report saturation).
-- Message drop correlation: measure whether dropped messages correlate with saturated relays or are spread evenly.
-
-**Why it matters:** This is the Phase 2 "Load & noise dynamics" section in the existing red team. It's acknowledged as necessary but not yet implemented. Real deployment will hit this within weeks of launch.
-
-### 10.7 Incoming Synapses Bias and Asymmetric Learning
-
-**The gap:** The LEARN section includes "incoming promotion" — peers that contact me often become outbound synapses. But this creates a potential asymmetry: a popular node gets many incoming edges, promotes them all, and becomes a hub. Its synaptome fills with whoever contacted it most recently, not whoever it needs to reach.
-
-**What breaks:**
-- Under publisher-subscriber asymmetry (one publisher, 1000 subscribers), the publisher's synaptome fills entirely with subscriber edges (via incoming promotion). It loses connectivity to peers outside the subscriber set.
-- A Byzantine attacker can spam a target node with incoming connections (fake publishes, fake subscribe-acks), causing the target to promote the attacker into its synaptome and learn to route toward it.
-- Incoming synapses lack the inertia lock that LTP-reinforced synapses get. A promoted incoming synapse can be evicted immediately on the next capacity crunch, creating jitter.
-
-**Measurement needed:**
-- Asymmetric pub/sub test: one publisher, 100 subscribers. Measure whether the publisher's synaptome remains diverse or becomes subscriber-dominated.
-- Incoming promotion ablation: disable incoming promotion and re-run all benchmarks. Measure the latency/success degradation.
-- Incoming inertia variant: when an incoming synapse is promoted, give it an inertia lock (same as LTP). Measure whether this improves or hurts the system.
-- Byzantine resistance: add a 1% "spammer" attack where adversary nodes spam incoming connections to a target. Measure whether the target's routing degrades.
-
-**Why it matters:** Incoming promotion is elegant (passive learning of who's interested in you), but it's a one-way signal. It doesn't encode "do I need to reach this peer" — only "this peer reached me." In a heterogeneous network, that asymmetry can be exploited.
-
-### 10.8 Parameter Sensitivity and Tuning Brittleness
-
-**The gap:** NH-1 claims 12 parameters vs NX-17's 44. But the existing materials don't measure how sensitive the protocol is to variations in those 12.
-
-**What breaks:**
-- If `INERTIA_DURATION` is too short (< 10 epochs), recently-learned synapses evict too fast and learning doesn't stick.
-- If `RECENCY_HALF_LIFE` is too long (> 100 epochs), stale synapses linger and block capacity.
-- If `DECAY_GAMMA` is too close to 1 (> 0.998), weights don't decay and the protocol converges to the initial synaptome.
-- If `DECAY_GAMMA` is too low (< 0.990), weights decay too fast and every lookup feels like a cold start.
-
-The existing materials don't show sensitivity curves for any of these.
-
-**Measurement needed:**
-- One-factor-at-a-time (OFAT) sensitivity: vary each of the 12 parameters ±20% around the default and measure global latency / pub/sub delivery.
-- Interaction study: measure whether changes in one parameter (e.g., INERTIA_DURATION) make other parameters (e.g., RECENCY_HALF_LIFE) more or less sensitive.
-- Scale-dependent tuning: does the optimal parameter set change with N? Run sensitivity at 1K, 10K, 50K nodes.
-- Heterogeneous-network tuning: measure whether the 12 parameters that work for "15% highway" also work for "0% highway" and "100% highway."
-
-**Why it matters:** The consolidation from 44 → 12 parameters is advertised as a feature. But if those 12 are brittle (high sensitivity, strong interactions), the "easier to tune" claim collapses. This is a pre-deployment audit.
-
-### 10.9 Temporal Pub/Sub Cache Semantics Under Partition
-
-**The gap:** The bounded replay cache on every relay is designed to recover from transient churn. But under a network partition, a relay in the West can accumulate messages the East never sees, and vice versa.
-
-**What breaks:**
-- After partition heals, subscribers in the East re-subscribe to a relay in the West. The West relay's cache has messages from while East was partitioned. Should it replay all of them, or only recent ones?
-- If it replays all, the subscriber gets a flood of "stale" messages and has to filter them by timestamp.
-- If it replays only recent ones, the subscriber misses history.
-- A malicious relay can selectively replay — holding back some messages, forwarding others — to poison the subscriber's view of history.
-
-**Measurement needed:**
-- Partition healing test: partition the network for 100 lookups (~10 seconds at 10 msg/sec publish rate). Each partition accumulates messages independently. On partition heal, measure what subscribers see: do they get history from both sides, one side, or neither?
-- Cache overflow test: if a relay's cache is full and a new message arrives during partition isolation, which message is dropped? Is the policy FIFO, LRU, or by topic?
-- Timestamp validation: add a validation check that replayed messages' publish timestamps are strictly monotonic per topic. Measure how often this check fails under partition.
-
-**Why it matters:** The temporal pub/sub mechanism is elegant under stable conditions. Under partition, it becomes a consistency problem. This is the Byzantine gap the existing red team flags.
-
-### 10.10 Deployment Realism: The Gap Between Simulator and Real WebRTC
-
-**The gap:** The simulator models "WebRTC with 50–100 connection cap" as a realistic constraint. But real WebRTC adds:
-- ICE gathering (1–3 s to find candidate paths)
-- STUN/TURN (latency spikes, asymmetry)
-- DTLS handshake (RTT + crypto overhead)
-- Media stream setup (if the connection is ever used for media)
-- Browser garbage collection (spikes every 100–500 ms)
-- Tab backgrounding (network I/O suspended, timer resolution drops to 1 s)
-
-**What breaks:**
-- A node that tries to add 10 new synapses in parallel will fire 10 concurrent ICE gathers, consuming all the browser's network threads. Other lookups stall.
-- A GC pause during a critical lookup can cause an RPC timeout (3 s) and trigger premature dead-peer eviction.
-- Incoming synapses from backgrounded tabs may silently fail to upgrade to full connections, leaving the synaptome with "connections" that aren't actually live.
-
-**Measurement needed:**
-- Concurrent-connection-setup test: measure the cost of firing N new ICE gathers in parallel. What's the crossover point where sequential setup (slower but serialized) beats parallel setup (faster individually but contends for resources)?
-- GC pause modeling: inject a 50 ms GC pause every 200 ms and measure lookup success degradation.
-- Backgrounding test: run the network, background 10% of nodes (timers drop to 1 s resolution), and measure pub/sub delivery latency and success.
-- Battery drain: estimate energy cost of keeping 50–100 concurrent connections alive (periodic keep-alives, socket I/O, radio on). Is the energy budget compatible with a mobile deployment?
-
-**Why it matters:** The existing red team mentions "frictionless connection fantasy" but doesn't quantify the friction. Phase 1 of the action plan is friction modeling — this is the specifics.
-
-### 10.11 Tier Summary
-
-**Tier 1 (Deploy Blockers)**
-1. **Latency noise / jitter** (10.4) — AP routing depends on clean RTT signals. Real networks have ±30% variance. Measure EMA constant sensitivity and jitter-tolerance.
-2. **Bandwidth saturation** (10.6) — Relay nodes will overflow under Zipf-distributed pub/sub. Need load-aware routing and admission control.
-3. **Concurrent connection setup cost** (10.10) — ICE gathering is the real bottleneck, not the synaptome logic. Measure how many parallel setup operations the browser can sustain.
-
-**Tier 2 (Correctness Under Stress)**
-4. **Convergence under heterogeneous churn** (10.1) — Ghinita-Teo adaptive annealing (temperature as function of local failure rate) is needed.
-5. **Asymmetric reachability / partition healing** (10.3) — Temporal consistency of replay cache and loop detection need specification.
-6. **Incoming synapse bias** (10.7) — Incoming promotion is elegant but one-directional; needs either asymmetric-learned inertia or explicit load-aware gating.
-
-**Tier 3 (Security Hardening)**
-7. **S2 cell eclipse and Sybil swarms** (10.5) — Integrate Vivaldi RTT validation or proof-of-location to prevent prefix forgery.
-8. **Byzantine relay hijacking** (10.5, 10.7) — Add MaxDisjoint replication of axon roots (Harvesf-Blough 2007).
-9. **Parameter sensitivity** (10.8) — OFAT sweep at 1K / 10K / 50K nodes; verify ±20% changes don't break the network.
-10. **Temporal cache under partition** (10.9) — Specify replay semantics for ragged partitions; add timestamp validation.
-
-These ten items, plus the five already in existing materials, form a complete pre-deployment audit. Tier 1 should block launch. Tier 2 should be solved before wide deployment. Tier 3 can be post-launch hardening.
-
----
-
-## 12. Operational Framework — Parameter Tuning
-
-The consolidation from NX-17's 44 parameters to NH-1's 12 is only valuable if those 12 can be tuned by operators without deep protocol knowledge.
-
-### 11.1 The Twelve Parameters
-
-| Parameter | Domain | Default | Range | What it controls |
-|---|---|---|---|---|
-| `INERTIA_DURATION` | LEARN | 20 epochs | 5–50 | How long a freshly-reinforced synapse is eviction-proof |
-| `RECENCY_HALF_LIFE` | FORGET | 50 epochs | 20–200 | How fast unused synapses become evictable |
-| `DECAY_GAMMA` | FORGET | 0.995 | 0.980–0.999 | Base weight decay rate per epoch |
-| `T_INIT` | EXPLORE | 1.0 | 0.5–2.0 | Initial exploration temperature |
-| `T_MIN` | EXPLORE | 0.05 | 0.01–0.20 | Minimum exploration floor |
-| `T_COOLING` | EXPLORE | 0.9997 | 0.9990–0.9999 | Temperature decay per lookup |
-| `EPSILON` | EXPLORE | 0.05 | 0.01–0.20 | Probability of random first hop |
-| `LOOKAHEAD_ALPHA` | NAVIGATE | 5 | 2–10 | Candidates probed per 2-hop evaluation |
-| `MAX_SYNAPTOME_SIZE` | STRUCTURE | 50 | 30–100 | Connection capacity per node |
-| `HIGHWAY_PCT` | STRUCTURE | 15 | 0–50 | Fraction of nodes with 256-synapse cap |
-| `GEO_BITS` | STRUCTURE | 8 | 0–16 | S2 cell prefix width (0 = no geography) |
-| `MAX_HOPS` | NAVIGATE | 40 | 10–100 | Safety cap on lookup depth |
-
-### 11.2 Three Levels of Tuning
-
-**Level 1: Operator Dials (Non-Expert)**
-
-For a deployment operator with no protocol knowledge:
-
-```
-Dial 1: "How churn-prone is my network?"
-  LOW (< 5% / day)    → T_COOLING = 0.99995, DECAY_GAMMA = 0.998
-  MEDIUM (5–20%)      → defaults (0.9997, 0.995)
-  HIGH (> 20%)        → T_COOLING = 0.9990, DECAY_GAMMA = 0.990
-
-Dial 2: "What's my device class mix?"
-  All browser         → MAX_SYNAPTOME = 50, HIGHWAY_PCT = 0
-  Mixed (typical)     → MAX_SYNAPTOME = 50, HIGHWAY_PCT = 15
-  Server-heavy        → MAX_SYNAPTOME = 256, HIGHWAY_PCT = 50
-
-Dial 3: "How latency-sensitive is my app?"
-  Message queue       → LOOKAHEAD_ALPHA = 2, T_MIN = 0.10 (faster, less exploration)
-  Real-time streaming → LOOKAHEAD_ALPHA = 8, T_MIN = 0.05 (more exploration for resilience)
-  Interactive chat    → defaults (balance)
-
-Dial 4: "What geographic span?"
-  Single region       → GEO_BITS = 12 (fine-grained locality)
-  Continental         → GEO_BITS = 8 (default)
-  Global              → GEO_BITS = 4 (coarse-grained)
-```
-
-These four dials map onto the 12 parameters via a lookup table. An operator never sees `DECAY_GAMMA` directly — they see "how churn-prone."
-
-**Level 2: Tuner Parameters (Protocol Engineer)**
-
-A protocol engineer deploying a new network sweeps the 12 parameters against a baseline workload:
-
-1. **Baseline measurement:** Run the network for 1 hour under "standard load" (500 lookups/min, 5% churn, 50% pub/sub). Record p50/p95/p99 lookup latency, pub/sub delivery rate and latency, synaptome diversity, temperature distribution.
-2. **OFAT sweep:** Vary each parameter ±20% around default. For each variant, re-run baseline and record deltas.
-3. **Interaction audit:** For any parameter pair that showed sensitivity, run a 2D grid sweep to measure interaction.
-4. **Scale sensitivity:** Run the OFAT at N ∈ {1K, 10K, 50K} and measure whether optimal parameters shift with scale.
-5. **Decision rule:** Adopt a new parameter value only if p50 latency improves ≥ 5% OR pub/sub delivery improves ≥ 2%, *and* p99 latency doesn't regress > 10%.
-
-**Level 3: Research Parameters (R&D)**
-
-Beyond the 12 core parameters, second-order knobs for research:
-- **Vitality exponent:** Currently `vitality = weight × recency`. Could be `weight^α × recency^β`.
-- **Latency penalty form:** Currently `½^(latency_ms/100)`. Could be exponential, sigmoid, step function.
-- **Incoming promotion threshold:** Currently after 2 uses. Could be adaptive based on synaptome load.
-- **Annealing reheat amount:** Currently spikes to 0.5. Could be function of dead-peer count or local churn rate.
-- **Triadic closure frequency:** Currently fires on every transit. Could be gated by minimum co-appearance count.
-
-These are not exposed to operators — they're for protocol improvement cycles.
-
-### 11.3 Tuning Workflow
-
-**Week 0–1: Pre-launch Tuning**
-1. Run baseline measurements at target scale (e.g., 25K nodes).
-2. Measure actual churn rate, latency distribution, traffic pattern.
-3. Map deployment profile to one of the four operator dials.
-4. Run baseline workload with dial's recommended parameters for 24 hours.
-5. If p99 latency is acceptable, proceed. If not, escalate to Level 2 tuning.
-
-**Week 1–2: Launch**
-Deploy with tuned parameters. Instrument the live network to collect per-node and aggregate metrics (Section 12).
-
-**Week 2–4: Adaptation**
-If metrics drift (churn increases, latency increases): recalculate which dial applies; if dial changes, apply the new Level 1 parameters and monitor; if dial stays the same but metrics drift, escalate to Level 2 on the live network with canary rollout.
-
-**Month 1–3: Steady State**
-Collect operational data. Every 2 weeks, measure whether current parameters still fit deployment or whether scale/churn/workload changes warrant re-tuning.
-
----
-
-## 13. Observability and Alerting
-
-### 12.1 Per-Node Metrics (Tier 1)
-
-Every node continuously tracks and periodically reports (every 60s):
-
-**Synaptome Health**
-- Size (current / max)
-- Stratum coverage (% of 64 strata with ≥1 peer)
-- Age distribution (% synapses < 100 epochs old, 100–1000, > 1000)
-- Weight distribution (p10/p50/p90 of weights)
-- Inertia lock status (# currently locked, % of synaptome)
-
-**Routing Performance**
-- Lookup success rate (% completed vs. hit MAX_HOPS)
-- Hops per lookup (p50 / p95 / p99)
-- Latency per lookup (p50 / p95 / p99 in ms)
-- Two-hop lookahead frequency
-- Iterative fallback frequency
-- Dead-peer eviction rate
-
-**Learning Dynamics**
-- LTP fire rate (per 100 lookups)
-- Triadic closure rate
-- Hop caching rate
-- Incoming promotion rate
-- Annealing replacement rate
-
-**Exploration State**
-- Current temperature T
-- Temperature age (epochs since last reheat)
-- Epsilon-greedy fire rate
-- Reheat frequency
-
-**Network Churn**
-- Dead-peer discoveries per 100 lookups
-- Inbound connection attempts (successes / failures)
-- Inbound connection churn (# closed per 100 epochs)
-- Synaptome stability (% unchanged over last 1000 lookups)
-
-### 12.2 Network-Level Aggregates (Tier 2)
-
-Roll up per-node metrics. Report every 5 minutes:
-
-**Routing Convergence**
-- Global p50 / p95 / p99 lookup latency
-- Lookup success rate across all nodes
-- Stratum coverage distribution (% of nodes with > 80% coverage)
-- Weight distribution (global p50/p90)
-- Synaptome diversity (entropy of stratum distribution per node, averaged)
-
-**Learning Rate**
-- Global LTP fire rate (% of lookups generating reinforcement)
-- Global triadic closure rate
-- Global annealing replacement rate
-- Learning concentration (% of learning happening in top 10% of nodes)
-
-**Churn Adaptation**
-- Network dead-peer rate
-- Reheat frequency distribution (p50/p95 per node)
-- Recovery time post-churn (lookups until latency returns to baseline)
-
-**Anomaly Indicators**
-- Synaptome age skew (% of nodes with median synapse age > 10K epochs)
-- Temperature stuck (% of nodes with T unchanged for > 10K epochs)
-- Stratum blackout (any stratum group with < 1 peer per node on average)
-
-### 12.3 Pub/Sub Metrics (Tier 3)
-
-Track every axonal tree separately:
-
-**Per-Topic Metrics**
-- Subscriber count (current, trend)
-- Publisher rate (messages/sec)
-- Delivery latency (p50 / p95 / p99 from publish to subscriber receipt)
-- Delivery success rate (% received by all subscribers)
-- Dropped message rate
-- Replay cache hit rate
-- Axon tree depth (max, p95)
-- Axon branching factor
-
-**Tree Integrity**
-- Dead-children per tree
-- Orphans per tree
-- Root stability (# times root changed per 1000 publishes)
-- Re-subscribe success rate
-
-**Load Distribution**
-- Relay load concentration (Gini coefficient)
-- Relay saturation (# relays with TX queue > 80%)
-- Fan-out breadth per relay
-
-### 12.4 Operator Dashboards (Tier 4 — The Four Dials)
-
-Abstract raw metrics into the four operator dials:
-
-```
-Dial 1: Churn Health
-  INPUT: Dead-peer rate, reheat frequency, synaptome stability
-  OUTPUT: "LOW" / "MEDIUM" / "HIGH"
-  ACTION: If drift from expected, suggest retuning T_COOLING and DECAY_GAMMA
-
-Dial 2: Device Class Balance
-  INPUT: Synaptome size distribution, inbound connection success rate
-  OUTPUT: "All browser" / "Mixed" / "Server-heavy"
-  ACTION: If < 80% of server-class nodes are at capacity, suggest increasing HIGHWAY_PCT
-
-Dial 3: Latency Profile
-  INPUT: p99 lookup latency, two-hop lookahead frequency, epsilon-greedy rate
-  OUTPUT: "Message queue" / "Interactive" / "Real-time"
-  ACTION: If p99 regresses, suggest increasing LOOKAHEAD_ALPHA
-
-Dial 4: Geographic Span
-  INPUT: Regional latency ratio (500 km / global), stratum distribution
-  OUTPUT: "Single region" / "Continental" / "Global"
-  ACTION: If regional latency exceeds expected, suggest increasing GEO_BITS
-```
-
-### 12.5 Alerting Rules
-
-**Critical Alerts (Page Immediately)**
-
-1. **Network Partition Detection** — Any stratum group with zero peers across > 50% of nodes
-2. **Lookup Success Collapse** — Network-wide success rate < 95%
-3. **Pub/Sub Delivery Failure** — Any topic with delivery rate < 90% for > 5 minutes
-4. **Synaptome Collapse** — > 20% of nodes with synaptome size < 30
-
-**Warning Alerts (Investigate Within Hours)**
-
-5. **Latency Creep** — p95 lookup latency increases > 20% over 1 hour
-6. **Learning Stall** — LTP fire rate drops below 10% of lookups for > 30 minutes
-7. **Stratum Imbalance** — > 30% of nodes with stratum coverage < 50%
-8. **Relay Concentration** — Any pub/sub topic with Gini coefficient > 0.75
-
-**Informational Alerts (Log for Analysis)**
-
-9. **Parameter Drift** — Any node with parameters diverging from network baseline
-10. **Byzantine Suspicion** — Any node with synaptome > 80% toward a single peer
-11. **Cache Overflow** — Any pub/sub replay cache running at > 90% capacity
-12. **Temperature Stuck** — Any node with temperature unchanged for > 10K epochs
-
----
-
-## 14. Diagnosis Playbooks
-
-### 13.1 Playbook: Lookup Success Collapse (Critical Alert #2)
-
-**Symptoms:** Network-wide lookup success < 95%
-
-**Investigation Steps:**
-
-1. **Check stratum coverage distribution**
-   - If > 20% of nodes have stratum coverage < 50%: network partitioned or lost long-range connectivity. Increase GEO_BITS by 4 to force re-seeding.
-   - If stratum coverage is normal: routing algorithm failure, not topology failure. Check two-hop lookahead fire rate.
-
-2. **Check dead-peer eviction rate**
-   - If > 30 evictions per 100 lookups: high churn or aggressive decay. Increase INERTIA_DURATION 20 → 30; decrease DECAY_GAMMA 0.995 → 0.998.
-   - If < 5 evictions per 100 lookups: low churn but routing failing — likely Byzantine or parameter misconfiguration. Check temperature distribution.
-
-3. **Check pub/sub separately**
-   - If pub/sub > 95% but lookups < 95%: pub/sub axonal tree is live but random lookups failing. Increase LOOKAHEAD_ALPHA 5 → 8.
-
-4. **Check for Byzantine attack**
-   - Sample 10 nodes with low success rates. Inspect their synaptomes: do they have > 50% weight to a single peer? If yes: probable incoming-synapse spam. Implement IP-based rate limiting on incoming connections from that peer.
-
-**Recovery Steps:**
-
-A. **Soft recovery (no reboot):** Increase EPSILON 0.05 → 0.15 for 1 hour. Spike all node temperatures to 0.5. Run 100 lookups per node with increased LOOKAHEAD_ALPHA. Measure: does success recover to > 98%?
-
-B. **Hard recovery (reboot required):** Roll back last parameter change. Rebuild synaptomes from scratch with stratified bootstrap. Increase INERTIA_DURATION to 30 during warmup. Run 10K lookups to re-learn routes.
-
-### 13.2 Playbook: Pub/Sub Delivery Failure (Critical Alert #3)
-
-**Symptoms:** Topic delivery rate < 90% for > 5 minutes
-
-**Investigation Steps:**
-
-1. **Check relay node health**
-   - Sample the root relay for this topic. Is it alive? If dead: re-subscribe should find new root within 10s. Check re-subscribe success rate; if < 90%, increase frequency 10s → 5s.
-   - If alive: check load. TX queue backed up? Relay is saturated. Consider hot-root migration.
-
-2. **Check tree integrity**
-   - Dead-children > 10% of subscriber count: subscribers detaching faster than re-subscribing fixes it. Increase re-subscribe frequency 10s → 3s.
-   - Orphans > 5%: subscribers re-subscribing but not finding any relay in time. Check stratum distribution of relays; may need more relays in subscriber cells.
-
-3. **Check cache behavior**
-   - Replay cache hit rate < 50%: subscribers missing history. Increase cache size 100 → 200 or extend retention.
-
-4. **Check for Byzantine relay**
-   - Sample delivered vs. dropped messages. Pattern-based dropout (always drops when load > 50%) suggests Byzantine relay. Temporarily blacklist; re-route topic to alternate.
-
-**Recovery Steps:**
-
-A. **Immediate (within 1 minute):** Increase re-subscribe frequency to 3s. Increase replay cache to 200 messages.
-
-B. **Short-term (1–5 minutes):** If relay saturated, trigger hot-root migration: select next-best relay (least loaded, same cell). Or spawn secondary relay in different cell (MaxDisjoint placement).
-
-C. **Long-term (> 5 minutes):** Analyze root-cause logs. If Byzantine: implement reputation penalties. If load: implement load-aware relay selection. If churn: increase GEO_BITS to stabilize relay discovery.
-
-### 13.3 Playbook: Latency Creep (Warning Alert #5)
-
-**Symptoms:** p95 lookup latency increases > 20% over 1 hour
-
-**Investigation Steps:**
-
-1. **Check for hot topics (Zipf-driven load)**
-   - Query pub/sub metrics; is one topic getting > 50% of publishes? If yes: that topic's relays are bottlenecks. Monitor relay queue depth; consider load-aware routing.
-
-2. **Check synaptome churn**
-   - LTP fire rate dropping (fewer lookups succeeding with short paths)? Old shortcuts evicting faster than new ones forming. Increase INERTIA_DURATION; decrease DECAY_GAMMA.
-
-3. **Check temperature distribution**
-   - Most nodes cold (T ≈ T_MIN)? Network annealed and stopped exploring. Increase T_MIN 0.05 → 0.10 to keep some exploration active. Or spike all temperatures to 0.3 for 1 hour to force re-exploration.
-
-4. **Check for network saturation**
-   - Aggregate throughput trending upward? Latency creep under load is normal. Monitor whether creep stabilizes.
-
-5. **Check two-hop lookahead effectiveness**
-   - Lookahead fire rate > 70%: algorithm struggling to find decisive first hops. Increase LOOKAHEAD_ALPHA 5 → 8. Check if stratum coverage degraded.
-
-**Recovery Steps:**
-
-A. **Soft recovery (minutes):** Increase LOOKAHEAD_ALPHA 5 → 7 temporarily. Monitor p95; if improvement > 5%, keep change.
-
-B. **Targeted recovery (hours):** If hot topic identified: implement load-aware relay selection. AP scoring: `AP *= max(0.5, 1 - relay_load / saturation_cap)`. Test on canary (10% of nodes) for 1 hour.
-
-C. **Structural recovery (days):** Analyze synaptome stability. If > 20% turnover per hour: INERTIA_DURATION too short. Increase 20 → 30 epochs.
-
----
-
-## 15. Production Readiness Checklist
-
-Before deploying NH-1 to production, verify:
-
-**Infrastructure**
-- [ ] Logging pipeline can handle per-node metrics from every node every 60s
-- [ ] Time synchronization across all nodes within 100 ms (for latency attribution)
-- [ ] Alerting system can ingest Tier 1 and 2 metrics and page on-call within 30s
-- [ ] Runbooks (playbooks 13.1–13.3) are accessible to on-call and walked through in drills
-
-**Operational Readiness**
-- [ ] On-call trained on the four operator dials; can shift parameter recommendations within 5 minutes
-- [ ] Canary rollout process defined (10% → 50% → 100%) and tested with a parameter change
-- [ ] Rollback procedure documented (how to rebuild synaptomes if a parameter change is bad)
-- [ ] Dashboard live and on-call has practiced reading it under simulated alerts
-
-**Protocol Verification**
-- [ ] Simulator-to-production gap analysis complete (jitter, timeouts, bandwidth caps modeled)
-- [ ] OFAT sensitivity analysis done; parameters not brittle (±20% change doesn't break the network)
-- [ ] Byzantine resistance test passed (1% spammer nodes don't degrade network to < 95% success)
-- [ ] Partition healing verified (Slice World equivalent test on libp2p)
-
-**Measurement**
-- [ ] Baseline metrics captured from pre-production testnet (what does "healthy" look like?)
-- [ ] Anomaly detection thresholds calibrated (alert #5: what counts as "creep"?)
-- [ ] Tier 3 (pub/sub) metrics collection end-to-end tested
-
-**Documentation**
-- [ ] Protocol specification complete and matches implementation
-- [ ] Operator dial mappings documented (churn profile → DECAY_GAMMA/T_COOLING conversions)
-- [ ] Failure modes catalogued (what does "stratum blackout" mean? what causes it?)
-- [ ] Runbooks written and reviewed by operations team
-
----
-
-## 16. Reputation and Byzantine Resistance
-
-All the playbooks above assume nodes are honest but fallible. NH-1 has no built-in Byzantine resilience.
-
-### 15.1 What Needs to Be Added
-
-**1. Per-synapse reputation score**
-
-Add a `reputation ∈ [0, 1]` field to each `Synapse`:
-- Starts at 0.5 (neutral)
-- Increments on successful relay
-- Decrements on relay failure
-- Used in AP scoring: `AP *= reputation` (low-reputation peers penalized)
-
-**2. Incoming-synapse rate limiting**
-
-An attacker can spam incoming connections to exhaust your inbound cap:
-- Track inbound arrival rate per source peer
-- If > 10 incoming syn/sec from one peer, rate-limit subsequent ones
-- Each rate-limited connection decrements reputation
-
-**3. Replay cache poisoning detection**
-
-An attacker can relay false messages on a pub/sub topic:
-- Add `contentHash` to every published message
-- Subscribers verify: if relay sends a message with wrong contentHash, mark relay Byzantine
-- Relay gets reputation decrement; topic root switches away if reputation drops below 0.3
-
-**4. Triadic closure gating**
-
-An attacker can introduce itself into every triadic closure:
-- Track which peers introduce you to others (transit partners)
-- Only trust introductions from peers with reputation > 0.7
-- Or: require 2+ independent paths through different peers before forming a triadic edge
-
-**Implementation size:** ~200 lines added to NH-1 (reputation tracking + AP multiplier + rate limiting).
-
-### 15.2 Verification Test
-
-Run the network with 1% Byzantine relays. Measure whether:
-- Lookup success stays > 95% (reputation penalties route around attackers)
-- Pub/sub delivery stays > 90% (axonal tree heals around Byzantine relays)
-- Reputation scores converge (honest peers develop high scores, attackers low scores)
-
-This is Phase 3 of the red-team action plan; it's not blocking but it's necessary before real deployment.
-
----
-
-## 17. Deployment Timeline
-
-**Status (v0.3.53).** The initial production Axona stack — `axona-peer` and `axona-bridge`, running the NH-1 implementation — is live (see §9.6). The plan below describes the path from this initial deployment to a multi-thousand-node operating network; it predates the v0.3.51 production launch and is retained as a forward-looking calibration for the scale-up phase.
-
-**Month 1: Simulator Hardening**
-- Complete OFAT sensitivity analysis (red-team item 10.8)
-- Run all ten additional red-team tests
-- Validate Phase 1 (friction modeling) preliminary implementation
-- Publish revised deck with sensitivity curves and operator dials
-
-**Month 2: yz.p2pnetwork Integration**
-- Port NH-1 to libp2p (NeuromorphicDHT.js → TypeScript in yz.p2pnetwork)
-- Implement Tier 1 metrics collection
-- Build operator dashboard (the four dials + critical alerts)
-- Test concurrent connection setup on real WebRTC
-
-**Month 3: Testnet (Small Scale)**
-- Deploy to 100-node testnet (Docker containers, simulated churn)
-- Run baseline measurement (1 hour at standard load)
-- Verify all Tier 1 metrics working and alerting
-- Run playbooks with simulated failures
-- Collect operator feedback on dashboard usability
-
-**Month 4: Testnet (Medium Scale)**
-- Scale to 1K nodes
-- Run OFAT sensitivity analysis on real hardware
-- Calibrate alert thresholds
-- Run Byzantine resistance test (1% spammer nodes)
-- Verify partition healing
-
-**Month 5: Staging (Production-Like)**
-- Deploy to 5K-node staging environment (geographically distributed)
-- Run 1-week soak test
-- Measure operator on-call experience
-- Implement reputation system if not already done
-- Finalize runbooks based on staging experience
-
-**Month 6: Limited Production Release**
-- Deploy with 500 initial nodes
-- Run under 10× normal expected load (stress test)
-- Monitor all Tier 1, 2, 3 metrics continuously
-- If latency, success rate, or pub/sub delivery degrade > 5%: roll back and diagnose
-- If stable for 1 week: proceed to 2K nodes
-
-**Month 7–8: Production Ramp**
-- Scale 2K → 5K → 10K nodes over 2 weeks
-- At each step, pause for 1 week of observation
-- If any metric diverges from testnet baseline, investigate before scaling further
-
-**Month 9+: Production at Scale**
-- Monitor continuously; dial tuning as needed
-- Measure real-world workload distribution (Zipf?)
-- Implement load-aware relay selection if hot-topic concentration appears
-- Plan Phase 2 (friction modeling with real latency, timeouts, jitter)
-
-### 16.1 Scale Transitions
-
-The parameters tuned for 5K nodes may not be optimal at 50K.
-
-**At 10K nodes (2× current):**
-- p50 latency will increase slightly
-- Pub/sub tree depth will increase
-- Monitor: do stratum coverage remain constant?
-- If coverage drops: increase GEO_BITS
-
-**At 25K nodes (5× current):**
-- Synaptome diversity becomes critical
-- Annealing replacement rate may drop
-- If LTP fire rate and annealing both drop: decrease DECAY_GAMMA
-
-**At 50K nodes (10× current):**
-- Browser-class nodes start to struggle
-- Increase HIGHWAY_PCT 15% → 25%
-- Or increase MAX_SYNAPTOME_SIZE 50 → 75
-
-**At 100K+ nodes:**
-- Consider two-tier topology: browser nodes route to nearest server-class node
-- Outside NH-1's current design scope; may need architectural change
-
----
-
-## 18. Comparison to Prior Art
-
-### 17.1 Coral DSHT
-
-Coral (Freedman, Freudenthal, Mazières — NSDI 2004) is a **distributed sloppy hash table** that powered Coral CDN. Hierarchical RTT clusters: each node measures RTT and joins multiple nested clusters. Lookup is local-first.
-
-| Aspect | Coral DSHT | N-DHT |
-|---|---|---|
-| Structure | Multiple nested DHTs, one per RTT cluster | Single flat synaptome with weighted edges |
-| Locality discovery | Active RTT measurement at join + cluster membership | Passive — observed traffic reinforces useful edges; S2 prefix seeds |
-| Storage semantics | Sloppy — multiple replicas per key, return-first-found | Strict — one canonical XOR-closest node per key |
-| Lookup | Local cluster first, escalate outward | Single greedy AP walk over weighted synaptome |
-| Adaptation | Cluster boundaries are static thresholds | Continuous: weights update on every successful path |
-| Designed for | Read-heavy content distribution | Routing + pub/sub — dynamic membership, real-time delivery |
-| Pub/sub support | Out of scope | First-class via axonal trees |
-
-Coral's design choice was: "give up the canonical mapping to win locality." NH-1's design choice was: "keep the canonical mapping; make locality emerge from learning." Different engineering trade-offs against the same core problem.
-
-### 17.2 Vivaldi
-
-Vivaldi (Dabek, Cox, Kaashoek, Morris — SIGCOMM 2004) is a **decentralized network coordinate system**. Each node continuously adjusts a synthetic position vector so that Euclidean distance approximates measured RTT.
-
-| Aspect | Vivaldi | N-DHT |
-|---|---|---|
-| Mechanism | Synthetic coordinates in N-D Euclidean space | Hebbian reinforcement on routing edges |
-| What's learned | Position vector per node that predicts RTT | Weight per synapse, reinforced by traffic |
-| Output | RTT prediction (any pair) | Ranked list of next-hops (per lookup) |
-| Locality discovery | Emergent from RTT measurements | Imposed via S2 cell ID prefix |
-| Convergence guarantee | Yes — coordinate descent on RTT residuals | Empirical — depends on traffic mixing |
-| Pub/sub support | Out of scope | First-class — axonal tree built on routed synaptome |
-
-A Vivaldi-style coordinate system is a candidate for replacing NH-1's structural S2 prefix with a learned locality primitive. Future benchmarks may include a Vivaldi-style protocol for completeness — both as comparison reference and forward-looking direction.
-
-### 17.3 Route-Diversity DHTs
-
-Castro et al. (OSDI 2002) is the foundational paper on Byzantine fault tolerance in DHTs. Three jointly-necessary mechanisms: constrained routing tables, secure node ID assignment, redundant routing.
-
-Harvesf & Blough (IEEE P2P 2007) makes redundant routing concrete: replicate at (n+1) × B^m locations to produce d disjoint routes. **MaxDisjoint replica placement** + **Neighbor Set Routing**: 90% lookup success with half the network compromised.
-
-| Aspect | Castro / Harvesf-Blough | N-DHT |
-|---|---|---|
-| Threat model | Byzantine — malicious nodes that lie about routing | Crash-failure — honest peers that disappear |
-| Mechanism | Replicate target at d disjoint placements | Maintain weighted synaptome with overlapping candidates |
-| What's redundant | Multiple disjoint paths to same key | Multiple weighted next-hop options per lookup |
-| Activation | Always — every lookup queries replicas in parallel | Reactive — iterative fallback only when greedy AP dead-ends |
-| Cost | ×d storage, parallel network load per lookup | One synaptome; lookup load unchanged |
-
-Their work delivers strong Byzantine resilience (90% success at 50% malicious) at the cost of d× storage and parallel query load. N-DHT delivers strong crash-failure resilience (100% delivery under 5% churn) at the cost of zero extra storage. Combining them — MaxDisjoint replication of NH-1 axon-tree roots — is the obvious next step for Byzantine-tolerant pub/sub.
-
-### 17.4 Hotspot-Aware Placement
-
-Makris, Tserpes, Anagnostopoulos (IEEE BIGDATA 2017) addresses what consistent-hashing DHTs ignore: **request rates are not uniform even when keys are.** Real workloads follow Zipf's law. On a 24-node Redis cluster: hottest node received 222K requests, others ~1–10K. Response time on hotspot was 5× cluster median.
-
-**Mechanism: Directory For Exceptions (DFE).** Hybrid placement keeping consistent hashing as default with a small distributed override.
-
-For NH-1: when an axon-tree root's request rate exceeds a permissible threshold, migrate the topic to a less-loaded peer in the synaptome and install a DFE-style redirect at the original location. Combined with secondary geo / RTT-based splitting, closes the gateway concentration failure mode under Zipf-popular topics.
-
----
-
-## 19. Future Work
-
-Three phases of next-step work, ordered from highest behavioral impact to security hardening.
-
-### 18.1 Phase 1 — Friction Modeling (Highest Priority)
-
-What the simulator is missing:
-
-- **`CONNECTION_SETUP_MS = 1500–2000 ms`** — new synapses sit in `PENDING` and are excluded from AP scoring until setup elapses
-- **`RPC_TIMEOUT_MS = 3000 ms`** — sends to silently-dropped nodes stall before iterative fallback or next AP hop is tried
-- **Request/reply RPC** — refactor `routeMessage` to trace forward path *and* reverse path. Either failure fails the RPC; reply may take a different path back
-
-### 18.2 Phase 2 — Load & Noise Dynamics
-
-Make the protocol measurable under stress:
-
-- **Load-dependent latency.** `effective_delay = base_delay × (1 + active_msg_rate / bandwidth_cap)`. Saturating gateways get penalized in AP scoring.
-- **Bandwidth dropping.** When a node exceeds its modeled cap, drop incoming messages instead of forwarding.
-- **Jitter injection.** Add `Normal(0, JITTER_SIGMA)` to per-hop RTT. Verify LTP EMA doesn't oscillate.
-- **Zipf-distributed publish workload.** Stress NH-1 with skewed publish rates to expose whether single-root axon trees saturate.
-- **Adaptive anneal/reheat driven by observed churn rate** (Ghinita & Teo 2006). Each node maintains rolling estimate of local failure rate `μ` and join rate `λ`. Anneal cooling rate, reheat amount, and synapse staleness threshold all become functions of `(μ, λ)` rather than fixed constants.
-- **Liveness vs accuracy decoupled.** Today `_evictAndReplace` (liveness) and `_tryAnneal` (accuracy) fire as mixed side-effects. Splitting them into independent threshold-triggered channels (Ghinita-Teo) gives operators one dial per channel.
-- **Variable-churn benchmark.** Add peak-hour test: alternate 3/sec churn for 30 min with 0.5/sec for 90 min, repeat. Measures NH-1's adaptation time at each transition.
-
-### 18.3 Phase 3 — Structural Integrity & Trustless Locality
-
-- **Bidirectional eviction agency.** When A connects to B, B independently runs its own stratified eviction to decide whether to keep the reverse edge.
-- **Vivaldi RTT integration.** Replace self-declared S2 prefix with organically learned coordinates — Sybil-resistant locality without trusting peers' self-claims.
-- **Geographic proof of work / IP-ASN binding.** Require geo-prefix to align with node's actual ASN/region or carry a hash-cash stamp.
-- **Topic replication via MaxDisjoint placement** (Harvesf & Blough 2007). Replicate every axon-tree root at d disjoint locations.
-- **Hot-axon-root migration** (Makris et al. 2017). When axon-tree root's request rate exceeds threshold, migrate the topic to a less-loaded peer.
-- **Target-QoS knob** (Ghinita & Teo 2006 framing). Expose `targetLookupFailureRate` and `targetMedianLatency` as user-facing parameters. The system self-tunes underlying constants to hit them. Precondition for a metaplastic NH-1.
-
-### 18.4 The Unfinished Consolidation
-
-NH-1 unified admission into a single vitality gate, but conceptual rules remain that could be further simplified:
-
-- **Stratified bootstrap vs. random bootstrap** — Why not let annealing *discover* stratum diversity rather than enforcing it at init?
-- **Two-hop lookahead as a separate operation** — Could this merge into AP scoring as a cost-of-uncertainty term?
-- **Temperature reheat on dead-peer discovery** — Could this be replaced by a learned "confidence" signal?
-
-These are not flaws — they're the remaining 18% of "why NH-1 is slower than NX-17." Each rule earned its keep. But they hint at a potential **NH-2**: further consolidation where those three merge into a unified confidence-and-exploration model.
-
-### 18.5 Bottom Line
-
-The brain is production-ready. The body is not — but the body is now the next *measurable, scopeable* problem rather than a tangle of interacting mechanisms. Each phase above produces falsifiable measurements; the simulator becomes the lab bench for the next iteration.
-
----
-
-## 20. References
-
-**Whitepaper** — `documents/Neuromorphic-DHT-Architecture.md` (companion repository, v0.67)
-**Source + data** — `github.com/YZ-social/dht-sim`
-
-### Architecture
-- Saltzer, Reed, Clark · *End-to-End Arguments in System Design* (ACM TOCS 1984) — function placement principle
-- Clark · *The Design Philosophy of the DARPA Internet Protocols* (SIGCOMM 1988)
-
-### Foundational DHT work
-- Maymounkov & Mazières · *Kademlia: A Peer-to-peer Information System Based on the XOR Metric* (IPTPS 2002)
-- Rowstron & Druschel · *Pastry: Scalable, decentralized object location and routing* (Middleware 2001)
-- Zhao et al. · *Tapestry: A Resilient Global-Scale Overlay* (IEEE J-SAC 2004)
-- Stoica et al. · *Chord: A Scalable Peer-to-peer Lookup Service* (SIGCOMM 2001)
-- Ratnasamy et al. · *A Scalable Content-Addressable Network* (SIGCOMM 2001)
-
-### Latency-aware DHTs
-- Dabek, Li, Sit, Robertson, Kaashoek, Morris · ***Designing a DHT for low latency and high throughput*** (NSDI 2004) — DHash++; the **3δ floor** analysis (§ 4.3) anchors the absolute-latency reference
-- Freedman, Mazières · *Sloppy Hashing and Self-Organizing Clusters* (IPTPS 2003) — the Coral DSHT design
-- Freedman, Freudenthal, Mazières · ***Democratizing Content Publication with Coral*** (NSDI 2004) — Coral CDN deployment
-- Gummadi et al. · *The Impact of DHT Routing Geometry on Resilience and Proximity* (SIGCOMM 2003)
-
-### Adaptive coordinates
-- Dabek, Cox, Kaashoek, Morris · ***Vivaldi: A Decentralized Network Coordinate System*** (SIGCOMM 2004)
-- Cox, Dabek, Kaashoek, Li, Morris · *Practical, Distributed Network Coordinates* (HotNets 2003)
-- Ledlie, Gardner, Seltzer · *Network Coordinates in the Wild* (NSDI 2007)
-
-### Byzantine resistance / route diversity
-- Castro, Druschel, Ganesh, Rowstron, Wallach · ***Secure Routing for Structured Peer-to-Peer Overlay Networks*** (OSDI 2002) — foundational Byzantine-DHT paper; **constrained routing + secure ID assignment + redundant routing** triplet
-- Harvesf, Blough · ***The Design and Evaluation of Techniques for Route Diversity in Distributed Hash Tables*** (IEEE P2P 2007) — **MaxDisjoint replica placement** + Neighbor Set Routing; 90% lookup success at 50% node failure
-- Baumgart & Mies · *S/Kademlia: A Practicable Approach Towards Secure Key-Based Routing* (ICPADS 2007)
-
-### Load balancing / hotspot mitigation
-- Karger, Lehman, Leighton, Panigrahy, Levine, Lewin · *Consistent Hashing and Random Trees* (STOC 1997)
-- Rao, Lakshminarayanan, Surana, Karp, Stoica · *Load balancing in structured P2P systems* (IPTPS 2003)
-- Makris, Tserpes, Anagnostopoulos · ***A novel object placement protocol for minimizing the average response time of get operations in distributed key-value stores*** (IEEE BIGDATA 2017) — **Directory For Exceptions (DFE)** + threshold-triggered migration
-
-### Adaptive maintenance / churn handling
-- Mahajan, Castro, Rowstron · *Controlling the Cost of Reliability in Peer-to-peer Overlays* (IPTPS 2003)
-- Krishnamurthy, El-Ansary, Aurell, Haridi · *A statistical theory of Chord under churn* (IPTPS 2005)
-- Ghinita, Teo · ***An Adaptive Stabilization Framework for Distributed Hash Tables*** (IPDPS 2006) — local statistical estimation of `(μ, λ, N)` + threshold-triggered liveness/accuracy checks
-
-### Pub/Sub
-- Castro, Druschel, Kermarrec, Rowstron · *SCRIBE: A Large-Scale and Decentralized Application-Level Multicast Infrastructure* (JSAC 2002)
-
-### Substrate (learning, decay, pruning)
-- Hebb · *The Organization of Behavior* (1949) — synaptic potentiation
-- Bliss & Lømo · *Long-lasting Potentiation of Synaptic Transmission in the Dentate Area of the Anaesthetized Rabbit* (J. Physiology 1973)
-- Ebbinghaus · *Über das Gedächtnis* (1885) — exponential forgetting curve
-- Frey & Morris · *Synaptic tagging and the late phase of LTP* (Nature 1997) — biological analog of weight × recency retention
-- Kirkpatrick, Gelatt, Vecchi · *Optimization by Simulated Annealing* (Science 1983)
-- LeCun, Denker, Solla · *Optimal Brain Damage* (NeurIPS 1989) — prune lowest-magnitude connections
-- O'Neil, O'Neil, Weikum · *The LRU-K Page Replacement Algorithm* (SIGMOD 1993) — multi-history recency for cache replacement
-- Watts & Strogatz · *Collective Dynamics of Small-World Networks* (Nature 1998)
-- Google · *S2 Geometry Library* (2011) — https://s2geometry.io/
-- Hilbert · *Ueber die stetige Abbildung einer Line auf ein Flachenstuck* (Mathematische Annalen 1891)
-
----
-
-*End of whitepaper. Total length ≈ 80 pages typeset.*
-
-*Suggested next steps for the reader:*
-1. *If you're a researcher interested in the mechanism: Sections 3–5 are the architectural core.*
-2. *If you're an operator preparing for deployment: Sections 11–14 are the operational core.*
-3. *If you're a security researcher: Sections 9–10 and 15 are the threat model.*
-4. *If you're a protocol contributor: Sections 6, 8, and 18 frame what's worth working on next.*
+## Glossary
+
+- **Activation potential (AP)** — the score Axona computes for each candidate next hop, combining XOR-distance progress, learned weight, and observed latency. The higher a connection's AP, the more likely a lookup "fires" down it.
+- **Author identity** — a location-free cryptographic signing key that names *who is speaking*. Durable across devices; verifiable by anyone; never linked by the network to your node identity. "Authorship is a signature, not an account."
+- **Axon** — in neuroscience, the branching output cable of a neuron; in Axona, the per-topic delivery structure — the role-holding nodes and sub-axons that fan a publish out to a topic's subscribers.
+- **Bridge / introducer** — a server that helps a brand-new participant make first contact with the mesh. Anyone can run one; they are interchangeable and disposable; once you are introduced, your traffic routes peer-to-peer with no bridge in the path.
+- **Control point** — any place in a system's design where some actor can control an action (David Clark). Axona is built to have none in the data path, because a control point is also a point of capture.
+- **DHT (distributed hash table)** — a way to find who holds a piece of content with no central directory, by giving everything an identifier and routing toward the closest one.
+- **End-to-end argument** — the principle (Saltzer, Reed, Clark, 1984) that functions like reliability, identity, and encryption belong at the endpoints, not in the network.
+- **LTP / LTD (long-term potentiation / depression)** — the brain's mechanisms for strengthening co-active connections and weakening unused ones; implemented literally in Axona's connection weights.
+- **Node identity** — a key bound to a coarse region that forms your *address* on the network and manages your connections. Names *where you are and how you connect*, never *who you are*.
+- **Proof of work, memory-hard** — a deliberately expensive computation required to mint an identity, designed to resist specialized-hardware speedups, so that flooding the network with identities has real cost.
+- **Pub/sub** — publish and subscribe: one participant sends to many via a per-topic delivery tree, with no server coordinating it.
+- **Relay** — a participant that provides service to the network (hosting address space, carrying routing, keeping topic history) without consuming it. A contributor to the commons, not a privileged tier the network depends on.
+- **S2 cell** — one of 192 regions of Earth's surface, numbered along a Hilbert curve so that nearby places get nearby numbers; the first byte of every Axona identifier.
+- **Sybil attack** — creating many false identities to gain disproportionate influence. Made costly by proof of work, not prevented by it.
+- **Synapse** — in Axona, a live connection to a peer, carrying a learned weight that rises with successful use and decays without it; the unit the vitality function scores.
+- **Tussle** — Clark's term for the working-out of misaligned interests among a network's actors, and the observation that *where* it is fought is a design choice.
+- **Vitality** — weight × recency: the score by which connections compete for a peer's limited connection slots.
+
+## Colophon and References
+
+This document supersedes and integrates two earlier documents — the *Axona Explainer* (v0.4.29), which carried the technical exposition now in Part II, and *Axona: Manifesto and White Paper* (v0.3), which carried Parts I and III — and it replaces the earlier Whitepaper Synthesis Edition (v0.3.58), whose operational and red-team reference material now lives in the Axona Architecture note, the operator documentation, and the red-team register. It draws its intellectual lineage from these sources, woven throughout rather than cited in isolation:
+
+- J. H. Saltzer, D. P. Reed, and D. D. Clark, "End-to-End Arguments in System Design," *ACM Transactions on Computer Systems* 2, no. 4 (November 1984): 277–288. The principle that functions belong at the endpoints, from which Axona's refusal to place identity, trust, confidentiality, or content-judgment in the network directly follows.
+- David D. Clark, *Designing an Internet* (MIT Press, 2018). The framework of tussle, control-point analysis, and the fundamental tussle between open architecture and the desire to control it; and the argument that decentralized control is often the more durable choice precisely because it offers no lever to capture.
+- Mitchell Kapor, "architecture is politics" — the aphorism, from the early days of the Electronic Frontier Foundation, that Part I extends across scales: the structure of a system is the allocation of power within it.
+- J. C. R. Licklider, "Man-Computer Symbiosis," *IRE Transactions on Human Factors in Electronics* HFE-1 (March 1960): 4–11. The vision of humans and machines coupled as collaborators, for which Axona aims to provide the missing communication substrate.
+- D. O. Hebb, *The Organization of Behavior* (Wiley, 1949). The learning rule — connections used together are strengthened — that Axona's neuromorphic routing implements as literal engineering.
+- P. Baran, "On Distributed Communications" (RAND, 1964). The survivable-network designs from which the commitment to routing around damage descends.
+- P. Maymounkov and D. Mazières, "Kademlia: A Peer-to-Peer Information System Based on the XOR Metric" (2002). The DHT that Axona's substrate extends.
+- F. Dabek et al., "Designing a DHT for Low Latency and High Throughput" (NSDI 2004). The 3δ lower bound that Part II's measurements are held against.
+- T. V. P. Bliss and T. Lømo, "Long-lasting potentiation of synaptic transmission in the dentate area of the anaesthetized rabbit" (1973). The experiment behind long-term potentiation.
+
+The technical claims here are grounded in the Axona source documentation: the Axona Architecture note, the API Reference, the Programmer Guide, and the AI Grounding file. Axona is live in production; its source is available at github.com/axona-net. The system described here is the deployed system, not a proposal.
+
+*The technology is shaped by the mission.*
