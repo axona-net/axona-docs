@@ -7,6 +7,35 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.28.0 → v4.29.0 — pull returns the full envelope; root self-verify restored; chunk msgIds (2026-07-18)
+
+**Testnet-bound. Wire-compatible (no flag day). One API-shape change — see the callout.**
+
+- **`peer.pull()` now returns the full envelope (v4.29.0, API-shape change).**
+  The pull response always carried the stored envelope over the wire, but the
+  client handler unwrapped it to the bare message body at the last step —
+  discarding `msgId`, `ts`, and the signature. Publish-confirm loops comparing
+  `env.msgId` could never succeed, and pull-then-act flows (kill / reply /
+  verify by msgId) were impossible. `pull()` now resolves the same envelope
+  shape a `sub()` callback delivers, as its docstring always promised.
+  **Migration:** code that treated the pull result as the message body itself
+  should now read `result.message`. Code already written against the
+  documented envelope shape (`result.message`, `result.msgId`) needs no
+  change and simply starts working.
+- **Root self-verification restored on standalone peers (v4.28.1).** The
+  default dht adapter's `lookup()` returned a bare id while every consumer
+  reads `r.path`, so the periodic root verify, the iterative strand-escape,
+  the empty-root probe candidates, and the leave-handoff heir fallback were
+  silent no-ops on every standalone peer (browser `connect()`, scripts, MCP).
+  A spurious or overtaken root claim now self-verifies via iterative lookup
+  and demotes/re-homes — the enabling fix for the warm-topic live-delivery
+  gap and the cold watcher-first split. New end-to-end gates:
+  `smoke_default_adapter_lookup`, `smoke_interloper_convergence`,
+  `smoke_pull_envelope`.
+- **`receiveChunkedBytes` reports chunk msgIds (v4.28.0).** The reassembled
+  file object now carries `file.msgIds` (one per chunk) so applications can
+  `kill()` chunk data once consumed.
+
 ## v4.10.1 — metrics rebuilt (+ message counter) & cohort-aware read/host paths (2026-06-30)
 
 **Testnet only; production stays on 3.x. Wire-compatible (WIRE 4.0, no flag day).**
