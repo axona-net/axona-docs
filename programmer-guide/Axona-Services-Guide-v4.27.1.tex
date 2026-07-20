@@ -187,7 +187,8 @@
 \section{Axona Services Guide}\label{axona-services-guide}
 
 \emph{(kernel 4.27.1 · testnet --- versioned with the protocol it
-describes)}
+describes; revised 2026-07-20 with an AI-agent launch procedure for the
+MCP server, §4b)}
 
 The other programmer-guide documents teach the \textbf{library} --- how
 to build your own peer with \texttt{@axona/protocol} and speak pub/sub.
@@ -732,6 +733,140 @@ Point it at testnet (or a specific bridge) with an \texttt{env} block
 \FunctionTok{\}}
 \end{Highlighting}
 \end{Shaded}
+
+\paragraph{Launching it --- a procedure for an AI
+agent}\label{launching-it-a-procedure-for-an-ai-agent}
+
+\emph{Follow these steps in order. Each has a check; do not proceed
+until the check passes. Most ``the MCP server won't start'' reports are
+step 3 (not restarting) or step 5 (aborting the slow first call) ---
+read those twice.}
+
+\textbf{1. Prerequisites (once per machine).} - Node \textbf{≥ 20}:
+\texttt{node\ -v}. (WebCrypto and the native transport need it.) - The
+\texttt{axona-relay} repository present locally, and its dependencies
+installed: \texttt{cd\ axona-relay\ \&\&\ npm\ install}. This step
+compiles/fetches the \textbf{\texttt{node-datachannel}} native WebRTC
+binary --- \emph{without it the peer cannot open a connection and every
+tool call fails}. The kernel is already vendored in the repo (no
+separate build). - Sanity-check the server file loads:
+\texttt{node\ -\/-check\ src/mcp.js} (exit 0).
+
+\textbf{2. Register the server.} The server is one command:
+\texttt{node\ \textless{}abs\textgreater{}/axona-relay/src/mcp.js}.
+Register it with the agent runtime. For Claude Code:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{claude}\NormalTok{ mcp add axona }\AttributeTok{{-}{-}}\NormalTok{ node /abs/path/to/axona{-}relay/src/mcp.js}
+\CommentTok{\# testnet instead of production:}
+\ExtensionTok{claude}\NormalTok{ mcp add axona }\AttributeTok{{-}{-}env}\NormalTok{ RELAY\_NETWORK=testnet }\AttributeTok{{-}{-}}\NormalTok{ node /abs/path/to/axona{-}relay/src/mcp.js}
+\end{Highlighting}
+\end{Shaded}
+
+or a project-scoped \texttt{.mcp.json} (the two blocks shown above).
+\textbf{Use an absolute path}, and make sure \texttt{node} is on the
+runtime's \texttt{PATH}.
+
+\textbf{3. Restart / reconnect the agent.} MCP servers are loaded
+\textbf{at client startup}. After \texttt{claude\ mcp\ add} (or editing
+\texttt{.mcp.json}) you \textbf{must restart or reconnect} the session,
+and approve the new project-scoped server once when prompted.
+\emph{Skipping this is the number-one reason the tools ``don't
+appear''.}
+
+\textbf{4. Confirm the tools are present.} After restart, the tools
+appear as \texttt{mcp\_\_axona\_\_axona\_status},
+\texttt{mcp\_\_axona\_\_axona\_publish}, etc. If they are absent, the
+server didn't load --- return to step 2/3 (path wrong, \texttt{node} not
+found, or no restart).
+
+\textbf{5. Bring the peer online --- call \texttt{axona\_status} and
+wait for it.} The persistent peer is created \textbf{lazily on the first
+tool call} and then waits for the mesh to form. \textbf{The first call
+can take several seconds, and up to \textasciitilde30 s on a cold
+network --- this is normal; let it return, do not treat the delay as a
+failure and do not spam retries} (there is one server process; retrying
+can't speed it up and only queues more work). \textbf{Definition of
+done:} \texttt{axona\_status} returns an object with a \texttt{nodeId},
+an \texttt{authorId}, and mesh health showing \textbf{at least one peer}
+(\texttt{mesh.peers\ ≥\ 1} / synaptome ≥ 1). That object \emph{is} the
+proof the server launched and joined the network. If it returns with
+\textbf{zero} peers, the mesh is still forming --- wait a few seconds
+and call \texttt{axona\_status} again.
+
+\textbf{6. Prove a round-trip (optional but recommended).}
+\texttt{axona\_publish} a message to a scratch topic, then
+\texttt{axona\_pull} the same topic + region --- you should read your
+own message back. Publisher and reader \textbf{must use the same
+\texttt{region}} (default \texttt{useast}) or they derive different
+topic IDs and never meet.
+
+\textbf{Failure modes and fixes:}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Symptom
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Cause
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Fix
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Tools never appear & server not loaded & restart the agent after
+\texttt{claude\ mcp\ add}; verify absolute path + \texttt{node} on
+PATH \\
+First call hangs \textasciitilde30 s then errors & mesh can't form
+(bridge unreachable) & check connectivity;
+\texttt{curl\ https://bridge.axona.net/healthz} (or
+\texttt{testnet.axona.net}) should return \texttt{\{"status":"ok"\}};
+then retry \\
+\texttt{TransportError:\ bridge\ socket\ closed\ before\ open} &
+transient bridge overload / admission race & \textbf{not fatal} --- wait
+a few seconds and call again \\
+Cannot find module \texttt{node-datachannel} (or similar native error) &
+\texttt{npm\ install} not run & run \texttt{npm\ install} in
+\texttt{axona-relay} \\
+\texttt{axona\_status} shows a \texttt{nodeId} a \emph{second} running
+agent also reports & two MCP processes share the durable identity file
+(\texttt{\textasciitilde{}/.axona/claude-mcp-identity.json}) → two peers
+with one nodeId collide on the network & give each agent its own
+identity: set \texttt{MCP\_AUTHOR\_PATH} to a distinct path per
+agent/project \\
+Published messages never arrive & region or network mismatch & both
+sides use the same \texttt{region}; both join the same network
+(\texttt{RELAY\_NETWORK} prod vs testnet) \\
+\end{longtable}
+}
+
+\textbf{Environment knobs} (set in the \texttt{env} block or the
+\texttt{-\/-env} flag): \texttt{RELAY\_NETWORK} (\texttt{prod} default /
+\texttt{testnet}) or \texttt{BRIDGE\_URL} (explicit, wins);
+\texttt{MCP\_REGION} (default \texttt{useast});
+\texttt{MCP\_AUTHOR\_PATH} (identity file --- override for concurrent
+agents); \texttt{MCP\_BUFFER\_CAP} (per-watch ring, default 1000).
+
+\textbf{One-line environment self-test (no agent needed).} Before wiring
+the MCP server, you can prove the machine can reach the network with the
+CLI --- same core (\texttt{src/ops.js}), same failure surface:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{node}\NormalTok{ src/cli.js pull }\StringTok{"axona:bridge{-}directory"}   \CommentTok{\# connects, returns within \textasciitilde{}30 s}
+\end{Highlighting}
+\end{Shaded}
+
+If that returns JSON, the MCP server will connect too. If it hangs or
+errors, fix connectivity first (steps 1 and the bridge \texttt{/healthz}
+check above) --- the MCP server is not the problem.
 
 \begin{quote}
 \textbf{Security boundary.} The MCP peer is a full

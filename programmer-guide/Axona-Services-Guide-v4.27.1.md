@@ -1,6 +1,7 @@
 # Axona Services Guide
 
-*(kernel 4.27.1 · testnet — versioned with the protocol it describes)*
+*(kernel 4.27.1 · testnet — versioned with the protocol it describes; revised
+2026-07-20 with an AI-agent launch procedure for the MCP server, §4b)*
 
 The other programmer-guide documents teach the **library** — how to build your
 own peer with `@axona/protocol` and speak pub/sub. This guide covers the
@@ -325,6 +326,87 @@ Point it at testnet (or a specific bridge) with an `env` block — also
   }
 }
 ```
+
+#### Launching it — a procedure for an AI agent
+
+*Follow these steps in order. Each has a check; do not proceed until the check
+passes. Most "the MCP server won't start" reports are step 3 (not restarting) or
+step 5 (aborting the slow first call) — read those twice.*
+
+**1. Prerequisites (once per machine).**
+- Node **≥ 20**: `node -v`. (WebCrypto and the native transport need it.)
+- The `axona-relay` repository present locally, and its dependencies installed:
+  `cd axona-relay && npm install`. This step compiles/fetches the
+  **`node-datachannel`** native WebRTC binary — *without it the peer cannot open
+  a connection and every tool call fails*. The kernel is already vendored in the
+  repo (no separate build).
+- Sanity-check the server file loads: `node --check src/mcp.js` (exit 0).
+
+**2. Register the server.** The server is one command: `node <abs>/axona-relay/src/mcp.js`.
+Register it with the agent runtime. For Claude Code:
+
+```bash
+claude mcp add axona -- node /abs/path/to/axona-relay/src/mcp.js
+# testnet instead of production:
+claude mcp add axona --env RELAY_NETWORK=testnet -- node /abs/path/to/axona-relay/src/mcp.js
+```
+
+or a project-scoped `.mcp.json` (the two blocks shown above). **Use an absolute
+path**, and make sure `node` is on the runtime's `PATH`.
+
+**3. Restart / reconnect the agent.** MCP servers are loaded **at client
+startup**. After `claude mcp add` (or editing `.mcp.json`) you **must restart or
+reconnect** the session, and approve the new project-scoped server once when
+prompted. *Skipping this is the number-one reason the tools "don't appear".*
+
+**4. Confirm the tools are present.** After restart, the tools appear as
+`mcp__axona__axona_status`, `mcp__axona__axona_publish`, etc. If they are absent,
+the server didn't load — return to step 2/3 (path wrong, `node` not found, or no
+restart).
+
+**5. Bring the peer online — call `axona_status` and wait for it.** The
+persistent peer is created **lazily on the first tool call** and then waits for
+the mesh to form. **The first call can take several seconds, and up to ~30 s on a
+cold network — this is normal; let it return, do not treat the delay as a failure
+and do not spam retries** (there is one server process; retrying can't speed it
+up and only queues more work). **Definition of done:** `axona_status` returns an
+object with a `nodeId`, an `authorId`, and mesh health showing **at least one
+peer** (`mesh.peers ≥ 1` / synaptome ≥ 1). That object *is* the proof the server
+launched and joined the network. If it returns with **zero** peers, the mesh is
+still forming — wait a few seconds and call `axona_status` again.
+
+**6. Prove a round-trip (optional but recommended).** `axona_publish` a message
+to a scratch topic, then `axona_pull` the same topic + region — you should read
+your own message back. Publisher and reader **must use the same `region`**
+(default `useast`) or they derive different topic IDs and never meet.
+
+**Failure modes and fixes:**
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Tools never appear | server not loaded | restart the agent after `claude mcp add`; verify absolute path + `node` on PATH |
+| First call hangs ~30 s then errors | mesh can't form (bridge unreachable) | check connectivity; `curl https://bridge.axona.net/healthz` (or `testnet.axona.net`) should return `{"status":"ok"}`; then retry |
+| `TransportError: bridge socket closed before open` | transient bridge overload / admission race | **not fatal** — wait a few seconds and call again |
+| Cannot find module `node-datachannel` (or similar native error) | `npm install` not run | run `npm install` in `axona-relay` |
+| `axona_status` shows a `nodeId` a *second* running agent also reports | two MCP processes share the durable identity file (`~/.axona/claude-mcp-identity.json`) → two peers with one nodeId collide on the network | give each agent its own identity: set `MCP_AUTHOR_PATH` to a distinct path per agent/project |
+| Published messages never arrive | region or network mismatch | both sides use the same `region`; both join the same network (`RELAY_NETWORK` prod vs testnet) |
+
+**Environment knobs** (set in the `env` block or the `--env` flag):
+`RELAY_NETWORK` (`prod` default / `testnet`) or `BRIDGE_URL` (explicit, wins);
+`MCP_REGION` (default `useast`); `MCP_AUTHOR_PATH` (identity file — override for
+concurrent agents); `MCP_BUFFER_CAP` (per-watch ring, default 1000).
+
+**One-line environment self-test (no agent needed).** Before wiring the MCP
+server, you can prove the machine can reach the network with the CLI — same core
+(`src/ops.js`), same failure surface:
+
+```bash
+node src/cli.js pull "axona:bridge-directory"   # connects, returns within ~30 s
+```
+
+If that returns JSON, the MCP server will connect too. If it hangs or errors,
+fix connectivity first (steps 1 and the bridge `/healthz` check above) — the MCP
+server is not the problem.
 
 > **Security boundary.** The MCP peer is a full publisher/subscriber/host with a
 > durable identity — treat it as a real network participant. Requests and
