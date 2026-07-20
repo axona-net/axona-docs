@@ -1,8 +1,8 @@
-# Axona AI Grounding — kernel 4.27.1
+# Axona AI Grounding — kernel 4.30.0
 
 This file is the complete, self-contained grounding for an AI system building
 an application on the Axona protocol. It matches the network it targets:
-**kernel 4.27.1 / wire 4.0, deployed on testnet (`wss://testnet.axona.net`)**.
+**kernel 4.30.0 / wire 4.0, deployed on testnet (`wss://testnet.axona.net`)**.
 Everything below is exact and current; nothing outside this file is required.
 If this version does not match the bridge you are connecting to, request the
 matching grounding file.
@@ -65,13 +65,20 @@ central server, message broker, or database.
    ephemeral and re-created each run.
 10. **Node 20+ or a browser over HTTPS.** The kernel needs Web Crypto
     (`crypto.subtle`) and ES modules. No build step, no bundler required.
+11. **An ephemeral publisher exits via `await peer.leave()`, never a bare
+    `process.exit()`.** A short-lived process (bot, script, one-shot job)
+    that publishes and dies immediately can take its message with it. Since
+    4.30.0 `leave()`'s drain holds until the published history has left the
+    node — `await peer.pub(...); await peer.leave();` is the durable
+    pattern. For a critical one-shot post, additionally confirm from an
+    INDEPENDENT fresh session (`pull(msgId)` or `sub` `since:'all'`).
 
 ---
 
 ## Install
 
 ```bash
-npm install github:axona-net/axona-protocol#v4.27.1
+npm install github:axona-net/axona-protocol#v4.30.0
 ```
 
 `package.json` must contain `"type": "module"`.
@@ -186,10 +193,15 @@ Delivery semantics an app can rely on:
 ```js
 const env  = await peer.pull(msgId, { topic });        // exact message by content hash, or null
 const last = await peer.pull(null,  { topic });        // topic's newest (may be slightly stale — served by the nearest replica ON PURPOSE)
+if (env) use(env.message);                             // pull resolves the FULL ENVELOPE — the body is env.message
 ```
 
-If the strict newest matters, subscribe instead of polling `pull(null)`.
-A successful pull extends the message's hold a little.
+`pull` resolves the same envelope shape `sub` delivers
+(`{ msgId, ts, seq, topic, message, signerPubkey?, signature? }`) or `null`.
+**Migration note:** kernels ≤ 4.28 resolved the bare body — code that uses
+the pull result directly as the payload predates 4.29 and must read
+`env.message`. If the strict newest matters, subscribe instead of polling
+`pull(null)`. A successful pull extends the message's hold a little.
 
 ## Topic activity (metrics)
 
@@ -430,11 +442,15 @@ The minimum gate before "done", in order:
   (Vite: delete `node_modules/.vite`) and restart the dev server. The
   stale-cache failure mode — the old kernel silently served under the new
   version number — has repeatedly cost real debugging time.
-- The testnet bridge is `wss://testnet.axona.net` (kernel 4.27.1, wire 4.0) —
+- The testnet bridge is `wss://testnet.axona.net` (kernel 4.30.0, wire 4.0) —
   the network this grounding targets. Production (`wss://bridge.axona.net`)
   runs the same wire-4 line, typically one release behind; the two are
   wire-compatible but SEPARATE networks (a peer joins one or the other).
 - Multiple tabs = independent peers (fine, but each is a separate node).
 
-*End of grounding. Human-oriented companions: the Axona Quick Start,
+*End of grounding (tier 1). Need the parts of the API this file doesn't
+cover — persistence, snapshots, custom transports, full error taxonomy,
+metrics aggregation, the behavioral/timing model, MCP tools? Load tier 2:
+[Axona-AI-Reference-v4.30.0.md](Axona-AI-Reference-v4.30.0.md), sectioned
+for selective loading. Human-oriented companions: the Axona Quick Start,
 Programmer Guide, and API Reference (same version).*

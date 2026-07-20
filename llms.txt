@@ -1,0 +1,41 @@
+# Axona Protocol — llms.txt
+# Serverless peer-to-peer pub/sub. Kernel 4.30.0 / wire 4.0.
+# Repo: https://github.com/axona-net/axona-docs
+
+Axona is a peer-to-peer communication substrate: topics are addresses
+derived from descriptors, messages route to an emergent per-topic root and
+fan out through a distribution tree. No central server, broker, or database.
+Authorship is an Ed25519 signature, not an account.
+
+## AI-facing documentation (start here)
+
+- Tier 1 — AI Grounding (hard rules + canonical patterns; keep in context):
+  programmer-guide/Axona-AI-Grounding-v4.30.0.md
+- Tier 2 — AI Reference (complete API surface: signatures, options, errors,
+  timing/behavioral model; sectioned for selective loading):
+  programmer-guide/Axona-AI-Reference-v4.30.0.md
+- Full corpus in one file: llms-full.txt (also llms-full.md)
+
+## The two rules that prevent 90% of generated-code failures
+
+1. A topic is a descriptor object { region?, owner?, name, write? }, never a
+   string; publisher and subscriber must use IDENTICAL fields (mismatch =
+   silent no-delivery).
+2. Every content operation takes the descriptor FIRST and names its signer:
+   pub(topic, msg, {signWith}) · kill(topic, msgId, {signWith}). There is no
+   id-only form and no default signer.
+
+## Human documentation (same version)
+
+- programmer-guide/Quick-Start-v4.27.1.md — 5-minute roundtrip
+- programmer-guide/Axona-Programmer-Guide-v4.27.1.md — mental model + recipes
+- programmer-guide/Axona-API-Reference-v4.27.1.md — every public symbol
+- programmer-guide/Axona-Services-Guide-v4.27.1.md — bridges, relays, MCP
+- whitepaper/Axona-Whitepaper.md — why this exists
+
+## Networks
+
+- testnet:    wss://testnet.axona.net       (newest kernel)
+- production: wss://bridge.axona.net (east) + wss://bridge-west.axona.net
+- GET /healthz on any bridge → { status, version, kernelVersion }
+- Install: npm install github:axona-net/axona-protocol#v4.30.0
