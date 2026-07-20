@@ -103,9 +103,10 @@ and others. They are cited throughout the whitepaper and architecture doc.
 - **[`TESTNET.md`](TESTNET.md)** — the staging-network quick reference: URLs, version matrix, running apps against the testnet bridge.
 - **[`RELEASE-NOTES.md`](RELEASE-NOTES.md)** — kernel and app changes, newest-first, keyed to kernel version.
 - **[`SECURITY-CHANGELOG.md`](SECURITY-CHANGELOG.md)** — public record of resolved security-relevant changes (what's now protected, keyed to kernel version).
+- **[`team-updates/`](team-updates/)** — the running engineering record: one dated team update per release or investigation (soak reviews, prod promotions, incident post-mortems), newest work at the highest version.
 - **[`dead-ends/`](dead-ends/)** — preserved failures kept as cautionary examples.
 - **[`history/`](history/)** — superseded versions of all documents, preserved as project-evolution context.
-- Loose notes at the repo root (`01_*.md`…`07_*.md`, team updates, diagnosis notes) — early design documents and the running engineering record.
+- Loose notes at the repo root (`01_*.md`…`07_*.md`, diagnosis notes) — early design documents and working notes.
 
 ## Repository map
 
