@@ -175,6 +175,45 @@ Throws: `TypeError` (empty name), `RangeError` (unknown region / bad owner /
 no region derivable). If derivation throws, SURFACE THE ERROR — never invent
 a fallback id (it silently diverges this client from every other peer).
 
+### §4.1 Decoding a shared topic link
+
+Because the topic ID is a **one-way** hash, a share surface can't transmit the
+id and expect a recipient to join — it must transmit the **descriptor** (the
+thing you hash), and the recipient re-derives the id locally. So a shared topic
+locator carries JSON, **not hex**. The canonical form (used by axona.chat's
+"copy link") is a base64url-encoded descriptor in a URL fragment:
+
+```
+https://axona.chat/#topic=<base64url(JSON)>
+      decodes to →  {"v":1,"r":"useast","n":"lobby"}            // open topic
+                    {"v":1,"r":"uknorth","n":"ops","w":"owner","o":"<authorId>","l":"Ops"}
+```
+
+Field map (short keys keep the URL compact; **defaults are omitted** and
+reapplied on decode): `v` schema version · `r` region · `n` name · `w` write
+(absent ⇒ `owner` if `o` present else `open`) · `o` owner author-id (owned
+topics only) · `net` network (absent ⇒ `production`) · `l` display label
+(absent ⇒ `n`). The token is **transparent and unsigned** — a locator, not a
+capability; an owned topic's `write:'owner'` policy still governs who may post.
+
+To act on it: pull the token from the URL, **JSON-decode it (do not hex-decode)**,
+reapply defaults, then hand the descriptor to `deriveTopicId` / `sub` / `pub`
+(or, over MCP, pass `region` + `name` to `axona_subscribe`).
+
+```js
+function parseTopicLink(url) {
+  const m = url.match(/[#?&]topic=([A-Za-z0-9\-_]+)/);          // hash or query
+  if (!m) return null;
+  let t = m[1].replace(/-/g, '+').replace(/_/g, '/');           // base64url → base64
+  t += '='.repeat((4 - t.length % 4) % 4);
+  const p = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(t), c => c.charCodeAt(0))));
+  return { region: p.r, name: p.n, write: p.w ?? (p.o ? 'owner' : 'open'),
+           owner: p.o, network: p.net ?? 'production', label: p.l ?? p.n };
+}
+const descriptor = parseTopicLink(link);
+await peer.sub(descriptor, handler, { since: 'all' });          // descriptor → id derived internally
+```
+
 ## §5. Publish / Subscribe
 
 ### `peer.pub(topic, message, { signWith })` → `Promise<msgId>`
