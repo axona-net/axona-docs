@@ -71,7 +71,7 @@ unchanged from 4.27.1 through the current 4.29.x production line).
 
 | PDF | What it is |
 |---|---|
-| [**Programmer Intro v0.4**](programmer-intro/Axona%20Programmer%20Intro%20v0.4.pdf) | A ~30-minute slide deck: what Axona is, how it works, the security model, the API you actually call, and a build-along of the live [Axona Minimal](https://demo.axona.net/apps/axona-minimal/) app. |
+| [**Programmer Intro v0.4**](programmer-guide/Axona%20Programmer%20Intro%20v0.4.pdf) | A ~30-minute slide deck: what Axona is, how it works, the security model, the API you actually call, and a build-along of the live [Axona Minimal](https://demo.axona.net/apps/axona-minimal/) app. |
 | [**Quick Start v4.27.1**](programmer-guide/Quick-Start-v4.27.1.pdf) | A working pub/sub roundtrip in 5 minutes: mint two identities, join the testnet, publish and subscribe. A runnable copy lives at [`programmer-guide/examples/minimal-pubsub/`](programmer-guide/examples/minimal-pubsub/). |
 | [**Programmer Guide v4.27.1**](programmer-guide/Axona-Programmer-Guide-v4.27.1.pdf) | The application-builder's book: the five ideas (peer, author, topic, publish, subscribe), then recipes — chat, feeds, presence, retraction, file sharing, DMs, metrics — plus pitfalls, errors, and limits. |
 | [**API Reference v4.27.1**](programmer-guide/Axona-API-Reference-v4.27.1.pdf) | Every public export: signature, params, returns, errors. The application surface first; transport and internals fenced off behind "you probably don't need this." |
@@ -121,8 +121,7 @@ and others. They are cited throughout the whitepaper and architecture doc.
 ├── explainer/         # Merged into the whitepaper; kept for history
 ├── architecture/      # Full-stack reference + deep-dive design notes
 ├── applications/      # Applications survey + product briefs
-├── programmer-intro/  # Programmer slide deck
-├── programmer-guide/  # Quick Start, Guide, API Ref, Services, AI docs (+ examples/)
+├── programmer-guide/  # Programmer Intro deck, Quick Start, Guide, API Ref, Services, AI docs (+ examples/)
 ├── implementation/    # Integration plans, wire spec, punchlists
 ├── red team/          # Red-team audits and analyses
 ├── reviews/           # External AI-agent reviews

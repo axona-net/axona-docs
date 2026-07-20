@@ -15,7 +15,7 @@ applies to **all** documents.
 | Architecture | `architecture/Axona-Architecture.tex` | `architecture/Axona Architecture v<X>.pdf` |
 | Applications | `applications/Axona-Applications.tex` | `applications/Axona Applications v<X>.pdf` |
 | Synopsis | `synopsis/Axona-Synopsis.tex` (tufte-handout) | `synopsis/Axona Synopsis v<X>.pdf` |
-| Programmer intro | `programmer-intro/Axona-Programmer-Intro.md` (Marp deck, Tufte theme) | `programmer-intro/Axona Programmer Intro v<X>.pdf` |
+| Programmer intro | `programmer-guide/Axona-Programmer-Intro.md` (Marp deck, Tufte theme) | `programmer-guide/Axona Programmer Intro v<X>.pdf` |
 
 A companion `.md` may exist for prose review, but **the `.tex` is authoritative**
 for the rendered PDF.
@@ -26,12 +26,12 @@ for the rendered PDF.
 > bump the in-file version; the PDF is regenerated in a follow-up render pass.
 >
 > **Marp decks** (`pitch/axona-pitch.md`, `presentation/deck.md`,
-> `programmer-intro/Axona-Programmer-Intro.md`) are slide decks with a Tufte
+> `programmer-guide/Axona-Programmer-Intro.md`) are slide decks with a Tufte
 > theme in the front-matter. Render with marp-cli + a local Chrome:
 > ```
 > CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
 >   npx -y @marp-team/marp-cli --pdf --allow-local-files \
->   programmer-intro/Axona-Programmer-Intro.md -o "programmer-intro/Axona Programmer Intro v<X>.pdf"
+>   programmer-guide/Axona-Programmer-Intro.md -o "programmer-guide/Axona Programmer Intro v<X>.pdf"
 > ```
 
 ## Figures
