@@ -16,6 +16,26 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.31.0 — 2026-07-21 (not yet deployed) — departing replicas hand off their history
+
+A gracefully departing node now safeguards every topic history it holds, not
+only the ones it serves as root. Previously a node leaving the network handed
+off only its *rooted* topics; a history copy it held as a *backup replica* was
+dropped silently — and when churn had already moved the last surviving copy of
+a message onto such a backup, that message was permanently lost even though it
+had been correctly published, confirmed, and replicated (observed in the field
+as ~10% of publishes unrecoverable after a publisher restart, immune to
+waiting or re-subscribing). PROTECTED: on departure, a non-root holder that
+cannot positively confirm the topic's root is still alive (an open link right
+now — deliberately not trusting beacons or keepalives, which stay "fresh" for
+tens of seconds after a root dies) pushes its full history to the topic's
+closest live node as a replication — union-merged if the recipient is a root,
+stored as a backup otherwise, so the history survives without minting a
+competing root. Deterministic restart-churn harness: full-timeline recovery
+82.5% → 100% (0 losses in 800 messages across 100 paired trials), live
+fan-out unchanged. Verification: `test/smoke_backup_handoff.mjs` +
+`test/diag_restart_loss.mjs`.
+
 ## Kernel v4.28.1 — 2026-07-18 (testnet) — root self-verification active on every peer
 
 Every node that claims a topic's root role now periodically verifies that claim
@@ -1708,4 +1728,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-07-18.*
+*Last updated: 2026-07-21.*
