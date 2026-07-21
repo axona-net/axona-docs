@@ -16,7 +16,27 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
-## Kernel v4.31.0 — 2026-07-21 (not yet deployed) — departing replicas hand off their history
+## Kernel v4.32.0 — 2026-07-21 (testnet) — graceful departure preserves history before announcing itself
+
+**Protected:** a publisher (or any holder) that leaves the network gracefully
+now transfers every topic history it is responsible for to a live heir — and
+receives a cryptographically-attributable acknowledgment — *before* it
+announces its departure. Previously the departure announcement went out first;
+peers proactively tore down their links to the leaver on hearing it, and the
+subsequent history transfers could no longer be delivered. Any message whose
+only copy was held by the leaver was permanently lost — silently, and
+deterministically for the same set of topics on every run. Applications
+observed this as "published and confirmed, but never receivable afterward."
+
+Also in this release: replica placement and heir selection now prefer nodes in
+the topic's own region (an out-of-region copy is durable but invisible to
+routed reads), topics with no surviving replica are handed off first when a
+departure is cut short, and a departing non-root holder can no longer cause a
+competing root to be created elsewhere.
+
+Note: v4.31.0 below shipped folded into this release rather than separately.
+
+## Kernel v4.31.0 — 2026-07-21 (folded into v4.32.0) — departing replicas hand off their history
 
 A gracefully departing node now safeguards every topic history it holds, not
 only the ones it serves as root. Previously a node leaving the network handed
