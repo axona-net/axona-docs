@@ -16,6 +16,28 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.34.0 — 2026-07-21 (testnet) — relayed connections work outside the browser
+
+**Protected:** peers running outside a browser (relays, bots, test harnesses,
+any Node process) can once again reach each other when both sit behind
+home-router NAT. Such pairs need a relay server, and the credential for it —
+a short-lived token whose user portion legitimately contains a colon — was
+being mangled by the Node WebRTC compatibility layer, which packs the
+credential into a URL and re-splits it on colons. The relay server therefore
+rejected every request, no relayed path was ever offered, and two NAT'd
+machines simply could not connect. Credentials are now encoded so they
+survive that packing; browsers are unaffected (they never take that path).
+
+Operationally this had teeth: testnet's region infrastructure fragmented
+into per-machine islands, each holding topic history only its own host could
+read — presenting as a stubborn, deterministic ~13% read-failure rate for
+whichever participant was on the wrong side. Credentials remain short-lived
+and per-session; nothing about their secrecy or lifetime changed.
+
+Known gap: relaying over TCP (for networks that block UDP entirely) is still
+unavailable — the ICE backend gathers no TCP-relayed path even against a
+server that accepts TCP. Tracked separately.
+
 ## Kernel v4.33.0 — 2026-07-21 (testnet) — reads recover past dead neighbors
 
 **Protected:** a reader arriving after nodes have died — even ungracefully —
