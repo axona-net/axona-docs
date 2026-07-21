@@ -16,6 +16,20 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.33.0 — 2026-07-21 (testnet) — reads recover past dead neighbors
+
+**Protected:** a reader arriving after nodes have died — even ungracefully —
+now recovers the topic history from the surviving replica cohort. Recovery
+probes prefer candidates the node can actually reach and rotate past
+non-responders instead of re-querying the same silent targets; and, as a
+temporary testnet-era aid, the bridge includes the authenticated identity of
+a closed connection in its departure broadcast so peers can immediately
+forget a dead node's stale routing memories. The hint grants no new removal
+power: it is ignored by any peer that can still reach the subject directly
+(a peer's own connectivity always outranks the bridge's opinion), it severs
+nothing, and ordinary peers still cannot announce departures for anyone but
+themselves.
+
 ## Kernel v4.32.0 — 2026-07-21 (testnet) — graceful departure preserves history before announcing itself
 
 **Protected:** a publisher (or any holder) that leaves the network gracefully
