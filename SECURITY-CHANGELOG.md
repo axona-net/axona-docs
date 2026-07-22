@@ -16,6 +16,45 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.37.0 — 2026-07-22 (testnet) — only a peer can retire itself
+
+**A third party can no longer force-evict a peer you hold a live connection
+with.** Axona already enforces this for a peer's own departure announcement:
+the graceful `peer-leaving` fast path evicts *only its authenticated origin*, so
+a node can announce its own exit but cannot spoof one for someone else. This
+release closes the same gap on the path the signaling bridge drives.
+
+A node retires a peer for exactly two reasons in this architecture: the peer
+authentically announces its **own** departure, or the **direct channel's own
+vitality** — the per-channel keepalive and connection-state machinery each node
+runs — reaches zero. Both are first-party signals about a relationship the node
+owns. A `peer-left` broadcast from the bridge is neither: it is a *third party*
+(the signaling bridge) asserting that **someone else** departed. It means only
+that the peer left the **bridge** — its slot was reclaimed (a bootstrap-nursery
+graduation), or a transient peer↔bridge blip — which says nothing about the
+direct, mutually-authenticated channel between two peers. Previously that
+third-party notice was wired straight into the hard eviction path: it tore the
+live channel down and purged the peer from the routing table, so a node that
+merely left the bridge while still fully meshed was force-evicted by every other
+node at the bridge's word. That made the bridge a single point of control over
+connections the peers had already established directly — the dependency the
+graceful-departure rule exists to forbid.
+
+Now a bridge `peer-left` about a peer whose channel is live is disregarded;
+whether that channel stays is decided only by its own vitality. A peer that
+truly vanished is still reaped within seconds by that machinery (or announces
+itself via `peer-leaving`); a peer that only left the bridge keeps its place in
+the mesh. Proven end-to-end over real WebRTC data channels
+(`test/integration/graduation_probe.mjs`): a fully-meshed node severs its own
+bridge link and its mesh stays completely intact, where before it collapsed to
+zero within milliseconds.
+
+This restores the load-bearing property that the mesh — not the bridge — is the
+network: the bridge can fail, reclaim a slot, or be removed entirely, and
+established peer-to-peer connectivity is unaffected.
+
+---
+
 ## Kernel v4.36.0 — 2026-07-22 (testnet) — reads recover past a degraded neighbor
 
 **Protected:** a reader now recovers the topic history even when the node
