@@ -1,7 +1,8 @@
 # Axona Services Guide
 
-*(kernel 4.27.1 · testnet — versioned with the protocol it describes; revised
-2026-07-20 with an AI-agent launch procedure for the MCP server, §4b)*
+*(kernel 4.35.0 · testnet — versioned with the protocol it describes; revised
+2026-07-22 with the one-command relay-fleet launcher and the relay update
+procedure, §3)*
 
 The other programmer-guide documents teach the **library** — how to build your
 own peer with `@axona/protocol` and speak pub/sub. This guide covers the
@@ -12,13 +13,13 @@ together, and the **PoW collector**. If you are operating an Axona deployment,
 wiring an agent into the network, or just want a topic to stay alive when no
 browser tab is open, this is the document for you.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v4.27.1)
-- **Wire version**: 4.0 (`WIRE_VERSION`); kernel version 4.27.1 (`KERNEL_VERSION`)
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v4.35.0)
+- **Wire version**: 4.0 (`WIRE_VERSION`); kernel version 4.35.0 (`KERNEL_VERSION`)
 - **Live networks**: both run the 4.x line. **Testnet** (`wss://testnet.axona.net`)
-  tracks the newest kernel — 4.27.1, the version this guide describes. The
+  tracks the newest kernel — 4.35.0, the version this guide describes. The
   **production** federated pair (`wss://bridge.axona.net` east +
   `wss://bridge-west.axona.net` west) runs the most recently promoted kernel
-  (4.21.0 at press time), typically one release behind while changes soak on
+  (4.29.0 at press time), typically one release behind while changes soak on
   testnet. The two networks are wire-compatible but *separate* — a peer joins
   one or the other; pick with `RELAY_NETWORK`/`BRIDGE_URL` (§3).
 - **Companion docs**:
@@ -195,6 +196,34 @@ claims the persistent identity (stable nodeId, `identity.<region>.json`); each
 **additional** instance mints a fresh ephemeral identity in the same region. So
 you get one well-known node plus as many throwaway nodes as you want.
 
+### Running a fleet (one command)
+
+To run several relays at once — on a fresh machine with nothing installed but
+Node 20+ and Git — use the cross-platform launcher instead of starting each by
+hand:
+
+```bash
+git clone -b testnet https://github.com/axona-net/axona-relay.git
+cd axona-relay
+npm install
+node scripts/fleet.mjs --region grizzly --count 10 --network testnet
+```
+
+The last line is the whole thing. It takes flags, not environment variables:
+
+| Flag | Meaning |
+|---|---|
+| `--region <name or code>` | Region every relay in the fleet hosts (e.g. `grizzly` or `0x80`). Default `useast`. |
+| `--count <n>` | How many relay processes to launch. Default `1`. |
+| `--network <prod or testnet>` | Which bridge to bootstrap from. Default `prod`. |
+| `--bridge <wss-url>` | Explicit bridge URL (overrides `--network`). |
+
+Each relay is its own child process with a fresh **ephemeral** transport
+identity (re-minted every start), so N relays never collide. `Ctrl-C` stops the
+whole fleet gracefully. It is pure Node — identical on Windows, macOS, and Linux
+(no bash, no global environment). On Windows this is the supported way to run a
+fleet, since the `start-fleet.sh` operator script is bash-only.
+
 ### Configuration (env)
 
 | Var | Default | Meaning |
@@ -229,6 +258,32 @@ Restart=always
 > connections** in the logs, not the raw process count. If the **desktop app**
 > (below) is also running, it carries *its own* embedded relay that respawns if
 > killed — expect one extra.
+
+### Updating a relay
+
+The kernel is **vendored** into the relay checkout (committed under
+`vendor/axona-protocol/`), so following a new testnet release is just a pull and
+a restart — no separate kernel install:
+
+```bash
+cd axona-relay
+git pull                 # brings the new relay + the vendored kernel it ships
+# then restart your relay(s):
+#   - fleet launcher:  Ctrl-C, then re-run `node scripts/fleet.mjs …`
+#   - systemd service: systemctl restart axona-relay
+```
+
+Each relay prints its versions in the startup banner —
+`axona-relay v0.67.0 [EPHEMERAL] (kernel v4.35.0)` — and the bridge reports the
+kernel it expects at `/healthz`. Keep them in step: a relay on an older kernel
+still connects and relays, but only relays on the **current** kernel take part
+in the newest behaviours (for example, cooperative bridge graduation, which a
+relay must be on kernel ≥ 4.35.0 to honour — an older relay counts against the
+bridge's connection cap but is never released to make room for a newcomer).
+
+*(Operators who vendor from a local kernel checkout re-vendor with
+`npm run sync:protocol` instead of `git pull`; end users who cloned the repo
+just pull.)*
 
 ---
 

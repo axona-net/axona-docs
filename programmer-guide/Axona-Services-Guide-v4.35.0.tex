@@ -175,7 +175,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small The Axona Services Guide \quad v4.27.1 \quad 2026-07-17\par}
+{\small The Axona Services Guide \quad v4.35.0 \quad 2026-07-22\par}
 \end{center}
 \vfill
 \null
@@ -186,9 +186,9 @@
 
 \section{Axona Services Guide}\label{axona-services-guide}
 
-\emph{(kernel 4.27.1 · testnet --- versioned with the protocol it
-describes; revised 2026-07-20 with an AI-agent launch procedure for the
-MCP server, §4b)}
+\emph{(kernel 4.35.0 · testnet --- versioned with the protocol it
+describes; revised 2026-07-22 with the one-command relay-fleet launcher
+and the relay update procedure, §3)}
 
 The other programmer-guide documents teach the \textbf{library} --- how
 to build your own peer with \texttt{@axona/protocol} and speak pub/sub.
@@ -206,17 +206,17 @@ document for you.
 \item
   \textbf{Protocol kernel}:
   \href{https://github.com/axona-net/axona-protocol}{@axona/protocol}
-  (v4.27.1)
+  (v4.35.0)
 \item
   \textbf{Wire version}: 4.0 (\texttt{WIRE\_VERSION}); kernel version
-  4.27.1 (\texttt{KERNEL\_VERSION})
+  4.35.0 (\texttt{KERNEL\_VERSION})
 \item
   \textbf{Live networks}: both run the 4.x line. \textbf{Testnet}
   (\texttt{wss://testnet.axona.net}) tracks the newest kernel ---
-  4.27.1, the version this guide describes. The \textbf{production}
+  4.35.0, the version this guide describes. The \textbf{production}
   federated pair (\texttt{wss://bridge.axona.net} east +
   \texttt{wss://bridge-west.axona.net} west) runs the most recently
-  promoted kernel (4.21.0 at press time), typically one release behind
+  promoted kernel (4.29.0 at press time), typically one release behind
   while changes soak on testnet. The two networks are wire-compatible
   but \emph{separate} --- a peer joins one or the other; pick with
   \texttt{RELAY\_NETWORK}/\texttt{BRIDGE\_URL} (§3).
@@ -514,6 +514,58 @@ Run it again in another terminal for a second node --- the
 same region. So you get one well-known node plus as many throwaway nodes
 as you want.
 
+\subsubsection{Running a fleet (one
+command)}\label{running-a-fleet-one-command}
+
+To run several relays at once --- on a fresh machine with nothing
+installed but Node 20+ and Git --- use the cross-platform launcher
+instead of starting each by hand:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{git}\NormalTok{ clone }\AttributeTok{{-}b}\NormalTok{ testnet https://github.com/axona{-}net/axona{-}relay.git}
+\BuiltInTok{cd}\NormalTok{ axona{-}relay}
+\ExtensionTok{npm}\NormalTok{ install}
+\ExtensionTok{node}\NormalTok{ scripts/fleet.mjs }\AttributeTok{{-}{-}region}\NormalTok{ grizzly }\AttributeTok{{-}{-}count}\NormalTok{ 10 }\AttributeTok{{-}{-}network}\NormalTok{ testnet}
+\end{Highlighting}
+\end{Shaded}
+
+The last line is the whole thing. It takes flags, not environment
+variables:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Flag
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Meaning
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{-\/-region\ \textless{}name\ or\ code\textgreater{}} & Region
+every relay in the fleet hosts (e.g.~\texttt{grizzly} or \texttt{0x80}).
+Default \texttt{useast}. \\
+\texttt{-\/-count\ \textless{}n\textgreater{}} & How many relay
+processes to launch. Default \texttt{1}. \\
+\texttt{-\/-network\ \textless{}prod\ or\ testnet\textgreater{}} & Which
+bridge to bootstrap from. Default \texttt{prod}. \\
+\texttt{-\/-bridge\ \textless{}wss-url\textgreater{}} & Explicit bridge
+URL (overrides \texttt{-\/-network}). \\
+\end{longtable}
+}
+
+Each relay is its own child process with a fresh \textbf{ephemeral}
+transport identity (re-minted every start), so N relays never collide.
+\texttt{Ctrl-C} stops the whole fleet gracefully. It is pure Node ---
+identical on Windows, macOS, and Linux (no bash, no global environment).
+On Windows this is the supported way to run a fleet, since the
+\texttt{start-fleet.sh} operator script is bash-only.
+
 \subsubsection{Configuration (env)}\label{configuration-env}
 
 {\def\LTcaptype{none} % do not increment counter
@@ -588,6 +640,36 @@ logs, not the raw process count. If the \textbf{desktop app} (below) is
 also running, it carries \emph{its own} embedded relay that respawns if
 killed --- expect one extra.
 \end{quote}
+
+\subsubsection{Updating a relay}\label{updating-a-relay}
+
+The kernel is \textbf{vendored} into the relay checkout (committed under
+\texttt{vendor/axona-protocol/}), so following a new testnet release is
+just a pull and a restart --- no separate kernel install:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\BuiltInTok{cd}\NormalTok{ axona{-}relay}
+\FunctionTok{git}\NormalTok{ pull                 }\CommentTok{\# brings the new relay + the vendored kernel it ships}
+\CommentTok{\# then restart your relay(s):}
+\CommentTok{\#   {-} fleet launcher:  Ctrl{-}C, then re{-}run \textasciigrave{}node scripts/fleet.mjs …\textasciigrave{}}
+\CommentTok{\#   {-} systemd service: systemctl restart axona{-}relay}
+\end{Highlighting}
+\end{Shaded}
+
+Each relay prints its versions in the startup banner ---
+\texttt{axona-relay\ v0.67.0\ {[}EPHEMERAL{]}\ (kernel\ v4.35.0)} ---
+and the bridge reports the kernel it expects at \texttt{/healthz}. Keep
+them in step: a relay on an older kernel still connects and relays, but
+only relays on the \textbf{current} kernel take part in the newest
+behaviours (for example, cooperative bridge graduation, which a relay
+must be on kernel ≥ 4.35.0 to honour --- an older relay counts against
+the bridge's connection cap but is never released to make room for a
+newcomer).
+
+\emph{(Operators who vendor from a local kernel checkout re-vendor with
+\texttt{npm\ run\ sync:protocol} instead of \texttt{git\ pull}; end
+users who cloned the repo just pull.)}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
 
