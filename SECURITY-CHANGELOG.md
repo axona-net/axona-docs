@@ -16,6 +16,35 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.35.0 / bridge 2.89.0 — 2026-07-22 (testnet) — the bridge stays a bridge
+
+**Protected:** the signaling bridge is a bootstrap and introduction point, not a
+supernode — and it now enforces that structurally. The bridge holds at most a
+bounded number of client connections (default 32). Once a newcomer would push it
+past the cap, the bridge **graduates** an established, already-meshed client:
+it closes that connection with a cooperative signal, and the client keeps its
+peer-to-peer mesh and simply stops leaning on the bridge, freeing the slot for
+whoever actually needs to bootstrap. This caps the bridge's resource footprint
+regardless of how many peers join, so a single small bridge host can seed a
+large mesh without being overwhelmed into shedding connections indiscriminately
+(which previously starved genuinely new peers of a bootstrap path).
+
+The graduation is safe by construction: a client that was **not** in fact meshed
+when released reconnects immediately (it checks its own live peer count), and a
+graduated client re-dials the bridge on its own if its mesh later thins below a
+floor — so no node can be stranded off the network. Only clients new enough to
+understand the cooperative close are ever graduated; older clients count toward
+the cap but are never force-dropped, so there is no flag day. The whole
+behaviour is off by one switch (`BRIDGE_NURSERY=off`) and the cap is tunable
+(`BRIDGE_MAX_PEERS`). Selection preserves a keyspace-diverse anchor set on the
+bridge and never removes a region's last representative.
+
+This makes the bridge's cost independent of network size — a robustness and
+availability property, keeping the introduction layer reachable for new
+participants under load rather than a resource an influx can exhaust.
+
+---
+
 ## Kernel v4.34.0 — 2026-07-21 (testnet) — relayed connections work outside the browser
 
 **Protected:** peers running outside a browser (relays, bots, test harnesses,
@@ -1784,4 +1813,4 @@ adversarial process — findings are tracked privately and hardened in batches,
 and this document is updated as each ships. Responsible-disclosure reports are
 welcome via the project maintainers.
 
-*Last updated: 2026-07-21.*
+*Last updated: 2026-07-22.*
