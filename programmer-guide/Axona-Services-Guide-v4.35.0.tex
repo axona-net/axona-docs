@@ -566,6 +566,15 @@ identical on Windows, macOS, and Linux (no bash, no global environment).
 On Windows this is the supported way to run a fleet, since the
 \texttt{start-fleet.sh} operator script is bash-only.
 
+By default the launcher shows a \textbf{live dashboard} --- one fixed
+table, one row per relay (node, state, peers, mesh, roles, subs),
+redrawn in place --- so you can watch fleet health at a glance instead
+of a wall of interleaved scrolling logs. Pass \texttt{-\/-raw} to stream
+each relay's raw log lines instead (for debugging a single relay), and
+\texttt{-\/-stagger\ \textless{}ms\textgreater{}} to change the gap
+between launches (default 600 ms; the spread keeps N simultaneous
+handshakes from overwhelming a small bridge host).
+
 \subsubsection{Configuration (env)}\label{configuration-env}
 
 {\def\LTcaptype{none} % do not increment counter

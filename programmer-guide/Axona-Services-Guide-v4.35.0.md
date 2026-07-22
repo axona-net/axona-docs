@@ -224,6 +224,14 @@ whole fleet gracefully. It is pure Node — identical on Windows, macOS, and Lin
 (no bash, no global environment). On Windows this is the supported way to run a
 fleet, since the `start-fleet.sh` operator script is bash-only.
 
+By default the launcher shows a **live dashboard** — one fixed table, one row
+per relay (node, state, peers, mesh, roles, subs), redrawn in place — so you can
+watch fleet health at a glance instead of a wall of interleaved scrolling logs.
+Pass `--raw` to stream each relay's raw log lines instead (for debugging a
+single relay), and `--stagger <ms>` to change the gap between launches (default
+600 ms; the spread keeps N simultaneous handshakes from overwhelming a small
+bridge host).
+
 ### Configuration (env)
 
 | Var | Default | Meaning |
