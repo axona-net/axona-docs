@@ -43,6 +43,16 @@ This makes the bridge's cost independent of network size — a robustness and
 availability property, keeping the introduction layer reachable for new
 participants under load rather than a resource an influx can exhaust.
 
+**Bridge 2.90.0 hardening (2026-07-22):** a live test at scale surfaced two
+weaknesses in the first cut. The "keep a diverse anchor set" selection was keyed
+on the bridge's own sequential connection id rather than the peer's keyspace
+region, so it wasn't actually diverse — it now keys on the authenticated nodeId
+region. And graduating many peers at once could thin the mesh enough that they
+re-dialled and were re-graduated, a churn loop; graduation is now paced —
+released one peer at a time, only above a hysteresis band, and never re-releasing
+the same node within a cooldown window — so scaling past the cap stays smooth
+instead of storming.
+
 ---
 
 ## Kernel v4.34.0 — 2026-07-21 (testnet) — relayed connections work outside the browser
