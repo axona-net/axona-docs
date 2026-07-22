@@ -16,6 +16,32 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.36.0 — 2026-07-22 (testnet) — reads recover past a degraded neighbor
+
+**Protected:** a reader now recovers the topic history even when the node
+XOR-closest to the topic is *alive but not serving* — overloaded, saturated, or
+stalled mid-work — rather than only when that node has died. The v4.33.0 fix
+above covers a neighbor that has *left the mesh* (routing re-terminates at a
+surviving cohort member, which serves the history). This one covers the harder
+case the earlier fix could not reach: a node that is still a mesh member and
+still the routing terminus for the topic, so every read that routes toward the
+topic terminates *at* it — yet it answers nothing. A reader farther from the
+topic than that node would wait indefinitely while the surviving replica cohort
+held the history one hop away.
+
+Now, once a subscriber has waited past the confirmation window without being
+served and is not itself the closest reachable node, it pulls the history
+**directly from the nearest reachable replicas in the cohort**, skipping the
+unresponsive closest node, and delivers it to the application. This is the read
+side of the same cohort-durability contract the write side already enforces
+(every publish is distributed to the K-closest cohort): a read no longer depends
+on any single node being healthy. The recovery holds a non-root copy only — it
+never claims to be the topic's root, so it cannot fork the topic — and it is
+bounded and rate-limited; if the primary recovers, the reader re-homes onto it
+and the recovery goes quiet. This is a robustness and availability property: it
+keeps history readable under single-node degradation, the last gap between a
+message being safely stored on the cohort and being reliably retrievable from it.
+
 ## Kernel v4.35.0 / bridge 2.89.0 — 2026-07-22 (testnet) — the bridge stays a bridge
 
 **Protected:** the signaling bridge is a bootstrap and introduction point, not a
