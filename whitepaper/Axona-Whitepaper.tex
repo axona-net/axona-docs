@@ -74,7 +74,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small Whitepaper \quad v0.8 \quad 2026-07-23\par}
+{\small Whitepaper \quad v0.9 \quad 2026-07-23\par}
 \end{center}
 \vfill
 \null\newpage
@@ -747,8 +747,9 @@ it is worth stating exactly.
 An Axona participant has two separate identities, and they are never
 interchangeable. The first is a \textbf{node identity}: a key bound to a rough
 location, which forms the participant's address in the network and manages its
-connections. It is the participant's presence on the wire. It never signs
-content. The second is an \textbf{author identity}: a bare cryptographic
+connections. It is the participant's presence on the wire, and it is
+\emph{ephemeral} --- regenerated each session, never a stable handle. It never
+signs content. The second is an \textbf{author identity}: a bare cryptographic
 signing key with no location and no address, which signs what the participant
 says and which any listener can verify. It is durable --- the same author key
 is recognized across sessions and devices --- and it is deliberately,
@@ -838,6 +839,48 @@ Recall the node address: \texttt{[8-bit region][256-bit hash of public key]}. Th
 \end{itemize}
 
 What this buys the mission: the network can let \emph{anyone} join with no gatekeeper, no account, no login server---while still guaranteeing that ``who you're talking to'' and ``who wrote this'' are real. No certificate authority, no reputation bureau; just keys and signatures, checked end to end. The cost is small and paid once: proving your key at connect time is a few thousandths of a second of math, and it never touches the speed of routing or delivery afterward.
+
+\subsection{Churn as a shield}
+
+There is a second asymmetry hiding in the first. The author identity is durable
+by design; the node identity is its opposite --- \emph{ephemeral}, minted fresh
+each time you join and discarded when you leave. Reload the page and your
+address in the network is new: a different key, a different position in the
+keyspace, a different set of neighbours. Nothing on the wire ties this session's
+presence to the last one.
+
+This runs against the usual grain of distributed systems. Where a message lives
+is decided by its \textbf{topic ID} --- a stable address derived from the
+topic's descriptor --- and the nodes responsible for a topic are simply those
+whose ephemeral addresses happen to fall closest to that ID at the moment. As
+peers join and leave, and because each arrival lands at a fresh random position,
+that responsible set is a rotating cast. You may be holding a topic on your
+machine this hour; rejoin tomorrow and your new address is elsewhere entirely
+--- near different topics, a stranger to the one you held. The topic stays
+findable, because its ID never moved; but no fixed machine is ever its home.
+
+For an adversary this is the hardest kind of target: always reachable, never in
+the same place. There is no server behind a channel to subpoena, no stable node
+behind an identity to surveil across sessions, no permanent custodian of a topic
+to coerce or knock offline --- because none of those fixed points exist to begin
+with. To follow a participant or a conversation you would have to re-locate a
+moving node \emph{and} the moving set of machines that currently hold its
+topics, continuously, as both reshuffle beneath you. This is the rare case where
+churn --- the thing every distributed system fights --- works \emph{for}
+security rather than against it. Axona already had to make its peace with churn:
+the neuromorphic routing of Idea~\#2 exists precisely to heal a network whose
+membership never stops changing, and the Slice World test measures it doing so.
+Having paid that price, the network collects a dividend it never budgeted for
+--- the same reshuffling the routing is built to survive is also, continuously,
+erasing the stationary targets that surveillance and censorship depend on.
+
+Two honest limits keep this in proportion. It is not anonymity: a local observer
+still sees the packets leaving your own connection, and --- as the mechanics
+above insist --- your \emph{authorship} is deliberately stable and public,
+because who said a thing is a fact Axona means to keep. Ephemerality protects the
+\emph{where}, not the \emph{who}. And infrastructure that wants to be found, such
+as a relay offering steady service, can choose to hold a stable identity; the
+disappearing address is the default for ordinary peers, not a law of the network.
 
 % =====================================================================
 % IX. THE THEORETICAL FLOOR

@@ -1,7 +1,7 @@
 # Axona
 ## A Free Substrate for a Society of Minds
 
-*Whitepaper · v0.8 · 2026-07-23 · David A. Smith · Axona.net*
+*Whitepaper · v0.9 · 2026-07-23 · David A. Smith · Axona.net*
 
 ---
 
@@ -291,7 +291,7 @@ A network with no boss has no central authority to vouch for anyone. So how do y
 
 Everything in the manifesto about freedom rests on one piece of engineering, so it is worth stating exactly.
 
-An Axona participant has two separate identities, and they are never interchangeable. The first is a **node identity**: a key bound to a rough location, which forms the participant's address in the network and manages its connections. It is the participant's presence on the wire. It never signs content. The second is an **author identity**: a bare cryptographic signing key with no location and no address, which signs what the participant says and which any listener can verify. It is durable — the same author key is recognized across sessions and devices — and it is deliberately, structurally disconnected from the node identity. Where you are and how you connect is one fact; who is speaking is a different fact; and the network is built so that the second cannot be derived from the first.
+An Axona participant has two separate identities, and they are never interchangeable. The first is a **node identity**: a key bound to a rough location, which forms the participant's address in the network and manages its connections. It is the participant's presence on the wire, and it is *ephemeral* — regenerated each session, never a stable handle. It never signs content. The second is an **author identity**: a bare cryptographic signing key with no location and no address, which signs what the participant says and which any listener can verify. It is durable — the same author key is recognized across sessions and devices — and it is deliberately, structurally disconnected from the node identity. Where you are and how you connect is one fact; who is speaking is a different fact; and the network is built so that the second cannot be derived from the first.
 
 This is the end-to-end argument made concrete. Identity, like encryption, is pushed to the endpoints, because only the endpoints can implement it completely and because putting it in the network would require the network to hold something it should never hold. **Authorship is a signature, not an account.**
 
@@ -306,6 +306,16 @@ Recall the node address: `[8-bit region][256-bit hash of your public key]`. That
 - **The region is the one thing you *don't* prove — on purpose.** The 8-bit prefix is a hint you choose, your "area code," so you're free to claim any region. But as §2 showed, lying about it only makes your *own* connections slower. Identity is math you can't fake; location is a hint you're free to pick.
 
 What this buys the mission: the network can let *anyone* join with no gatekeeper, no account, no login server — while still guaranteeing that "who you're talking to" and "who wrote this" are real. No certificate authority, no reputation bureau; just keys and signatures, checked end to end. (The cost is small and paid once: proving your key at connect time is a few thousandths of a second of math, and it never touches the speed of routing or delivery afterward.)
+
+### Churn as a shield
+
+There is a second asymmetry hiding in the first. The author identity is durable by design; the node identity is its opposite — *ephemeral*, minted fresh each time you join and discarded when you leave. Reload the page and your address in the network is new: a different key, a different position in the keyspace, a different set of neighbours. Nothing on the wire ties this session's presence to the last one.
+
+This runs against the usual grain of distributed systems. Where a message lives is decided by its **topic ID** — a stable address derived from the topic's descriptor — and the nodes responsible for a topic are simply those whose ephemeral addresses happen to fall closest to that ID at the moment. As peers join and leave, and because each arrival lands at a fresh random position, that responsible set is a rotating cast. You may be holding a topic on your machine this hour; rejoin tomorrow and your new address is elsewhere entirely — near different topics, a stranger to the one you held. The topic stays findable, because its ID never moved; but no fixed machine is ever its home.
+
+For an adversary this is the hardest kind of target: always reachable, never in the same place. There is no server behind a channel to subpoena, no stable node behind an identity to surveil across sessions, no permanent custodian of a topic to coerce or knock offline — because none of those fixed points exist to begin with. To follow a participant or a conversation you would have to re-locate a moving node *and* the moving set of machines that currently hold its topics, continuously, as both reshuffle beneath you. This is the rare case where churn — the thing every distributed system fights — works *for* security rather than against it. Axona already had to make its peace with churn: the neuromorphic routing of §3 exists precisely to heal a network whose membership never stops changing, and the Slice World test measures it doing so. Having paid that price, the network collects a dividend it never budgeted for — the same reshuffling the routing is built to survive is also, continuously, erasing the stationary targets that surveillance and censorship depend on.
+
+Two honest limits keep this in proportion. It is not anonymity: a local observer still sees the packets leaving your own connection, and — as the mechanics above insist — your *authorship* is deliberately stable and public, because who said a thing is a fact Axona means to keep. Ephemerality protects the *where*, not the *who*. And infrastructure that wants to be found, such as a relay offering steady service, can choose to hold a stable identity; the disappearing address is the default for ordinary peers, not a law of the network.
 
 ### A word about secrecy, stated plainly
 
