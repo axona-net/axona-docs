@@ -175,7 +175,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small The Axona Services Guide \quad v4.35.0 \quad 2026-07-22\par}
+{\small The Axona Services Guide \quad v4.38.0 \quad 2026-07-23\par}
 \end{center}
 \vfill
 \null
@@ -186,8 +186,8 @@
 
 \section{Axona Services Guide}\label{axona-services-guide}
 
-\emph{(kernel 4.35.0 · testnet --- versioned with the protocol it
-describes; revised 2026-07-22 with the one-command relay-fleet launcher
+\emph{(kernel 4.38.0 · testnet --- versioned with the protocol it
+describes; revised 2026-07-23 with the one-command relay-fleet launcher
 and the relay update procedure, §3)}
 
 The other programmer-guide documents teach the \textbf{library} --- how
@@ -206,14 +206,14 @@ document for you.
 \item
   \textbf{Protocol kernel}:
   \href{https://github.com/axona-net/axona-protocol}{@axona/protocol}
-  (v4.35.0)
+  (v4.38.0)
 \item
   \textbf{Wire version}: 4.0 (\texttt{WIRE\_VERSION}); kernel version
-  4.35.0 (\texttt{KERNEL\_VERSION})
+  4.38.0 (\texttt{KERNEL\_VERSION})
 \item
   \textbf{Live networks}: both run the 4.x line. \textbf{Testnet}
   (\texttt{wss://testnet.axona.net}) tracks the newest kernel ---
-  4.35.0, the version this guide describes. The \textbf{production}
+  4.38.0, the version this guide describes. The \textbf{production}
   federated pair (\texttt{wss://bridge.axona.net} east +
   \texttt{wss://bridge-west.axona.net} west) runs the most recently
   promoted kernel (4.29.0 at press time), typically one release behind
@@ -226,12 +226,12 @@ document for you.
   \begin{itemize}
   \tightlist
   \item
-    \href{Quick-Start-v4.27.1.md}{Quick Start} ·
-    \href{Axona-Programmer-Guide-v4.27.1.md}{Programmer Guide} ·
-    \href{Axona-API-Reference-v4.27.1.md}{API Reference} --- the
+    \href{Quick-Start-v4.38.0.md}{Quick Start} ·
+    \href{Axona-Programmer-Guide-v4.38.0.md}{Programmer Guide} ·
+    \href{Axona-API-Reference-v4.38.0.md}{API Reference} --- the
     library.
   \item
-    \href{Axona-AI-Grounding-v4.27.1.md}{AI Grounding} --- building with
+    \href{Axona-AI-Grounding-v4.30.0.md}{AI Grounding} --- building with
     an AI assistant.
   \item
     \href{../architecture/Axona-Architecture.tex}{Architecture} --- how
@@ -387,7 +387,7 @@ or, with the repo checked out:
 \BuiltInTok{cd}\NormalTok{ /opt/axona{-}bridge}
 \ExtensionTok{docker}\NormalTok{ compose build        }\CommentTok{\# builds first; the old container keeps serving}
 \ExtensionTok{docker}\NormalTok{ compose up }\AttributeTok{{-}d}        \CommentTok{\# fast swap; Caddy keeps its certificate}
-\ExtensionTok{curl}\NormalTok{ https://bridge.example.net/healthz     }\CommentTok{\# → \{"status":"ok","version":…,"kernelVersion":"4.27.1"\}}
+\ExtensionTok{curl}\NormalTok{ https://bridge.example.net/healthz     }\CommentTok{\# → \{"status":"ok","version":…,"kernelVersion":"4.38.0"\}}
 \end{Highlighting}
 \end{Shaded}
 
@@ -667,7 +667,7 @@ just a pull and a restart --- no separate kernel install:
 \end{Shaded}
 
 Each relay prints its versions in the startup banner ---
-\texttt{axona-relay\ v0.67.0\ {[}EPHEMERAL{]}\ (kernel\ v4.35.0)} ---
+\texttt{axona-relay\ v0.67.0\ {[}EPHEMERAL{]}\ (kernel\ v4.38.0)} ---
 and the bridge reports the kernel it expects at \texttt{/healthz}. Keep
 them in step: a relay on an older kernel still connects and relays, but
 only relays on the \textbf{current} kernel take part in the newest
@@ -1116,10 +1116,10 @@ same role.
 \begin{itemize}
 \tightlist
 \item
-  \textbf{\href{Axona-Programmer-Guide-v4.27.1.md}{Programmer Guide}}
+  \textbf{\href{Axona-Programmer-Guide-v4.38.0.md}{Programmer Guide}}
   --- build the peer that talks to these services.
 \item
-  \textbf{\href{Axona-API-Reference-v4.27.1.md}{API Reference}} ---
+  \textbf{\href{Axona-API-Reference-v4.38.0.md}{API Reference}} ---
   \texttt{host()} / \texttt{unhost()}, \texttt{metricTopic()}, and the
   rest of the public surface.
 \item

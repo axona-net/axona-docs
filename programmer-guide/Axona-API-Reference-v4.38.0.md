@@ -1,24 +1,24 @@
 # Axona API Reference
 
-Reference for every public symbol exported from `@axona/protocol` v4.27.1.
+Reference for every public symbol exported from `@axona/protocol` v4.38.0.
 
 Organized by what application developers reach for first (identity, peer
 lifecycle, pub/sub, direct messaging, introspection), then the
 transport/protocol surface, then low-level utilities. Every signature
-below is verified against the v4.27.1 kernel source.
+below is verified against the v4.38.0 kernel source.
 
 > **Which network?** Both live networks run the 4.x line (wire 4.0).
-> **Testnet** (`wss://testnet.axona.net`) tracks the newest kernel — v4.27.1,
+> **Testnet** (`wss://testnet.axona.net`) tracks the newest kernel — v4.38.0,
 > the version this reference describes. **Production** (`wss://bridge.axona.net`
 > east + `wss://bridge-west.axona.net` west) runs the most recently promoted
 > kernel, typically one release behind while changes soak. The API surface below
 > is identical on both; point wherever you deploy. Install
-> `github:axona-net/axona-protocol#v4.27.1`.
+> `github:axona-net/axona-protocol#v4.38.0`.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v4.27.1.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v4.27.1.md) — mental model +
+- [Quick Start](Quick-Start-v4.38.0.md) — 5-minute working roundtrip.
+- [Programmer Guide](Axona-Programmer-Guide-v4.38.0.md) — mental model +
   worked example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects.
@@ -39,7 +39,7 @@ but most apps only need the main barrel.
 > surface** (§§10–16) and **Low-level utilities** (§§17–23) exist for
 > transport authors, tooling, and the curious. Building with an AI
 > assistant? Hand it the
-> [AI Grounding](Axona-AI-Grounding-v4.27.1.md) file — the application
+> [AI Grounding](Axona-AI-Grounding-v4.30.0.md) file — the application
 > surface distilled to rules and patterns.
 
 ---
@@ -1385,7 +1385,7 @@ import { webTransport } from '@axona/protocol/transport/web/index.js';
 const transport = webTransport({
   bridgeUrl:   'wss://testnet.axona.net',  // or wss://bridge.axona.net (production)
   identity:    node,                       // from createNodeIdentity — signs the handshake
-  peerVersion: '4.27.1',                   // your app version (gated by the bridge)
+  peerVersion: '4.38.0',                   // your app version (gated by the bridge)
   reconnect:   true,
 });
 await transport.start();                  // resolves after the bridge handshake
@@ -1636,7 +1636,7 @@ introduces no keyspace skew.
 
 ```js
 WIRE_VERSION         // '4.0'      — wire format major.minor (bridges gate on this)
-KERNEL_VERSION       // '4.27.1'   — kernel semver (npm release tag)
+KERNEL_VERSION       // '4.38.0'   — kernel semver (npm release tag)
 AUTH_PROTO           // 'axona/5'  — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426       — WebSocket close code for a version mismatch
 ENVELOPE_DOMAIN      // 'axona:pubsub-envelope:v2'
@@ -1664,6 +1664,51 @@ await peer.pub({ region: 'useast', name: 'lobby' }, msg, { signWith: ANONYMOUS }
 
 *(Only relevant if you have code from an earlier kernel line. New
 readers: skip.)*
+
+### What changed in v4.28.0–v4.38.0 (2026-07-23; v4.38.0 on testnet and production)
+
+**One additive API** — `setAuthorClass` / `getAuthorClass` — everything else is
+behavioral: read-path resilience, bridge independence, and departure
+correctness, each pinned by a deterministic test and a production-shaped soak.
+Existing signatures are unchanged.
+
+- **Read-repair (v4.30.0–v4.36.0).** A read now survives a topic-closest node
+  that is reachable-but-degraded or gone: the request escalates past dead or
+  degraded holders, and a stuck subscriber repairs from the cohort. `pull(msgId)`
+  is still *exact* and pull-latest still *eventually-consistent* — you simply get
+  an answer more often under churn. No call-site change.
+- **Leave-order handoff (v4.29.0).** A departing root now hands off its history
+  *before* it announces the departure (was the reverse, which dropped the
+  hand-off). Clean `leave()`s no longer lose the tail of a topic's history.
+- **Bridge independence + vitality graduation (v4.37.0–v4.38.0).** When the
+  signaling bridge graduates an established peer to free a slot, that peer keeps
+  its WebRTC mesh instead of collapsing to zero. A third-party `peer-left` can no
+  longer evict a peer from another peer's mesh; only a peer's own authenticated
+  departure or its channel's own vitality retires it. The bridge now graduates the
+  best-meshed node it can most afford to lose. Transparent to `peer.*` callers.
+- **Signed author-class (additive, `setAuthorClass` / `getAuthorClass`).** A
+  voluntary, signed provenance claim bound to an **author** key — `'human'`,
+  `'agent'`, `'service'`, `'bridge'`, or `'relay'`. It is **not a gate**: the
+  kernel never reads it before routing, and its absence resolves to `'unstated'`,
+  never a default. Carried as a self-signed attestation on the author's owner-only
+  profile topic, so it is discoverable from an Author ID alone.
+
+  ```ts
+  peer.setAuthorClass(cls, { signWith, operator?, operatorSignWith?, label? })
+    → Promise<{ msgId, attestation }>
+  //   cls: 'human' | 'agent' | 'service' | 'bridge' | 'relay'
+  //   signWith: the AuthorIdentity to declare for and sign with.
+
+  peer.getAuthorClass(authorId, { timeoutMs = 1000 })
+    → Promise<{ class, operator, operatorVerified, label?, ts? }>
+  //   authorId: 64-hex Author ID (== signerPubkey). Pulls + verifies the
+  //   author's attestation; any missing/invalid/unparseable result is
+  //   { class: 'unstated' } — never a wrong default.
+  ```
+
+  Apps that badge or filter by human/agent should resolve via `getAuthorClass`
+  (keyed on the authenticated `signerPubkey`), not on any in-body field, and
+  render `'unstated'` normally rather than hiding it.
 
 ### What changed in v4.23.0–v4.27.1 (2026-07-17 roll; v4.27.1 promoted to production)
 

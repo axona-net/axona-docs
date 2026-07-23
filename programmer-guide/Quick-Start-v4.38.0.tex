@@ -175,7 +175,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small The Axona Quick Start \quad v4.27.1 \quad 2026-07-17\par}
+{\small The Axona Quick Start \quad v4.38.0 \quad 2026-07-23\par}
 \end{center}
 \vfill
 \null
@@ -187,7 +187,7 @@
 \section{Axona Quick Start}\label{axona-quick-start}
 
 Get a working pub/sub roundtrip in \textbf{under five minutes} on the
-current \texttt{@axona/protocol} \textbf{v4.27.1} API (kernel 4.27.1).
+current \texttt{@axona/protocol} \textbf{v4.38.0} API (kernel 4.38.0).
 One Node process connects to the live \textbf{testnet} bridge,
 subscribes to an open topic, publishes a signed message, and logs what
 comes back.
@@ -195,7 +195,7 @@ comes back.
 \begin{quote}
 \textbf{Two live networks, one line.} Both run the 4.x kernel:
 \textbf{testnet} (\texttt{wss://testnet.axona.net}) tracks the newest
-release --- 4.27.1, which this Quick Start pins --- and
+release --- 4.38.0, which this Quick Start pins --- and
 \textbf{production} (\texttt{wss://bridge.axona.net}) runs the most
 recently promoted release. This Quick Start uses testnet; swap the
 bridge URL to target production.
@@ -206,13 +206,13 @@ Companion documents:
 \begin{itemize}
 \tightlist
 \item
-  \href{Axona-Programmer-Guide-v4.27.1.md}{Programmer Guide} --- the
+  \href{Axona-Programmer-Guide-v4.38.0.md}{Programmer Guide} --- the
   five ideas + recipes for real apps.
 \item
-  \href{Axona-API-Reference-v4.27.1.md}{API Reference} --- every
+  \href{Axona-API-Reference-v4.38.0.md}{API Reference} --- every
   exported symbol.
 \item
-  \href{Axona-AI-Grounding-v4.27.1.md}{AI Grounding} --- building with
+  \href{Axona-AI-Grounding-v4.30.0.md}{AI Grounding} --- building with
   an AI assistant? Hand it this file.
 \end{itemize}
 
@@ -237,7 +237,7 @@ entry point.
 \FunctionTok{mkdir}\NormalTok{ my{-}axona{-}demo }\KeywordTok{\&\&} \BuiltInTok{cd}\NormalTok{ my{-}axona{-}demo}
 \ExtensionTok{npm}\NormalTok{ init }\AttributeTok{{-}y}
 \ExtensionTok{npm}\NormalTok{ pkg set type=module}
-\ExtensionTok{npm}\NormalTok{ install github:axona{-}net/axona{-}protocol\#v4.27.1}
+\ExtensionTok{npm}\NormalTok{ install github:axona{-}net/axona{-}protocol\#v4.38.0}
 \end{Highlighting}
 \end{Shaded}
 
@@ -329,7 +329,7 @@ Save this as \texttt{index.js} --- it mirrors how
 \ImportTok{import}\NormalTok{ \{ deriveTopicId}\OperatorTok{,}\NormalTok{ KERNEL\_VERSION \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
 \ImportTok{import}\NormalTok{ \{ connect \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol/connect.js\textquotesingle{}}\OperatorTok{;}
 
-\KeywordTok{const}\NormalTok{ BRIDGE }\OperatorTok{=} \StringTok{\textquotesingle{}wss://testnet.axona.net\textquotesingle{}}\OperatorTok{;}           \CommentTok{// live testnet bridge (kernel 4.27.1)}
+\KeywordTok{const}\NormalTok{ BRIDGE }\OperatorTok{=} \StringTok{\textquotesingle{}wss://testnet.axona.net\textquotesingle{}}\OperatorTok{;}           \CommentTok{// live testnet bridge (kernel 4.38.0)}
 \KeywordTok{const}\NormalTok{ HERE   }\OperatorTok{=}\NormalTok{ \{ }\DataTypeTok{lat}\OperatorTok{:} \FloatTok{38.0}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:} \OperatorTok{{-}}\FloatTok{77.0}\NormalTok{ \}}\OperatorTok{;}           \CommentTok{// your real location (us{-}east here)}
 \KeywordTok{const}\NormalTok{ TOPIC  }\OperatorTok{=}\NormalTok{ \{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}quick{-}start{-}demo\textquotesingle{}}\NormalTok{ \}}\OperatorTok{;}   \CommentTok{// open topic}
 
@@ -381,7 +381,7 @@ You should see the counter climb, one tick per second, until you stop it
 with \textbf{Ctrl+C}:
 
 \begin{verbatim}
-kernel v4.27.1 — connecting…
+kernel v4.38.0 — connecting…
 mesh ready (4 peers, 1200ms)
 topic id: 89a1b2c3…
 [pub ] tick #1 (msgId 8e9d4b1a30c2…)
@@ -463,8 +463,8 @@ Run against production & set
 \texttt{BRIDGE\ =\ \textquotesingle{}wss://bridge.axona.net\textquotesingle{}}
 (same 4.x line; a separate network from testnet) \\
 See the full mental model &
-\href{Axona-Programmer-Guide-v4.27.1.md}{Programmer Guide} \\
-Look up a specific symbol & \href{Axona-API-Reference-v4.27.1.md}{API
+\href{Axona-Programmer-Guide-v4.38.0.md}{Programmer Guide} \\
+Look up a specific symbol & \href{Axona-API-Reference-v4.38.0.md}{API
 Reference} \\
 \end{longtable}
 }
@@ -497,8 +497,8 @@ by your network. There is no fallback to a local process; the demo needs
 the bridge to find peers.
 
 \textbf{\texttt{UPGRADE\_REQUIRED} close code (4426)} --- a wire/version
-mismatch. The testnet bridge runs kernel 4.27.1 (wire 4.0); install
-\texttt{github:axona-net/axona-protocol\#v4.27.1}. Production runs the
+mismatch. The testnet bridge runs kernel 4.38.0 (wire 4.0); install
+\texttt{github:axona-net/axona-protocol\#v4.38.0}. Production runs the
 same wire-4 line (one release behind), so 4426 there means a genuinely
 stale pin --- upgrade to the bridge's kernel version (shown at its
 \texttt{/healthz}).

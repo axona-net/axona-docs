@@ -1,7 +1,7 @@
 # Axona Services Guide
 
-*(kernel 4.35.0 · testnet — versioned with the protocol it describes; revised
-2026-07-22 with the one-command relay-fleet launcher and the relay update
+*(kernel 4.38.0 · testnet — versioned with the protocol it describes; revised
+2026-07-23 with the one-command relay-fleet launcher and the relay update
 procedure, §3)*
 
 The other programmer-guide documents teach the **library** — how to build your
@@ -13,18 +13,18 @@ together, and the **PoW collector**. If you are operating an Axona deployment,
 wiring an agent into the network, or just want a topic to stay alive when no
 browser tab is open, this is the document for you.
 
-- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v4.35.0)
-- **Wire version**: 4.0 (`WIRE_VERSION`); kernel version 4.35.0 (`KERNEL_VERSION`)
+- **Protocol kernel**: [@axona/protocol](https://github.com/axona-net/axona-protocol) (v4.38.0)
+- **Wire version**: 4.0 (`WIRE_VERSION`); kernel version 4.38.0 (`KERNEL_VERSION`)
 - **Live networks**: both run the 4.x line. **Testnet** (`wss://testnet.axona.net`)
-  tracks the newest kernel — 4.35.0, the version this guide describes. The
+  tracks the newest kernel — 4.38.0, the version this guide describes. The
   **production** federated pair (`wss://bridge.axona.net` east +
   `wss://bridge-west.axona.net` west) runs the most recently promoted kernel
   (4.29.0 at press time), typically one release behind while changes soak on
   testnet. The two networks are wire-compatible but *separate* — a peer joins
   one or the other; pick with `RELAY_NETWORK`/`BRIDGE_URL` (§3).
 - **Companion docs**:
-  - [Quick Start](Quick-Start-v4.27.1.md) · [Programmer Guide](Axona-Programmer-Guide-v4.27.1.md) · [API Reference](Axona-API-Reference-v4.27.1.md) — the library.
-  - [AI Grounding](Axona-AI-Grounding-v4.27.1.md) — building with an AI assistant.
+  - [Quick Start](Quick-Start-v4.38.0.md) · [Programmer Guide](Axona-Programmer-Guide-v4.38.0.md) · [API Reference](Axona-API-Reference-v4.38.0.md) — the library.
+  - [AI Grounding](Axona-AI-Grounding-v4.30.0.md) — building with an AI assistant.
   - [Architecture](../architecture/Axona-Architecture.tex) — how the bridge + transport work under the hood.
 
 > **Library vs. services.** A *peer* is the unit the library gives you: an
@@ -121,7 +121,7 @@ or, with the repo checked out:
 cd /opt/axona-bridge
 docker compose build        # builds first; the old container keeps serving
 docker compose up -d        # fast swap; Caddy keeps its certificate
-curl https://bridge.example.net/healthz     # → {"status":"ok","version":…,"kernelVersion":"4.27.1"}
+curl https://bridge.example.net/healthz     # → {"status":"ok","version":…,"kernelVersion":"4.38.0"}
 ```
 
 Full provisioning options (the installer, the Docker bundle, and a manual
@@ -282,7 +282,7 @@ git pull                 # brings the new relay + the vendored kernel it ships
 ```
 
 Each relay prints its versions in the startup banner —
-`axona-relay v0.67.0 [EPHEMERAL] (kernel v4.35.0)` — and the bridge reports the
+`axona-relay v0.67.0 [EPHEMERAL] (kernel v4.38.0)` — and the bridge reports the
 kernel it expects at `/healthz`. Keep them in step: a relay on an older kernel
 still connects and relays, but only relays on the **current** kernel take part
 in the newest behaviours (for example, cooperative bridge graduation, which a
@@ -563,9 +563,9 @@ any other peer that takes on the same role.
 
 ## Where to go next
 
-- **[Programmer Guide](Axona-Programmer-Guide-v4.27.1.md)** — build the peer that
+- **[Programmer Guide](Axona-Programmer-Guide-v4.38.0.md)** — build the peer that
   talks to these services.
-- **[API Reference](Axona-API-Reference-v4.27.1.md)** — `host()` / `unhost()`,
+- **[API Reference](Axona-API-Reference-v4.38.0.md)** — `host()` / `unhost()`,
   `metricTopic()`, and the rest of the public surface.
 - **`axona-bridge/deploy/INSTALL.md`** — provision a bridge (installer, Docker,
   or manual).

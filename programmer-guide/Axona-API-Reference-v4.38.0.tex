@@ -175,7 +175,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small The Axona API Reference \quad v4.27.1 \quad 2026-07-17\par}
+{\small The Axona API Reference \quad v4.38.0 \quad 2026-07-23\par}
 \end{center}
 \vfill
 \null
@@ -187,22 +187,22 @@
 \section{Axona API Reference}\label{axona-api-reference}
 
 Reference for every public symbol exported from \texttt{@axona/protocol}
-v4.27.1.
+v4.38.0.
 
 Organized by what application developers reach for first (identity, peer
 lifecycle, pub/sub, direct messaging, introspection), then the
 transport/protocol surface, then low-level utilities. Every signature
-below is verified against the v4.27.1 kernel source.
+below is verified against the v4.38.0 kernel source.
 
 \begin{quote}
 \textbf{Which network?} Both live networks run the 4.x line (wire 4.0).
 \textbf{Testnet} (\texttt{wss://testnet.axona.net}) tracks the newest
-kernel --- v4.27.1, the version this reference describes.
+kernel --- v4.38.0, the version this reference describes.
 \textbf{Production} (\texttt{wss://bridge.axona.net} east +
 \texttt{wss://bridge-west.axona.net} west) runs the most recently
 promoted kernel, typically one release behind while changes soak. The
 API surface below is identical on both; point wherever you deploy.
-Install \texttt{github:axona-net/axona-protocol\#v4.27.1}.
+Install \texttt{github:axona-net/axona-protocol\#v4.38.0}.
 \end{quote}
 
 Companion documents:
@@ -210,10 +210,10 @@ Companion documents:
 \begin{itemize}
 \tightlist
 \item
-  \href{Quick-Start-v4.27.1.md}{Quick Start} --- 5-minute working
+  \href{Quick-Start-v4.38.0.md}{Quick Start} --- 5-minute working
   roundtrip.
 \item
-  \href{Axona-Programmer-Guide-v4.27.1.md}{Programmer Guide} --- mental
+  \href{Axona-Programmer-Guide-v4.38.0.md}{Programmer Guide} --- mental
   model + worked example + pitfalls.
 \item
   \href{../SECURITY-CHANGELOG.md}{Security changelog} --- what each
@@ -238,7 +238,7 @@ them, but most apps only need the main barrel.
 readers never need anything else. The \textbf{Transport + protocol
 surface} (§§10--16) and \textbf{Low-level utilities} (§§17--23) exist
 for transport authors, tooling, and the curious. Building with an AI
-assistant? Hand it the \href{Axona-AI-Grounding-v4.27.1.md}{AI
+assistant? Hand it the \href{Axona-AI-Grounding-v4.30.0.md}{AI
 Grounding} file --- the application surface distilled to rules and
 patterns.
 \end{quote}
@@ -2457,7 +2457,7 @@ bootstrap + signaling, plus a WebRTC mesh). Sub-path import:
 \KeywordTok{const}\NormalTok{ transport }\OperatorTok{=} \FunctionTok{webTransport}\NormalTok{(\{}
   \DataTypeTok{bridgeUrl}\OperatorTok{:}   \StringTok{\textquotesingle{}wss://testnet.axona.net\textquotesingle{}}\OperatorTok{,}  \CommentTok{// or wss://bridge.axona.net (production)}
   \DataTypeTok{identity}\OperatorTok{:}\NormalTok{    node}\OperatorTok{,}                       \CommentTok{// from createNodeIdentity — signs the handshake}
-  \DataTypeTok{peerVersion}\OperatorTok{:} \StringTok{\textquotesingle{}4.27.1\textquotesingle{}}\OperatorTok{,}                   \CommentTok{// your app version (gated by the bridge)}
+  \DataTypeTok{peerVersion}\OperatorTok{:} \StringTok{\textquotesingle{}4.38.0\textquotesingle{}}\OperatorTok{,}                   \CommentTok{// your app version (gated by the bridge)}
   \DataTypeTok{reconnect}\OperatorTok{:}   \KeywordTok{true}\OperatorTok{,}
 \NormalTok{\})}\OperatorTok{;}
 \ControlFlowTok{await}\NormalTok{ transport}\OperatorTok{.}\FunctionTok{start}\NormalTok{()}\OperatorTok{;}                  \CommentTok{// resolves after the bridge handshake}
@@ -2750,7 +2750,7 @@ address}, so raising it introduces no keyspace skew.
 \begin{Shaded}
 \begin{Highlighting}[]
 \NormalTok{WIRE\_VERSION         }\CommentTok{// \textquotesingle{}4.0\textquotesingle{}      — wire format major.minor (bridges gate on this)}
-\NormalTok{KERNEL\_VERSION       }\CommentTok{// \textquotesingle{}4.27.1\textquotesingle{}   — kernel semver (npm release tag)}
+\NormalTok{KERNEL\_VERSION       }\CommentTok{// \textquotesingle{}4.38.0\textquotesingle{}   — kernel semver (npm release tag)}
 \NormalTok{AUTH\_PROTO           }\CommentTok{// \textquotesingle{}axona/5\textquotesingle{}  — authenticated{-}identity handshake tag}
 \NormalTok{UPGRADE\_CLOSE\_CODE   }\CommentTok{// 4426       — WebSocket close code for a version mismatch}
 \NormalTok{ENVELOPE\_DOMAIN      }\CommentTok{// \textquotesingle{}axona:pubsub{-}envelope:v2\textquotesingle{}}
@@ -2783,6 +2783,75 @@ migrators}\label{appendix-version-history-for-migrators}
 
 \emph{(Only relevant if you have code from an earlier kernel line. New
 readers: skip.)}
+
+\subsubsection{What changed in v4.28.0--v4.38.0 (2026-07-23; v4.38.0 on
+testnet and
+production)}\label{what-changed-in-v4.28.0v4.38.0-2026-07-23-v4.38.0-on-testnet-and-production}
+
+\textbf{One additive API} --- \texttt{setAuthorClass} /
+\texttt{getAuthorClass} --- everything else is behavioral: read-path
+resilience, bridge independence, and departure correctness, each pinned
+by a deterministic test and a production-shaped soak. Existing
+signatures are unchanged.
+
+\begin{itemize}
+\item
+  \textbf{Read-repair (v4.30.0--v4.36.0).} A read now survives a
+  topic-closest node that is reachable-but-degraded or gone: the request
+  escalates past dead or degraded holders, and a stuck subscriber
+  repairs from the cohort. \texttt{pull(msgId)} is still \emph{exact}
+  and pull-latest still \emph{eventually-consistent} --- you simply get
+  an answer more often under churn. No call-site change.
+\item
+  \textbf{Leave-order handoff (v4.29.0).} A departing root now hands off
+  its history \emph{before} it announces the departure (was the reverse,
+  which dropped the hand-off). Clean \texttt{leave()}s no longer lose
+  the tail of a topic's history.
+\item
+  \textbf{Bridge independence + vitality graduation (v4.37.0--v4.38.0).}
+  When the signaling bridge graduates an established peer to free a
+  slot, that peer keeps its WebRTC mesh instead of collapsing to zero. A
+  third-party \texttt{peer-left} can no longer evict a peer from another
+  peer's mesh; only a peer's own authenticated departure or its
+  channel's own vitality retires it. The bridge now graduates the
+  best-meshed node it can most afford to lose. Transparent to
+  \texttt{peer.*} callers.
+\item
+  \textbf{Signed author-class (additive, \texttt{setAuthorClass} /
+  \texttt{getAuthorClass}).} A voluntary, signed provenance claim bound
+  to an \textbf{author} key ---
+  \texttt{\textquotesingle{}human\textquotesingle{}},
+  \texttt{\textquotesingle{}agent\textquotesingle{}},
+  \texttt{\textquotesingle{}service\textquotesingle{}},
+  \texttt{\textquotesingle{}bridge\textquotesingle{}}, or
+  \texttt{\textquotesingle{}relay\textquotesingle{}}. It is \textbf{not
+  a gate}: the kernel never reads it before routing, and its absence
+  resolves to \texttt{\textquotesingle{}unstated\textquotesingle{}},
+  never a default. Carried as a self-signed attestation on the author's
+  owner-only profile topic, so it is discoverable from an Author ID
+  alone.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{peer}\OperatorTok{.}\FunctionTok{setAuthorClass}\NormalTok{(cls}\OperatorTok{,}\NormalTok{ \{ signWith}\OperatorTok{,}\NormalTok{ operator}\OperatorTok{?,}\NormalTok{ operatorSignWith}\OperatorTok{?,}\NormalTok{ label}\OperatorTok{?}\NormalTok{ \})}
+\NormalTok{  → }\BuiltInTok{Promise}\OperatorTok{\textless{}}\NormalTok{\{ msgId}\OperatorTok{,}\NormalTok{ attestation \}}\OperatorTok{\textgreater{}}
+\CommentTok{//   cls: \textquotesingle{}human\textquotesingle{} | \textquotesingle{}agent\textquotesingle{} | \textquotesingle{}service\textquotesingle{} | \textquotesingle{}bridge\textquotesingle{} | \textquotesingle{}relay\textquotesingle{}}
+\CommentTok{//   signWith: the AuthorIdentity to declare for and sign with.}
+
+\NormalTok{peer}\OperatorTok{.}\FunctionTok{getAuthorClass}\NormalTok{(authorId}\OperatorTok{,}\NormalTok{ \{ timeoutMs }\OperatorTok{=} \DecValTok{1000}\NormalTok{ \})}
+\NormalTok{  → }\BuiltInTok{Promise}\OperatorTok{\textless{}}\NormalTok{\{ }\KeywordTok{class}\OperatorTok{,}\NormalTok{ operator}\OperatorTok{,}\NormalTok{ operatorVerified}\OperatorTok{,}\NormalTok{ label}\OperatorTok{?,}\NormalTok{ ts}\OperatorTok{?}\NormalTok{ \}}\OperatorTok{\textgreater{}}
+\CommentTok{//   authorId: 64{-}hex Author ID (== signerPubkey). Pulls + verifies the}
+\CommentTok{//   author\textquotesingle{}s attestation; any missing/invalid/unparseable result is}
+\CommentTok{//   \{ class: \textquotesingle{}unstated\textquotesingle{} \} — never a wrong default.}
+\end{Highlighting}
+\end{Shaded}
+
+  Apps that badge or filter by human/agent should resolve via
+  \texttt{getAuthorClass} (keyed on the authenticated
+  \texttt{signerPubkey}), not on any in-body field, and render
+  \texttt{\textquotesingle{}unstated\textquotesingle{}} normally rather
+  than hiding it.
+\end{itemize}
 
 \subsubsection{What changed in v4.23.0--v4.27.1 (2026-07-17 roll;
 v4.27.1 promoted to

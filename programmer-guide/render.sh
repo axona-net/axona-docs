@@ -12,15 +12,15 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-VERSION="v4.35.0"
-DATE="2026-07-22"
+VERSION="v4.38.0"
+DATE="2026-07-23"
 
 DOCS=(
-  "Quick-Start-$VERSION"
-  "Axona-Programmer-Guide-$VERSION"
-  "Axona-API-Reference-$VERSION"
-  "Axona-Services-Guide-$VERSION"
-  "Axona-AI-Grounding-$VERSION"
+  "Quick-Start-v4.38.0"
+  "Axona-Programmer-Guide-v4.38.0"
+  "Axona-API-Reference-v4.38.0"
+  "Axona-Services-Guide-v4.38.0"
+  "Axona-AI-Grounding-v4.30.0"
 )
 [ "$#" -gt 0 ] && DOCS=("$@")
 
