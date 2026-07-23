@@ -74,7 +74,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small Whitepaper \quad v0.9 \quad 2026-07-23\par}
+{\small Whitepaper \quad v0.10 \quad 2026-07-23\par}
 \end{center}
 \vfill
 \null\newpage
@@ -1384,6 +1384,8 @@ A network that cannot be made to take sides cannot be made to take the right sid
 either. We ask the reader to hold both halves of that sentence at once, because
 Axona does.
 
+\subsection{The Builder's Liability}
+
 We recognize the legal environment in which we are deploying this substrate.
 Recent prosecutions of developers behind decentralized tools have demonstrated
 aggressive state pursuit when those tools facilitate crime.
@@ -1528,6 +1530,26 @@ The pattern generalizes. Wherever coordination today requires renting a chokepoi
 \end{itemize}
 
 None of these requires a new protocol feature. They are the same five primitives --- signed posts, derived topics, geographic locality, bounded ephemerality, nameless keys --- rearranged.
+
+\subsection{The markets it displaces}
+
+Read the same primitives through a market lens and a total addressable market comes into focus: nearly every managed-realtime vendor sells, at bottom, the one thing Axona provides with no server in the path --- fan-out. The companion \emph{Axona Applications} note works this through vendor by vendor, with pricing and an honest account of what each tier does and does not replace; the shape of it is this:
+
+\begin{table}[h]
+\small
+\begin{tabular}{@{}p{0.42\linewidth}p{0.52\linewidth}@{}}
+\toprule
+\textsc{Incumbent market (representative vendors)} & \textsc{What Axona offers instead} \\
+\midrule
+\textbf{Managed realtime pub/sub} --- the bullseye (Pusher, Ably, PubNub, Firebase Realtime) & Server-free fan-out on derived topics: no per-message or per-connection metering, and no central relay that can throttle or cut a channel. \\
+\textbf{Anonymous broadcast} --- a capability no incumbent offers & Reach an audience without revealing which connection sent the message; the socket-bound designs of Pusher/Ably/PubNub cannot do this by construction. \\
+\textbf{IoT \& MQTT messaging} (HiveMQ, EMQX, AWS IoT Core) & Geographic routing keeps device traffic regional and low-latency, with no broker to provision or meter per connection. \\
+\textbf{Peer-assisted delivery \& collaboration} (CDN video, Liveblocks, Convex, Ably Spaces) & Endpoints relay for one another, so capacity grows with the audience instead of with a rented cluster. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+We are careful about the edges, and that companion note more so: Axona is best-effort pub/sub, not a durable exactly-once log, so it \emph{complements} rather than replaces Kafka-class streaming and push-notification delivery. What it displaces is the rented chokepoint at the center of realtime coordination; what it \emph{adds} is the anonymous, censorship-resistant fan-out no centralized vendor can structurally provide.
 
 \section{10.\quad What Goes Wrong}
 

@@ -1,7 +1,7 @@
 # Axona
 ## A Free Substrate for a Society of Minds
 
-*Whitepaper · v0.9 · 2026-07-23 · David A. Smith · Axona.net*
+*Whitepaper · v0.10 · 2026-07-23 · David A. Smith · Axona.net*
 
 ---
 
@@ -466,6 +466,8 @@ This is "architecture is politics" in its most compact form: **the location of a
 
 This relocation is the whole story, and it is why the two sections that follow are not really two stories but one. When we describe what goes right, we are describing the consequences of moving the tussle out of the network. When we describe what goes wrong, we are describing the same move, from the other side. A network that cannot be made to take sides cannot be made to take the right side either. We ask the reader to hold both halves of that sentence at once, because Axona does.
 
+### The Builder's Liability
+
 We recognize the legal environment in which we are deploying this substrate. Recent prosecutions of developers behind decentralized tools have demonstrated aggressive state pursuit when those tools facilitate crime.
 
 However, there is a fundamental distinction in the architectural layer. Axona is a neutral transport protocol, functioning analogously to TCP/IP. The transport is, by necessity and mathematical design, unable to interact with its payload. Just as the architects of the internet's foundational routing protocols are not liable for the data moving through their pipes, Axona simply moves opaque bytes between endpoints. It provides no application-layer services, operates no centralized registry, and transmits speech, not currency. We are building the foundational rails for a society of minds, firmly rooted in the established legal and architectural precedents of neutral network infrastructure.
@@ -525,6 +527,19 @@ The pattern generalizes. Wherever coordination today requires renting a chokepoi
 | **Healthcare** | An epidemiological outbreak map — anonymous, localized disease reporting | Geographic cells let health workers watch regional clusters in real time, even when national infrastructure fails |
 
 None of these requires a new protocol feature. They are the same five primitives — signed posts, derived topics, geographic locality, bounded ephemerality, nameless keys — rearranged.
+
+### The markets it displaces
+
+Read the same primitives through a market lens and a total addressable market comes into focus: nearly every managed-realtime vendor sells, at bottom, the one thing Axona provides with no server in the path — fan-out. The companion *Axona Applications* note works this through vendor by vendor, with pricing and an honest account of what each tier does and does not replace; the shape of it is this:
+
+| Incumbent market (representative vendors) | What Axona offers instead |
+|---|---|
+| **Managed realtime pub/sub** — the bullseye (Pusher, Ably, PubNub, Firebase Realtime) | Server-free fan-out on derived topics: no per-message or per-connection metering, and no central relay that can throttle or cut a channel. |
+| **Anonymous broadcast** — a capability no incumbent offers | Reach an audience without revealing which connection sent the message; the socket-bound designs of Pusher/Ably/PubNub cannot do this by construction. |
+| **IoT & MQTT messaging** (HiveMQ, EMQX, AWS IoT Core) | Geographic routing keeps device traffic regional and low-latency, with no broker to provision or meter per connection. |
+| **Peer-assisted delivery & collaboration** (CDN video, Liveblocks, Convex, Ably Spaces) | Endpoints relay for one another, so capacity grows with the audience instead of with a rented cluster. |
+
+We are careful about the edges, and that companion note more so: Axona is best-effort pub/sub, not a durable exactly-once log, so it *complements* rather than replaces Kafka-class streaming and push-notification delivery. What it displaces is the rented chokepoint at the center of realtime coordination; what it *adds* is the anonymous, censorship-resistant fan-out no centralized vendor can structurally provide.
 
 ## 10. What Goes Wrong
 
