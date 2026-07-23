@@ -1,5 +1,5 @@
 # Axona Protocol — llms.txt
-# Serverless peer-to-peer pub/sub. Kernel 4.30.0 / wire 4.0.
+# Serverless peer-to-peer pub/sub. Kernel 4.38.0 / wire 4.0.
 # Repo: https://github.com/axona-net/axona-docs
 
 Axona is a peer-to-peer communication substrate: topics are addresses
@@ -10,10 +10,10 @@ Authorship is an Ed25519 signature, not an account.
 ## AI-facing documentation (start here)
 
 - Tier 1 — AI Grounding (hard rules + canonical patterns; keep in context):
-  programmer-guide/Axona-AI-Grounding-v4.30.0.md
+  programmer-guide/Axona-AI-Grounding-v4.38.0.md
 - Tier 2 — AI Reference (complete API surface: signatures, options, errors,
   timing/behavioral model; sectioned for selective loading):
-  programmer-guide/Axona-AI-Reference-v4.30.0.md
+  programmer-guide/Axona-AI-Reference-v4.38.0.md
 - Full corpus in one file: llms-full.txt (also llms-full.md)
 
 ## The two rules that prevent 90% of generated-code failures
@@ -27,10 +27,10 @@ Authorship is an Ed25519 signature, not an account.
 
 ## Human documentation (same version)
 
-- programmer-guide/Quick-Start-v4.27.1.md — 5-minute roundtrip
-- programmer-guide/Axona-Programmer-Guide-v4.27.1.md — mental model + recipes
-- programmer-guide/Axona-API-Reference-v4.27.1.md — every public symbol
-- programmer-guide/Axona-Services-Guide-v4.27.1.md — bridges, relays, MCP
+- programmer-guide/Quick-Start-v4.38.0.md — 5-minute roundtrip
+- programmer-guide/Axona-Programmer-Guide-v4.38.0.md — mental model + recipes
+- programmer-guide/Axona-API-Reference-v4.38.0.md — every public symbol
+- programmer-guide/Axona-Services-Guide-v4.38.0.md — bridges, relays, MCP
 - whitepaper/Axona-Whitepaper.md — why this exists
 
 ## Networks
@@ -38,4 +38,4 @@ Authorship is an Ed25519 signature, not an account.
 - testnet:    wss://testnet.axona.net       (newest kernel)
 - production: wss://bridge.axona.net (east) + wss://bridge-west.axona.net
 - GET /healthz on any bridge → { status, version, kernelVersion }
-- Install: npm install github:axona-net/axona-protocol#v4.30.0
+- Install: npm install github:axona-net/axona-protocol#v4.38.0

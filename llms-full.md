@@ -1,15 +1,15 @@
-# Axona Protocol — llms-full (kernel 4.30.0)
+# Axona Protocol — llms-full (kernel 4.38.0)
 
 Complete AI-facing corpus: the Grounding file (tier 1: hard rules +
 canonical patterns) followed by the AI Reference (tier 2: full API
 surface + behavioral model). Generated from the canonical markdown in
 programmer-guide/ — do not edit here.
 
-# Axona AI Grounding — kernel 4.30.0
+# Axona AI Grounding — kernel 4.38.0
 
 This file is the complete, self-contained grounding for an AI system building
 an application on the Axona protocol. It matches the network it targets:
-**kernel 4.30.0 / wire 4.0, deployed on testnet (`wss://testnet.axona.net`)**.
+**kernel 4.38.0 / wire 4.0, deployed on testnet (`wss://testnet.axona.net`)**.
 Everything below is exact and current; nothing outside this file is required.
 If this version does not match the bridge you are connecting to, request the
 matching grounding file.
@@ -85,7 +85,7 @@ central server, message broker, or database.
 ## Install
 
 ```bash
-npm install github:axona-net/axona-protocol#v4.30.0
+npm install github:axona-net/axona-protocol#v4.38.0
 ```
 
 `package.json` must contain `"type": "module"`.
@@ -449,7 +449,7 @@ The minimum gate before "done", in order:
   (Vite: delete `node_modules/.vite`) and restart the dev server. The
   stale-cache failure mode — the old kernel silently served under the new
   version number — has repeatedly cost real debugging time.
-- The testnet bridge is `wss://testnet.axona.net` (kernel 4.30.0, wire 4.0) —
+- The testnet bridge is `wss://testnet.axona.net` (kernel 4.38.0, wire 4.0) —
   the network this grounding targets. Production (`wss://bridge.axona.net`)
   runs the same wire-4 line, typically one release behind; the two are
   wire-compatible but SEPARATE networks (a peer joins one or the other).
@@ -458,26 +458,25 @@ The minimum gate before "done", in order:
 *End of grounding (tier 1). Need the parts of the API this file doesn't
 cover — persistence, snapshots, custom transports, full error taxonomy,
 metrics aggregation, the behavioral/timing model, MCP tools? Load tier 2:
-[Axona-AI-Reference-v4.30.0.md](Axona-AI-Reference-v4.30.0.md), sectioned
+[Axona-AI-Reference-v4.38.0.md](Axona-AI-Reference-v4.38.0.md), sectioned
 for selective loading. Human-oriented companions: the Axona Quick Start,
 Programmer Guide, and API Reference (same version).*
 
-
 ---
 
-# Axona AI Reference — kernel 4.30.0
+# Axona AI Reference — kernel 4.38.0
 
 The **complete** application API surface of `@axona/protocol`, in a form built
 for an AI developer. This is tier 2 of the AI documentation pair:
 
-- **Tier 1 — [AI Grounding](Axona-AI-Grounding-v4.30.0.md)** (~440 lines):
+- **Tier 1 — [AI Grounding](Axona-AI-Grounding-v4.38.0.md)** (~440 lines):
   hard rules + canonical patterns. Keep it in context for ANY Axona work.
 - **Tier 2 — this file** (~1000 lines): every public method with signature,
   options, errors, and timing/behavioral expectations. Load the section you
   need; each section is self-contained given the Grounding file.
 
-Target network: **kernel 4.30.0 / wire 4.0**. Install
-`github:axona-net/axona-protocol#v4.30.0`. If your bridge rejects you with
+Target network: **kernel 4.38.0 / wire 4.0**. Install
+`github:axona-net/axona-protocol#v4.38.0`. If your bridge rejects you with
 close code 4426, your kernel pin and the bridge disagree — match them.
 
 Every statement here is normative and verified against the kernel source.
@@ -641,6 +640,45 @@ const r = await resolveTopic(descriptor);          // { region(code), owner, nam
 Throws: `TypeError` (empty name), `RangeError` (unknown region / bad owner /
 no region derivable). If derivation throws, SURFACE THE ERROR — never invent
 a fallback id (it silently diverges this client from every other peer).
+
+### §4.1 Decoding a shared topic link
+
+Because the topic ID is a **one-way** hash, a share surface can't transmit the
+id and expect a recipient to join — it must transmit the **descriptor** (the
+thing you hash), and the recipient re-derives the id locally. So a shared topic
+locator carries JSON, **not hex**. The canonical form (used by axona.chat's
+"copy link") is a base64url-encoded descriptor in a URL fragment:
+
+```
+https://axona.chat/#topic=<base64url(JSON)>
+      decodes to →  {"v":1,"r":"useast","n":"lobby"}            // open topic
+                    {"v":1,"r":"uknorth","n":"ops","w":"owner","o":"<authorId>","l":"Ops"}
+```
+
+Field map (short keys keep the URL compact; **defaults are omitted** and
+reapplied on decode): `v` schema version · `r` region · `n` name · `w` write
+(absent ⇒ `owner` if `o` present else `open`) · `o` owner author-id (owned
+topics only) · `net` network (absent ⇒ `production`) · `l` display label
+(absent ⇒ `n`). The token is **transparent and unsigned** — a locator, not a
+capability; an owned topic's `write:'owner'` policy still governs who may post.
+
+To act on it: pull the token from the URL, **JSON-decode it (do not hex-decode)**,
+reapply defaults, then hand the descriptor to `deriveTopicId` / `sub` / `pub`
+(or, over MCP, pass `region` + `name` to `axona_subscribe`).
+
+```js
+function parseTopicLink(url) {
+  const m = url.match(/[#?&]topic=([A-Za-z0-9\-_]+)/);          // hash or query
+  if (!m) return null;
+  let t = m[1].replace(/-/g, '+').replace(/_/g, '/');           // base64url → base64
+  t += '='.repeat((4 - t.length % 4) % 4);
+  const p = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(t), c => c.charCodeAt(0))));
+  return { region: p.r, name: p.n, write: p.w ?? (p.o ? 'owner' : 'open'),
+           owner: p.o, network: p.net ?? 'production', label: p.l ?? p.n };
+}
+const descriptor = parseTopicLink(link);
+await peer.sub(descriptor, handler, { since: 'all' });          // descriptor → id derived internally
+```
 
 ## §5. Publish / Subscribe
 
@@ -1028,13 +1066,21 @@ session, never on a pub/sub message.
 
 ## §21. Version deltas (for migrating generated code)
 
+- **4.31.0–4.38.0** — reliability hardening, all **behavioral (no API
+  change)**; generated code needs no edits across this span. Leave-order
+  handoff fix so a graceful exit never drops its cohort handoff (4.32.0);
+  read-path escalation past dead/degraded holders + bridge departure hints,
+  so a read no longer stalls on one unresponsive closest node (4.33.0);
+  stuck-subscriber cohort read-repair, so reads survive unhealthy neighbours
+  (4.36.0); bridge vitality-graduation retains the mesh when the bootstrap
+  socket closes (4.38.0, current testnet).
 - **4.30.0** — internal (Phase 8 sync engine). Behavioral: self-rooted
   publish/kill confirms only after cohort dispatch → `pub→leave()` is durable
   for ephemeral publishers (§18.4); departing nodes re-resolve heirs.
   No API change.
 - **4.29.0** — **`peer.pull` resolves the FULL Envelope** (was: bare body).
   Migrate `const body = await pull(...)` → `const env = await pull(...);
-  env.message`. Only API change in the 4.23→4.30 span.
+  env.message`. Only API change in the 4.23→4.38 span.
 - **4.28.1** — root self-verification restored on standalone peers (heal
   ≤45 s worst case; was: interloper roots could persist). Behavioral only.
 - **4.23.0–4.27.1** — canonical regions, acked leave-handoff, role natures,
@@ -1046,6 +1092,6 @@ session, never on a pub/sub message.
 
 ---
 
-*Tier 1 companion: [Axona-AI-Grounding-v4.30.0.md](Axona-AI-Grounding-v4.30.0.md)
+*Tier 1 companion: [Axona-AI-Grounding-v4.38.0.md](Axona-AI-Grounding-v4.38.0.md)
 (hard rules + canonical patterns — keep it in context). Human docs: Quick
 Start, Programmer Guide, API Reference, Services Guide (same version).*
