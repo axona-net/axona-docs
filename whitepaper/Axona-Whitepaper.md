@@ -1,7 +1,7 @@
 # Axona
 ## A Free Substrate for a Society of Minds
 
-*Whitepaper · v0.4 · 2026-07-19 · David A. Smith · Axona.net*
+*Whitepaper · v0.5 · 2026-07-23 · David A. Smith · Axona.net*
 
 ---
 
@@ -448,6 +448,10 @@ This is "architecture is politics" in its most compact form: **the location of a
 
 This relocation is the whole story, and it is why the two sections that follow are not really two stories but one. When we describe what goes right, we are describing the consequences of moving the tussle out of the network. When we describe what goes wrong, we are describing the same move, from the other side. A network that cannot be made to take sides cannot be made to take the right side either. We ask the reader to hold both halves of that sentence at once, because Axona does.
 
+We recognize the legal environment in which we are deploying this substrate. Recent prosecutions of developers behind decentralized tools have demonstrated aggressive state pursuit when those tools facilitate crime.
+
+However, there is a fundamental distinction in the architectural layer. Axona is a neutral transport protocol, functioning analogously to TCP/IP. The transport is, by necessity and mathematical design, unable to interact with its payload. Just as the architects of the internet's foundational routing protocols are not liable for the data moving through their pipes, Axona simply moves opaque bytes between endpoints. It provides no application-layer services, operates no centralized registry, and transmits speech, not currency. We are building the foundational rails for a society of minds, firmly rooted in the established legal and architectural precedents of neutral network infrastructure.
+
 ---
 
 ## 9. What Goes Right
@@ -525,6 +529,12 @@ There is a risk specific to a substrate built for machines as well as people, an
 The completion of Licklider's vision that we celebrate in the manifesto has a shadow. A gate-free coordination layer for AI systems is exactly as available to a misaligned or adversarially directed system as to an aligned one. An agent pursuing an end no person would choose can hold a durable identity, recruit other agents, form coalitions, and coordinate — and the network will carry its signed bytes without objection, because objecting was never its function. We are building this before the problem of ensuring that AI systems reliably do what people intend is solved. We think that is a reason for urgency in the surrounding work, not a reason to withhold the substrate; but an agent-coordination layer arriving ahead of alignment is a serious risk, and we present it as one.
 
 The agent-legibility feature described in §9 is a real mitigation and a partial one. It is voluntary: an agent that wishes to be legible declares itself, and an agent that does not, does not. The absence of a declaration reads as "unstated," never as "human" — the network makes no claim it cannot verify — but a mechanism that the well-behaved adopt and the ill-behaved ignore is a floor, not a wall. We offer it as what it is.
+
+### The limit of neutral routing
+
+The most severe test of a chokepoint-free network is not disinformation; it is illicit material, specifically child sexual abuse material (CSAM). A network that cannot inspect opaque, signed bytes cannot run network-side hash-matching algorithms (like PhotoDNA) to block it. This is the starkest failure mode of uncensorable publish/subscribe infrastructure.
+
+The defense cannot live in the network, so it must be built into the endpoints. Applications built on Axona (such as chat clients or feed UIs) retain the ability—and the moral obligation—to implement local, client-side filtering. An application can silently drop or refuse to render content that matches known illicit hashes. The network remains neutral, but the human-facing endpoints do not have to be.
 
 ### Sovereignty and the limits of the state
 

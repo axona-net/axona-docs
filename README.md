@@ -41,7 +41,7 @@ PDF — see [`BUILDING.md`](BUILDING.md) for the render process.
 
 | PDF | What it is |
 |---|---|
-| [**Axona Whitepaper v0.4**](whitepaper/Axona%20Whitepaper%20v0.4.pdf) | The unified document and the best single read: the Manifesto (Part I — why a network with no owner), The Machine (Part II — the full technical exposition), and The Politics (Part III — governance and consequences). Supersedes the standalone Explainer and Manifesto. |
+| [**Axona Whitepaper v0.5**](whitepaper/Axona%20Whitepaper%20v0.5.pdf) | The unified document and the best single read: the Manifesto (Part I — why a network with no owner), The Machine (Part II — the full technical exposition), and The Politics (Part III — governance and consequences). Supersedes the standalone Explainer and Manifesto. |
 | [**Axona Synopsis v0.6**](synopsis/Axona%20Synopsis%20v0.6.pdf) | A short position note: what Axona is, what is genuinely new (un-censorable assembly, ungovernable mobilization), who it is for — people and, increasingly, AI agents — and the costs of an un-censorable medium. |
 | [**Axona Pitch v0.23**](pitch/Axona%20Pitch%20v0.23.pdf) | The two-column pitch: no-owner framing, live products (axona.chat, civildefense.io), and the headline 25K-node benchmark numbers. |
 | [**Axona Manifesto**](manifesto/Axona-Manifesto.pdf) | The original manifesto as a standalone piece (now also Part I of the whitepaper): architecture is politics, at the scale of the protocol. |

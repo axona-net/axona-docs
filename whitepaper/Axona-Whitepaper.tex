@@ -74,7 +74,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small Whitepaper \quad v0.4 \quad 2026-07-19\par}
+{\small Whitepaper \quad v0.5 \quad 2026-07-23\par}
 \end{center}
 \vfill
 \null\newpage
@@ -1279,6 +1279,20 @@ A network that cannot be made to take sides cannot be made to take the right sid
 either. We ask the reader to hold both halves of that sentence at once, because
 Axona does.
 
+We recognize the legal environment in which we are deploying this substrate.
+Recent prosecutions of developers behind decentralized tools have demonstrated
+aggressive state pursuit when those tools facilitate crime.
+
+However, there is a fundamental distinction in the architectural layer. Axona is
+a neutral transport protocol, functioning analogously to TCP/IP. The transport
+is, by necessity and mathematical design, unable to interact with its payload.
+Just as the architects of the internet's foundational routing protocols are not
+liable for the data moving through their pipes, Axona simply moves opaque bytes
+between endpoints. It provides no application-layer services, operates no
+centralized registry, and transmits speech, not currency. We are building the
+foundational rails for a society of minds, firmly rooted in the established legal
+and architectural precedents of neutral network infrastructure.
+
 \section{9.\quad What Goes Right}
 
 The affirmative case for Axona is the case for what becomes possible when
@@ -1478,6 +1492,21 @@ and an agent that does not, does not. The absence of a declaration reads as
 ``unstated,'' never as ``human'' --- the network makes no claim it cannot verify
 --- but a mechanism that the well-behaved adopt and the ill-behaved ignore is a
 floor, not a wall. We offer it as what it is.
+
+\subsection{The limit of neutral routing}
+
+The most severe test of a chokepoint-free network is not disinformation; it is
+illicit material, specifically child sexual abuse material (CSAM). A network that
+cannot inspect opaque, signed bytes cannot run network-side hash-matching
+algorithms (like PhotoDNA) to block it. This is the starkest failure mode of
+uncensorable publish/subscribe infrastructure.
+
+The defense cannot live in the network, so it must be built into the endpoints.
+Applications built on Axona (such as chat clients or feed UIs) retain the
+ability---and the moral obligation---to implement local, client-side filtering.
+An application can silently drop or refuse to render content that matches known
+illicit hashes. The network remains neutral, but the human-facing endpoints do
+not have to be.
 
 \subsection{Sovereignty and the limits of the state}
 
