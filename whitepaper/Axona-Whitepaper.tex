@@ -74,7 +74,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small Whitepaper \quad v0.5 \quad 2026-07-23\par}
+{\small Whitepaper \quad v0.6 \quad 2026-07-23\par}
 \end{center}
 \vfill
 \null\newpage
@@ -109,8 +109,8 @@ enter at any point. Technical reader: Part~II is for you. Skeptical reader: \S10
 (\emph{What Goes Wrong}) and \emph{What Axona Is Not} are where the costs are counted. A glossary sits at the end.}
 
 Axona is both problems falling together: a communication network with no
-owner --- no company, no server, no place in the middle, because there is
-nowhere for one to be --- running in production today on ordinary
+owner --- no company, no server, no place in the middle --- running in
+production today on ordinary
 phones, browsers, and laptops, at the theoretical floor of what physics
 permits. Three ideas make it fast where
 every predecessor was slow. \textbf{Location-aware addresses} keep local
@@ -120,11 +120,16 @@ fade, the brain's own rule for wiring neurons --- lets the network learn
 shortcuts and heal around failures. And \textbf{self-repairing broadcast
 trees} let one voice reach many with no coordinating server.
 
-The keystone is a single design choice: \textbf{authorship is a signature,
-not an account.} Who is speaking is a key the speaker holds; where they
-connect from is a separate fact the network never links to it. The network moves signed bytes between endpoints and does
-nothing else --- it cannot rank what you say, suppress it, or reveal who
-you are, because it was never told and never needed to know.
+The keystone is one old principle applied without exception: the
+\textbf{end-to-end argument} --- that a network's meaningful functions
+belong at its edges, not in its middle (Saltzer, Reed, and Clark, 1984).
+Follow it all the way down and you reach a single design choice:
+\textbf{authorship is a signature, not an account.} Who is speaking is a
+key the speaker holds; where they connect from is a separate fact the
+network never links to it. The network moves signed bytes between endpoints
+and does nothing else --- it cannot rank what you say, suppress it, or
+reveal who you are, because identity, like reliability and confidentiality
+before it, lives only at the ends.
 
 That one property is the source of everything Axona makes possible and
 everything it makes dangerous --- the same property seen from two sides.
@@ -136,16 +141,13 @@ peers --- and a \emph{misaligned} agent the same place on the same terms.
 the right side either.}
 
 We think it is worth building anyway --- for the same reason humanity kept
-fire and built hearths and fire brigades rather than giving it back. But
-the answer is not a central authority --- that only rebuilds the
-intermediary we abolished. The answer is \textbf{sight and stewardship}: making the
-network's life visible, and building human institutions --- accountable,
-bounded, resistant to capture --- that respond to what they see without
-seizing the thing itself. The network is built; the harder, human problem
-remains --- the reason for this document, whose spine is Mitchell Kapor's
-observation extended:
-\textbf{architecture is politics}, at the scale of the protocol, its
-applications, and the social structures it makes possible.
+fire rather than giving it back: not a central authority to control it,
+which only rebuilds the intermediary we abolished, but \textbf{sight and
+stewardship} --- making the network's life visible, and building
+accountable, capture-resistant institutions that respond to what they see
+without seizing the thing itself. The network is built; the harder, human problem remains --- the
+reason for this document, whose spine is Mitchell Kapor's observation
+extended: \textbf{architecture is politics}, at every scale.
 
 \newpage
 \manpart{Part I \;\textbullet\; Manifesto}
@@ -171,6 +173,20 @@ correspondent's: a platform, a carrier, a cloud. Usually that intermediary is
 benign. Sometimes it is not. But the arrangement itself --- that a third party
 stands in the path of every conversation and could intervene --- is the thing
 we set out to make impossible rather than merely impolite.
+
+A generation ago, someone made almost this claim and was mocked for it. In
+1996, from Davos, John Perry Barlow addressed \emph{A Declaration of the
+Independence of Cyberspace} to the governments of the world: ``you weary
+giants of flesh and steel,'' he wrote, ``you have no sovereignty where we
+gather.'' He was wrong about the internet he was standing on --- a network
+already thick with the servers, registries, and carriers that states and
+companies would spend the next thirty years learning to seize. A declaration
+cannot make a chokepoint vanish; only a different architecture can. Where
+Barlow \emph{proclaimed} independence, Axona attempts the humbler and harder
+thing: to \emph{build} the substrate on which a bounded version of it is
+simply true --- no one in the path to petition or to capture --- and then,
+unlike the Declaration, to count in the same breath what such a place costs
+as well as what it frees.
 
 \subsection{The principle we did not invent}
 
@@ -1998,6 +2014,11 @@ throughout rather than cited in isolation:
 \item[Kapor] ``Architecture is politics'' --- the aphorism, from the early
 days of the Electronic Frontier Foundation, that Part~I extends across
 scales: the structure of a system is the allocation of power within it.
+\item[Barlow (1996)] \emph{A Declaration of the Independence of Cyberspace}
+(Davos), https://www.eff.org/cyberspace-independence. The aspiration --- a
+network with no sovereign in its path --- that Axona attempts to make real in
+architecture rather than proclamation, while, unlike the Declaration,
+counting the costs of such a place.
 \item[Saltzer, Reed \& Clark (1984)] ``End-to-End Arguments in System Design,''
 \emph{ACM TOCS} 2(4): 277--288. The principle that functions belong at the
 endpoints, from which Axona's refusal to place identity, trust, confidentiality, or
