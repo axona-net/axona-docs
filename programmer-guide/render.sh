@@ -20,7 +20,7 @@ DOCS=(
   "Axona-Programmer-Guide-v4.38.0"
   "Axona-API-Reference-v4.38.0"
   "Axona-Services-Guide-v4.38.0"
-  "Axona-AI-Grounding-v4.30.0"
+  "Axona-AI-Grounding-v4.38.0"
 )
 [ "$#" -gt 0 ] && DOCS=("$@")
 

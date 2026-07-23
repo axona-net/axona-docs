@@ -1,8 +1,8 @@
-# Axona AI Grounding — kernel 4.30.0
+# Axona AI Grounding — kernel 4.38.0
 
 This file is the complete, self-contained grounding for an AI system building
 an application on the Axona protocol. It matches the network it targets:
-**kernel 4.30.0 / wire 4.0, deployed on testnet (`wss://testnet.axona.net`)**.
+**kernel 4.38.0 / wire 4.0, deployed on testnet (`wss://testnet.axona.net`)**.
 Everything below is exact and current; nothing outside this file is required.
 If this version does not match the bridge you are connecting to, request the
 matching grounding file.
@@ -78,7 +78,7 @@ central server, message broker, or database.
 ## Install
 
 ```bash
-npm install github:axona-net/axona-protocol#v4.30.0
+npm install github:axona-net/axona-protocol#v4.38.0
 ```
 
 `package.json` must contain `"type": "module"`.
@@ -442,7 +442,7 @@ The minimum gate before "done", in order:
   (Vite: delete `node_modules/.vite`) and restart the dev server. The
   stale-cache failure mode — the old kernel silently served under the new
   version number — has repeatedly cost real debugging time.
-- The testnet bridge is `wss://testnet.axona.net` (kernel 4.30.0, wire 4.0) —
+- The testnet bridge is `wss://testnet.axona.net` (kernel 4.38.0, wire 4.0) —
   the network this grounding targets. Production (`wss://bridge.axona.net`)
   runs the same wire-4 line, typically one release behind; the two are
   wire-compatible but SEPARATE networks (a peer joins one or the other).
@@ -451,6 +451,6 @@ The minimum gate before "done", in order:
 *End of grounding (tier 1). Need the parts of the API this file doesn't
 cover — persistence, snapshots, custom transports, full error taxonomy,
 metrics aggregation, the behavioral/timing model, MCP tools? Load tier 2:
-[Axona-AI-Reference-v4.30.0.md](Axona-AI-Reference-v4.30.0.md), sectioned
+[Axona-AI-Reference-v4.38.0.md](Axona-AI-Reference-v4.38.0.md), sectioned
 for selective loading. Human-oriented companions: the Axona Quick Start,
 Programmer Guide, and API Reference (same version).*

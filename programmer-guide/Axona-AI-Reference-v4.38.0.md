@@ -1,16 +1,16 @@
-# Axona AI Reference — kernel 4.30.0
+# Axona AI Reference — kernel 4.38.0
 
 The **complete** application API surface of `@axona/protocol`, in a form built
 for an AI developer. This is tier 2 of the AI documentation pair:
 
-- **Tier 1 — [AI Grounding](Axona-AI-Grounding-v4.30.0.md)** (~440 lines):
+- **Tier 1 — [AI Grounding](Axona-AI-Grounding-v4.38.0.md)** (~440 lines):
   hard rules + canonical patterns. Keep it in context for ANY Axona work.
 - **Tier 2 — this file** (~1000 lines): every public method with signature,
   options, errors, and timing/behavioral expectations. Load the section you
   need; each section is self-contained given the Grounding file.
 
-Target network: **kernel 4.30.0 / wire 4.0**. Install
-`github:axona-net/axona-protocol#v4.30.0`. If your bridge rejects you with
+Target network: **kernel 4.38.0 / wire 4.0**. Install
+`github:axona-net/axona-protocol#v4.38.0`. If your bridge rejects you with
 close code 4426, your kernel pin and the bridge disagree — match them.
 
 Every statement here is normative and verified against the kernel source.
@@ -600,13 +600,21 @@ session, never on a pub/sub message.
 
 ## §21. Version deltas (for migrating generated code)
 
+- **4.31.0–4.38.0** — reliability hardening, all **behavioral (no API
+  change)**; generated code needs no edits across this span. Leave-order
+  handoff fix so a graceful exit never drops its cohort handoff (4.32.0);
+  read-path escalation past dead/degraded holders + bridge departure hints,
+  so a read no longer stalls on one unresponsive closest node (4.33.0);
+  stuck-subscriber cohort read-repair, so reads survive unhealthy neighbours
+  (4.36.0); bridge vitality-graduation retains the mesh when the bootstrap
+  socket closes (4.38.0, current testnet).
 - **4.30.0** — internal (Phase 8 sync engine). Behavioral: self-rooted
   publish/kill confirms only after cohort dispatch → `pub→leave()` is durable
   for ephemeral publishers (§18.4); departing nodes re-resolve heirs.
   No API change.
 - **4.29.0** — **`peer.pull` resolves the FULL Envelope** (was: bare body).
   Migrate `const body = await pull(...)` → `const env = await pull(...);
-  env.message`. Only API change in the 4.23→4.30 span.
+  env.message`. Only API change in the 4.23→4.38 span.
 - **4.28.1** — root self-verification restored on standalone peers (heal
   ≤45 s worst case; was: interloper roots could persist). Behavioral only.
 - **4.23.0–4.27.1** — canonical regions, acked leave-handoff, role natures,
@@ -618,6 +626,6 @@ session, never on a pub/sub message.
 
 ---
 
-*Tier 1 companion: [Axona-AI-Grounding-v4.30.0.md](Axona-AI-Grounding-v4.30.0.md)
+*Tier 1 companion: [Axona-AI-Grounding-v4.38.0.md](Axona-AI-Grounding-v4.38.0.md)
 (hard rules + canonical patterns — keep it in context). Human docs: Quick
 Start, Programmer Guide, API Reference, Services Guide (same version).*

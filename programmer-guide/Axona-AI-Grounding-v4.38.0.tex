@@ -175,7 +175,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small The Axona AI Grounding \quad v4.30.0 \quad 2026-07-17\par}
+{\small The Axona AI Grounding \quad v4.38.0 \quad 2026-07-23\par}
 \end{center}
 \vfill
 \null
@@ -185,11 +185,11 @@
 \setcounter{page}{1}
 
 \section{Axona AI Grounding --- kernel
-4.30.0}\label{axona-ai-grounding-kernel-4.30.0}
+4.38.0}\label{axona-ai-grounding-kernel-4.38.0}
 
 This file is the complete, self-contained grounding for an AI system
 building an application on the Axona protocol. It matches the network it
-targets: \textbf{kernel 4.30.0 / wire 4.0, deployed on testnet
+targets: \textbf{kernel 4.38.0 / wire 4.0, deployed on testnet
 (\texttt{wss://testnet.axona.net})}. Everything below is exact and
 current; nothing outside this file is required. If this version does not
 match the bridge you are connecting to, request the matching grounding
@@ -277,15 +277,15 @@ errors}\label{hard-rules-violations-cause-silent-failure-or-thrown-errors}
   (\texttt{crypto.subtle}) and ES modules. No build step, no bundler
   required.
 \item
-  \textbf{An ephemeral publisher exits via \texttt{await peer.leave()},
+  \textbf{An ephemeral publisher exits via \texttt{await\ peer.leave()},
   never a bare \texttt{process.exit()}.} A short-lived process (bot,
   script, one-shot job) that publishes and dies immediately can take its
   message with it. Since 4.30.0 \texttt{leave()}'s drain holds until the
-  published history has left the node —
-  \texttt{await peer.pub(...); await peer.leave();} is the durable
+  published history has left the node ---
+  \texttt{await\ peer.pub(...);\ await\ peer.leave();} is the durable
   pattern. For a critical one-shot post, additionally confirm from an
   INDEPENDENT fresh session (\texttt{pull(msgId)} or \texttt{sub}
-  \texttt{since:'all'}).
+  \texttt{since:\textquotesingle{}all\textquotesingle{}}).
 \end{enumerate}
 
 \begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
@@ -294,7 +294,7 @@ errors}\label{hard-rules-violations-cause-silent-failure-or-thrown-errors}
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\ExtensionTok{npm}\NormalTok{ install github:axona{-}net/axona{-}protocol\#v4.30.0}
+\ExtensionTok{npm}\NormalTok{ install github:axona{-}net/axona{-}protocol\#v4.38.0}
 \end{Highlighting}
 \end{Shaded}
 
@@ -460,17 +460,17 @@ retry.
 \begin{Highlighting}[]
 \KeywordTok{const}\NormalTok{ env  }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{pull}\NormalTok{(msgId}\OperatorTok{,}\NormalTok{ \{ topic \})}\OperatorTok{;}        \CommentTok{// exact message by content hash, or null}
 \KeywordTok{const}\NormalTok{ last }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{pull}\NormalTok{(}\KeywordTok{null}\OperatorTok{,}\NormalTok{  \{ topic \})}\OperatorTok{;}        \CommentTok{// topic\textquotesingle{}s newest (may be slightly stale — served by the nearest replica ON PURPOSE)}
+\ControlFlowTok{if}\NormalTok{ (env) }\FunctionTok{use}\NormalTok{(env}\OperatorTok{.}\AttributeTok{message}\NormalTok{)}\OperatorTok{;}                             \CommentTok{// pull resolves the FULL ENVELOPE — the body is env.message}
 \end{Highlighting}
 \end{Shaded}
 
 \texttt{pull} resolves the same envelope shape \texttt{sub} delivers
-(\texttt{\{ msgId, ts, seq, topic, message, signerPubkey?, signature? \}})
-or \texttt{null} — the body is \texttt{env.message}. \textbf{Migration
-note:} kernels $\le$ 4.28 resolved the bare body; code using the pull
-result directly as the payload predates 4.29 and must read
-\texttt{env.message}. If the strict newest matters, subscribe instead of
-polling \texttt{pull(null)}. A successful pull extends the message's hold
-a little.
+(\texttt{\{\ msgId,\ ts,\ seq,\ topic,\ message,\ signerPubkey?,\ signature?\ \}})
+or \texttt{null}. \textbf{Migration note:} kernels ≤ 4.28 resolved the
+bare body --- code that uses the pull result directly as the payload
+predates 4.29 and must read \texttt{env.message}. If the strict newest
+matters, subscribe instead of polling \texttt{pull(null)}. A successful
+pull extends the message's hold a little.
 
 \subsection{Topic activity (metrics)}\label{topic-activity-metrics}
 
@@ -851,7 +851,7 @@ order:
   served under the new version number --- has repeatedly cost real
   debugging time.
 \item
-  The testnet bridge is \texttt{wss://testnet.axona.net} (kernel 4.30.0,
+  The testnet bridge is \texttt{wss://testnet.axona.net} (kernel 4.38.0,
   wire 4.0) --- the network this grounding targets. Production
   (\texttt{wss://bridge.axona.net}) runs the same wire-4 line, typically
   one release behind; the two are wire-compatible but SEPARATE networks
@@ -861,10 +861,10 @@ order:
 \end{itemize}
 
 \emph{End of grounding (tier 1). Need the parts of the API this file
-doesn't cover — persistence, snapshots, custom transports, the full error
+doesn't cover --- persistence, snapshots, custom transports, full error
 taxonomy, metrics aggregation, the behavioral/timing model, MCP tools?
-Load tier 2: Axona-AI-Reference-v4.30.0.md, sectioned for selective
-loading. Human-oriented companions: the Axona Quick Start, Programmer
-Guide, and API Reference (same version).}
+Load tier 2: \url{Axona-AI-Reference-v4.38.0.md}, sectioned for
+selective loading. Human-oriented companions: the Axona Quick Start,
+Programmer Guide, and API Reference (same version).}
 
 \end{document}
