@@ -16,6 +16,27 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.39.0 — 2026-07-23 (testnet) — availability: every node self-integrates on bootstrap
+
+**A node now weaves itself into the mesh on every bootstrap path, so it cannot
+silently sit unreachable at the passive-adoption floor.** Reachability *to* a
+node lives in its neighbours' routing tables, not its own; a freshly-connected
+node must proactively discover its neighbourhood (`findKClosest(ownId)`) and open
+authenticated channels so those neighbours adopt it. That self-integration
+already existed but only ran on `join(sponsor)` — the two one-call bootstrap
+paths applications actually use (`connect()` and no-sponsor `join()`) skipped it.
+A node that never self-integrates is reachable only from whoever dialed it, and
+in a sparse/relay-poor region self-roots its topics as sole copies — an
+availability failure for pub/sub (fresh subscribers read nothing). Both bootstrap
+paths now self-integrate by default.
+
+This is enforced entirely peer-to-peer: self-integration is `findKClosest` over
+the mesh, and the signaling bridge remains **transport-only** — never a routing
+hop and never a topic root, child, replica, or handoff heir. No central
+introducer, directory, or authority is added or relied upon.
+
+---
+
 ## Kernel v4.37.0 — 2026-07-22 (testnet) — only a peer can retire itself
 
 **A third party can no longer force-evict a peer you hold a live connection
