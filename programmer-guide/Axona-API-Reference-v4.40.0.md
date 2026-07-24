@@ -842,8 +842,9 @@ roots reported.
                                //   emitted on the topic (kills included) — max across cohort
   subscribers:   number;       // topic-wide subscriber total — summed across the cohort
   bytes:         number;       // live cached envelope bytes — max across cohort
-  publishes:     number;       // RESERVED — no root currently emits this field, so it is ALWAYS 0.
-                               //   Use `seq` / `current_count` for volume, not this.
+  publishes:     number;       // (v4.41.0) advisory throughput: distinct messages ever cached at this
+                               //   root (real messages, NOT kills); monotonic, maxed across the cohort.
+                               //   On a peer/root running <4.41.0 this is still 0.
   ts:            number|null;  // freshest snapshot timestamp
   signer:        string|null;  // the freshest snapshot envelope's signerPubkey (provenance)
   cohortSize:    number;       // # of distinct roots that reported a snapshot

@@ -1653,7 +1653,7 @@ snapshots; default \texttt{1500}. \\
                                \CommentTok{//   emitted on the topic (kills included) — max across cohort}
 \NormalTok{  subscribers}\OperatorTok{:}   \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// topic{-}wide subscriber total — summed across the cohort}
 \NormalTok{  bytes}\OperatorTok{:}         \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// live cached envelope bytes — max across cohort}
-\NormalTok{  publishes}\OperatorTok{:}     \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// RESERVED — no root emits this; ALWAYS 0. Use seq/current\_count for volume.}
+\NormalTok{  publishes}\OperatorTok{:}     \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// (v4.41.0) advisory throughput: distinct messages ever cached (excl. kills); maxed across cohort}
 \NormalTok{  ts}\OperatorTok{:}            \DataTypeTok{number}\OperatorTok{|}\DataTypeTok{null}\OperatorTok{;}  \CommentTok{// freshest snapshot timestamp}
 \NormalTok{  signer}\OperatorTok{:}        \DataTypeTok{string}\OperatorTok{|}\DataTypeTok{null}\OperatorTok{;}  \CommentTok{// the freshest snapshot envelope\textquotesingle{}s signerPubkey (provenance)}
 \NormalTok{  cohortSize}\OperatorTok{:}    \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// \# of distinct roots that reported a snapshot}
