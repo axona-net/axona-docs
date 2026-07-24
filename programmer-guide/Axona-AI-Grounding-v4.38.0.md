@@ -108,23 +108,32 @@ const { peer, author, status, disconnect } = await connect({
 
 Teardown: `await disconnect();`
 
-Options: `k` (routing set size, default 20), `ready` (forwarded to
-`peer.ready()`; `false` skips the wait), `transport`/`nodeIdentity`
-(injection for tests or custom stacks), `web` (extra webTransport options).
+`connect()` is the ONLY bootstrap an application needs — every case is an
+option, not a reason to assemble by hand: `k` (routing set size, default 20),
+`ready` (forwarded to `peer.ready()`; `false` skips the wait), `author`
+(`string`=durable / `true`=ephemeral / `false`=none), `transport` (custom/sim),
+`nodeIdentity` (durable/pre-minted), `domain` (share one mesh across several
+peers in a process), `persist` (persistence adapter), `rootReplicas` /
+`maxPublishBytes` / `synaptomeMaintain` (advanced tuning), `web` (extra
+webTransport options).
 
-### Alternative: manual assembly (custom transports / multiple peers)
+### Driving the lifecycle yourself (sim / tests only — rare)
+
+The constructors + `peer.start`/`join`/`integrate`/`ready` are ADVANCED building
+blocks that `connect()` composes in the correct order. Do NOT hand-assemble a
+peer for an application — it is how apps silently skipped self-integration and
+self-rooted their topics as **singletons**, losing cross-region delivery. If you
+genuinely drive the lifecycle (a sim harness, a test), you MUST call
+`peer.integrate()` after start, or the peer sits at the passive-adoption churn
+floor:
 
 ```js
-const nodeIdentity = await createNodeIdentity({ lat: 38.0, lng: -77.0 });
-const author = await createAuthorIdentity({ persistAs: 'myapp:author' });
-const transport = webTransport({ bridgeUrl: 'wss://testnet.axona.net', identity: nodeIdentity });
-const node = new NeuronNode({ id: nodeIdentity.id, lat: 38.0, lng: -77.0 }); // hex id accepted (4.14+)
-node.transport = transport;
 const peer = new AxonaPeer({ domain: new AxonaDomain({ k: 20 }),
                              node, nodeIdentity, transport });
 await transport.start(nodeIdentity.id);
 await peer.start();
-const status = await peer.ready();
+await peer.ready();
+await peer.integrate();   // REQUIRED by hand — connect() does this for you
 ```
 
 ---
