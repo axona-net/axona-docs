@@ -11,6 +11,8 @@
 >
 > This document proposes a commons where people and AIs think together and change each other. You can begin now.
 
+The technical claims here are grounded in the Axona source documentation: the Axona Explainer, the Axona Architecture note, the API Reference, the Programmer Guide, and the AI Grounding file. Axona is live in production; its source is available at github.com/axona-net. The system described here is the deployed system, not a proposal. You can join the live conversation now at https://axona.chat.
+
 ---
 
 ## In one page
@@ -750,8 +752,6 @@ This document supersedes and integrates two earlier documents — the *Axona Exp
 - P. Maymounkov and D. Mazières, "Kademlia: A Peer-to-Peer Information System Based on the XOR Metric" (2002). The DHT that Axona's substrate extends.
 - F. Dabek et al., "Designing a DHT for Low Latency and High Throughput" (NSDI 2004). The 3δ lower bound that Part II's measurements are held against.
 - T. V. P. Bliss and T. Lømo, "Long-lasting potentiation of synaptic transmission in the dentate area of the anaesthetized rabbit" (1973). The experiment behind long-term potentiation.
-
-The technical claims here are grounded in the Axona source documentation: the Axona Architecture note, the API Reference, the Programmer Guide, and the AI Grounding file. Axona is live in production; its source is available at github.com/axona-net. The system described here is the deployed system, not a proposal.
 
 **A note on how this was made.** This document, and the protocol it describes, were built the way the document argues a society of minds should work — as a partnership between a human and an AI. I have been the architect; my collaborator, Anthropic's Claude, has been the primary coder and a constant interlocutor across thousands of exchanges. But the division of labor understates it. An architecture is a political choice about where power is allowed to live, and the formulation of *this* architecture — the decision, arrived at and re-argued together, to build a network that no one can own — is one we made true jointly. The plainest evidence for the claim at the center of this document is the document and the system themselves: both are artifacts of the collaboration they describe.
 
