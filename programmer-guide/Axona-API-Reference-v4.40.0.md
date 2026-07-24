@@ -1,23 +1,23 @@
 # Axona API Reference
 
-Reference for every public symbol exported from `@axona/protocol` v4.38.0.
+Reference for every public symbol exported from `@axona/protocol` v4.40.0.
 
 Organized by what application developers reach for first (identity, peer
 lifecycle, pub/sub, direct messaging, introspection), then the
 transport/protocol surface, then low-level utilities. Every signature
-below is verified against the v4.38.0 kernel source.
+below is verified against the v4.40.0 kernel source.
 
 > **Which network?** Both live networks run the 4.x line (wire 4.0).
-> **Testnet** (`wss://testnet.axona.net`) tracks the newest kernel — v4.38.0,
+> **Testnet** (`wss://testnet.axona.net`) tracks the newest kernel — v4.40.0,
 > the version this reference describes. **Production** (`wss://bridge.axona.net`
 > east + `wss://bridge-west.axona.net` west) runs the most recently promoted
 > kernel, typically one release behind while changes soak. The API surface below
 > is identical on both; point wherever you deploy. Install
-> `github:axona-net/axona-protocol#v4.38.0`.
+> `github:axona-net/axona-protocol#v4.40.0`.
 
 Companion documents:
 
-- [Quick Start](Quick-Start-v4.38.0.md) — 5-minute working roundtrip.
+- [Quick Start](Quick-Start-v4.40.0.md) — 5-minute working roundtrip.
 - [Programmer Guide](Axona-Programmer-Guide-v4.38.0.md) — mental model +
   worked example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
@@ -39,7 +39,7 @@ but most apps only need the main barrel.
 > surface** (§§10–16) and **Low-level utilities** (§§17–23) exist for
 > transport authors, tooling, and the curious. Building with an AI
 > assistant? Hand it the
-> [AI Grounding](Axona-AI-Grounding-v4.30.0.md) file — the application
+> [AI Grounding](Axona-AI-Grounding-v4.40.0.md) file — the application
 > surface distilled to rules and patterns.
 
 ---
@@ -323,40 +323,55 @@ console.log(id === node.id);   // true
 
 ## 3. AxonaPeer construction + lifecycle
 
-### `connect({ bridge, location, author?, k?, ready?, transport?, nodeIdentity?, web? })` → `Promise<{ peer, author, nodeIdentity, transport, status, disconnect }>` *(kernel 4.16.0)*
+### `connect(options)` → `Promise<{ peer, author, nodeIdentity, transport, status, disconnect }>` *(kernel 4.16.0; barrel export 4.40.0)*
 
-The one-call bootstrap — import from the `connect.js` subpath:
+**The single bootstrap an application uses.** `connect()` composes the whole
+startup sequence — mints the connection identity (and, by default, an ephemeral
+author), builds the web transport + `NeuronNode` + `AxonaDomain` + `AxonaPeer`,
+`start()`s, awaits `peer.ready()`, **and self-integrates the node into the
+routing mesh** (`peer.integrate()`) — in the one correct order. It is exported
+from the main barrel (and still from the `connect.js` subpath):
 
 ```js
-import { connect } from '@axona/protocol/connect.js';
+import { connect } from '@axona/protocol';          // also: '@axona/protocol/connect.js'
 const { peer, author, status, disconnect } = await connect({
   bridge: 'wss://testnet.axona.net', location: { lat: 38, lng: -77 } });
 ```
 
-Mints the connection identity (and, by default, an ephemeral author),
-builds the web transport + `NeuronNode` + `AxonaDomain` + `AxonaPeer`,
-starts everything, and awaits `peer.ready()`. Pure sugar over the
-constructors below — use them directly for custom wiring.
+Every startup variation is an **option**, never a reason to drop to the
+constructors below:
 
 | Param | Type | Notes |
 |---|---|---|
 | `bridge` | string | `wss://` bridge URL. Required unless `transport` injected. |
 | `location` | `{ lat, lng }` | The node's real location. Required unless `nodeIdentity` injected. |
-| `author` | `true` \| string \| identity \| `false` | `true` (default) ephemeral author; a string → durable via `persistAs`; an author identity → used as-is; `false` → none. |
+| `author` | `true` \| string \| identity \| `false` | `true` (default) ephemeral author; a **string** → durable author via `persistAs`; an author identity → used as-is; `false` → no author minted. |
 | `k` | number (20) | Routing closest-set size. |
 | `ready` | object \| `false` | Forwarded to `peer.ready()`; `false` skips the wait (`status` is `null`). |
-| `transport` / `nodeIdentity` | — | Injection for tests, sim, custom stacks; the web transport is only loaded when no `transport` is given. |
+| `transport` | `Transport` | Inject a custom/sim transport; the web transport is only loaded when this is absent. |
+| `nodeIdentity` | `Identity` | Inject a durable/pre-minted connection key instead of minting one from `location`. |
+| `domain` | `AxonaDomain` | Share **one** routing domain (mesh) across several peers built in the same process. |
+| `persist` | `PersistenceAdapter` | Enable auto-checkpointing of identity, subscriptions, synaptome, and hosting state. |
+| `rootReplicas` | number | Replication factor for a topic's authoritative cohort (advanced tuning). |
+| `maxPublishBytes` | number | Per-publish cap (clamped to the WebRTC-interop floor; advanced tuning). |
+| `synaptomeMaintain` | `boolean \| object` | Opt into continuous near-quota maintenance (see `AxonaPeer` below). |
 | `web` | object | Extra options forwarded to the `webTransport` factory. |
 
 `disconnect()` performs `peer.leave()` + `peer.stop()` + `transport.stop()`,
-best-effort. `connect` lives outside the main barrel (the barrel stays
-environment-neutral); the import path is `@axona/protocol/connect.js`.
+best-effort.
 
+> **Why not assemble by hand?** The constructors and lifecycle calls below are
+> the **advanced building blocks `connect()` composes** — documented here for
+> transport authors, sims, and tests, not as an application setup path.
+> Hand-assembling a peer is how apps silently **skipped `peer.integrate()`** and
+> so self-rooted their topics as **singletons**, losing cross-region delivery
+> (a real shipped bug). If you build a peer by hand you MUST call
+> `peer.integrate()` after `start()`/`ready()` — `connect()` does it for you.
 
 `AxonaPeer` is the per-node DHT contract implementation — one instance
 per running node.
 
-### `new AxonaPeer({ nodeIdentity, domain, transport, ... })`
+### `new AxonaPeer({ nodeIdentity, domain, transport, ... })` *(advanced — `connect()` builds this)*
 
 | Param | Type | Notes |
 |---|---|---|
@@ -419,7 +434,19 @@ so you can surface "still connecting" rather than throw.
 await peer.start();
 const status = await peer.ready();          // defaults: 4 peers or a stable plateau, ≤10s
 if (!status.ready) console.warn('mesh still warming — publishes may be thin');
+await peer.integrate();                     // REQUIRED in a hand-driven lifecycle (connect() does it)
 ```
+
+### `peer.integrate()` → `Promise<void>`
+
+Actively integrate a freshly-started node into the routing mesh — **directed
+integration**: the node routes a small burst of traffic at its XOR-neighbours so
+*their* routing tables learn it, instead of waiting for passive inbound adoption.
+Call it once after `start()`/`ready()`. `connect()` calls it for you; a
+hand-driven lifecycle **must** call it itself. Skipping it leaves the node at the
+passive-adoption churn floor — the failure that made hand-assembled peers
+self-root their own topics as **singletons** (no cross-region delivery).
+Idempotent; a no-op on a node `connect()` already integrated.
 
 ### `peer.stop()` → `Promise<void>`
 
@@ -1385,7 +1412,7 @@ import { webTransport } from '@axona/protocol/transport/web/index.js';
 const transport = webTransport({
   bridgeUrl:   'wss://testnet.axona.net',  // or wss://bridge.axona.net (production)
   identity:    node,                       // from createNodeIdentity — signs the handshake
-  peerVersion: '4.38.0',                   // your app version (gated by the bridge)
+  peerVersion: '4.40.0',                   // your app version (gated by the bridge)
   reconnect:   true,
 });
 await transport.start();                  // resolves after the bridge handshake
@@ -1636,7 +1663,7 @@ introduces no keyspace skew.
 
 ```js
 WIRE_VERSION         // '4.0'      — wire format major.minor (bridges gate on this)
-KERNEL_VERSION       // '4.38.0'   — kernel semver (npm release tag)
+KERNEL_VERSION       // '4.40.0'   — kernel semver (npm release tag)
 AUTH_PROTO           // 'axona/5'  — authenticated-identity handshake tag
 UPGRADE_CLOSE_CODE   // 4426       — WebSocket close code for a version mismatch
 ENVELOPE_DOMAIN      // 'axona:pubsub-envelope:v2'
@@ -1664,6 +1691,21 @@ await peer.pub({ region: 'useast', name: 'lobby' }, msg, { signWith: ANONYMOUS }
 
 *(Only relevant if you have code from an earlier kernel line. New
 readers: skip.)*
+
+### What changed in v4.39.0–v4.40.0 (2026-07-24; v4.40.0 on testnet)
+
+**No new API — a bootstrap consolidation.** `connect()` is now the single
+documented way to bring up a peer: it self-integrates the node
+(`peer.integrate()`) as part of startup, and it accepts every option an app
+could need (`bridge`, `location`, `author`, `k`, `ready`, `transport`,
+`nodeIdentity`, `domain`, `persist`, `rootReplicas`, `maxPublishBytes`,
+`synaptomeMaintain`, `web`) so no application ever drops to the constructors.
+`connect` is now also exported from the **main barrel**
+(`import { connect } from '@axona/protocol'`), not only the `connect.js` subpath.
+The constructors + `peer.start`/`join`/`ready`/`integrate` are reclassified as
+advanced building blocks `connect()` composes — hand-assembling a peer *without*
+`peer.integrate()` was how apps self-rooted their topics as singletons; that
+integration step is no longer easy to miss. Existing signatures are unchanged.
 
 ### What changed in v4.28.0–v4.38.0 (2026-07-23; v4.38.0 on testnet and production)
 
@@ -1762,7 +1804,7 @@ overnight production-shaped soak per release.
 
 ### What changed in v4.12.0–v4.16.1 (2026-07-02 testnet roll)
 
-- **`connect()` (v4.16.0)** — the one-call bootstrap above; no other API change.
+- **`connect()` (v4.16.0; barrel export + single-bootstrap consolidation v4.40.0)** — the one-call bootstrap above; no other API change.
 - **Immediate metrics answer (v4.16.1)** — a topic root publishes the FIRST
   metric snapshot the moment a metrics lease arms, so it arrives at routing
   latency (measured ~0.3 s on testnet) instead of on the next 5 s tick. Cadence

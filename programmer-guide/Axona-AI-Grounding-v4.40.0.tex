@@ -175,7 +175,7 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small The Axona AI Grounding \quad v4.38.0 \quad 2026-07-23\par}
+{\small The Axona AI Grounding \quad v4.40.0 \quad 2026-07-24\par}
 \end{center}
 \vfill
 \null
@@ -185,11 +185,11 @@
 \setcounter{page}{1}
 
 \section{Axona AI Grounding --- kernel
-4.38.0}\label{axona-ai-grounding-kernel-4.38.0}
+4.40.0}\label{axona-ai-grounding-kernel-4.40.0}
 
 This file is the complete, self-contained grounding for an AI system
 building an application on the Axona protocol. It matches the network it
-targets: \textbf{kernel 4.38.0 / wire 4.0, deployed on testnet
+targets: \textbf{kernel 4.40.0 / wire 4.0, deployed on testnet
 (\texttt{wss://testnet.axona.net})}. Everything below is exact and
 current; nothing outside this file is required. If this version does not
 match the bridge you are connecting to, request the matching grounding
@@ -294,7 +294,7 @@ errors}\label{hard-rules-violations-cause-silent-failure-or-thrown-errors}
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\ExtensionTok{npm}\NormalTok{ install github:axona{-}net/axona{-}protocol\#v4.38.0}
+\ExtensionTok{npm}\NormalTok{ install github:axona{-}net/axona{-}protocol\#v4.40.0}
 \end{Highlighting}
 \end{Shaded}
 
@@ -302,8 +302,8 @@ errors}\label{hard-rules-violations-cause-silent-failure-or-thrown-errors}
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\ImportTok{import}\NormalTok{ \{ connect \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol/connect.js\textquotesingle{}}\OperatorTok{;}   \CommentTok{// the one{-}call bootstrap}
 \ImportTok{import}\NormalTok{ \{}
+\NormalTok{  connect}\OperatorTok{,}                                 \CommentTok{// the one{-}call bootstrap (also at @axona/protocol/connect.js)}
 \NormalTok{  AxonaPeer}\OperatorTok{,}\NormalTok{ AxonaDomain}\OperatorTok{,}\NormalTok{ NeuronNode}\OperatorTok{,}\NormalTok{ ANONYMOUS}\OperatorTok{,}
 \NormalTok{  createNodeIdentity}\OperatorTok{,}\NormalTok{ createAuthorIdentity}\OperatorTok{,}
 \NormalTok{  deriveTopicId}\OperatorTok{,}\NormalTok{ metricTopic}\OperatorTok{,}\NormalTok{ KERNEL\_VERSION}\OperatorTok{,}
@@ -330,27 +330,37 @@ exactly)}\label{canonical-peer-bootstrap-copy-exactly}
 
 Teardown: \texttt{await\ disconnect();}
 
-Options: \texttt{k} (routing set size, default 20), \texttt{ready}
-(forwarded to \texttt{peer.ready()}; \texttt{false} skips the wait),
-\texttt{transport}/\texttt{nodeIdentity} (injection for tests or custom
-stacks), \texttt{web} (extra webTransport options).
+\texttt{connect()} is the ONLY bootstrap an application needs --- every case
+is an option, not a reason to assemble by hand: \texttt{k} (routing set size,
+default 20), \texttt{ready} (forwarded to \texttt{peer.ready()};
+\texttt{false} skips the wait), \texttt{author}
+(\texttt{string}=durable / \texttt{true}=ephemeral / \texttt{false}=none),
+\texttt{transport} (custom/sim), \texttt{nodeIdentity} (durable/pre-minted),
+\texttt{domain} (share one mesh across several peers in a process),
+\texttt{persist} (persistence adapter), \texttt{rootReplicas} /
+\texttt{maxPublishBytes} / \texttt{synaptomeMaintain} (advanced tuning),
+\texttt{web} (extra webTransport options).
 
-\subsubsection{Alternative: manual assembly (custom transports /
-multiple
-peers)}\label{alternative-manual-assembly-custom-transports-multiple-peers}
+\subsubsection{Driving the lifecycle yourself (sim / tests only ---
+rare)}\label{driving-the-lifecycle-yourself-sim-tests-only-rare}
+
+The constructors +
+\texttt{peer.start}/\texttt{join}/\texttt{integrate}/\texttt{ready} are
+ADVANCED building blocks that \texttt{connect()} composes in the correct
+order. Do NOT hand-assemble a peer for an application --- it is how apps
+silently skipped self-integration and self-rooted their topics as
+\textbf{singletons}, losing cross-region delivery. If you genuinely drive the
+lifecycle (a sim harness, a test), you MUST call \texttt{peer.integrate()}
+after start, or the peer sits at the passive-adoption churn floor:
 
 \begin{Shaded}
 \begin{Highlighting}[]
-\KeywordTok{const}\NormalTok{ nodeIdentity }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{createNodeIdentity}\NormalTok{(\{ }\DataTypeTok{lat}\OperatorTok{:} \FloatTok{38.0}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:} \OperatorTok{{-}}\FloatTok{77.0}\NormalTok{ \})}\OperatorTok{;}
-\KeywordTok{const}\NormalTok{ author }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{createAuthorIdentity}\NormalTok{(\{ }\DataTypeTok{persistAs}\OperatorTok{:} \StringTok{\textquotesingle{}myapp:author\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;}
-\KeywordTok{const}\NormalTok{ transport }\OperatorTok{=} \FunctionTok{webTransport}\NormalTok{(\{ }\DataTypeTok{bridgeUrl}\OperatorTok{:} \StringTok{\textquotesingle{}wss://testnet.axona.net\textquotesingle{}}\OperatorTok{,} \DataTypeTok{identity}\OperatorTok{:}\NormalTok{ nodeIdentity \})}\OperatorTok{;}
-\KeywordTok{const}\NormalTok{ node }\OperatorTok{=} \KeywordTok{new} \FunctionTok{NeuronNode}\NormalTok{(\{ }\DataTypeTok{id}\OperatorTok{:}\NormalTok{ nodeIdentity}\OperatorTok{.}\AttributeTok{id}\OperatorTok{,} \DataTypeTok{lat}\OperatorTok{:} \FloatTok{38.0}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:} \OperatorTok{{-}}\FloatTok{77.0}\NormalTok{ \})}\OperatorTok{;} \CommentTok{// hex id accepted (4.14+)}
-\NormalTok{node}\OperatorTok{.}\AttributeTok{transport} \OperatorTok{=}\NormalTok{ transport}\OperatorTok{;}
 \KeywordTok{const}\NormalTok{ peer }\OperatorTok{=} \KeywordTok{new} \FunctionTok{AxonaPeer}\NormalTok{(\{ }\DataTypeTok{domain}\OperatorTok{:} \KeywordTok{new} \FunctionTok{AxonaDomain}\NormalTok{(\{ }\DataTypeTok{k}\OperatorTok{:} \DecValTok{20}\NormalTok{ \})}\OperatorTok{,}
 \NormalTok{                             node}\OperatorTok{,}\NormalTok{ nodeIdentity}\OperatorTok{,}\NormalTok{ transport \})}\OperatorTok{;}
 \ControlFlowTok{await}\NormalTok{ transport}\OperatorTok{.}\FunctionTok{start}\NormalTok{(nodeIdentity}\OperatorTok{.}\AttributeTok{id}\NormalTok{)}\OperatorTok{;}
 \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{start}\NormalTok{()}\OperatorTok{;}
-\KeywordTok{const}\NormalTok{ status }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{ready}\NormalTok{()}\OperatorTok{;}
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{ready}\NormalTok{()}\OperatorTok{;}
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{integrate}\NormalTok{()}\OperatorTok{;}   \CommentTok{// REQUIRED by hand --- connect() does this for you}
 \end{Highlighting}
 \end{Shaded}
 
@@ -851,7 +861,7 @@ order:
   served under the new version number --- has repeatedly cost real
   debugging time.
 \item
-  The testnet bridge is \texttt{wss://testnet.axona.net} (kernel 4.38.0,
+  The testnet bridge is \texttt{wss://testnet.axona.net} (kernel 4.40.0,
   wire 4.0) --- the network this grounding targets. Production
   (\texttt{wss://bridge.axona.net}) runs the same wire-4 line, typically
   one release behind; the two are wire-compatible but SEPARATE networks

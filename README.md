@@ -72,11 +72,11 @@ unchanged from 4.27.1 through the current 4.38.0 production line).
 | PDF | What it is |
 |---|---|
 | [**Programmer Intro v0.4**](programmer-guide/Axona%20Programmer%20Intro%20v0.4.pdf) | A ~30-minute slide deck: what Axona is, how it works, the security model, the API you actually call, and a build-along of the live [Axona Minimal](https://demo.axona.net/apps/axona-minimal/) app. |
-| [**Quick Start v4.38.0**](programmer-guide/Quick-Start-v4.38.0.pdf) | A working pub/sub roundtrip in 5 minutes: mint two identities, join the testnet, publish and subscribe. A runnable copy lives at [`programmer-guide/examples/minimal-pubsub/`](programmer-guide/examples/minimal-pubsub/). |
+| [**Quick Start v4.40.0**](programmer-guide/Quick-Start-v4.40.0.pdf) | A working pub/sub roundtrip in 5 minutes: mint two identities, join the testnet, publish and subscribe. A runnable copy lives at [`programmer-guide/examples/minimal-pubsub/`](programmer-guide/examples/minimal-pubsub/). |
 | [**Programmer Guide v4.38.0**](programmer-guide/Axona-Programmer-Guide-v4.38.0.pdf) | The application-builder's book: the five ideas (peer, author, topic, publish, subscribe), then recipes — chat, feeds, presence, retraction, file sharing, DMs, metrics — plus pitfalls, errors, and limits. |
-| [**API Reference v4.38.0**](programmer-guide/Axona-API-Reference-v4.38.0.pdf) | Every public export: signature, params, returns, errors. The application surface first; transport and internals fenced off behind "you probably don't need this." |
+| [**API Reference v4.40.0**](programmer-guide/Axona-API-Reference-v4.40.0.pdf) | Every public export: signature, params, returns, errors. The application surface first; transport and internals fenced off behind "you probably don't need this." |
 | [**Services Guide v4.38.0**](programmer-guide/Axona-Services-Guide-v4.38.0.pdf) | For operators: the signaling bridge, the relay and its four front-ends (console, CLI, MCP server, desktop), directory/federation, and the PoW collector — the programs you *run* rather than write. |
-| [**AI Grounding v4.38.0**](programmer-guide/Axona-AI-Grounding-v4.38.0.pdf) | Tier 1 of the AI documentation pair: hard rules, exact signatures, canonical patterns, error codes, limits — paste the [`.md`](programmer-guide/Axona-AI-Grounding-v4.38.0.md) into an AI assistant's context so it writes correct Axona code from the start. |
+| [**AI Grounding v4.40.0**](programmer-guide/Axona-AI-Grounding-v4.40.0.pdf) | Tier 1 of the AI documentation pair: hard rules, exact signatures, canonical patterns, error codes, limits — paste the [`.md`](programmer-guide/Axona-AI-Grounding-v4.40.0.md) into an AI assistant's context so it writes correct Axona code from the start. |
 
 Tier 2 of the AI pair is markdown-only: the
 [**AI Reference**](programmer-guide/Axona-AI-Reference-v4.38.0.md) — the
