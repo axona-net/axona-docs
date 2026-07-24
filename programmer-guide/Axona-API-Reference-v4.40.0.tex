@@ -1653,7 +1653,7 @@ snapshots; default \texttt{1500}. \\
                                \CommentTok{//   emitted on the topic (kills included) — max across cohort}
 \NormalTok{  subscribers}\OperatorTok{:}   \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// topic{-}wide subscriber total — summed across the cohort}
 \NormalTok{  bytes}\OperatorTok{:}         \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// live cached envelope bytes — max across cohort}
-\NormalTok{  publishes}\OperatorTok{:}     \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// present only if the publisher tracks it; else 0}
+\NormalTok{  publishes}\OperatorTok{:}     \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// RESERVED — no root emits this; ALWAYS 0. Use seq/current\_count for volume.}
 \NormalTok{  ts}\OperatorTok{:}            \DataTypeTok{number}\OperatorTok{|}\DataTypeTok{null}\OperatorTok{;}  \CommentTok{// freshest snapshot timestamp}
 \NormalTok{  signer}\OperatorTok{:}        \DataTypeTok{string}\OperatorTok{|}\DataTypeTok{null}\OperatorTok{;}  \CommentTok{// the freshest snapshot envelope\textquotesingle{}s signerPubkey (provenance)}
 \NormalTok{  cohortSize}\OperatorTok{:}    \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// \# of distinct roots that reported a snapshot}
@@ -1666,6 +1666,24 @@ Use \texttt{seq} for total-ever (published + killed),
 \texttt{current\_count} for currently-live, and their gap to spot churn.
 \texttt{subscribers} is a topic-wide count for UX, not billing. All
 values are advisory.
+
+\begin{quote}
+\textbf{A real zero vs.\ ``no data yet'' --- read \texttt{stale}, not the
+counters.} The numbers alone can't tell you which you have.
+\texttt{stale:\ true} (⟺ \texttt{cohortSize:\ 0}, \texttt{ts:\ null},
+\texttt{signer:\ null}) means \textbf{no snapshot arrived} in the window --- every
+field reads 0 only because nothing reported, \emph{not} because the topic is empty.
+This is exactly what you get calling \texttt{metrics()} immediately after
+\texttt{pub()}: the first snapshot rides a demand-driven lease and may land a beat
+later, so the synchronous read races it. A result with \texttt{stale:\ false},
+\texttt{cohortSize\ ≥\ 1}, and a real \texttt{ts}/\texttt{signer} is a
+\textbf{genuine} reading --- its zeros are true current values
+(\texttt{current\_count:\ 0} = the cache really is empty; \texttt{bytes:\ 0} at a
+just-promoted root = nothing tallied there yet). \textbf{Never read a
+\texttt{stale} result as ``zero activity.''} For a live view, don't poll right
+after publishing --- keep a standing \texttt{sub(metricTopic(T),\ …)} and treat
+metrics as the stream it is.
+\end{quote}
 
 \begin{Shaded}
 \begin{Highlighting}[]

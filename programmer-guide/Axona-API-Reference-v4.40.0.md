@@ -842,7 +842,8 @@ roots reported.
                                //   emitted on the topic (kills included) — max across cohort
   subscribers:   number;       // topic-wide subscriber total — summed across the cohort
   bytes:         number;       // live cached envelope bytes — max across cohort
-  publishes:     number;       // present only if the publisher tracks it; else 0
+  publishes:     number;       // RESERVED — no root currently emits this field, so it is ALWAYS 0.
+                               //   Use `seq` / `current_count` for volume, not this.
   ts:            number|null;  // freshest snapshot timestamp
   signer:        string|null;  // the freshest snapshot envelope's signerPubkey (provenance)
   cohortSize:    number;       // # of distinct roots that reported a snapshot
@@ -853,6 +854,19 @@ roots reported.
 Use `seq` for total-ever (published + killed), `current_count` for currently-live,
 and their gap to spot churn. `subscribers` is a topic-wide count for UX, not
 billing. All values are advisory.
+
+> **A real zero vs. "no data yet" — read `stale`, not the counters.** The numbers
+> alone can't tell you which you have. `stale: true` (⟺ `cohortSize: 0`,
+> `ts: null`, `signer: null`) means **no snapshot arrived** in the window — every
+> field reads 0 only because nothing reported, *not* because the topic is empty.
+> This is exactly what you get calling `metrics()` immediately after `pub()`: the
+> first snapshot rides a demand-driven lease and may land a beat later, so the
+> synchronous read races it. A result with `stale: false`, `cohortSize ≥ 1`, and a
+> real `ts`/`signer` is a **genuine** reading — its zeros are true current values
+> (`current_count: 0` = the cache really is empty; `bytes: 0` at a just-promoted
+> root = nothing tallied there yet). **Never read a `stale` result as "zero
+> activity."** For a live view, don't poll right after publishing — keep a standing
+> `sub(metricTopic(T), …)` and treat metrics as the stream it is.
 
 ```js
 const m = await peer.metrics({ region: 'useast', name: 'lobby' });
