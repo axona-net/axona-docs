@@ -1,5 +1,9 @@
 # Axona Kernel — Invariants & Structural Rules
 *v1.0 — 2026-07-25 · extracted from the root-system refactor (v0.2 Phases 1–8), adopted as the standard for all subsequent restructuring.*
+*Deployed kernel as of 2026-07-25: **prod 4.41.0** · **testnet 4.39.0**. Version
+numbers below (e.g. "repairPlane.js, 4.42.0") name the release a fix LANDED IN —
+they are provenance, not a claim that it is running. 4.42.0 is tagged and HELD;
+testnet was rolled back to 4.39.0 on 2026-07-25. `/healthz` is the only truth.*
 
 Every rule here is either **fenced** (a named test fails if it regresses) or **declared unfenced** (the honest drift backlog). A rule that isn't a test drifts — the un-tabled `READ_REPAIR` policy proved it within weeks of the sync engine shipping.
 

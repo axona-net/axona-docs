@@ -1,5 +1,9 @@
 # Axona Kernel — Architecture Health Scorecard & Refactor Plan
-*Working draft — 2026-07-25. NOT yet committed to axona-docs (awaiting David's decision (a)).*
+*v1.0 — 2026-07-25. Committed to axona-docs (David approved).*
+*Deployed kernel as of 2026-07-25: **prod 4.41.0** · **testnet 4.39.0**. Where this
+document cites 4.40–4.42 it is naming the release a change LANDED IN, not a
+release in service — 4.42.0 is tagged and held, and testnet was rolled back to
+4.39.0 on 2026-07-25. Check `/healthz` for ground truth, never a document.*
 *Grounded in 4 parallel code surveys of `/Users/croqueteer/Documents/claude/axona-protocol/src` (source-of-truth). Kernel = 20,415 LOC / 57 files.*
 
 ## Context / why

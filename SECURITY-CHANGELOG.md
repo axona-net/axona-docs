@@ -16,7 +16,21 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
-## Kernel v4.42.0 — 2026-07-25 (testnet) — durability: graceful-leave handoff scales with role count
+## Kernel v4.42.0 — 2026-07-25 — **HELD, NOT DEPLOYED** — durability: graceful-leave handoff scales with role count
+
+> **Status as of 2026-07-25: tagged but running nowhere.** This entry described a
+> testnet deployment that no longer exists. 4.42.0 was live on testnet from
+> ~13:47 to ~17:35 UTC on 2026-07-25, then testnet was deliberately rolled back
+> to **4.39.0** as a known-good baseline while an owner-write delivery failure was
+> investigated. **Production never ran 4.42.0** and is on **4.41.0**. Promotion is
+> gated on a clean soak: the 17 cycles collected before the rollback showed
+> scale-scenario delivery averaging 97.7% with a 79.2% floor (5/17 scale, 3/15
+> churn failures), which is not a pass. The fix described below is real, tagged,
+> and fenced by `smoke_handoff_scaling.mjs` — it is simply not in service.
+>
+> Verify what is actually deployed, never this file: `curl
+> https://bridge.axona.net/healthz` (prod) and `curl
+> https://testnet.axona.net/healthz` (testnet).
 
 **A departing node's history handoff now waits proportionally to how much it
 carries, so a mass leaver no longer strands sole-copy history behind a
