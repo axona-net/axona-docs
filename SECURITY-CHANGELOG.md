@@ -16,6 +16,37 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.42.0 — 2026-07-25 (testnet) — durability: graceful-leave handoff scales with role count
+
+**A departing node's history handoff now waits proportionally to how much it
+carries, so a mass leaver no longer strands sole-copy history behind a
+batch-size-invariant timer.** The graceful-leave handoff pushes each held topic
+cache to its heir and waits for a confirming ack — but the per-round ack window
+was a flat constant while heir-side ingest is O(topics received): a burst
+publisher or a subscriber that accrued dozens of roles pushed its whole batch
+into a few heirs at once, the heirs worked through the ingest queue and acked
+in O(K), and every "late" topic was counted unacked and fell through to a
+single **unconfirmed** fallback send. For topics where the leaver held the
+network's only copy, durability rode one fire-and-forget packet (observed live
+on prod: 68/68 topics unacked on a ~68-role leaver; a fresh subscriber then
+replayed zero for ~17% of topics). The window now scales with the round's
+batch size (base + per-topic margin, capped) and is progress-aware: it extends
+while acks are still arriving and stall-exits when they stop, so a dead-silent
+heir still cannot hold up a departure. Leaver-local only — no wire change; old
+and new kernels interoperate. What is PROTECTED: published history survives
+the departure of the node that held it, at any realistic role count, with a
+confirmed hand-over instead of a hopeful one. Fenced by a scaling smoke that
+reproduces the mass-leaver case (many topics × queue-delayed acks) alongside
+the existing burst and no-ack cases.
+
+Also in this release: the sync-engine policy table is now CLOSED (the
+previously un-tabled read-repair policy has a typed row, and the completeness
+test rejects any policy count other than the known eight); the role object's
+shape is fully declared at construction (no runtime field graft-ons); and the
+dead `unpub` module (removed from the wire in v4.3.0) is deleted outright.
+
+---
+
 ## Kernel v4.39.0 — 2026-07-23 (testnet) — availability: every node self-integrates on bootstrap
 
 **A node now weaves itself into the mesh on every bootstrap path, so it cannot
