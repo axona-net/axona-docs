@@ -16,6 +16,45 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.39.2 / relay v0.82.0 — 2026-07-25 — **privacy: a node's transport identity is never persisted**
+
+A node's **transport identity** — its `nodeId` and the keypair behind it — is now
+minted fresh on every process start and written to no persistent store. Its
+**author** identity still persists, by design.
+
+**What is protected.** A `nodeId` that survives restarts is a durable correlator: it
+links a node's sessions to one another, which exposes its IP, and through that its
+physical location. Ephemerality is the defence, and it costs nothing — a node
+returning under its old id gains no advantage, because the mesh has already
+restructured and healed around its absence. Re-identification was the only thing
+persistence added.
+
+Durable WHO, ephemeral WHERE. The split is now enforced rather than merely intended:
+
+- The kernel's `identity` persistence namespace is gone. It was written on every
+  shutdown flush and restored on start, so **any** application that wired a
+  `PersistenceAdapter` silently carried one address across every restart. A stored
+  envelope left by an older build is ignored, never adopted.
+- `snapshot()` no longer carries an identity envelope. It previously embedded the
+  full keypair — private key included — and `fromSnapshot()` restored it and derived
+  the node id from it. Because snapshots exist to be stored and reloaded, this was a
+  second, complete path to a durable address. Snapshots now carry state (who a peer
+  knows, what it subscribes to); a restoring caller supplies a fresh identity.
+- `connectPeer()` no longer accepts a transport identity at all. The parameter existed
+  only so a caller could inject a durable one; removing it makes the pattern
+  unrepresentable rather than merely unused.
+- Relay and MCP stores hold **authors only**.
+
+**Author keys are unaffected and still persist.** For an owned topic the author key
+*is* the authority — `owner` and `write` fold into the topic id — so it must be
+durable. The signed envelope continues to disclose who signed, never where they are.
+
+Fenced in both directions: a peer restarted against the same store must come up with
+a **different** `nodeId`, while its author identity must **still** round-trip; plus a
+per-repo static fence that scans source *and* configuration for identity paths,
+identity files, and any claim that a `nodeId` survives a restart — deployment
+artifacts included, since one instance of the anti-pattern lived in a compose comment.
+
 ## Kernel v4.42.0 — 2026-07-25 — **HELD, NOT DEPLOYED** — durability: graceful-leave handoff scales with role count
 
 > **Status as of 2026-07-25: tagged but running nowhere.** This entry described a

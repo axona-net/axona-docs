@@ -33,6 +33,34 @@ Every rule here is either **fenced** (a named test fails if it regresses) or **d
 | B9 | **Converge before serving authority** — an empty self-root pulls cohort history before acting as root. | rootClaim `become` → birth probe | `smoke_empty_root_pull.mjs` |
 | B10 | **Eviction is principal-liveness-gated** (I-10) — a planted nature is retired only when its principal is gone AND re-homed. | rootClaim `retireBackup` + policy-table `evictor` column | `smoke_sync_engine.mjs` (evictor completeness) |
 | B11 | A **mass leaver's sole-copy topics hand off first** (singletons → replicated roots → holders), so a cut-off departure saves the most vulnerable history. | repairPlane job tiering | `smoke_handoff_scaling.mjs` (indirect) — **partial fence** |
+| **I-ID** | **Transport identity is ephemeral; author identity is durable.** A node's transport identity (nodeId + keypair) is minted fresh every process start and written to NO persistent store — not a namespace, not a file, not a snapshot, not a container volume. An author identity may and must persist. | kernel: `_writeNamespace('identity')` no-op + `_loadFromPersist` ignores + `snapshot()` carries no identity · relay/MCP: author-only store, `connectPeer()` takes no identity | `smoke_persistence_wiring.js` (restart ⇒ different nodeId; author still persists) · `smoke_snapshot.js` · `fence_transport_identity.mjs` (static, per repo) |
+
+### I-ID in full — why this one is not a preference
+
+Every other invariant here protects correctness. This one protects **people**, so it
+gets stated plainly.
+
+A `nodeId` that survives restarts is a durable correlator. It links a node's sessions
+to one another over time; that links them to an IP; and that locates a person. The
+countervailing benefit is **nil** — transport IDs are ephemeral by construction, and a
+node returning under its old id gains nothing, because the mesh has already
+restructured and healed around its absence. All cost, no benefit.
+
+None of the following justify breaking it. Each is a signal the *design* is wrong:
+reconnection continuity, role or route retention across restarts, debugging or log
+correlation, deduplicating concurrent processes, or reputation keyed on a node.
+(Bridge reputation is keyed on the bridge URL precisely so its signer can rotate.)
+
+Author identity is the opposite case: place-free, meant to be durable and
+recognizable, and for owned topics it *is* the authority — `owner` and `write` fold
+into the topic id. Durable WHO, ephemeral WHERE. The envelope names a signer, never
+a node and never a region ([[Publisher location stays out of the protocol]]).
+
+Found 2026-07-25 in five places at once — the kernel's persistence namespace, the
+kernel's own `snapshot()` escape hatch (which embedded the private key), the MCP
+peer's `~/.axona` store, the relay README + systemd example, and two stale key files
+on production bridges. The static fence exists because the behavioural tests could
+not see four of those five.
 
 ## C. Process rules (how changes land)
 
