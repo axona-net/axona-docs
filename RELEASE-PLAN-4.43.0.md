@@ -150,26 +150,49 @@ probably fine, but "probably" is not good enough for the mechanism every client 
 find the network. **Measure it before shipping:** who currently roots that topic id, and
 how many distinct nodes hold it.
 
-### Decisions I need from you
+### Decisions — settled
 
-1. **Region pin.** The directory is pinned to `useast`, so global discovery depends on
-   one region's coverage. Keep it simple and single-region, or give each region its own
-   directory topic (bridges publish to their own, clients read their own and fall back)?
-   Single-region is what works today; per-region removes a global dependency on one
-   region but multiplies the topic.
-2. **Bridge author key: durable or ephemeral?** Today the bridge mints an *ephemeral*
-   author, so the signer rotates every restart and entries dedup on URL alone. I-ID
-   permits a durable author (durable WHO is the legitimate half). A durable one would
-   let a client verify "this is the same bridge that announced last hour" rather than
-   trusting the URL by itself. Worth it, or is URL-plus-TLS enough?
-3. **Retention window.** For "older than an hour ⇒ offline" to be readable, the topic
-   must retain at least two or three hours of beats so a fresh subscriber sees the
-   current generation. What ceiling do we want?
-4. **Persist cadence on nodes.** Save on every arriving beat, or debounce? And prune
-   entries past what age, so the book does not grow without bound?
+**1. Multi-region.** A bridge publishes its entry to the directory topic of **every
+region that already has a bridge** — eagle, and each other populated region. Not one
+global topic, and not only its own.
 
-I have not implemented any of this — the design touches the release, so it should be
-settled first.
+The bootstrap is self-expanding and needs no seed list: a bridge reads the directory it
+can already reach (its own region, plus whatever its persisted book holds), learns which
+regions have bridges, and publishes to each. A new region joins the set the moment a
+bridge lands there.
+
+Cost is small and linear — B bridges × R regions publishes per hour. Today that's 2×2=4
+an hour; even at 20 bridges across 10 regions it's ~3 a minute. **The real cost is not
+traffic, it's coverage:** each region's directory topic needs a node near *its* id, so
+adding regions multiplies the requirement that made step 1 a gate. Publishing into a
+region with nothing near that topic id puts the entry nowhere.
+
+**2. Region names: animal names, `useast`/`uswest` deprecated.** Verified before
+planning it — `{region:'useast'}` and `{region:'eagle'}` derive **the identical topic
+id** (`89e2ea650b8193b8274aa169…`). It is a pure rename over the same cells, **not** a
+flag day: no topic moves, no id changes, old and new names interoperate during the
+migration. The legacy names are still wired into relay service names
+(`axona-relay@useast`), `MCP_REGION`, and the directory descriptor — those are the
+migration surface.
+
+**3. Bridge author key: durable.** The bridge gets a persisted author identity instead
+of minting a throwaway per start, so a client can verify "this is the same bridge that
+announced an hour ago" rather than trusting the URL alone. This is squarely legitimate
+under I-ID — *author* is the durable half. It lives beside `bridges.json` in the bridge's
+`/data` volume, and it is the **only** key a bridge persists; its transport identity
+stays ephemeral.
+
+**4. Retention: the standard 24h window, no special case, no pruning.** Correct — and
+worth being precise about the mechanism, because it is append-and-expire rather than
+overwrite. Each entry carries `ts: Date.now()`, so every beat is a distinct message that
+accumulates and then ages out on the ordinary 24h ceiling. So:
+
+- **the topic self-prunes** — 24 beats per bridge per region resident, then TTL evicts;
+- **the node's book self-bounds** — it is keyed by bridge URL, so its size is the number
+  of distinct bridges ever seen, not the number of beats.
+
+Neither needs a pruner. One consequence to keep in view: a consumer must take the
+**latest entry per URL** rather than treating every stored beat as a separate bridge.
 
 ## 5. What 4.43.0 is
 
@@ -179,9 +202,11 @@ settled first.
         +  connect exported from root     (restored from 4.40.0)
         +  bridge directory as an ORDINARY topic:
              · drop the bridge's host() call
-             · hourly re-publish per bridge (heartbeat)
+             · hourly re-publish, to EVERY bridge-populated region
              · freshness = liveness (stale ⇒ presumed offline)
-             · every node persists its directory copy
+             · every node persists its directory copy (URL-keyed)
+             · bridge gets a DURABLE author key (transport stays ephemeral)
+        +  region names → animal names (useast/uswest deprecated; pure rename)
         −  everything from 4.42.0         (re-gated separately)
 ```
 
@@ -194,8 +219,7 @@ everywhere, so `/healthz` tells the whole truth again.
    today, and how many distinct nodes hold it. This gates the whole directory change:
    if nothing is near that address, dropping the `host()` breaks discovery, and we need
    to know that before writing code rather than after deploying it.
-2. Settle the four directory decisions (region pin, bridge author key, retention
-   window, persist cadence).
+2. ~~Settle the directory decisions~~ — **done**, see §4.
 3. Restore the two reverted pieces onto testnet; kernel suite green.
 4. Implement the directory change: drop `host()`, add the hourly beat, add per-node
    persistence + pruning. Fence the beat (an entry older than the window is not treated
