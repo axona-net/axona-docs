@@ -1,0 +1,143 @@
+# Kernel 4.43.0 — what to keep, what to drop, and why
+
+*2026-07-25. Written to decide one thing: what goes into a single 4.43.0 that ships
+everywhere, so testnet and prod stop diverging.*
+
+---
+
+## 1. Where we actually are
+
+| | version | what it is |
+|---|---|---|
+| **prod** (`origin/main`) | **4.41.0** | running on both bridges + 9 relays |
+| **testnet** (local branch) | **4.39.2** | 4.39.0 baseline + two new fixes |
+| **4.42.0** | tagged, deployed **nowhere** | failed its soak gate |
+
+**The version numbers are misleading, and this is the thing to understand first.**
+
+testnet is *ahead* of prod in git — it contains every single commit that prod has.
+The "rollback to 4.39.0" was done as a **revert commit** that restored the older file
+contents, not by rewinding the branch. So the history marched forward while the
+version string went backwards:
+
+```
+v4.40.0 → v4.41.0 → v4.42.0 → [revert tree to 4.39.0] → 4.39.1 → 4.39.2
+                                        ↑
+                         this is where the 4.40/4.41/4.42 code was undone
+```
+
+Consequence: **merging testnet into main is a clean fast-forward in git, but it would
+silently roll prod's behaviour back** — the revert would go out as if it were an
+upgrade. Nothing warns you. That is the trap 4.43.0 exists to avoid.
+
+---
+
+## 2. What each version added after 4.38
+
+| version | what it added | in testnet today? |
+|---|---|---|
+| **4.39.0** | `connect()` and sponsor-less `join()` self-integrate on bootstrap | ✅ baseline |
+| **4.39.1** | **Address rule** — `host(topic)` refuses a topic this node isn't near | ✅ new |
+| **4.39.2** | **I-ID** — transport identity never persisted (+ snapshot fix, 3 fences) | ✅ new |
+| **4.40.0** | `connect()` re-framed as *the* entry point; exported from the package root | ❌ reverted |
+| **4.41.0** | `metrics().publishes` became a real counter (it had always read 0) | ❌ reverted |
+| **4.42.0** | mass-leaver handoff scaling · policy-table closure · closed role shape · deleted dead `unpub.js` | ❌ reverted, never shipped |
+
+---
+
+## 3. Keep or drop — one call each
+
+### ✅ KEEP — the two testnet fixes (4.39.1 + 4.39.2)
+
+Both are new, both are fenced, both are the reason we're doing this release.
+
+- **Address rule (4.39.1)** — hosting is decided by a node's *address*, never by who
+  owns the topic. Fenced by `smoke_host_address_rule.mjs`.
+- **I-ID (4.39.2)** — a node's transport identity is minted fresh every start and
+  written nowhere; author identity still persists. Fenced three ways, and verified
+  live: two MCP peer starts produced different nodeIds and the same authorId.
+
+### ✅ RESTORE — `metrics().publishes` (4.41.0)
+
+**Prod is running this today.** Ship 4.43.0 without it and throughput metrics silently
+return to reading 0 — the exact failure mode we spent real time chasing when metrics
+were dead across all of 4.x. It is a one-line counter in `topicStore.js` plus its read
+path. Small, self-contained, no interaction with anything else in this release.
+
+### ✅ RESTORE — `connect` exported from the package root (4.40.0)
+
+Cheap, and it removes a foot-gun. **Nothing currently breaks without it** — axona-chat
+imports from the `@axona/protocol/connect.js` subpath, which works in both versions,
+and I verified the subpath export and the `disconnect` return both survive on testnet.
+So this is not urgent; it is just that having `connect` importable from the root is
+what the docs describe, and doc/code drift is how we got here.
+
+### ❌ DROP from 4.43.0 — everything in 4.42.0
+
+This is the one real judgement call, and the answer is no — not because the work is
+bad, but because **it never passed its gate**: scale delivery 97.7% mean / 79.2% floor,
+with 5/17 scale and 3/15 churn scenarios failing. It has been deployed nowhere, so
+dropping it costs us nothing that is currently running.
+
+Folding an ungated change into the release whose entire purpose is *"get back to a
+stable, testable baseline"* would defeat the release. The tag stays; it gets re-gated
+on its own, against a clean 4.43.0 baseline, where a regression will actually be
+attributable.
+
+One exception worth noting: 4.42.0 also **deleted `unpub.js`** (118 lines of dead
+code). That part is zero-risk. It is not worth a special case — it can ride along with
+the re-gated 4.42 work.
+
+---
+
+## 4. The one interaction that will bite
+
+**The address rule will break the bridge directory.**
+
+`axona-bridge/src/bridge_directory.js:94` calls `peer.host(DIRECTORY_TOPIC)` — it hosts
+a *named* topic regardless of whether the bridge's address is anywhere near it. That is
+exactly what the 4.39.1 address rule refuses. Today prod runs an unguarded kernel, so
+the call succeeds. **The moment 4.43.0 reaches the bridges, it starts being refused.**
+
+This has to be resolved *before or with* the release, not after. Two options:
+
+1. **Let the bridge stop hosting the directory** and rely on the relays that are already
+   near that topic's address in the keyspace. Correct by the rule; needs a check that
+   the directory topic actually has coverage.
+2. **Give the directory topic an address the bridge legitimately covers**, so hosting it
+   is consistent with the rule rather than an exception to it.
+
+Option 1 is the honest one. It needs one measurement first: who currently roots the
+directory topic besides the bridges.
+
+Everything else is clean — the two testnet fixes touch `AxonaPeer.js`, while the 4.42.0
+work touches `rootClaim` / `repairPlane` / `syncEngine`. Different files, no conflict.
+
+---
+
+## 5. What 4.43.0 is
+
+```
+4.43.0  =  testnet 4.39.2
+        +  metrics().publishes            (restored from 4.41.0)
+        +  connect exported from root     (restored from 4.40.0)
+        +  bridge directory hosting fix   (required by the address rule)
+        −  everything from 4.42.0         (re-gated separately)
+```
+
+Ships across the board: kernel, relay, bridge, axona.chat, demo apps — one version
+everywhere, so `/healthz` tells the whole truth again.
+
+## 6. Order of work
+
+1. Restore the two reverted pieces onto testnet; kernel suite green.
+2. Measure who roots the bridge-directory topic; fix `bridge_directory.js` accordingly.
+3. Tag 4.43.0. Re-vendor into relay + bridge; re-pin axona-chat and the demo apps.
+4. Testnet first — full fleet, verify `/healthz` reads 4.43.0 everywhere.
+5. Soak on a clean field. This is the baseline everything later gets measured against,
+   so it is worth doing properly rather than quickly.
+6. Promote to prod: bridges first, then the 9 relays rolling, then the apps.
+7. Re-gate 4.42.0 separately against 4.43.0.
+
+**Note on axona-peer:** frozen since 4.38.0 and deliberately not part of this. It gets
+no re-vendor, no version bump, no kernel pin change.
