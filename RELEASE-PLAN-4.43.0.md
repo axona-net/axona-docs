@@ -90,30 +90,86 @@ the re-gated 4.42 work.
 
 ---
 
-## 4. The one interaction that will bite
+## 4. The bridge directory — treat it like any other topic
 
-**The address rule will break the bridge directory.**
+**The directive:** the bridge topic is not special. It is reachable by every bridge and
+every user, each bridge re-publishes its own entry roughly hourly, freshness is what
+tells you a bridge is alive, and every node keeps its own persisted copy.
 
-`axona-bridge/src/bridge_directory.js:94` calls `peer.host(DIRECTORY_TOPIC)` — it hosts
-a *named* topic regardless of whether the bridge's address is anywhere near it. That is
-exactly what the 4.39.1 address rule refuses. Today prod runs an unguarded kernel, so
-the call succeeds. **The moment 4.43.0 reaches the bridges, it starts being refused.**
+This settles the open question from the address rule, and it settles it cleanly.
 
-This has to be resolved *before or with* the release, not after. Two options:
+### What is there today
 
-1. **Let the bridge stop hosting the directory** and rely on the relays that are already
-   near that topic's address in the keyspace. Correct by the rule; needs a check that
-   the directory topic actually has coverage.
-2. **Give the directory topic an address the bridge legitimately covers**, so hosting it
-   is consistent with the rule rather than an exception to it.
+`bridge_directory.js` calls `peer.host(DIRECTORY_TOPIC)` — the bridge roots its own
+directory topic regardless of address. Under the 4.39.1 address rule that call starts
+being **refused**. But the comment above it explains *why* it was added, and it is a
+real problem, not laziness:
 
-Option 1 is the honest one. It needs one measurement first: who currently roots the
-directory topic besides the bridges.
+> the launch publish lands before peers reconnect… without this it would route into an
+> empty mesh and be lost as the real region-closest roots fill in.
 
-Everything else is clean — the two testnet fixes touch `AxonaPeer.js`, while the 4.42.0
-work touches `rootClaim` / `repairPlane` / `syncEngine`. Different files, no conflict.
+So the bridge was hosting its own topic to survive its own cold start.
 
----
+### Why hourly re-publish fixes it properly
+
+**A heartbeat makes a lost publish harmless.** If the entry is re-sent every hour, the
+launch publish landing in an empty mesh costs nothing — the next beat repopulates it.
+The ordering problem the `host()` was patching stops existing, so the patch can go.
+
+That is the whole trade: *one hosting exception* is replaced by *one repeating publish*,
+and the topic becomes ordinary.
+
+It also buys liveness for free. Today a bridge that dies leaves a directory entry behind
+with nothing to retract it. With hourly beats, **age is the health signal** — an entry
+under an hour old is live, one several hours old is almost certainly gone. No tombstones,
+no departure protocol, no explicit retraction to get wrong.
+
+### What changes
+
+| | now | after |
+|---|---|---|
+| hosting | bridge `host()`s the directory | **nothing hosts it specially** — it roots wherever its address lands |
+| publishing | once at launch, plus on change | **every ~1h**, plus on change |
+| liveness | no signal; stale entries persist | **entry age** — over an hour old ⇒ presumed offline |
+| client copy | discovered book, in memory | **persisted on every node**, refreshed as beats arrive |
+
+Persisting the directory on every node is also what lets a cold client bootstrap from
+what it already knows instead of a hardcoded seed list. Note this does **not** conflict
+with I-ID: a node saving *other* nodes' bridge URLs is fine — what it may never save is
+its own transport identity.
+
+### The one risk this introduces
+
+Made ordinary, the directory inherits the ordinary requirement: **some node's address
+must be near the topic id, or the topic has no root and discovery breaks.** The `host()`
+was masking that.
+
+The topic is `{ region: 'useast', name: 'axona:bridge-directory' }` — pinned to one
+region. Prod runs an `axona-relay@useast` on each of the three droplets, so coverage is
+probably fine, but "probably" is not good enough for the mechanism every client uses to
+find the network. **Measure it before shipping:** who currently roots that topic id, and
+how many distinct nodes hold it.
+
+### Decisions I need from you
+
+1. **Region pin.** The directory is pinned to `useast`, so global discovery depends on
+   one region's coverage. Keep it simple and single-region, or give each region its own
+   directory topic (bridges publish to their own, clients read their own and fall back)?
+   Single-region is what works today; per-region removes a global dependency on one
+   region but multiplies the topic.
+2. **Bridge author key: durable or ephemeral?** Today the bridge mints an *ephemeral*
+   author, so the signer rotates every restart and entries dedup on URL alone. I-ID
+   permits a durable author (durable WHO is the legitimate half). A durable one would
+   let a client verify "this is the same bridge that announced last hour" rather than
+   trusting the URL by itself. Worth it, or is URL-plus-TLS enough?
+3. **Retention window.** For "older than an hour ⇒ offline" to be readable, the topic
+   must retain at least two or three hours of beats so a fresh subscriber sees the
+   current generation. What ceiling do we want?
+4. **Persist cadence on nodes.** Save on every arriving beat, or debounce? And prune
+   entries past what age, so the book does not grow without bound?
+
+I have not implemented any of this — the design touches the release, so it should be
+settled first.
 
 ## 5. What 4.43.0 is
 
@@ -121,7 +177,11 @@ work touches `rootClaim` / `repairPlane` / `syncEngine`. Different files, no con
 4.43.0  =  testnet 4.39.2
         +  metrics().publishes            (restored from 4.41.0)
         +  connect exported from root     (restored from 4.40.0)
-        +  bridge directory hosting fix   (required by the address rule)
+        +  bridge directory as an ORDINARY topic:
+             · drop the bridge's host() call
+             · hourly re-publish per bridge (heartbeat)
+             · freshness = liveness (stale ⇒ presumed offline)
+             · every node persists its directory copy
         −  everything from 4.42.0         (re-gated separately)
 ```
 
@@ -130,14 +190,24 @@ everywhere, so `/healthz` tells the whole truth again.
 
 ## 6. Order of work
 
-1. Restore the two reverted pieces onto testnet; kernel suite green.
-2. Measure who roots the bridge-directory topic; fix `bridge_directory.js` accordingly.
-3. Tag 4.43.0. Re-vendor into relay + bridge; re-pin axona-chat and the demo apps.
-4. Testnet first — full fleet, verify `/healthz` reads 4.43.0 everywhere.
-5. Soak on a clean field. This is the baseline everything later gets measured against,
+1. **Measure the directory's coverage first** — who roots `axona:bridge-directory`
+   today, and how many distinct nodes hold it. This gates the whole directory change:
+   if nothing is near that address, dropping the `host()` breaks discovery, and we need
+   to know that before writing code rather than after deploying it.
+2. Settle the four directory decisions (region pin, bridge author key, retention
+   window, persist cadence).
+3. Restore the two reverted pieces onto testnet; kernel suite green.
+4. Implement the directory change: drop `host()`, add the hourly beat, add per-node
+   persistence + pruning. Fence the beat (an entry older than the window is not treated
+   as live) and the no-host path.
+5. Tag 4.43.0. Re-vendor into relay + bridge; re-pin axona-chat and the demo apps.
+6. Testnet first — full fleet, verify `/healthz` reads 4.43.0 everywhere. Then leave it
+   running long enough to see **at least two directory beats** land and a deliberately
+   stopped bridge age out of the listing.
+7. Soak on a clean field. This is the baseline everything later gets measured against,
    so it is worth doing properly rather than quickly.
-6. Promote to prod: bridges first, then the 9 relays rolling, then the apps.
-7. Re-gate 4.42.0 separately against 4.43.0.
+8. Promote to prod: bridges first, then the 9 relays rolling, then the apps.
+9. Re-gate 4.42.0 separately against 4.43.0.
 
 **Note on axona-peer:** frozen since 4.38.0 and deliberately not part of this. It gets
 no re-vendor, no version bump, no kernel pin change.
