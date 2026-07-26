@@ -16,6 +16,28 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.44.0 — 2026-07-26 — **NOT YET DEPLOYED** — durability: a departing node's history survives a mass departure
+
+When a node leaves the network it hands the topic histories it holds to the
+successors nearest each topic, and waits for them to acknowledge. That wait was a
+**fixed** interval, while the work on the receiving side grows with the number of
+topics being transferred. A node holding dozens of topics therefore ran out of time
+before its successors could finish acknowledging — and each unacknowledged topic
+fell through to a single unconfirmed fallback send. Where the leaver held the only
+copy, that history could be lost.
+
+**What is protected.** The acknowledgement window now scales with the size of the
+batch being handed off (capped), and exits early both when every successor has
+acknowledged and when acknowledgements stop arriving altogether — so it spends time
+in proportion to evidence of progress rather than to a guess. A departure that
+transfers 68 topics now completes with zero unacknowledged, where previously all 68
+were unacknowledged.
+
+**Scope.** No protocol or wire change; the receiving side is untouched, so upgraded
+and un-upgraded nodes interoperate. This restores a fix that first shipped in
+v4.42.0, a release that was withheld and therefore never reached production; the
+withheld release's other contents remain withheld.
+
 ## Kernel v4.43.0 / relay v0.84.0 / bridge v2.95.0 — 2026-07-26 — **DEPLOYED TO PROD** — privacy: a node's transport identity is never persisted
 
 A node's **transport identity** — its `nodeId` and the keypair behind it — is now
