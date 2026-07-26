@@ -142,6 +142,51 @@ twice on 4.41.0 would show nothing, since the fix lives in the departing node's 
 pin is transitive through `civildefense.io`, so it may need a bump there too. Happy to help
 with that.
 
+## 4b. Second arm, `--includeImages false` — this one reached confirmation
+
+With the image path removed the run completed end to end, so we also have delivery numbers.
+577 publications in 385 topics.
+
+**Departures.** Three nodes left during the run, and the axon counts show why your suite is
+such a good stress case:
+
+| node | axons held at departure |
+|---|---|
+| publisher | 694 |
+| confirm subscriber 1 | 456 |
+| confirm subscriber 2 | 742 |
+
+**161 `handoff-unacked` across the three.** Note the confirm subscribers shed as many roles
+as the publisher — they burst-subscribe hundreds of topics, accrue holder roles, then leave.
+So the suite partly injects the churn class it is measuring. Not a criticism; it makes it a
+sterner test than a single-publisher departure. But it means "unacked" counts should be read
+per-departure, not as one number.
+
+**Delivery — and a caveat that matters more than the number.** 283 topics reported a count
+mismatch, distributed like this:
+
+| received per 1 published | topics |
+|---|---|
+| 6 | 145 |
+| 7 | 44 |
+| 5 | 39 |
+| 8 | 11 |
+| 3–4 | 21 |
+| 1–2 | 7 |
+| **0** | **16** |
+
+**The 5–8 range is almost certainly not a kernel fault, and I am not reporting it as one.**
+Your topic names are deterministic (`civildefense.io:4:<cell>:<tag>`), and I ran the suite
+four times today against prod — twice crashing partway, so their kill bookkeeping never
+completed. Six-ish stale events per topic is exactly what four of my runs plus your earlier
+ones would leave behind. **The topic namespace is dirty, so treat these delivery figures as
+unusable until a clean-slate run.** I'd want fresh topic names or a verified full kill sweep
+before quoting any delivery percentage.
+
+**The 16 zero-delivery topics are the interesting residue** — that's the class you reported
+as 20/116 on the earlier 4.41.0 run. 16 of 385 here, but with a dirty namespace I won't
+convert that to a rate.
+
 ## 5. How to reproduce what I ran
 
 ```
