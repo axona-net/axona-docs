@@ -16,7 +16,35 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
-## Kernel v4.44.0 — 2026-07-26 — **NOT YET DEPLOYED** — durability: a departing node's history survives a mass departure
+## Kernel v4.45.0 — 2026-07-26 — durability: an acknowledgement now means the history was actually kept
+
+When a node leaves, it hands each topic's history to the successor nearest that
+topic and waits for an acknowledgement before considering the topic safe. The
+acknowledgement was sent whenever the receiver finished *processing* the batch —
+not when it finished *keeping* it. A receiver that discarded part of a batch (a
+malformed record, a record whose signature did not verify, a record stamped
+implausibly far in the future) sent an acknowledgement indistinguishable from one
+that kept everything. The departing node then treated that topic as safe, skipped
+both its retry and its wider redistribution, and left. Where it held the only
+copy, the discarded records were gone.
+
+**What is protected.** The acknowledgement now carries a count of what the
+receiver actually holds against what was sent, and a departing node treats a
+short count as *not acknowledged* — retry and wider redistribution still run, so
+the last copy of a record is not dropped on the strength of a confirmation that
+was never true. Records the receiver already held, or had deliberately retired
+via a kill, count as kept: its state correctly accounts for them. The two discard
+paths that previously left no trace at all are now recorded, so a shortfall can be
+attributed rather than merely observed. Nodes running older builds omit the count;
+those acknowledgements are accepted as before, so a mixed network keeps working.
+
+**Why it matters beyond this one path.** A confirmation is only worth what it
+actually verifies. This change is the same discipline applied elsewhere in Axona:
+a claim is checked against evidence, not accepted on assertion.
+
+---
+
+## Kernel v4.44.0 — 2026-07-26 — durability: a departing node's history survives a mass departure
 
 When a node leaves the network it hands the topic histories it holds to the
 successors nearest each topic, and waits for them to acknowledge. That wait was a
