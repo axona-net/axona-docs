@@ -16,7 +16,7 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
-## Kernel v4.39.2 / relay v0.82.0 — 2026-07-25 — **privacy: a node's transport identity is never persisted**
+## Kernel v4.43.0 / relay v0.84.0 / bridge v2.95.0 — 2026-07-26 — **DEPLOYED TO PROD** — privacy: a node's transport identity is never persisted
 
 A node's **transport identity** — its `nodeId` and the keypair behind it — is now
 minted fresh on every process start and written to no persistent store. Its
@@ -54,6 +54,32 @@ a **different** `nodeId`, while its author identity must **still** round-trip; p
 per-repo static fence that scans source *and* configuration for identity paths,
 identity files, and any claim that a `nodeId` survives a restart — deployment
 artifacts included, since one instance of the anti-pattern lived in a compose comment.
+
+**Also in this release — the bridge directory stops being a special case.**
+
+- **No node hosts the directory topic by exception any more.** The bridge used to
+  `host()` its own directory topic regardless of where its address fell, which is
+  the one thing the address rule forbids. It is now an ordinary open topic that
+  roots wherever its id lands. The reason the exception existed — a launch publish
+  landing in a not-yet-assembled mesh — is handled instead by an hourly re-publish,
+  which makes a lost publish harmless.
+
+- **Bridges now carry a DURABLE author key** (and only that key; their transport
+  identity is still minted fresh every start). A client can therefore verify that
+  the bridge announcing itself this hour is the same one that announced last hour,
+  rather than trusting the URL alone. This is the legitimate half of I-ID: durable
+  WHO, ephemeral WHERE.
+
+- **Entry freshness is now the liveness signal.** A bridge that dies simply stops
+  beating and ages out of the listing; there is no departure protocol, no tombstone,
+  and nothing to forge or replay. Entries expire on the ordinary 24h ceiling.
+
+- **A non-production bridge must never advertise itself** (`BRIDGE_DIRECTORY=off`
+  on testnet/staging/scratch). This is now written into the deploy guide as a rule,
+  because the consequence is permanent rather than transient: every node *persists*
+  the directory entries it hears, so one stray advertisement from a test bridge is
+  written into the bootstrap book of every client that heard it and stays there.
+  Freshness ages out the entry; it does not remove the URL from a URL-keyed book.
 
 ## Kernel v4.42.0 — 2026-07-25 — **HELD, NOT DEPLOYED** — durability: graceful-leave handoff scales with role count
 
