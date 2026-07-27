@@ -1,6 +1,6 @@
 # Saturation and Admission — a node must be able to say "no"
 
-**v0.2 · 2026-07-27 · kernel 4.45.0 on prod · status: DESIGN, nothing implemented**
+**v0.3 · 2026-07-27 · kernel 4.45.0 on prod · status: DESIGN, nothing implemented**
 
 ## The one-sentence version
 
@@ -122,48 +122,46 @@ whose address should carry no keyspace obligation.
 
 ---
 
-## D0 — Role-admission grace: transport at once, roles in a minute
+---
 
-*Added v0.2 on David's directive, 2026-07-27. This is the FIRST thing to build —
-it is smaller than everything below and it addresses the incident we actually hit.*
+## D0 — ONE refusal gate, TWO reasons
 
-### The insight
-
-A joining node needs to carry traffic immediately, because **transport is what
-integrates it** — reachability to a newcomer lives in its neighbours' routing
-tables and is healed by inbound traffic, not by waiting. But it does **not** need
-to *manage* a role immediately, and role management is exactly what breaks it:
-bulk role ingest blocks the event loop, the client-hello misses the bridge's 5 s
-deadline, the bridge rejects it, and it accrues more roles while locked out.
-
-Separate the two. **Route from the first second; manage nothing for a minute.**
-
-### It generalises a guard that already exists
-
-`wireHandlers.js:99` already declines to self-root when `meshBare()`:
+*v0.3, 2026-07-27. David: "both of those should refuse new roles if necessary."
+v0.2 had these as separate mechanisms — grace for the newcomer, saturation for
+the loaded node. That was a structural mistake. They are two reasons for the
+same decision and they share one gate, one decline path, and one floor.*
 
 ```js
-if (idBig(lc(payload.subscriberId)) === this.nodeId && this._rootClaim.meshBare()) return 'consumed';
+// AxonaManager — the ONLY place that decides whether a role may be taken.
+canAcceptRole() {
+  if (!this.seated())      return { ok: false, why: 'not-seated'  };  // NOT YET
+  if (this.saturated())    return { ok: false, why: 'saturated'   };  // NOT ANY MORE
+  return { ok: true };
+}
+
+// NOT YET — a joining node transports at once, manages nothing until it is in.
+seated() {
+  return (this._now() - this._joinedAt) >= ROLE_GRACE_MS   // 60-120 s
+      && this.state === 'open'
+      && this.openMeshChannels() >= 1;   // OPEN, not merely bound. Tonight's
+}                                        // locked-out relays are 0 open / 58 bound.
+
+// NOT ANY MORE — self-declared, self-limiting, can only ever hold LESS.
+saturated() {
+  return this.axonRoles.size            >= MAX_ROLES
+      || this.cacheBytesTotal           >= RELAY_CACHE_BYTES
+      || this.ingestQueueDepth          >= INGEST_QUEUE_MAX * 0.75;
+}
 ```
 
-`meshBare()` is binary and far too eager to clear — it returns false as soon as
-ONE routable non-bridge neighbour exists, which is nothing like being seated. D0
-is that same instinct, with a threshold that means something.
+Both branches are refusals of *new* roles. Neither ever sheds what the node
+already promised — a node that drops held roles under pressure is a node whose
+acks cannot be trusted, which is the #402 lesson.
 
-### The gate
+### One decline path
 
-```
-inRoleGrace() = (now - joinedAt) < ROLE_GRACE_MS      // David: 60–120 s
-             || !seated()                             // and not yet actually seated
-```
-
-`seated()` should be a real readiness predicate, not just a clock: `state == open`
-AND at least one OPEN mesh channel (not merely bound — tonight's locked-out relays
-show `mesh(open/bound)=0/58`, i.e. 58 bound and zero open). A node that never
-seats never manages roles — and that is correct. It still transports.
-
-While `inRoleGrace()`, **all five `_becomeRoot` sites decline.** Declining is not
-dropping, and it means something different per site:
+All five `_becomeRoot` sites consult `canAcceptRole()`. Declining is not
+dropping, and the per-site semantics are identical whichever reason fired:
 
 | `why` | Decline behaviour | Risk if wrong |
 |---|---|---|
@@ -173,31 +171,38 @@ dropping, and it means something different per site:
 | `kill-terminal` | forward the kill | tombstone lost, killed msg resurrects |
 | `metricson-terminal` | forward or no-op | cosmetic only |
 
-`pub-terminal` is the dangerous one and needs the most care: a node in grace that
-declines to root a publish, with nowhere to forward it, has lost the message.
+`pub-terminal` is the dangerous one: a node that declines to root a publish with
+nowhere to forward it has destroyed the message.
 
-### 4.45.0 is a prerequisite, not a coincidence
+### One floor — and it must ship in the same commit
 
-Declining a `handoff-heir` is only safe **because** 4.45.0 made the handoff ack
-honest (#402). Before that, a refusal and a successful adoption were
-indistinguishable on the wire — the leaver would have marked the topic acked,
-skipped retry and cohort spray, and departed, dropping the last copy. The honest
-ack is what makes "no" a usable answer.
+If EVERY candidate refuses, nobody roots and the topic has no root. Both reasons
+can do this, in different ways, and both happened tonight:
 
-### The floor — the failure mode this could cause
+* **all not-seated** — a fleet-wide restart puts every relay in grace at once
+* **all saturated** — 9 relays at 400-700 roles each on 961 MB boxes
 
-If **every** candidate is in grace, nobody accepts and topics have no root. That
-is precisely tonight's shape: a fleet-wide restart puts all nine relays in grace
-simultaneously. So there must be a floor: when no out-of-grace candidate exists,
-**accept anyway and log `admitted-in-grace`** — the same shape
-`wireHandlers.js:174` already uses to seat a subscriber over capacity. A grace
-period that can partition the network is worse than no grace period.
+So: when no accepting candidate exists, **accept anyway and log
+`admitted-despite { why, roles, cacheBytes }`**. Mirrors `wireHandlers.js:174`
+seating a subscriber over capacity. The log line is what turns a silent overload
+into a visible one — refusing everywhere without it is a partition we could not
+diagnose.
 
-### Why this is separable from D3
+### One declaration
 
-Grace says "not yet". `MAX_ROLES` says "not any more". Different mechanisms,
-different triggers, both needed — and grace is far cheaper, needs no beacon
-change, and is the one that fixes the incident of 2026-07-27.
+`canAcceptRole()`'s verdict rides the existing liveness beacon — no new round
+trip. Heir selection and cohort spray in `repairPlane` skip candidates that
+declare either reason, walking on to the next-closest willing node. This is what
+makes refusal useful rather than merely polite: today a refused node still gets
+picked again immediately, because the chooser cannot see the refusal.
+
+### Why the address rule survives this
+
+Both reasons are properties of the node's OWN state, self-declared and
+self-limiting, and can only ever cause a node to hold LESS. Neither can be used
+to ACQUIRE a role — only to decline one. Skipping a refusing node is therefore
+not a privilege granted to anybody; it is the chooser respecting an honest
+"cannot". That keeps it outside the class of thing the address rule forbids.
 
 
 ## 3. Design
