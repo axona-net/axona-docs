@@ -32,6 +32,8 @@ Every rule here is either **fenced** (a named test fails if it regresses) or **d
 | B8 | A **kill callback fires only if the body was delivered** to that app. | topicStore `_deliverKillToApp` | `smoke_pubsub_kill.mjs` |
 | B9 | **Converge before serving authority** — an empty self-root pulls cohort history before acting as root. | rootClaim `become` → birth probe | `smoke_empty_root_pull.mjs` |
 | B10 | **Eviction is principal-liveness-gated** (I-10) — a planted nature is retired only when its principal is gone AND re-homed. | rootClaim `retireBackup` + policy-table `evictor` column | `smoke_sync_engine.mjs` (evictor completeness) |
+| B12 | **A bridge is a bridge — it has no other role. Always.** A bridge transports and introduces; it never holds a topic role (root, backup, child or holder), at any load, in any topology, with no floor exception. | routing refuses it as a next hop (`AxonaPeer.js:647`) · `host()` removed 2026-07-25 · `neverRoot:true` HARD admission refusal (bridge_engine, kernel 4.46.0) | `smoke_role_admission.mjs` (bridge refusal is HARD; floor must not override) — **needs a fence asserting a bridge peer ends with axonRoles empty after bring-up** |
+| B13 | **Capacity is measured, never counted.** A node's fitness to hold roles is observed pressure against real protocol deadlines (`servicePressure` = staleness / `DROP_MS`; `helloPressure` = tick lag / `HELLO_DEADLINE_MS`), never `axonRoles.size`. A count is inventory; these measure capability, which is what predicts failure. | `AxonaManager.inspectCapacity()` + `saturated()` (kernel 4.47.0) | `smoke_role_admission.mjs` — asserts MAX_ROLES roles all serviced on time is a HEALTHY node |
 | B11 | A **mass leaver's sole-copy topics hand off first** (singletons → replicated roots → holders), so a cut-off departure saves the most vulnerable history. | repairPlane job tiering | `smoke_handoff_scaling.mjs` (indirect) — **partial fence** |
 | **I-ID** | **Transport identity is ephemeral; author identity is durable.** A node's transport identity (nodeId + keypair) is minted fresh every process start and written to NO persistent store — not a namespace, not a file, not a snapshot, not a container volume. An author identity may and must persist. | kernel: `_writeNamespace('identity')` no-op + `_loadFromPersist` ignores + `snapshot()` carries no identity · relay/MCP: author-only store, `connectPeer()` takes no identity | `smoke_persistence_wiring.js` (restart ⇒ different nodeId; author still persists) · `smoke_snapshot.js` · `fence_transport_identity.mjs` (static, per repo) |
 
@@ -68,6 +70,34 @@ precedent for hard admission refusals — it is not precedent for anything.
 **What may depend on region:** ranking candidates, choosing a mint point,
 preferring a nearer holder. **What may not:** whether a role can be taken, held,
 handed off, or routed to.
+
+### B12 in full — the bridge, and why the fence is absolute
+
+The tempting exception is: what if a bridge is the only candidate for a topic and
+refusing loses a publish? Grant the exception and a bridge roots under load,
+which is exactly when it can least afford to.
+
+The exception is unnecessary. A bridge is the sole candidate only when the mesh is
+so small that it is nearly the only node — a fresh-launch window. Loss there is
+uninteresting: transient, with nothing yet stored, and it closes by itself as real
+nodes arrive. Trading a permanent architectural property for a few seconds of
+empty-network durability is a bad trade.
+
+Three independent doors enforce it, and it is worth knowing all three so nobody
+"fixes" one thinking it is the only guard:
+
+1. **Routing** (oldest): `AxonaPeer.js:647` skips the bridge in the greedy
+   next-hop scan — `bridge is signaling infra, not a topic root/forwarder`. Mesh
+   traffic is never routed toward a bridge at all.
+2. **`host()` removed** (2026-07-25): the bridge no longer explicitly hosts the
+   directory topic.
+3. **`neverRoot`** (kernel 4.46.0): the bridge's own `sub()` can no longer
+   self-root. HARD tier — the `admitted-despite` floor may never override it.
+
+A design draft (Saturation-and-Admission v0.5) proposed softening (3) when the
+alternative was data loss. Rejected 2026-07-27. See that doc for the correction,
+including a reroute-loop claim that turned out to be speculation — a `'consumed'`
+return ends the walk, and the bridge's own re-send finds a relay.
 
 ### I-ID in full — why this one is not a preference
 

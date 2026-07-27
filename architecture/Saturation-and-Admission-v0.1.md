@@ -1,6 +1,6 @@
 # Saturation and Admission — a node must be able to say "no"
 
-**v0.5 · 2026-07-26 · kernel 4.45.0 on prod · status: DESIGN, nothing implemented**
+**v0.6 · 2026-07-27 · kernel 4.45.0 on prod · status: DESIGN, nothing implemented**
 
 ## The one-sentence version
 
@@ -154,13 +154,51 @@ seated() {
       && this.openMeshChannels() >= 1;   // OPEN, not merely bound. Tonight's
 }                                        // locked-out relays are 0 open / 58 bound.
 
-// NOT ANY MORE — self-declared, self-limiting, can only ever hold LESS.
+// NOT ANY MORE — v4.47.0: MEASURED capability, not counted inventory.
 saturated() {
-  return this.axonRoles.size   >= MAX_ROLES
-      || this.cacheBytesTotal  >= RELAY_CACHE_BYTES
-      || this.ingestQueueDepth >= INGEST_QUEUE_MAX * 0.75;
+  const c = this.inspectCapacity();
+  if (c.servicePressure >= SATURATION_PRESSURE) return true;  // roles are rotting
+  if (c.helloPressure   >= SATURATION_PRESSURE) return true;  // about to be kicked
+  return c.roles >= this._maxRoles * 8;                       // telemetry-dead backstop only
 }
 ```
+
+### Capacity is MEASURED, not counted (v4.47.0)
+
+The v4.46.0 predicate was `axonRoles.size >= MAX_ROLES`. That asks about
+inventory. 96 idle roles is nothing; 96 hot ones may be fatal; the same count
+means different things on different hardware. Prod settled the argument
+empirically — MAX_ROLES was 96 while relays ran 184 / 269 / 389 / 434 / 627 /
+644 / 725 / 1182, because the floor must admit every terminal role or drop the
+message. A number exceeded twelvefold in normal operation is not a ceiling.
+
+Two observed measurements replace it, each divided by a deadline the protocol
+already enforces, so each reads as *fraction of the way to a named failure*:
+
+| metric | numerator (observed) | denominator | 1.0 means |
+|---|---|---|---|
+| `servicePressure` | age of least-recently-serviced role (`role.sync.lastServicedAt`, stamped for ALL roles each tick) | `DROP_MS` 180s | a role has SILENTLY ROTTED — its cohort gave up on it |
+| `helloPressure` | tick lag: gap between tick starts minus the interval requested | `HELLO_DEADLINE_MS` 5s | this node is being CLOSED by the bridge — the #332 spiral |
+
+`servicePressure` measures the *outcome* (staleness), so one number catches
+skipped ticks, event-loop stalls, budget starvation and GC pauses together.
+`helloPressure` covers the case `servicePressure` cannot: a node drowning in
+publish ingest while holding few roles. Both, never either.
+
+**What was deliberately NOT used.** `ceil(roles / REPLICATE_FULL_BUDGET) * tick`
+looks like a capacity metric and is not — it is a linear function of the role
+count, i.e. MAX_ROLES in different units. It was computed (it put sfo3's 1182
+roles at 103 % of DROP_MS, which is a true and useful *illustration*) and then
+rejected as a *predicate*, because shipping it would have been arithmetic wearing
+a telemetry costume.
+
+**Consequence for saturation-skipping in healing.** The node a chooser should
+skip is the one with high pressure, not the one with a high role count. Those are
+different sets — the earlier design would have skipped the wrong nodes.
+
+`MAX_ROLES` survives only as a far-off (8x) backstop for the case where telemetry
+itself is dead — no tick has run, so every pressure reads 0 and the node looks
+perfectly healthy. It must never be the primary signal again.
 
 ### Three reasons, two tiers
 
@@ -187,14 +225,47 @@ Both were wrong:
 The shipped default is correct. The hazard was the *documentation* asserting the
 opposite, which would have led a reader to enable the lock to restore compliance.
 
-**Why the bridge is the only HARD reason.** A soft bridge refusal would be
-overridden by the floor the first time every candidate in a neighbourhood was
-busy — quietly, under exactly the load where the bridge is least able to afford
-it, with the `admitted-despite` line making it look intentional. The bridge is
-the one node whose failure is least tolerable; its address must carry no keyspace
-obligation at any pressure. `host()` was removed on 2026-07-25 for this reason
-and `sub()` kept rooting anyway (see 2.4) — a soft tier would reopen that door on
-a timer.
+**Why the bridge is the only HARD reason — and why it is ABSOLUTE.**
+
+> "A bridge is a bridge — it has no other role. This is always true."
+> — David, 2026-07-27
+
+No floor exception. No soft tier. No "unless the alternative is data loss". An
+earlier draft of this doc (v0.5) proposed exactly that hedge and it was wrong:
+the only situation in which a bridge is the sole candidate for a topic is a mesh
+so small that the bridge is nearly the only node — a fresh-launch window. A loss
+there is uninteresting: it is transient, and the mesh is holding nothing yet. The
+window closes on its own the moment real nodes arrive. Buying insurance against
+it by letting a bridge root would trade a permanent architectural property for a
+few seconds of empty-network durability.
+
+**The routing layer already enforced this before admission control existed.**
+`AxonaPeer.js:647`, in the greedy next-hop scan:
+
+```js
+if (bridgeId !== null && syn.peerId === bridgeId) continue;   // bridge is signaling infra, not a topic root/forwarder
+```
+
+Nodes do not route topic traffic toward a bridge at all. So a bridge is
+essentially never the terminus for anything arriving from the mesh — only for
+traffic it originates itself (its own `sub()` on `axona:bridge-directory`).
+`neverRoot` therefore closes the *last* door rather than opening a new front:
+`host()` was removed 2026-07-25, `sub()` self-rooting is closed now, and routing
+had already refused to deliver topic work here. Three doors, all shut, one
+principle.
+
+*Correction on record:* v0.5 of this doc claimed a fenced bridge would enter a
+reroute loop, because `_send` falls back to `target = topicId` (AxonaManager.js:186)
+and routing toward `topicId` from its own terminus returns to self. That was
+inferred from `_send` alone without reading the routing layer, and it is wrong on
+two counts: a `'consumed'` return ends the walk (AxonaPeer.js:672), and the
+bridge's fresh walk scans a synaptome full of relays and forwards to one. No loop
+forms. The claim was speculation reported as a finding.
+
+*Residual wart, not a fault:* `sub-terminal` returns `'consumed'` without seating
+AND without rerouting, where `pub`/`kill` at least reroute. Unreachable from mesh
+traffic for the line-647 reason above, so it is an inconsistency to tidy rather
+than a live gap.
 
 ### One decline path
 
