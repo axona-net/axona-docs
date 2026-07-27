@@ -1,6 +1,6 @@
 # Saturation and Admission — a node must be able to say "no"
 
-**v0.1 · 2026-07-27 · kernel 4.45.0 on prod · status: DESIGN, nothing implemented**
+**v0.2 · 2026-07-27 · kernel 4.45.0 on prod · status: DESIGN, nothing implemented**
 
 ## The one-sentence version
 
@@ -76,13 +76,16 @@ become the next comfortable theory.
 ### 2.3 A node can never refuse a role
 
 There is no cap on `axonRoles.size` anywhere in the kernel. `_becomeRoot()` is
-called unconditionally from three sites:
+called unconditionally from **five** sites (v0.1 of this doc said three — wrong,
+corrected by re-reading):
 
-| Site | Trigger |
+| Site | `why` |
 |---|---|
-| `wireHandlers.js:101` | a SUB terminates here → `'sub-terminal'` |
-| `syncEngine.js:165` | a HANDOFF arrives → `'handoff-heir'` |
-| `AxonaManager.js:211` | definition |
+| `wireHandlers.js:101` | `sub-terminal` — a SUB terminates here |
+| `wireHandlers.js:265` | `pub-terminal` — a PUB terminates here |
+| `wireHandlers.js:662` | `kill-terminal` |
+| `wireHandlers.js:772` | `metricson-terminal` |
+| `syncEngine.js:165` | `handoff-heir` — a HANDOFF arrives |
 
 The only refusal in the whole surface is regional (`host-refused-foreign-region`).
 Capacity handling exists for **subscribers** — `MAX_DIRECT = 20`, then delegate
@@ -116,6 +119,86 @@ roots — it is the one node in the system whose failure is least tolerable and
 whose address should carry no keyspace obligation.
 
 ---
+
+---
+
+## D0 — Role-admission grace: transport at once, roles in a minute
+
+*Added v0.2 on David's directive, 2026-07-27. This is the FIRST thing to build —
+it is smaller than everything below and it addresses the incident we actually hit.*
+
+### The insight
+
+A joining node needs to carry traffic immediately, because **transport is what
+integrates it** — reachability to a newcomer lives in its neighbours' routing
+tables and is healed by inbound traffic, not by waiting. But it does **not** need
+to *manage* a role immediately, and role management is exactly what breaks it:
+bulk role ingest blocks the event loop, the client-hello misses the bridge's 5 s
+deadline, the bridge rejects it, and it accrues more roles while locked out.
+
+Separate the two. **Route from the first second; manage nothing for a minute.**
+
+### It generalises a guard that already exists
+
+`wireHandlers.js:99` already declines to self-root when `meshBare()`:
+
+```js
+if (idBig(lc(payload.subscriberId)) === this.nodeId && this._rootClaim.meshBare()) return 'consumed';
+```
+
+`meshBare()` is binary and far too eager to clear — it returns false as soon as
+ONE routable non-bridge neighbour exists, which is nothing like being seated. D0
+is that same instinct, with a threshold that means something.
+
+### The gate
+
+```
+inRoleGrace() = (now - joinedAt) < ROLE_GRACE_MS      // David: 60–120 s
+             || !seated()                             // and not yet actually seated
+```
+
+`seated()` should be a real readiness predicate, not just a clock: `state == open`
+AND at least one OPEN mesh channel (not merely bound — tonight's locked-out relays
+show `mesh(open/bound)=0/58`, i.e. 58 bound and zero open). A node that never
+seats never manages roles — and that is correct. It still transports.
+
+While `inRoleGrace()`, **all five `_becomeRoot` sites decline.** Declining is not
+dropping, and it means something different per site:
+
+| `why` | Decline behaviour | Risk if wrong |
+|---|---|---|
+| `sub-terminal` | re-route the SUB onward to the next-closest node | subscriber never attaches |
+| `pub-terminal` | **forward the PUB toward the real root — never swallow it** | **message loss** |
+| `handoff-heir` | refuse; the leaver picks another heir | last copy dropped |
+| `kill-terminal` | forward the kill | tombstone lost, killed msg resurrects |
+| `metricson-terminal` | forward or no-op | cosmetic only |
+
+`pub-terminal` is the dangerous one and needs the most care: a node in grace that
+declines to root a publish, with nowhere to forward it, has lost the message.
+
+### 4.45.0 is a prerequisite, not a coincidence
+
+Declining a `handoff-heir` is only safe **because** 4.45.0 made the handoff ack
+honest (#402). Before that, a refusal and a successful adoption were
+indistinguishable on the wire — the leaver would have marked the topic acked,
+skipped retry and cohort spray, and departed, dropping the last copy. The honest
+ack is what makes "no" a usable answer.
+
+### The floor — the failure mode this could cause
+
+If **every** candidate is in grace, nobody accepts and topics have no root. That
+is precisely tonight's shape: a fleet-wide restart puts all nine relays in grace
+simultaneously. So there must be a floor: when no out-of-grace candidate exists,
+**accept anyway and log `admitted-in-grace`** — the same shape
+`wireHandlers.js:174` already uses to seat a subscriber over capacity. A grace
+period that can partition the network is worse than no grace period.
+
+### Why this is separable from D3
+
+Grace says "not yet". `MAX_ROLES` says "not any more". Different mechanisms,
+different triggers, both needed — and grace is far cheaper, needs no beacon
+change, and is the one that fixes the incident of 2026-07-27.
+
 
 ## 3. Design
 
@@ -200,7 +283,10 @@ failed precisely because nothing checked the outcome — only the intent.
 
 ## 4. Sequencing
 
-1. **D2 observability first** — `cache-evicted` + the global byte counter. It is
+0. **D0 role-admission grace** — smallest change, fixes the observed incident,
+   and reuses an existing guard. Needs the `admitted-in-grace` floor in the same
+   commit, or a fleet restart partitions the network.
+1. **D2 observability** — `cache-evicted` + the global byte counter. It is
    the cheapest change and it tells us whether eviction is actually happening in
    the field. Everything else is guesswork until we can see it.
 2. **D4 bridge fence** — small, isolated, verifiable, and it removes load from
