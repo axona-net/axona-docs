@@ -22,7 +22,7 @@ Every rule here is either **fenced** (a named test fails if it regresses) or **d
 
 | # | Invariant | Enforced at | Fence |
 |---|-----------|-------------|-------|
-| B1 | The topic tree is **region-homogeneous**; a terminus refuses out-of-region topics. | wireHandlers terminus region check | `smoke_region_lock.mjs` |
+| B1 | **Region is an optimization, never a wall.** Region prefixes bias placement toward locality; they NEVER decide whether a node may hold, root, or route a topic. A sparse region must roll over into its neighbours. See "B1 in full" below — the region-lock machinery exists and defaults OFF; leaving it off is the invariant. | `isRegionLockEnforced === false` (constants.js) | `smoke_region_lock.mjs` fences the dormant path only — **needs a fence asserting the default stays off** |
 | B2 | A joiner **iteratively verifies before self-rooting** (network lookup past the local table). | rootElection `_rootHint_` | `smoke_root_hint.mjs`, `smoke_interloper_convergence.mjs` |
 | B3 | **Never defer to a farther node, a ghost, or the departing node** (I-2). | rootClaim `liveCloserRoot` + leaver-beacon purge | `smoke_leave_handoff_burst.mjs` (heir no-defer case) |
 | B4 | **Roots union-ingest** — a REPLICATE at a claim-holder merges; it never usurps or is refused. | syncEngine `UNION_AT_ROOT` | `smoke_split_history_union.mjs` |
@@ -34,6 +34,40 @@ Every rule here is either **fenced** (a named test fails if it regresses) or **d
 | B10 | **Eviction is principal-liveness-gated** (I-10) — a planted nature is retired only when its principal is gone AND re-homed. | rootClaim `retireBackup` + policy-table `evictor` column | `smoke_sync_engine.mjs` (evictor completeness) |
 | B11 | A **mass leaver's sole-copy topics hand off first** (singletons → replicated roots → holders), so a cut-off departure saves the most vulnerable history. | repairPlane job tiering | `smoke_handoff_scaling.mjs` (indirect) — **partial fence** |
 | **I-ID** | **Transport identity is ephemeral; author identity is durable.** A node's transport identity (nodeId + keypair) is minted fresh every process start and written to NO persistent store — not a namespace, not a file, not a snapshot, not a container volume. An author identity may and must persist. | kernel: `_writeNamespace('identity')` no-op + `_loadFromPersist` ignores + `snapshot()` carries no identity · relay/MCP: author-only store, `connectPeer()` takes no identity | `smoke_persistence_wiring.js` (restart ⇒ different nodeId; author still persists) · `smoke_snapshot.js` · `fence_transport_identity.mjs` (static, per repo) |
+
+### B1 in full — region is an optimization, reaffirmed 2026-07-26
+
+**The rule.** A region prefix biases *where* a topic prefers to live, to keep
+traffic near its users. It is a hint to placement and ranking. It is not a
+capability boundary, not an admission check, and not a reason to refuse a role.
+Nothing outside placement quality may depend on it.
+
+**Why it cannot be load-bearing.** Regions are unevenly populated by nature —
+some cells will have a handful of nodes, some none. A region that is allowed to
+refuse out-of-region work cannot borrow capacity from next door, so a thin region
+degrades to unrooted topics and dropped publishes while healthy neighbours sit
+idle metres away in the keyspace. Locality is worth optimizing for and worth
+nothing to enforce: the failure mode of a missed optimization is a slower hop,
+the failure mode of an enforced wall is data with nowhere to live.
+
+**Current code state, verified 2026-07-26.** `isRegionLockEnforced` resolves to
+`false`. The refusal paths exist — `AxonaManager.js:186 _regionOk`, `:387
+host-refused-foreign-region`, `wireHandlers.js:67/205/234`, `repairPlane.js:60/511`
+— and every one is dormant behind that flag. **The shipped default is correct.**
+The hazard is the dormant machinery plus the previous wording of this row, which
+described the wall as the invariant and would have led a future reader to flip
+the flag *to restore compliance*.
+
+**This is a reaffirmation, not a new decision.** It was settled well before this
+entry; [[research_cross_region_selfroot_fix]] records it as "region prefix = HINT
+not wall" from the 4.17.1 cross-region fix, where treating the prefix as a wall
+had already produced 0 % cross-region delivery. Rewritten here because the row
+above said the opposite and because a design draft cited the dormant refusal as
+precedent for hard admission refusals — it is not precedent for anything.
+
+**What may depend on region:** ranking candidates, choosing a mint point,
+preferring a nearer holder. **What may not:** whether a role can be taken, held,
+handed off, or routed to.
 
 ### I-ID in full — why this one is not a preference
 

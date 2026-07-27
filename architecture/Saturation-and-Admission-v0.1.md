@@ -1,6 +1,6 @@
 # Saturation and Admission — a node must be able to say "no"
 
-**v0.4 · 2026-07-27 · kernel 4.45.0 on prod · status: DESIGN, nothing implemented**
+**v0.5 · 2026-07-26 · kernel 4.45.0 on prod · status: DESIGN, nothing implemented**
 
 ## The one-sentence version
 
@@ -136,9 +136,9 @@ same decision and they share one gate, one decline path, and one floor.*
 // TWO TIERS. The floor (below) may override SOFT refusals and must NEVER
 // override HARD ones.
 canAcceptRole() {
-  // ── HARD: categorical. Not capacity. The floor cannot override these. ──
+  // ── HARD: categorical. Not capacity. The floor cannot override this. ──
   if (this.isBridge)              return { ok:false, why:'bridge',         hard:true };
-  if (!this.inRegion(topicBig))   return { ok:false, why:'foreign-region', hard:true };
+  // NOT region. Region is an optimization, never a wall — INVARIANTS.md B1.
 
   // ── SOFT: situational. Self-declared, temporary, floor-overridable. ──
   if (!this.seated())             return { ok:false, why:'not-seated',     hard:false };
@@ -166,27 +166,35 @@ saturated() {
 
 | Reason | Tier | Says |
 |---|---|---|
-| `bridge` | HARD | **not ever** — a bridge is a bridge: transport and introduction |
-| `foreign-region` | HARD | **not here** — the address rule; already enforced today |
+| `bridge` | **HARD** | **not ever** — a bridge is a bridge: transport and introduction |
 | `not-seated` | soft | **not yet** — still integrating; carries traffic, manages nothing |
 | `saturated` | soft | **not any more** — full |
 
-`foreign-region` is not new. `AxonaManager.js:387` already logs
-`host-refused-foreign-region`, which is the only refusal in the kernel today.
-Folding it in is a move, not an invention — and it establishes that hard
-refusals already exist and are already respected.
+**Region is deliberately absent.** v0.4 of this doc listed `foreign-region` as a
+second HARD reason and cited `host-refused-foreign-region` as existing precedent.
+Both were wrong:
 
-**Why the bridge must be HARD.** A soft bridge refusal would be overridden by
-the floor the first time every candidate in a neighbourhood was busy — quietly,
-under exactly the load where the bridge is least able to afford it, and with the
-`admitted-despite` line making it look intentional. The bridge is the one node
-whose failure is least tolerable; its address must carry no keyspace obligation
-at any pressure. `host()` was removed on 2026-07-25 for this reason and `sub()`
-kept rooting anyway (see 2.4) — a soft tier would reopen that door on a timer.
+* **Wrong on principle.** Region is a placement optimization, not a capability
+  boundary. Sparse regions must be able to roll over into their neighbours; a
+  region permitted to refuse work cannot borrow capacity, so a thin region
+  degrades to unrooted topics while healthy neighbours sit idle. Settled long
+  before this doc, and re-affirmed as **INVARIANTS.md B1** on 2026-07-26.
+* **Wrong on fact.** The refusal is dormant: `isRegionLockEnforced` resolves to
+  `false`, so nothing region-gated is enforced in shipped code. It was cited as
+  precedent without resolving the flag — the call site was read, the default was
+  not.
 
-Both branches are refusals of *new* roles. Neither ever sheds what the node
-already promised — a node that drops held roles under pressure is a node whose
-acks cannot be trusted, which is the #402 lesson.
+The shipped default is correct. The hazard was the *documentation* asserting the
+opposite, which would have led a reader to enable the lock to restore compliance.
+
+**Why the bridge is the only HARD reason.** A soft bridge refusal would be
+overridden by the floor the first time every candidate in a neighbourhood was
+busy — quietly, under exactly the load where the bridge is least able to afford
+it, with the `admitted-despite` line making it look intentional. The bridge is
+the one node whose failure is least tolerable; its address must carry no keyspace
+obligation at any pressure. `host()` was removed on 2026-07-25 for this reason
+and `sub()` kept rooting anyway (see 2.4) — a soft tier would reopen that door on
+a timer.
 
 ### One decline path
 
@@ -214,9 +222,9 @@ can do this, in different ways, and both happened tonight:
 
 So: when no candidate with a SOFT refusal remains, **accept anyway and log
 `admitted-despite { why, roles, cacheBytes }`** — soft only. A node whose refusal
-is HARD is never a fallback candidate, however desperate the neighbourhood: if
-every remaining node is a bridge or out-of-region, the correct outcome is an
-unrooted topic and a loud log, not a bridge quietly taking a root. Mirrors `wireHandlers.js:174`
+is HARD is never a fallback candidate, however desperate the neighbourhood: if every
+remaining node is a bridge, the correct outcome is an unrooted topic and a loud
+log, not a bridge quietly taking a root. Mirrors `wireHandlers.js:174`
 seating a subscriber over capacity. The log line is what turns a silent overload
 into a visible one — refusing everywhere without it is a partition we could not
 diagnose.
