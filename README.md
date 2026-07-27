@@ -101,6 +101,7 @@ and others. They are cited throughout the whitepaper and architecture doc.
 - **[`reviews/`](reviews/)** — external AI-agent reviews of the protocol and its documentation, unedited.
 - **[`BUILDING.md`](BUILDING.md)** — how every typeset doc is rendered (source → tectonic → versioned PDF, prior PDF archived to `history/`). Read before bumping any document.
 - **[`TESTNET.md`](TESTNET.md)** — the staging-network quick reference: URLs, version matrix, running apps against the testnet bridge.
+- **[`RELEASE-SURFACES.md`](RELEASE-SURFACES.md)** — every place a version, install command or cross-repo link is written down, the four render pipelines, and the release checklist. Read this before a docs cycle.
 - **[`RELEASE-NOTES.md`](RELEASE-NOTES.md)** — kernel and app changes, newest-first, keyed to kernel version.
 - **[`SECURITY-CHANGELOG.md`](SECURITY-CHANGELOG.md)** — public record of resolved security-relevant changes (what's now protected, keyed to kernel version).
 - **[`team-updates/`](team-updates/)** — the running engineering record: one dated team update per release or investigation (soak reviews, prod promotions, incident post-mortems), newest work at the highest version.
