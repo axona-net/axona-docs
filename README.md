@@ -88,7 +88,8 @@ root.
 
 ### External references
 
-[`references/`](references/) holds the third-party papers the design draws on —
+`references/` (local only — the third-party PDFs are gitignored for copyright,
+so this directory is **not** in the repo) holds the papers the design draws on —
 Kademlia and S/Kademlia, Pastry, Tapestry, Chord/DHT surveys, Hashcash, the
 Sybil attack, the end-to-end argument, Licklider's *Man-Computer Symbiosis*,
 and others. They are cited throughout the whitepaper and architecture doc.
