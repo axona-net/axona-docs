@@ -1,0 +1,1216 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+  nobib]{tufte-handout}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{\textbf{#1}}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+% =====================================================================
+% axona-doc-preamble.tex — shared LaTeX preamble for the programmer-guide
+% quartet (Quick-Start, Programmer Guide, API Reference, Services Guide).
+%
+% These docs are markdown-native; the PDF is built by converting the .md to
+% a tufte-handout .tex with pandoc (-H this file) and compiling with tectonic.
+% See render.sh. Modeled on explainer/Axona-Explainer.tex (the flat-essay
+% original); the tweaks below make tufte-handout work for code/table-heavy
+% reference material.
+% =====================================================================
+
+\definecolor{rust}{RGB}{185,78,54}
+\definecolor{rustsoft}{RGB}{212,168,150}
+\definecolor{inkmuted}{RGB}{102,102,102}
+\usepackage{microtype}
+
+% Explainer-matched page furniture: tufte-handout's letterspaced running
+% heads fail on certain page breaks (the SOUL \MakeTextLowercase issue the
+% explainer works around), so use the same fancyhdr style — no running
+% head, a centered page number in the footer.
+\usepackage{fancyhdr}
+\fancypagestyle{ndhtplain}{%
+  \fancyhf{}%
+  \renewcommand{\headrulewidth}{0pt}%
+  \fancyfoot[C]{\thepage}%
+}
+
+% Explainer-matched heading-orphan protection: reserve vertical room before
+% each (sub)section heading so a heading never sits alone at a page bottom.
+\usepackage{etoolbox}
+\usepackage{needspace}
+\pretocmd{\section}{\needspace{6\baselineskip}}{}{}
+\pretocmd{\subsection}{\needspace{4\baselineskip}}{}{}
+
+% XeTeX (tectonic) unicode monospace: renders … → and the box-drawing ASCII
+% diagrams that the default CM/LM mono cannot. Menlo ships with macOS.
+\setmonofont{Menlo}[Scale=0.78]
+
+% tufte-handout ships \subsubsection as an error stub (it wants flat essays).
+% A run-in fallback lets nested reference headings (§4.2, §12.3, …) compile.
+\renewcommand{\subsubsection}[1]{\medskip\par\noindent{\normalsize\bfseries #1}\par\nobreak\smallskip}
+
+% These docs use no margin notes, so reclaim tufte's wide right margin: widen
+% the text block so code blocks and API tables don't overflow it.
+\usepackage{geometry}
+\geometry{left=1in, textwidth=6.1in, marginparsep=0.2in, marginparwidth=0.9in,
+          top=1in, headsep=0.4in}
+
+% Wrap long code lines (cheat-sheet comments run to ~130 chars) with a ↪ marker
+% instead of overflowing. Applies to pandoc's fancyvrb Highlighting/Verbatim.
+\usepackage{fvextra}
+\fvset{breaklines=true, breakanywhere=true}
+
+% A few technical symbols appear in prose / inline code that Latin Modern and
+% Menlo don't cover; map them to math equivalents so they render (rather than
+% dropping to tofu). Only maps chars actually used — leaves → alone (it renders).
+\usepackage{newunicodechar}
+\newunicodechar{≈}{\ensuremath{\approx}}
+\newunicodechar{≠}{\ensuremath{\neq}}
+\newunicodechar{≥}{\ensuremath{\geq}}
+\newunicodechar{≤}{\ensuremath{\leq}}
+\newunicodechar{×}{\ensuremath{\times}}
+\newunicodechar{·}{\ensuremath{\cdot}}
+\newunicodechar{‖}{\ensuremath{\|}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{}
+
+\begin{document}
+
+% Generated by render.sh — the explainer-style title page.
+\thispagestyle{empty}
+\null\vfill
+\begin{center}
+{\fontsize{48}{52}\selectfont \textsc{Axona}\par}
+\vspace{0.6em}
+{\Large\itshape Bridges, Relays, and the Programs You Run\par}
+\vspace{4em}
+{\large David A.~Smith\par}
+{\itshape\small Axona.net\par}
+\vspace{2em}
+{\small The Axona Services Guide \quad v4.48.0 \quad 2026-07-27\par}
+\end{center}
+\vfill
+\null
+\newpage
+\pagestyle{ndhtplain}
+\thispagestyle{ndhtplain}
+\setcounter{page}{1}
+
+\section{Axona Services Guide}\label{axona-services-guide}
+
+\emph{(kernel 4.48.0 · testnet --- versioned with the protocol it
+describes; revised 2026-07-23 with the one-command relay-fleet launcher
+and the relay update procedure, §3)}
+
+The other programmer-guide documents teach the \textbf{library} --- how
+to build your own peer with \texttt{@axona/protocol} and speak pub/sub.
+This guide covers the \textbf{services}: the ready-made programs you
+\emph{run} (or rent) rather than write --- the signaling
+\textbf{bridge}, the \textbf{relay} and its four front-ends (console,
+CLI, MCP server, desktop app), the \textbf{directory/federation} that
+ties bridges together, and the \textbf{PoW collector}. If you are
+operating an Axona deployment, wiring an agent into the network, or just
+want a topic to stay alive when no browser tab is open, this is the
+document for you.
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Protocol kernel}:
+  \href{https://github.com/axona-net/axona-protocol}{@axona/protocol}
+  (v4.48.0)
+\item
+  \textbf{Wire version}: 4.0 (\texttt{WIRE\_VERSION}); kernel version
+  4.48.0 (\texttt{KERNEL\_VERSION})
+\item
+  \textbf{Live networks}: both run the 4.x line. \textbf{Testnet}
+  (\texttt{wss://testnet.axona.net}) tracks the newest kernel ---
+  4.48.0, the version this guide describes. The \textbf{production}
+  federated pair (\texttt{wss://bridge.axona.net} east +
+  \texttt{wss://bridge-west.axona.net} west) runs the most recently
+  promoted kernel (4.29.0 at press time), typically one release behind
+  while changes soak on testnet. The two networks are wire-compatible
+  but \emph{separate} --- a peer joins one or the other; pick with
+  \texttt{RELAY\_NETWORK}/\texttt{BRIDGE\_URL} (§3).
+\item
+  \textbf{Companion docs}:
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \href{Quick-Start-v4.48.0.md}{Quick Start} ·
+    \href{Axona-Programmer-Guide-v4.48.0.md}{Programmer Guide} ·
+    \href{Axona-API-Reference-v4.48.0.md}{API Reference} --- the
+    library.
+  \item
+    \href{Axona-AI-Grounding-v4.30.0.md}{AI Grounding} --- building with
+    an AI assistant.
+  \item
+    \href{../architecture/Axona-Architecture.tex}{Architecture} --- how
+    the bridge + transport work under the hood.
+  \end{itemize}
+\end{itemize}
+
+\begin{quote}
+\textbf{Library vs.~services.} A \emph{peer} is the unit the library
+gives you: an identity + a transport + a pub/sub manager, running inside
+a browser tab, a Node process, or an agent. The library is enough to
+build a complete app. The \textbf{services} exist because some jobs
+outlive a single tab: brokering the first WebRTC handshake between two
+strangers (the \textbf{bridge}), keeping a topic's messages available
+when every author has closed their laptop (a \textbf{relay} that
+\texttt{host()}s the topic), and letting non-browser callers --- shells,
+agents, GUIs --- publish and subscribe (the \textbf{CLI / MCP / desktop}
+front-ends). None of them is privileged: every service is just a peer
+that has volunteered to stay online and take on a role.
+\end{quote}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{1. The service map}\label{the-service-map}
+
+\begin{verbatim}
+                      +----------------------------------------------+
+   browser apps  ---> |  BRIDGE   wss://bridge.axona.net (+ west)     |
+   (axona.net,        |  - WebSocket rendezvous (first handshake)     |
+    demo apps)        |  - STUN/TURN (NAT traversal, coturn)          |
+                      |  - embedded peer: federation uplink + hosts   |
+   relays / CLI / --->|    the bridge DIRECTORY topic                 |
+   MCP / desktop      +-----------------------+----------------------+
+                                              |  (after signaling, peers
+                                              v   talk WebRTC; bridge optional)
+                      +----------------------------------------------+
+                      |  RELAY   "a subset of the bridge"            |
+                      |  a headless peer that joins the mesh to:     |
+                      |  - host()  keyspace / topics  -> durable roots|
+                      |  - publish METRIC snapshots   -> metricTopic  |
+                      |  front-ends over one core (src/ops.js):       |
+                      |  console/TUI . CLI . MCP server . desktop app |
+                      +----------------------------------------------+
+\end{verbatim}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Service
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Package / entry
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+What it is
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Runs where
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\textbf{Bridge} & \texttt{axona-bridge} (\texttt{src/server.js}) &
+Signaling rendezvous + STUN/TURN + a federating, directory-hosting peer
+& A server (Docker stack) \\
+\textbf{Relay --- console/TUI} & \texttt{axona-relay}
+(\texttt{src/index.js}, bin \texttt{axona-relay}) & Headless node that
+hosts topics + publishes metrics; live dashboard & A box you keep
+online \\
+\textbf{Relay --- CLI} & \texttt{axona-cli} (\texttt{src/cli.js}) &
+One-shot \texttt{pub} / \texttt{sub} / \texttt{pull} from a shell or
+script & Anywhere with Node \\
+\textbf{Relay --- MCP server} & \texttt{axona-mcp} (\texttt{src/mcp.js})
+& A \textbf{persistent peer} with a durable identity, exposed as native
+\textbf{agent tools} (publish/subscribe/host) over MCP/stdio & Spawned
+by the agent host \\
+\textbf{Relay --- desktop app} & \texttt{axona-relay/desktop} (Electron)
+& A GUI wrapper around the relay & A laptop/desktop \\
+\textbf{PoW collector} & \texttt{axona-relay/pow-collector.js}
+(\texttt{npm\ run\ collect}) & Subscribes to the PoW-bench results topic
+and archives them & A box you keep online \\
+\textbf{Directory / federation} & kernel \texttt{bridgeDirectory.js} & A
+\emph{behavior}, not a process: bridges advertise, clients fail over &
+Inside bridges + clients \\
+\end{longtable}
+}
+
+The same \texttt{@axona/protocol} kernel runs in every box above. There
+is no special ``server build'' --- a bridge is a peer that also
+terminates WebSockets and TURN; a relay is a peer that also
+\texttt{host()}s and publishes metrics.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{2. The Bridge}\label{the-bridge}
+
+\subsubsection{What it is}\label{what-it-is}
+
+A \textbf{bridge} is the only piece of fixed infrastructure Axona needs,
+and even it is needed only at the \textbf{start} of a connection. Two
+browsers that have never met cannot exchange WebRTC offer/answer SDP on
+their own --- they need a mutually reachable rendezvous. The bridge is
+that rendezvous. It does three jobs:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{WebSocket signaling} --- relays the offer/answer/ICE handshake
+  between two peers until their direct WebRTC data channel is open.
+  After that the bridge is \textbf{out of the data path}; peers talk
+  peer-to-peer over the mesh.
+\item
+  \textbf{STUN/TURN} --- a bundled \textbf{coturn} gives peers their
+  public reflexive address (STUN) and, for the \textasciitilde10--15\%
+  of NAT pairs that can't connect directly, relays the media (TURN). The
+  bridge mints short-lived TURN credentials in its welcome frame.
+\item
+  \textbf{An embedded peer} --- the bridge process also \emph{joins its
+  own network} as a node. That embedded peer \textbf{federates} (an
+  outbound uplink to a sibling bridge, §5) and \textbf{hosts the bridge
+  directory topic} so clients can discover other bridges and fail over.
+\end{enumerate}
+
+\begin{quote}
+A bridge is a convenience, not an authority. It cannot read message
+payloads (they're end-to-end between mesh peers), cannot forge a publish
+(every envelope is author-signed), and any number of independent bridges
+can coexist --- clients rank and fail over between them.
+\end{quote}
+
+\subsubsection{Running one}\label{running-one}
+
+Production bridges run as a \textbf{Docker Compose stack} ---
+\texttt{bridge} + \textbf{Caddy} (automatic TLS) + \textbf{coturn}
+(TURN) --- from the \texttt{axona-bridge} repo. The one-command path for
+a fresh Ubuntu/Debian host:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{curl} \AttributeTok{{-}fsSL}\NormalTok{ https://raw.githubusercontent.com/axona{-}net/axona{-}bridge/main/deploy/install.sh }\DataTypeTok{\textbackslash{}}
+  \KeywordTok{|} \FunctionTok{sudo}\NormalTok{ BRIDGE\_DOMAIN=bridge.example.net LETSENCRYPT\_EMAIL=you@example.net bash}
+\end{Highlighting}
+\end{Shaded}
+
+or, with the repo checked out:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\BuiltInTok{cd}\NormalTok{ /opt/axona{-}bridge}
+\ExtensionTok{docker}\NormalTok{ compose build        }\CommentTok{\# builds first; the old container keeps serving}
+\ExtensionTok{docker}\NormalTok{ compose up }\AttributeTok{{-}d}        \CommentTok{\# fast swap; Caddy keeps its certificate}
+\ExtensionTok{curl}\NormalTok{ https://bridge.example.net/healthz     }\CommentTok{\# → \{"status":"ok","version":…,"kernelVersion":"4.48.0"\}}
+\end{Highlighting}
+\end{Shaded}
+
+Full provisioning options (the installer, the Docker bundle, and a
+manual walkthrough) are in
+\textbf{\texttt{axona-bridge/deploy/INSTALL.md}}.
+
+\subsubsection{Configuration}\label{configuration}
+
+Bridge config lives in \texttt{/etc/axona-bridge.env} (systemd) or the
+compose \texttt{.env}:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Var
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Meaning
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{DOMAIN} / \texttt{PUBLIC\_IP} & Public hostname + IP (TLS + TURN
+advertisement) \\
+\texttt{TURN\_AUTH\_SECRET} & Shared secret with coturn's
+\texttt{static-auth-secret}; the bridge mints creds from it \\
+\texttt{BRIDGE\_PUBLIC\_URL} & The \texttt{wss://} URL this bridge
+advertises in the directory
+(e.g.~\texttt{wss://bridge-west.axona.net}) \\
+\texttt{BRIDGE\_DIRECTORY} & \texttt{on} (advertise + host the
+directory) or \texttt{off} (isolated fleet --- testnet uses
+\texttt{off}) \\
+\texttt{BRIDGE\_DIRECTORY\_MIN\_UPTIME\_MS} & How long a bridge must
+have been up before it advertises. Default \texttt{300000} (5 min). See
+``The establishment gate'' below \\
+\texttt{BRIDGE\_DIRECTORY\_MIN\_PEERS} & How many mesh peers it must
+have before it advertises. Default \texttt{3} \\
+\texttt{BRIDGE\_NEVER\_ROOT} & \texttt{1}/unset = a bridge never holds a
+topic role (the default, and the invariant). \texttt{0} restores
+pre-4.46 behaviour --- only for a bridge-only network with no relays at
+all \\
+\texttt{BRIDGE\_LAT} / \texttt{BRIDGE\_LNG} / \texttt{REGION\_LABEL} &
+The bridge's geo anchor + a human label for its directory entry \\
+\texttt{MIN\_PEER\_VERSION} & Lowest wire version admitted; older peers
+get \texttt{UPGRADE\_REQUIRED} (WS close 4426) \\
+\texttt{HOST} & Bind address --- production sets \texttt{127.0.0.1} so
+the reverse proxy is the only ingress \\
+\texttt{HEALTHZ\_TOKEN} & Gates the \textbf{full} \texttt{/healthz} body
++ \texttt{/diag}; unauthenticated \texttt{/healthz} returns only
+\texttt{\{status,version,kernelVersion\}} \\
+\end{longtable}
+}
+
+\subsubsection{The establishment gate}\label{the-establishment-gate}
+
+A bridge does \textbf{not} advertise itself the moment it starts. It
+waits until it is \emph{established} ---
+\texttt{BRIDGE\_DIRECTORY\_MIN\_UPTIME\_MS} of uptime \textbf{and}
+\texttt{BRIDGE\_DIRECTORY\_MIN\_PEERS} mesh peers --- and only then
+publishes its directory entry. The hourly heartbeat keeps the entry
+fresh from there.
+
+Two reasons, and the second is the one that bites:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{It is the honest behaviour.} A bridge that announces ``connect
+  to me'' before it can carry traffic is advertising a promise it cannot
+  keep. A launch publish is worth nothing anyway: nobody is listening to
+  a mesh the bridge has not joined yet.
+\item
+  \textbf{At launch a bridge is TERMINAL for its own directory topic.}
+  Its synaptome is empty, so nobody is closer to that address than it
+  is. Combined with the bridge fence (\texttt{BRIDGE\_NEVER\_ROOT},
+  below) it would refuse to root the very topic it is publishing --- and
+  before kernel 4.48.0 the declined message was re-routed to the only
+  node available, itself, in an unbounded synchronous loop. That took a
+  production bridge down for \textasciitilde50 minutes on 2026-07-27.
+\end{enumerate}
+
+Both halves are now fixed independently: the gate removes the trigger
+(bridge 2.100.0) and the kernel terminates an undeliverable declined
+message rather than retrying it (4.48.0). Either alone is sufficient;
+both is correct.
+
+\textbf{What you will see in the log} while it waits:
+
+\begin{verbatim}
+directory:awaiting-establishment {"upMs":15703,"peers":44,"needUptimeMs":300000,"needPeers":3}
+directory:established           {"upMs":302076,"peers":45}
+directory:published             {"url":"wss://bridge.axona.net","reason":"established","region":"eagle"}
+\end{verbatim}
+
+A bridge sitting in \texttt{awaiting-establishment} is healthy and
+serving traffic --- it is simply not yet listed for \emph{other} people
+to bootstrap through.
+
+\subsubsection{A bridge is a bridge --- it never holds a topic
+role}\label{a-bridge-is-a-bridge-it-never-holds-a-topic-role}
+
+A bridge transports and introduces. It is never a root, backup, child or
+holder for any topic, at any load, in any topology. This is enforced in
+three independent places, so do not assume removing one is enough:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Routing} skips a bridge as a next hop entirely (oldest guard).
+\item
+  \textbf{\texttt{host()} was removed} from the directory publisher
+  (2026-07-25).
+\item
+  \textbf{\texttt{neverRoot:\ true}} makes the kernel refuse every role
+  at the HARD tier --- the admission floor may \emph{not} override it,
+  even when every other candidate is saturated or still in grace.
+\end{itemize}
+
+\texttt{BRIDGE\_NEVER\_ROOT=0} exists only for a bridge-only network
+during a cold start with no relays at all. If you find yourself reaching
+for it in production, the answer is more relays, not a bridge holding
+data.
+
+\subsubsection{Health \& introspection}\label{health-introspection}
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{GET\ /healthz} --- unauthenticated, returns
+  \texttt{\{status,\ version,\ kernelVersion\}}.
+\item
+  \texttt{GET\ /healthz} with header
+  \texttt{X-Healthz-Token:\ \textless{}token\textgreater{}} --- the full
+  body: synaptome size, directory \texttt{\{enabled,url\}}, uplink
+  status, peer counts.
+\item
+  \texttt{GET\ /diag} (token-gated) --- deeper diagnostics.
+\end{itemize}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{3. The Relay}\label{the-relay}
+
+\subsubsection{What it is}\label{what-it-is-1}
+
+A \textbf{relay is a subset of the bridge}: the embedded-peer half,
+without the WebSocket/TURN server. It is a headless node you keep online
+so the network has durable, well-placed members. Two jobs:
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \textbf{Hosting} --- \texttt{host()} makes the relay a \textbf{root}
+  for a keyspace region (or for named topics) \emph{without
+  subscribing}, so it stores-and-serves a topic's messages even when it
+  doesn't consume them. This is what keeps a topic's backlog answerable
+  after every author closes their tab. By default a relay hosts its
+  region's keyspace (\texttt{0x89} for \texttt{useast}). Under the 4.x
+  \textbf{cohort} model a topic is replicated across the K-closest
+  nodes, so durability no longer rests on one relay --- several
+  co-hosting relays converge on the same history via anti-entropy, and
+  any of them can answer a read.
+\item
+  \textbf{Metrics} --- served \textbf{on demand} (v4.12.0): when any
+  client subscribes to a topic's derived \texttt{metricTopic(T)}, a
+  renewable \emph{metrics-on} lease routes to the topic's root --- often
+  a relay, since relays root what they host --- and while the lease is
+  fresh that root publishes a signed snapshot
+  (\texttt{\{current\_count,\ seq,\ subscribers,\ bytes\}}) every
+  \textasciitilde20 s, giving subscribers live counts + a rolling
+  \textasciitilde48 h trend instead of polling. The first snapshot lands
+  \textasciitilde2--20 s after demand turns on; publishing stops
+  \textasciitilde70 s after the last metric subscriber leaves. (The
+  pre-4.12 push loop --- publish every rooted topic on a timer, watched
+  or not --- is retired.) \textbf{Both open and owned} topics serve
+  metrics (owned-topic activity counts are public too); \texttt{seq} is
+  the dense message counter (total events ever, kills included). Because
+  every co-hosting root publishes its own snapshot, the reader-side
+  \texttt{peer.metrics()} aggregates across the cohort (sums
+  subscribers, maxes the rest --- see the API Reference).
+\end{enumerate}
+
+\subsubsection{Running one}\label{running-one-1}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\BuiltInTok{cd}\NormalTok{ axona{-}relay}
+\ExtensionTok{npm}\NormalTok{ install}
+\ExtensionTok{npm}\NormalTok{ start          }\CommentTok{\# live dashboard (interactive TTY)}
+\ExtensionTok{npm}\NormalTok{ run probe      }\CommentTok{\# plain timestamped log lines (RELAY\_TUI=0) — for piping / services}
+\end{Highlighting}
+\end{Shaded}
+
+Run it again in another terminal for a second node --- the
+\textbf{first} instance claims the persistent identity (stable nodeId,
+\texttt{identity.\textless{}region\textgreater{}.json}); each
+\textbf{additional} instance mints a fresh ephemeral identity in the
+same region. So you get one well-known node plus as many throwaway nodes
+as you want.
+
+\subsubsection{Running a fleet (one
+command)}\label{running-a-fleet-one-command}
+
+To run several relays at once --- on a fresh machine with nothing
+installed but Node 20+ and Git --- use the cross-platform launcher
+instead of starting each by hand:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{git}\NormalTok{ clone }\AttributeTok{{-}b}\NormalTok{ testnet https://github.com/axona{-}net/axona{-}relay.git}
+\BuiltInTok{cd}\NormalTok{ axona{-}relay}
+\ExtensionTok{npm}\NormalTok{ install}
+\ExtensionTok{node}\NormalTok{ scripts/fleet.mjs }\AttributeTok{{-}{-}region}\NormalTok{ grizzly }\AttributeTok{{-}{-}count}\NormalTok{ 10 }\AttributeTok{{-}{-}network}\NormalTok{ testnet}
+\end{Highlighting}
+\end{Shaded}
+
+The last line is the whole thing. It takes flags, not environment
+variables:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Flag
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Meaning
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{-\/-region\ \textless{}name\ or\ code\textgreater{}} & Region
+every relay in the fleet hosts (e.g.~\texttt{grizzly} or \texttt{0x80}).
+Default \texttt{useast}. \\
+\texttt{-\/-count\ \textless{}n\textgreater{}} & How many relay
+processes to launch. Default \texttt{1}. \\
+\texttt{-\/-network\ \textless{}prod\ or\ testnet\textgreater{}} & Which
+bridge to bootstrap from. Default \texttt{prod}. \\
+\texttt{-\/-bridge\ \textless{}wss-url\textgreater{}} & Explicit bridge
+URL (overrides \texttt{-\/-network}). \\
+\end{longtable}
+}
+
+Each relay is its own child process with a fresh \textbf{ephemeral}
+transport identity (re-minted every start), so N relays never collide.
+\texttt{Ctrl-C} stops the whole fleet gracefully. It is pure Node ---
+identical on Windows, macOS, and Linux (no bash, no global environment).
+On Windows this is the supported way to run a fleet, since the
+\texttt{start-fleet.sh} operator script is bash-only.
+
+By default the launcher shows a \textbf{live dashboard} --- one fixed
+table, one row per relay (node, state, peers, mesh, roles, subs),
+redrawn in place --- so you can watch fleet health at a glance instead
+of a wall of interleaved scrolling logs. Pass \texttt{-\/-raw} to stream
+each relay's raw log lines instead (for debugging a single relay), and
+\texttt{-\/-stagger\ \textless{}ms\textgreater{}} to change the gap
+between launches (default 600 ms; the spread keeps N simultaneous
+handshakes from overwhelming a small bridge host).
+
+\subsubsection{Configuration (env)}\label{configuration-env}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Var
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Default
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Meaning
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{RELAY\_NETWORK} & \texttt{prod} & Bootstrap network:
+\texttt{prod} (\texttt{bridge.axona.net}) or \texttt{testnet}
+(\texttt{testnet.axona.net}). Both run the 4.x line; testnet tracks the
+newest kernel. Use \texttt{testnet} to follow the staging line this
+guide describes; \texttt{prod} for production service. \\
+\texttt{BRIDGE\_URL} & --- & Explicit bridge URL; \textbf{overrides}
+\texttt{RELAY\_NETWORK} \\
+\texttt{RELAY\_REGION} & --- & \texttt{auto} (detect), a region name
+(\texttt{useast}), or code (\texttt{0x89}) --- sets the nodeId geo
+prefix \\
+\texttt{RELAY\_LAT} / \texttt{RELAY\_LNG} &
+\texttt{37.77}/\texttt{-122.42} & Geo prefix by coordinate (if
+\texttt{RELAY\_REGION} unset). Default = SF (\texttt{uswest}) \\
+\texttt{RELAY\_IDENTITY\_PATH} &
+\texttt{./identity.\textless{}region\textgreater{}.json} & Persisted
+keypair (stable nodeId) \\
+\texttt{RELAY\_HOST\_KEYSPACE} & \texttt{1} & Host the region's whole
+keyspace (set \texttt{0} to host only \texttt{RELAY\_TOPICS}) \\
+\texttt{RELAY\_TOPICS} & --- & Comma-separated topic names to host
+explicitly \\
+\texttt{RELAY\_METRICS} & \texttt{1} & Publish metric snapshots
+(\texttt{0} to disable) \\
+\texttt{RELAY\_METRICS\_INTERVAL\_MS} & \textasciitilde20000 & Metric
+publish cadence (\textasciitilde20 s) \\
+\texttt{RELAY\_TUI} & auto & \texttt{1} force dashboard, \texttt{0}
+force plain log \\
+\end{longtable}
+}
+
+Bridge precedence: \texttt{BRIDGE\_URL} › \texttt{RELAY\_NETWORK} ›
+\texttt{prod}. Region precedence: \texttt{RELAY\_REGION} ›
+\texttt{RELAY\_LAT}/\texttt{RELAY\_LNG} › default SF.
+
+\subsubsection{Run as a service
+(systemd)}\label{run-as-a-service-systemd}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\CommentTok{\# /etc/systemd/system/axona{-}relay.service}
+\KeywordTok{[Service]}
+\DataTypeTok{Environment}\OtherTok{=}\StringTok{RELAY\_REGION=useast RELAY\_TUI=0}
+\DataTypeTok{ExecStart}\OtherTok{=}\StringTok{/usr/bin/node /opt/axona{-}relay/src/index.js}
+\DataTypeTok{Restart}\OtherTok{=}\StringTok{always}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{quote}
+\textbf{Operator note --- process count.} Each relay forks \textbf{one
+worker child}, so a healthy \emph{N}-node fleet is \textbf{2 × N}
+\texttt{node\ src/index.js} processes (a parent + worker per node).
+Judge fleet health by the distinct \textbf{bridge connections} in the
+logs, not the raw process count. If the \textbf{desktop app} (below) is
+also running, it carries \emph{its own} embedded relay that respawns if
+killed --- expect one extra.
+\end{quote}
+
+\subsubsection{Updating a relay}\label{updating-a-relay}
+
+The kernel is \textbf{vendored} into the relay checkout (committed under
+\texttt{vendor/axona-protocol/}), so following a new testnet release is
+just a pull and a restart --- no separate kernel install:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\BuiltInTok{cd}\NormalTok{ axona{-}relay}
+\FunctionTok{git}\NormalTok{ pull                 }\CommentTok{\# brings the new relay + the vendored kernel it ships}
+\CommentTok{\# then restart your relay(s):}
+\CommentTok{\#   {-} fleet launcher:  Ctrl{-}C, then re{-}run \textasciigrave{}node scripts/fleet.mjs …\textasciigrave{}}
+\CommentTok{\#   {-} systemd service: systemctl restart axona{-}relay}
+\end{Highlighting}
+\end{Shaded}
+
+Each relay prints its versions in the startup banner ---
+\texttt{axona-relay\ v0.67.0\ {[}EPHEMERAL{]}\ (kernel\ v4.48.0)} ---
+and the bridge reports the kernel it expects at \texttt{/healthz}. Keep
+them in step: a relay on an older kernel still connects and relays, but
+only relays on the \textbf{current} kernel take part in the newest
+behaviours (for example, cooperative bridge graduation, which a relay
+must be on kernel ≥ 4.35.0 to honour --- an older relay counts against
+the bridge's connection cap but is never released to make room for a
+newcomer).
+
+\emph{(Operators who vendor from a local kernel checkout re-vendor with
+\texttt{npm\ run\ sync:protocol} instead of \texttt{git\ pull}; end
+users who cloned the repo just pull.)}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{4. Relay front-ends}\label{relay-front-ends}
+
+The relay's core pub/sub lives in \texttt{src/ops.js} (\texttt{publish}
+/ \texttt{subscribe} / \texttt{pull}). The \textbf{CLI} uses it directly
+--- one throwaway peer per call. The \textbf{MCP server} wraps it in a
+\emph{persistent} peer (\texttt{src/mcp-session.js}) so an agent can be
+a standing participant rather than a series of one-shot connections. The
+\textbf{desktop app} is the GUI relay.
+
+\subsubsection{\texorpdfstring{4a. CLI
+(\texttt{axona-cli})}{4a. CLI (axona-cli)}}\label{a.-cli-axona-cli}
+
+One-shot pub/sub/pull from a shell or script --- no long-lived process:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{npm}\NormalTok{ run pub  }\AttributeTok{{-}{-}} \AttributeTok{{-}{-}topic}\NormalTok{ us{-}east/hello }\AttributeTok{{-}{-}message} \StringTok{"hi"}          \CommentTok{\# prints \{ ok, msgId, … \}}
+\ExtensionTok{npm}\NormalTok{ run sub  }\AttributeTok{{-}{-}} \AttributeTok{{-}{-}topic}\NormalTok{ us{-}east/hello }\AttributeTok{{-}{-}seconds}\NormalTok{ 20            }\CommentTok{\# JSON lines for N seconds}
+\ExtensionTok{npm}\NormalTok{ run pull }\AttributeTok{{-}{-}} \AttributeTok{{-}{-}topic}\NormalTok{ us{-}east/hello                         }\CommentTok{\# the single latest message}
+\end{Highlighting}
+\end{Shaded}
+
+Good for cron jobs, CI checks, shell glue, and quick manual probes.
+
+\subsubsection{\texorpdfstring{4b. MCP server
+(\texttt{axona-mcp})}{4b. MCP server (axona-mcp)}}\label{b.-mcp-server-axona-mcp}
+
+\texttt{src/mcp.js} is a \textbf{Model Context Protocol} server that
+exposes Axona as \textbf{native agent tools}, so Claude Code (and any
+MCP-speaking agent) gets first-class \texttt{axona\_*} tools instead of
+shelling out. It speaks JSON-RPC over \textbf{stdio} (stdout = protocol,
+stderr = logs).
+
+\textbf{It holds ONE persistent peer} (\texttt{src/mcp-session.js}),
+opened lazily on the first call and kept connected --- so the agent is a
+continuous participant, not a series of one-shot connections. That peer
+signs with a \textbf{durable identity} (both the node identity and the
+author keypair persist to
+\texttt{\textasciitilde{}/.axona/claude-mcp-identity.json}), so the
+agent keeps the \textbf{same Author ID and nodeId across restarts} --- a
+stable on-network identity, not a fresh persona each call.
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Tool
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Args
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Purpose
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{axona\_publish} & \texttt{topic}, \texttt{message},
+\texttt{region?} & Publish, signed by the stable author \\
+\texttt{axona\_pull} & \texttt{topic}, \texttt{region?} & Fetch only the
+latest message \\
+\texttt{axona\_watch} & \texttt{topic}, \texttt{region?},
+\texttt{since?}
+(\texttt{all}\textbar{}\texttt{latest}\textbar{}\texttt{live}) & Open a
+\textbf{standing subscription}; arrivals buffer server-side \\
+\texttt{axona\_poll} & \texttt{topic?}, \texttt{peek?}, \texttt{max?},
+\texttt{wait?}, \texttt{timeoutSec?} & Drain the buffer (the agent's
+``inbox''); \texttt{wait:true} \textbf{long-polls} until a message
+lands \\
+\texttt{axona\_unwatch} & \texttt{topic}, \texttt{region?} & Stop a
+watch, discard its buffer \\
+\texttt{axona\_host} & \texttt{topic}, \texttt{region?} & \textbf{Root}
+the topic on the agent's peer (store + serve, no subscribe) \\
+\texttt{axona\_unhost} & \texttt{topic}, \texttt{region?} & Stop
+hosting \\
+\texttt{axona\_status} & --- & Peer nodeId + Author ID, mesh health,
+per-watch + hosted lists \\
+\texttt{axona\_subscribe} & \texttt{topic}, \texttt{region?},
+\texttt{seconds?} (1--120), \texttt{since?} & One-shot listen window
+(back-compat) \\
+\end{longtable}
+}
+
+Region defaults to \texttt{useast} (\texttt{0x89}); subscribers must use
+the \textbf{same region} as the publisher. The server's code default
+targets \textbf{production}; set \texttt{RELAY\_NETWORK=testnet} to join
+the staging network instead. Both run the 4.x line, but they are
+separate networks --- the agent participates in whichever one its peer
+joined, alongside the live apps on that network.
+
+\textbf{Receiving --- push vs.~poll.} Two paths cover the same arrivals:
+- \textbf{Push} --- every message on a watched topic is emitted as an
+MCP \emph{logging notification} (\texttt{sendLoggingMessage}) to the
+client. This is best-effort: it reaches the MCP client, but a turn-based
+agent loop won't be interrupted by it. - \textbf{Long-poll} ---
+\texttt{axona\_poll(wait:true,\ timeoutSec)} blocks \textbf{server-side}
+until a message arrives (or the timeout), returning at push latency.
+This is the reliable pull side. The standing watch buffers anything that
+lands between polls, so nothing is lost in the gaps.
+
+The agent becomes a \textbf{live participant} by pairing
+\texttt{axona\_watch} with a \texttt{/loop} that calls
+\texttt{axona\_poll(wait:true)} each iteration: watch once, then
+poll-act-repeat. A message that asks for work is a request to execute
+and reply; \textbf{approval for sensitive or irreversible actions stays
+on the authenticated session, never the pub/sub channel} (a signed
+message proves the author key, but the topic is still an external data
+channel --- see the security boundary below).
+
+Register it as a project-scoped MCP server with a \texttt{.mcp.json} at
+your repo root:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{\{}
+  \DataTypeTok{"mcpServers"}\FunctionTok{:} \FunctionTok{\{}
+    \DataTypeTok{"axona"}\FunctionTok{:} \FunctionTok{\{} \DataTypeTok{"command"}\FunctionTok{:} \StringTok{"node"}\FunctionTok{,} \DataTypeTok{"args"}\FunctionTok{:} \OtherTok{[}\StringTok{"/abs/path/to/axona{-}relay/src/mcp.js"}\OtherTok{]} \FunctionTok{\}}
+  \FunctionTok{\}}
+\FunctionTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+Point it at testnet (or a specific bridge) with an \texttt{env} block
+--- also \texttt{MCP\_REGION} (default \texttt{useast}),
+\texttt{MCP\_AUTHOR\_PATH} (identity file), \texttt{MCP\_BUFFER\_CAP}
+(per-watch ring, default 1000):
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{\{}
+  \DataTypeTok{"mcpServers"}\FunctionTok{:} \FunctionTok{\{}
+    \DataTypeTok{"axona"}\FunctionTok{:} \FunctionTok{\{}
+      \DataTypeTok{"command"}\FunctionTok{:} \StringTok{"node"}\FunctionTok{,}
+      \DataTypeTok{"args"}\FunctionTok{:} \OtherTok{[}\StringTok{"/abs/path/to/axona{-}relay/src/mcp.js"}\OtherTok{]}\FunctionTok{,}
+      \DataTypeTok{"env"}\FunctionTok{:} \FunctionTok{\{} \DataTypeTok{"RELAY\_NETWORK"}\FunctionTok{:} \StringTok{"testnet"} \FunctionTok{\}}
+    \FunctionTok{\}}
+  \FunctionTok{\}}
+\FunctionTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\paragraph{Launching it --- a procedure for an AI
+agent}\label{launching-it-a-procedure-for-an-ai-agent}
+
+\emph{Follow these steps in order. Each has a check; do not proceed
+until the check passes. Most ``the MCP server won't start'' reports are
+step 3 (not restarting) or step 5 (aborting the slow first call) ---
+read those twice.}
+
+\textbf{1. Prerequisites (once per machine).} - Node \textbf{≥ 20}:
+\texttt{node\ -v}. (WebCrypto and the native transport need it.) - The
+\texttt{axona-relay} repository present locally, and its dependencies
+installed: \texttt{cd\ axona-relay\ \&\&\ npm\ install}. This step
+compiles/fetches the \textbf{\texttt{node-datachannel}} native WebRTC
+binary --- \emph{without it the peer cannot open a connection and every
+tool call fails}. The kernel is already vendored in the repo (no
+separate build). - Sanity-check the server file loads:
+\texttt{node\ -\/-check\ src/mcp.js} (exit 0).
+
+\textbf{2. Register the server.} The server is one command:
+\texttt{node\ \textless{}abs\textgreater{}/axona-relay/src/mcp.js}.
+Register it with the agent runtime. For Claude Code:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{claude}\NormalTok{ mcp add axona }\AttributeTok{{-}{-}}\NormalTok{ node /abs/path/to/axona{-}relay/src/mcp.js}
+\CommentTok{\# testnet instead of production:}
+\ExtensionTok{claude}\NormalTok{ mcp add axona }\AttributeTok{{-}{-}env}\NormalTok{ RELAY\_NETWORK=testnet }\AttributeTok{{-}{-}}\NormalTok{ node /abs/path/to/axona{-}relay/src/mcp.js}
+\end{Highlighting}
+\end{Shaded}
+
+or a project-scoped \texttt{.mcp.json} (the two blocks shown above).
+\textbf{Use an absolute path}, and make sure \texttt{node} is on the
+runtime's \texttt{PATH}.
+
+\textbf{3. Restart / reconnect the agent.} MCP servers are loaded
+\textbf{at client startup}. After \texttt{claude\ mcp\ add} (or editing
+\texttt{.mcp.json}) you \textbf{must restart or reconnect} the session,
+and approve the new project-scoped server once when prompted.
+\emph{Skipping this is the number-one reason the tools ``don't
+appear''.}
+
+\textbf{4. Confirm the tools are present.} After restart, the tools
+appear as \texttt{mcp\_\_axona\_\_axona\_status},
+\texttt{mcp\_\_axona\_\_axona\_publish}, etc. If they are absent, the
+server didn't load --- return to step 2/3 (path wrong, \texttt{node} not
+found, or no restart).
+
+\textbf{5. Bring the peer online --- call \texttt{axona\_status} and
+wait for it.} The persistent peer is created \textbf{lazily on the first
+tool call} and then waits for the mesh to form. \textbf{The first call
+can take several seconds, and up to \textasciitilde30 s on a cold
+network --- this is normal; let it return, do not treat the delay as a
+failure and do not spam retries} (there is one server process; retrying
+can't speed it up and only queues more work). \textbf{Definition of
+done:} \texttt{axona\_status} returns an object with a \texttt{nodeId},
+an \texttt{authorId}, and mesh health showing \textbf{at least one peer}
+(\texttt{mesh.peers\ ≥\ 1} / synaptome ≥ 1). That object \emph{is} the
+proof the server launched and joined the network. If it returns with
+\textbf{zero} peers, the mesh is still forming --- wait a few seconds
+and call \texttt{axona\_status} again.
+
+\textbf{6. Prove a round-trip (optional but recommended).}
+\texttt{axona\_publish} a message to a scratch topic, then
+\texttt{axona\_pull} the same topic + region --- you should read your
+own message back. Publisher and reader \textbf{must use the same
+\texttt{region}} (default \texttt{useast}) or they derive different
+topic IDs and never meet.
+
+\textbf{Failure modes and fixes:}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Symptom
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Cause
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Fix
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Tools never appear & server not loaded & restart the agent after
+\texttt{claude\ mcp\ add}; verify absolute path + \texttt{node} on
+PATH \\
+First call hangs \textasciitilde30 s then errors & mesh can't form
+(bridge unreachable) & check connectivity;
+\texttt{curl\ https://bridge.axona.net/healthz} (or
+\texttt{testnet.axona.net}) should return \texttt{\{"status":"ok"\}};
+then retry \\
+\texttt{TransportError:\ bridge\ socket\ closed\ before\ open} &
+transient bridge overload / admission race & \textbf{not fatal} --- wait
+a few seconds and call again \\
+Cannot find module \texttt{node-datachannel} (or similar native error) &
+\texttt{npm\ install} not run & run \texttt{npm\ install} in
+\texttt{axona-relay} \\
+\texttt{axona\_status} shows a \texttt{nodeId} a \emph{second} running
+agent also reports & two MCP processes share the durable identity file
+(\texttt{\textasciitilde{}/.axona/claude-mcp-identity.json}) → two peers
+with one nodeId collide on the network & give each agent its own
+identity: set \texttt{MCP\_AUTHOR\_PATH} to a distinct path per
+agent/project \\
+Published messages never arrive & region or network mismatch & both
+sides use the same \texttt{region}; both join the same network
+(\texttt{RELAY\_NETWORK} prod vs testnet) \\
+\end{longtable}
+}
+
+\textbf{Environment knobs} (set in the \texttt{env} block or the
+\texttt{-\/-env} flag): \texttt{RELAY\_NETWORK} (\texttt{prod} default /
+\texttt{testnet}) or \texttt{BRIDGE\_URL} (explicit, wins);
+\texttt{MCP\_REGION} (default \texttt{useast});
+\texttt{MCP\_AUTHOR\_PATH} (identity file --- override for concurrent
+agents); \texttt{MCP\_BUFFER\_CAP} (per-watch ring, default 1000).
+
+\textbf{One-line environment self-test (no agent needed).} Before wiring
+the MCP server, you can prove the machine can reach the network with the
+CLI --- same core (\texttt{src/ops.js}), same failure surface:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ExtensionTok{node}\NormalTok{ src/cli.js pull }\StringTok{"axona:bridge{-}directory"}   \CommentTok{\# connects, returns within \textasciitilde{}30 s}
+\end{Highlighting}
+\end{Shaded}
+
+If that returns JSON, the MCP server will connect too. If it hangs or
+errors, fix connectivity first (steps 1 and the bridge \texttt{/healthz}
+check above) --- the MCP server is not the problem.
+
+\begin{quote}
+\textbf{Security boundary.} The MCP peer is a full
+publisher/subscriber/host with a durable identity --- treat it as a real
+network participant. Requests and reversible work can flow over a topic,
+but the agent must keep the approval gate for destructive, irreversible,
+or outward-facing actions on its authenticated session, not on an Axona
+message: a signed envelope authenticates \emph{who}, but an open-topic
+message is still untrusted external input.
+\end{quote}
+
+\subsubsection{\texorpdfstring{4c. Desktop app
+(\texttt{axona-relay/desktop})}{4c. Desktop app (axona-relay/desktop)}}\label{c.-desktop-app-axona-relaydesktop}
+
+An \textbf{Electron} GUI wrapper around the relay --- the same hosting +
+metrics node, with a window instead of a terminal. Useful for
+non-operators who want to contribute a durable node by leaving an app
+open. Because it embeds a relay, a running desktop app adds one node to
+your local fleet (and respawns it on crash).
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{5. Directory \& federation}\label{directory-federation}
+
+A single bridge is a single point of failure. Axona avoids that with two
+cooperating behaviors, both built into the bridge's embedded peer:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Directory.} Each bridge with \texttt{BRIDGE\_DIRECTORY=on}
+  publishes a signed entry
+  (\texttt{\{url,\ lat,\ lng,\ label,\ ver,\ ts\}}) to the well-known
+  open topic \texttt{axona:bridge-directory} (pinned to the
+  \texttt{useast} region so everyone derives the same Topic ID) and
+  \texttt{host()}s that topic so the entry survives. At launch a client
+  collects the directory, ranks candidates (configured roots →
+  known-good by reputation → fresh from the directory), and
+  \textbf{fails over} to a saved alternate if its primary is
+  unreachable.
+\item
+  \textbf{Federation.} A bridge with the directory on also
+  \textbf{uplinks} --- an outbound \texttt{webTransport} connection
+  \emph{into} a sibling bridge --- so the two bridges share one
+  connectome. A client connected to \textbf{either} bridge can then
+  discover and reach peers on \textbf{both}. In the live network,
+  \texttt{bridge-west} uplinks to \texttt{bridge.axona.net}; the east
+  bridge stays uplink-less as the seed.
+\end{itemize}
+
+\begin{quote}
+Verify federation against a \textbf{warm} topic (both bridges host +
+republish \texttt{axona:bridge-directory}), never a cold fresh topic ---
+a cold topic has no roots yet and reads as a false zero.
+\end{quote}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{6. The PoW collector}\label{the-pow-collector}
+
+\texttt{pow-collector.js} (\texttt{npm\ run\ collect}) is a small
+standing service that subscribes to the proof-of-work benchmark
+\textbf{results} topic and archives each published result for later
+analysis. It's optional infrastructure for the PoW research line, not
+part of the core pub/sub path. (It can wedge silently --- alive but not
+receiving --- so a restart with
+\texttt{since:\textquotesingle{}all\textquotesingle{}} backfills the
+retained backlog.)
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{7. Choosing what to run}\label{choosing-what-to-run}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+You want to\ldots{}
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Run
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Let strangers connect to your app's network & A \textbf{bridge} (or use
+a live one --- \texttt{bridge.axona.net} for production,
+\texttt{testnet.axona.net} for staging) \\
+Keep a topic's messages alive when no author is online & A
+\textbf{relay} that \texttt{host()}s it \\
+Publish live subscriber counts for a topic & Nothing extra ---
+\textbf{any root serves metrics on demand} when a client subscribes to
+\texttt{metricTopic(T)}; a relay just makes the root durable \\
+Publish/subscribe from a shell, cron, or CI & The \textbf{CLI}
+(\texttt{axona-cli}) \\
+Give an AI agent native Axona tools & The \textbf{MCP server}
+(\texttt{axona-mcp}) \\
+Contribute a node from a desktop, no terminal & The \textbf{desktop
+app} \\
+Survive a bridge outage & Two \textbf{federated bridges} + the
+directory \\
+\end{longtable}
+}
+
+Most application developers run \textbf{none} of these in development
+--- they point the library at the live \texttt{bridge.axona.net} and let
+the existing relay fleet host their topics. You reach for self-hosted
+services when you want an isolated network, guaranteed topic durability,
+or an agent/automation integration.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{8. Are there analogous
+systems?}\label{are-there-analogous-systems}
+
+If you know other realtime/decentralized stacks, the Axona services map
+onto patterns you've already seen:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Axona service
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Closest analogue elsewhere
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+Bridge (signaling + TURN) & WebRTC \textbf{STUN/TURN} servers;
+\textbf{libp2p} circuit-relay v2 / rendezvous \\
+Relay (durable topic host) & An \textbf{MQTT broker} / \textbf{NATS}
+server with retained messages --- but decentralized and unprivileged \\
+Bridge directory & \textbf{DNS seeds / bootstrap node lists} (Bitcoin,
+IPFS) \\
+MCP server & Any other \textbf{MCP integration} (GitHub, Slack) --- a
+thin agent-facing adapter over the library \\
+\end{longtable}
+}
+
+The difference in every row is the same: in those systems the server is
+an \emph{authority} (it owns the namespace, the messages, or the
+membership). In Axona the service is a \emph{volunteer} --- a peer that
+took on a role and can be replaced by any other peer that takes on the
+same role.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Where to go next}\label{where-to-go-next}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{\href{Axona-Programmer-Guide-v4.48.0.md}{Programmer Guide}}
+  --- build the peer that talks to these services.
+\item
+  \textbf{\href{Axona-API-Reference-v4.48.0.md}{API Reference}} ---
+  \texttt{host()} / \texttt{unhost()}, \texttt{metricTopic()}, and the
+  rest of the public surface.
+\item
+  \textbf{\texttt{axona-bridge/deploy/INSTALL.md}} --- provision a
+  bridge (installer, Docker, or manual).
+\item
+  \textbf{\texttt{axona-relay/README.md}} --- the relay's full
+  configuration + dashboard reference.
+\end{itemize}
+
+Found a gap in this guide? Open an issue at
+\url{https://github.com/axona-net/axona-docs}.
+
+\end{document}

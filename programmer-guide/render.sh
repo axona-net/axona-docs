@@ -5,22 +5,22 @@
 # numbers, heading-orphan protection (see axona-doc-preamble.tex).
 #
 #   ./render.sh                          # render all five
-#   ./render.sh Quick-Start-v4.22.0      # render one (basename, no extension)
+#   ./render.sh Quick-Start-v4.48.0      # render one (basename, no extension)
 #
 # Requires: pandoc + tectonic on PATH (no system TeX Live needed — tectonic is
 # self-contained and auto-fetches tufte-latex). Menlo font (macOS) for code.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-VERSION="v4.38.0"
-DATE="2026-07-23"
+VERSION="v4.48.0"
+DATE="2026-07-27"
 
 DOCS=(
-  "Quick-Start-v4.38.0"
-  "Axona-Programmer-Guide-v4.38.0"
-  "Axona-API-Reference-v4.38.0"
-  "Axona-Services-Guide-v4.38.0"
-  "Axona-AI-Grounding-v4.38.0"
+  "Quick-Start-v4.48.0"
+  "Axona-Programmer-Guide-v4.48.0"
+  "Axona-API-Reference-v4.48.0"
+  "Axona-Services-Guide-v4.48.0"
+  "Axona-AI-Grounding-v4.48.0"
 )
 [ "$#" -gt 0 ] && DOCS=("$@")
 

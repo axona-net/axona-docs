@@ -1,0 +1,3187 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+\documentclass[
+  nobib]{tufte-handout}
+\usepackage{xcolor}
+\usepackage{amsmath,amssymb}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math} % this also loads fontspec
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+\usepackage{lmodern}
+\ifPDFTeX\else
+  % xetex/luatex font selection
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\newenvironment{Shaded}{}{}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.49,0.56,0.16}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\BuiltInTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{#1}}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.53,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.56,0.13,0.00}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.73,0.13,0.13}{\textit{#1}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{1.00,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.25,0.63,0.44}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.02,0.16,0.49}{#1}}
+\newcommand{\ImportTok}[1]{\textcolor[rgb]{0.00,0.50,0.00}{\textbf{#1}}}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.40,0.40,0.40}{#1}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.00,0.44,0.13}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.74,0.48,0.00}{#1}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.73,0.40,0.53}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.10,0.09,0.49}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.25,0.44,0.63}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.38,0.63,0.69}{\textbf{\textit{#1}}}}
+\usepackage{longtable,booktabs,array}
+\newcounter{none} % for unnumbered tables
+\usepackage{calc} % for calculating minipage widths
+% Correct order of tables after \paragraph or \subparagraph
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd\longtable{\par}{\if@noskipsec\mbox{}\fi\par}{}{}
+\makeatother
+% Allow footnotes in longtable head/foot
+\IfFileExists{footnotehyper.sty}{\usepackage{footnotehyper}}{\usepackage{footnote}}
+\makesavenoteenv{longtable}
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+% =====================================================================
+% axona-doc-preamble.tex — shared LaTeX preamble for the programmer-guide
+% quartet (Quick-Start, Programmer Guide, API Reference, Services Guide).
+%
+% These docs are markdown-native; the PDF is built by converting the .md to
+% a tufte-handout .tex with pandoc (-H this file) and compiling with tectonic.
+% See render.sh. Modeled on explainer/Axona-Explainer.tex (the flat-essay
+% original); the tweaks below make tufte-handout work for code/table-heavy
+% reference material.
+% =====================================================================
+
+\definecolor{rust}{RGB}{185,78,54}
+\definecolor{rustsoft}{RGB}{212,168,150}
+\definecolor{inkmuted}{RGB}{102,102,102}
+\usepackage{microtype}
+
+% Explainer-matched page furniture: tufte-handout's letterspaced running
+% heads fail on certain page breaks (the SOUL \MakeTextLowercase issue the
+% explainer works around), so use the same fancyhdr style — no running
+% head, a centered page number in the footer.
+\usepackage{fancyhdr}
+\fancypagestyle{ndhtplain}{%
+  \fancyhf{}%
+  \renewcommand{\headrulewidth}{0pt}%
+  \fancyfoot[C]{\thepage}%
+}
+
+% Explainer-matched heading-orphan protection: reserve vertical room before
+% each (sub)section heading so a heading never sits alone at a page bottom.
+\usepackage{etoolbox}
+\usepackage{needspace}
+\pretocmd{\section}{\needspace{6\baselineskip}}{}{}
+\pretocmd{\subsection}{\needspace{4\baselineskip}}{}{}
+
+% XeTeX (tectonic) unicode monospace: renders … → and the box-drawing ASCII
+% diagrams that the default CM/LM mono cannot. Menlo ships with macOS.
+\setmonofont{Menlo}[Scale=0.78]
+
+% tufte-handout ships \subsubsection as an error stub (it wants flat essays).
+% A run-in fallback lets nested reference headings (§4.2, §12.3, …) compile.
+\renewcommand{\subsubsection}[1]{\medskip\par\noindent{\normalsize\bfseries #1}\par\nobreak\smallskip}
+
+% These docs use no margin notes, so reclaim tufte's wide right margin: widen
+% the text block so code blocks and API tables don't overflow it.
+\usepackage{geometry}
+\geometry{left=1in, textwidth=6.1in, marginparsep=0.2in, marginparwidth=0.9in,
+          top=1in, headsep=0.4in}
+
+% Wrap long code lines (cheat-sheet comments run to ~130 chars) with a ↪ marker
+% instead of overflowing. Applies to pandoc's fancyvrb Highlighting/Verbatim.
+\usepackage{fvextra}
+\fvset{breaklines=true, breakanywhere=true}
+
+% A few technical symbols appear in prose / inline code that Latin Modern and
+% Menlo don't cover; map them to math equivalents so they render (rather than
+% dropping to tofu). Only maps chars actually used — leaves → alone (it renders).
+\usepackage{newunicodechar}
+\newunicodechar{≈}{\ensuremath{\approx}}
+\newunicodechar{≠}{\ensuremath{\neq}}
+\newunicodechar{≥}{\ensuremath{\geq}}
+\newunicodechar{≤}{\ensuremath{\leq}}
+\newunicodechar{×}{\ensuremath{\times}}
+\newunicodechar{·}{\ensuremath{\cdot}}
+\newunicodechar{‖}{\ensuremath{\|}}
+\usepackage{bookmark}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same}
+\hypersetup{
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\author{}
+\date{}
+
+\begin{document}
+
+% Generated by render.sh — the explainer-style title page.
+\thispagestyle{empty}
+\null\vfill
+\begin{center}
+{\fontsize{48}{52}\selectfont \textsc{Axona}\par}
+\vspace{0.6em}
+{\Large\itshape Every Public Symbol, Exactly\par}
+\vspace{4em}
+{\large David A.~Smith\par}
+{\itshape\small Axona.net\par}
+\vspace{2em}
+{\small The Axona API Reference \quad v4.48.0 \quad 2026-07-27\par}
+\end{center}
+\vfill
+\null
+\newpage
+\pagestyle{ndhtplain}
+\thispagestyle{ndhtplain}
+\setcounter{page}{1}
+
+\section{Axona API Reference}\label{axona-api-reference}
+
+Reference for every public symbol exported from \texttt{@axona/protocol}
+v4.48.0.
+
+Organized by what application developers reach for first (identity, peer
+lifecycle, pub/sub, direct messaging, introspection), then the
+transport/protocol surface, then low-level utilities. Every signature
+below is verified against the v4.48.0 kernel source.
+
+\begin{quote}
+\textbf{Which network?} Both live networks run the 4.x line (wire 4.0).
+\textbf{Testnet} (\texttt{wss://testnet.axona.net}) tracks the newest
+kernel --- v4.48.0, the version this reference describes.
+\textbf{Production} (\texttt{wss://bridge.axona.net} east +
+\texttt{wss://bridge-west.axona.net} west) runs the most recently
+promoted kernel, typically one release behind while changes soak. The
+API surface below is identical on both; point wherever you deploy.
+Install \texttt{github:axona-net/axona-protocol\#v4.48.0}.
+\end{quote}
+
+Companion documents:
+
+\begin{itemize}
+\tightlist
+\item
+  \href{Quick-Start-v4.48.0.md}{Quick Start} --- 5-minute working
+  roundtrip.
+\item
+  \href{Axona-Programmer-Guide-v4.38.0.md}{Programmer Guide} --- mental
+  model + worked example + pitfalls.
+\item
+  \href{../SECURITY-CHANGELOG.md}{Security changelog} --- what each
+  kernel version protects.
+\end{itemize}
+
+Imports throughout assume:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ }\CommentTok{/* … */}\NormalTok{ \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+Sub-path imports (e.g.~\texttt{@axona/protocol/contracts/Transport.js},
+\texttt{@axona/protocol/persistence/file.js}) work for symbols that need
+them, but most apps only need the main barrel.
+
+\begin{quote}
+\textbf{How to read this reference.} It has three parts. The
+\textbf{Application surface} (§§1--9) is what applications call --- most
+readers never need anything else. The \textbf{Transport + protocol
+surface} (§§10--16) and \textbf{Low-level utilities} (§§17--23) exist
+for transport authors, tooling, and the curious. Building with an AI
+assistant? Hand it the \href{Axona-AI-Grounding-v4.48.0.md}{AI
+Grounding} file --- the application surface distilled to rules and
+patterns.
+\end{quote}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Table of contents}\label{table-of-contents}
+
+\subsubsection{Application surface (what you'll use
+first)}\label{application-surface-what-youll-use-first}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\tightlist
+\item
+  \hyperref[1-types-referenced-throughout]{Types referenced throughout}
+\item
+  \hyperref[2-identity]{Identity}
+\item
+  \hyperref[3-axonapeer-construction--lifecycle]{AxonaPeer construction
+  + lifecycle}
+\item
+  \hyperref[4-pubsub]{Pub/sub}
+
+  \begin{itemize}
+  \tightlist
+  \item
+    \hyperref[41-topic-addressing]{4.1 Topic addressing}
+  \item
+    \hyperref[42-publish--subscribe]{4.2 publish / subscribe}
+  \item
+    \hyperref[43-pull--metrics]{4.3 pull / metrics}
+  \item
+    \hyperref[44-owner--creator-ops-kill]{4.4 owner + creator ops: kill}
+  \item
+    \hyperref[45-hosting-host--unhost]{4.5 hosting: host / unhost}
+  \item
+    \hyperref[46-topic-limits]{4.6 topic limits}
+  \end{itemize}
+\item
+  \hyperref[5-direct-messaging]{Direct messaging}
+\item
+  \hyperref[6-mesh-introspection--events]{Mesh introspection + events}
+\item
+  \hyperref[7-envelopes--verification]{Envelopes + verification}
+\item
+  \hyperref[8-errors]{Errors}
+\item
+  \hyperref[9-persistence]{Persistence}
+\end{enumerate}
+
+\subsubsection{Transport + protocol
+surface}\label{transport-protocol-surface}
+
+\begin{quote}
+\textbf{You probably don't need this part.} Everything an application
+calls is in §§1--9 above. The sections from here on are for people
+implementing transports, embedding the kernel, or building tooling.
+\end{quote}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{9}
+\tightlist
+\item
+  \hyperref[10-contracts]{Contracts}
+\item
+  \hyperref[11-sim-transport]{Sim transport}
+\item
+  \hyperref[12-web-transport]{Web transport}
+\item
+  \hyperref[13-handshake]{Handshake}
+\item
+  \hyperref[14-authenticated-identity-handshake-axona5]{Authenticated-identity
+  handshake (axona/5)}
+\item
+  \hyperref[15-bridge-directory]{Bridge directory}
+\item
+  \hyperref[16-low-level-pubsub-builders]{Low-level pub/sub builders}
+\end{enumerate}
+
+\subsubsection{Low-level utilities}\label{low-level-utilities}
+
+\begin{quote}
+\textbf{Internals.} Pure helpers the kernel itself is built from. Apps
+import these only for unusual jobs (custom signing, ID math, region
+tables).
+\end{quote}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\setcounter{enumi}{16}
+\tightlist
+\item
+  \hyperref[17-ed25519-helpers]{Ed25519 helpers}
+\item
+  \hyperref[18-hex--id-math]{Hex / ID math}
+\item
+  \hyperref[19-s2-geographic-cells]{S2 geographic cells}
+\item
+  \hyperref[20-region-names]{Region names}
+\item
+  \hyperref[21-geo-helpers]{Geo helpers}
+\item
+  \hyperref[22-proof-of-work-scaffolding]{Proof-of-work scaffolding}
+\item
+  \hyperref[23-constants]{Constants}
+\end{enumerate}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Application surface}\label{application-surface}
+
+\subsection{1. Types referenced
+throughout}\label{types-referenced-throughout}
+
+\subsubsection{\texorpdfstring{\texttt{Identity} (node
+identity)}{Identity (node identity)}}\label{identity-type}
+
+Returned by \texttt{createNodeIdentity}. The connection/transport
+keypair; its pubkey forms the nodeId.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\{}
+\NormalTok{  id}\OperatorTok{:}         \DataTypeTok{string}\OperatorTok{;}       \CommentTok{// 66{-}char lowercase hex (264{-}bit nodeId)}
+\NormalTok{  pubkey}\OperatorTok{:}     \BuiltInTok{Uint8Array}\OperatorTok{;}   \CommentTok{// 32{-}byte Ed25519 public key}
+\NormalTok{  pubkeyHex}\OperatorTok{:}  \DataTypeTok{string}\OperatorTok{;}       \CommentTok{// 64{-}char lowercase hex}
+\NormalTok{  privateKey}\OperatorTok{:} \BuiltInTok{CryptoKey}\OperatorTok{;}    \CommentTok{// Web Crypto Ed25519 (browser + Node 20+)}
+\NormalTok{  region}\OperatorTok{:}\NormalTok{     \{ lat}\OperatorTok{:} \DataTypeTok{number}\OperatorTok{,}\NormalTok{ lng}\OperatorTok{:} \DataTypeTok{number}\NormalTok{ \}}\OperatorTok{;}
+\NormalTok{  createdAt}\OperatorTok{:}  \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// ms epoch}
+\NormalTok{  pow}\OperatorTok{:}        \DataTypeTok{string}\OperatorTok{;}       \CommentTok{// transport{-}role PoW nonce (\textquotesingle{}\textquotesingle{} = inert at difficulty 0)}
+  \FunctionTok{sign}\NormalTok{(message}\OperatorTok{:} \BuiltInTok{Uint8Array}\NormalTok{)}\OperatorTok{:} \BuiltInTok{Promise}\OperatorTok{\textless{}}\BuiltInTok{Uint8Array}\OperatorTok{\textgreater{};}
+  \FunctionTok{verify}\NormalTok{(message}\OperatorTok{:} \BuiltInTok{Uint8Array}\OperatorTok{,}\NormalTok{ signature}\OperatorTok{:} \BuiltInTok{Uint8Array}\NormalTok{)}\OperatorTok{:} \BuiltInTok{Promise}\OperatorTok{\textless{}}\DataTypeTok{boolean}\OperatorTok{\textgreater{};}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+The top byte of \texttt{id} is the S2 region cell for
+\texttt{(lat,\ lng)}; the bottom 256 bits are \texttt{SHA-256(pubkey)}.
+The id is self-authenticating --- a peer can only claim an id it holds
+the private key for.
+
+\subsubsection{\texorpdfstring{\texttt{AuthorIdentity} (authorship
+identity)}{AuthorIdentity (authorship identity)}}\label{author-identity-type}
+
+Returned by \texttt{createAuthorIdentity}. A keypair only --- \textbf{no
+nodeId, no region} (authorship is not a place). Its public key is the
+Author ID.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\{}
+\NormalTok{  kind}\OperatorTok{:}       \StringTok{\textquotesingle{}author\textquotesingle{}}\OperatorTok{;}
+\NormalTok{  authorId}\OperatorTok{:}   \DataTypeTok{string}\OperatorTok{;}       \CommentTok{// 64{-}char hex Author ID (== signerPubkey on the wire)}
+\NormalTok{  pubkey}\OperatorTok{:}     \BuiltInTok{Uint8Array}\OperatorTok{;}   \CommentTok{// 32{-}byte Ed25519 public key}
+\NormalTok{  pubkeyHex}\OperatorTok{:}  \DataTypeTok{string}\OperatorTok{;}       \CommentTok{// 64{-}char hex (same value as authorId)}
+\NormalTok{  privateKey}\OperatorTok{:} \BuiltInTok{CryptoKey}\OperatorTok{;}
+\NormalTok{  createdAt}\OperatorTok{:}  \DataTypeTok{number}\OperatorTok{;}
+\NormalTok{  pow}\OperatorTok{:}        \DataTypeTok{string}\OperatorTok{;}       \CommentTok{// publish{-}role PoW nonce (\textquotesingle{}\textquotesingle{} = inert)}
+  \FunctionTok{sign}\NormalTok{(message}\OperatorTok{:} \BuiltInTok{Uint8Array}\NormalTok{)}\OperatorTok{:} \BuiltInTok{Promise}\OperatorTok{\textless{}}\BuiltInTok{Uint8Array}\OperatorTok{\textgreater{};}
+  \FunctionTok{verify}\NormalTok{(message}\OperatorTok{:} \BuiltInTok{Uint8Array}\OperatorTok{,}\NormalTok{ signature}\OperatorTok{:} \BuiltInTok{Uint8Array}\NormalTok{)}\OperatorTok{:} \BuiltInTok{Promise}\OperatorTok{\textless{}}\DataTypeTok{boolean}\OperatorTok{\textgreater{};}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+You pass an \texttt{AuthorIdentity} (or \texttt{ANONYMOUS}) as
+\texttt{\{\ signWith\ \}} to \texttt{peer.pub} / \texttt{kill}.
+
+\subsubsection{\texorpdfstring{\texttt{TopicDescriptor}
+(type)}{TopicDescriptor (type)}}\label{topic-descriptor-type}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\{}
+\NormalTok{  region}\OperatorTok{?:} \DataTypeTok{string} \OperatorTok{|} \DataTypeTok{number}\OperatorTok{;}   \CommentTok{// region name (\textquotesingle{}useast\textquotesingle{}), \textquotesingle{}0x89\textquotesingle{}, \textquotesingle{}137\textquotesingle{}, or 137; omit → node region}
+\NormalTok{  owner}\OperatorTok{?:}  \DataTypeTok{string} \OperatorTok{|} \DataTypeTok{null}\OperatorTok{;}     \CommentTok{// 64{-}hex Author ID, or absent for an open topic}
+\NormalTok{  name}\OperatorTok{:}    \DataTypeTok{string}\OperatorTok{;}            \CommentTok{// required, non{-}empty}
+\NormalTok{  write}\OperatorTok{?:}  \StringTok{\textquotesingle{}open\textquotesingle{}} \OperatorTok{|} \StringTok{\textquotesingle{}owner\textquotesingle{}}\OperatorTok{;}  \CommentTok{// defaults by owner presence (see §4.1)}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{\texorpdfstring{\texttt{Envelope}
+(type)}{Envelope (type)}}\label{envelope-type}
+
+What \texttt{peer.sub} delivers and \texttt{peer.pull} returns.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\{}
+\NormalTok{  msgId}\OperatorTok{:}        \DataTypeTok{string}\OperatorTok{;}   \CommentTok{// 64{-}char hex = sha256(canonical(\{ publisher, message \}))}
+\NormalTok{  seq}\OperatorTok{:}          \DataTypeTok{number}\OperatorTok{;}   \CommentTok{// per{-}publisher monotonic sequence (folded under the signature)}
+\NormalTok{  ts}\OperatorTok{:}           \DataTypeTok{number}\OperatorTok{;}   \CommentTok{// ms epoch when published}
+\NormalTok{  topic}\OperatorTok{:}\NormalTok{        TopicDescriptor}\OperatorTok{;}   \CommentTok{// the SIGNED descriptor \{ region, owner, name, write \}}
+\NormalTok{  message}\OperatorTok{:}      \DataTypeTok{any}\OperatorTok{;}      \CommentTok{// your JSON{-}serializable payload}
+\NormalTok{  signature}\OperatorTok{?:}   \DataTypeTok{string}\OperatorTok{;}   \CommentTok{// \textquotesingle{}ed25519:\textless{}128 hex\textgreater{}\textquotesingle{}; present iff signed}
+\NormalTok{  signerPubkey}\OperatorTok{?:} \DataTypeTok{string}\OperatorTok{;}  \CommentTok{// 64{-}char hex Author ID; present iff signed}
+\NormalTok{  signerPow}\OperatorTok{?:}   \DataTypeTok{string}\OperatorTok{;}   \CommentTok{// publish{-}role PoW nonce; present iff signed (\textquotesingle{}\textquotesingle{} at difficulty 0)}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{quote}
+\textbf{\texttt{ts} is publish time, and it is the only legitimate input
+to recency logic.} A subscription with \texttt{since} replays history,
+so an envelope that \emph{arrives} now may have been \emph{published}
+hours ago --- ``last seen'' / online / freshness features must compare
+against \texttt{env.ts}, never the local clock at delivery, and must
+keep the latest \texttt{ts} per author (replay order is not guaranteed).
+Field bug: arrival-time stamping resurrected a full day of departed
+users as ``online'' on every app launch.
+\end{quote}
+
+A \textbf{retraction} (see \texttt{peer.kill}) is delivered to your
+\texttt{sub} handler as a marker instead of a full envelope:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\{ deleted}\OperatorTok{:} \KeywordTok{true}\OperatorTok{,}\NormalTok{ msgId}\OperatorTok{:} \DataTypeTok{string}\OperatorTok{,}\NormalTok{ topic}\OperatorTok{:} \DataTypeTok{string} \OperatorTok{|} \DataTypeTok{null}\NormalTok{ \}}
+\end{Highlighting}
+\end{Shaded}
+
+Branch on \texttt{env.deleted\ ===\ true} to drop your local copy of
+\texttt{msgId}.
+
+\subsubsection{\texorpdfstring{\texttt{Subscription}
+(type)}{Subscription (type)}}\label{subscription-type}
+
+Opaque handle returned by \texttt{peer.sub()}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{sub}\OperatorTok{.}\AttributeTok{id}          \CommentTok{// string — unique per subscription}
+\NormalTok{sub}\OperatorTok{.}\AttributeTok{topicId}     \CommentTok{// string — 66{-}char hex topic ID}
+\NormalTok{sub}\OperatorTok{.}\AttributeTok{topicName}   \CommentTok{// string — your original topic name (or \textquotesingle{}\#\textless{}id{-}prefix\textgreater{}\textquotesingle{} for an id{-}only sub)}
+\NormalTok{sub}\OperatorTok{.}\FunctionTok{stop}\NormalTok{()      }\CommentTok{// Promise\textless{}void\textgreater{} — cancel; idempotent}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{\texorpdfstring{\texttt{PeerId} / \texttt{TopicId}
+(types)}{PeerId / TopicId (types)}}\label{id-types}
+
+In the public API, peer IDs and topic IDs are \textbf{66-char lowercase
+hex strings}. The kernel holds them as \texttt{bigint} internally;
+conversion happens at the API boundary. Pass strings unless a signature
+explicitly says BigInt (\texttt{peer.lookup}).
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{2. Identity}\label{identity}
+
+Two factories. \texttt{createNodeIdentity} is the connection key
+(location + nodeId, used for the handshake and routing).
+\texttt{createAuthorIdentity} is the publish key (no location, used to
+sign messages). They are separate on purpose (key separation): a peer
+holds a node identity and signs each publish with an author identity
+supplied per call.
+
+\subsubsection{\texorpdfstring{\texttt{createNodeIdentity(\{\ lat,\ lng,\ extractable?\ \})}
+→
+\texttt{Promise\textless{}Identity\textgreater{}}}{createNodeIdentity(\{ lat, lng, extractable? \}) → Promise\textless Identity\textgreater{}}}\label{createnodeidentity-lat-lng-extractable-promiseidentity}
+
+Generate a fresh node identity: a new Ed25519 keypair plus the 264-bit
+nodeId derived from the public key + region.
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Param
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{lat} & \texttt{number} & required --- latitude of the node's
+region \\
+\texttt{lng} & \texttt{number} & required --- longitude \\
+\texttt{extractable} & \texttt{boolean} & default \texttt{true}. Pass
+\texttt{false} for an ephemeral browser identity so the signing key
+can't be exported (XSS can't exfiltrate it). Leave \texttt{true} if you
+will \texttt{dumpIdentity} it. \\
+\end{longtable}
+}
+
+\textbf{Returns} an \hyperref[identity-type]{\texttt{Identity}}. The top
+byte of \texttt{.id} is the S2 cell for \texttt{(lat,\ lng)}.
+
+\textbf{Throws} \texttt{IdentityError}:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{IDENTITY\_INVALID\_FORMAT} --- \texttt{lat}/\texttt{lng} not
+  numbers.
+\item
+  \texttt{IDENTITY\_KEYGEN\_FAILED} --- Web Crypto Ed25519
+  \texttt{generateKey} failed.
+\end{itemize}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ createNodeIdentity \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+
+\KeywordTok{const}\NormalTok{ node }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{createNodeIdentity}\NormalTok{(\{ }\DataTypeTok{lat}\OperatorTok{:} \FloatTok{38.0}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:} \OperatorTok{{-}}\FloatTok{77.0}\NormalTok{ \})}\OperatorTok{;}
+\BuiltInTok{console}\OperatorTok{.}\FunctionTok{log}\NormalTok{(node}\OperatorTok{.}\AttributeTok{id}\NormalTok{)}\OperatorTok{;}             \CommentTok{// \textquotesingle{}df…\textquotesingle{}  (66 hex chars)}
+\BuiltInTok{console}\OperatorTok{.}\FunctionTok{log}\NormalTok{(node}\OperatorTok{.}\AttributeTok{id}\OperatorTok{.}\FunctionTok{slice}\NormalTok{(}\DecValTok{0}\OperatorTok{,} \DecValTok{2}\NormalTok{))}\OperatorTok{;} \CommentTok{// region byte}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{\texorpdfstring{\texttt{createAuthorIdentity(\{\ persistAs?,\ store?,\ extractable?\ \})}
+→
+\texttt{Promise\textless{}AuthorIdentity\textgreater{}}}{createAuthorIdentity(\{ persistAs?, store?, extractable? \}) → Promise\textless AuthorIdentity\textgreater{}}}\label{createauthoridentity-persistas-store-extractable-promiseauthoridentity}
+
+Mint (or load-or-create) the authorship key whose public key is the
+Author ID. Durability is the only real choice: ephemeral (unlinkable) or
+persisted (a recognizable author across sessions, able to retract).
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Param
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{persistAs} & \texttt{string} & storage key; load-or-create then
+save. Omit for an ephemeral author. \\
+\texttt{store} & \texttt{\{\ get,\ set\ \}} & custom store; defaults to
+browser \texttt{localStorage} when \texttt{persistAs} is set. \\
+\texttt{extractable} & \texttt{boolean} & default \texttt{true};
+\textbf{forced \texttt{true}} when \texttt{persistAs} is set (a
+persisted key must be exportable). \\
+\end{longtable}
+}
+
+\textbf{Returns} an
+\hyperref[author-identity-type]{\texttt{AuthorIdentity}}.
+
+\textbf{Throws} \texttt{IdentityError}
+(\texttt{IDENTITY\_KEYGEN\_FAILED}, \texttt{IDENTITY\_LOAD\_FAILED},
+\texttt{IDENTITY\_INVALID\_FORMAT}).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ createAuthorIdentity \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+
+\KeywordTok{const}\NormalTok{ ephemeral }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{createAuthorIdentity}\NormalTok{()}\OperatorTok{;}              \CommentTok{// unlinkable, one session}
+\KeywordTok{const}\NormalTok{ durable   }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{createAuthorIdentity}\NormalTok{(\{ }\DataTypeTok{persistAs}\OperatorTok{:} \StringTok{\textquotesingle{}me\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;} \CommentTok{// recognizable across reloads}
+\BuiltInTok{console}\OperatorTok{.}\FunctionTok{log}\NormalTok{(durable}\OperatorTok{.}\AttributeTok{authorId}\NormalTok{)}\OperatorTok{;}   \CommentTok{// 64{-}hex Author ID — share this as \textasciigrave{}owner\textasciigrave{}}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{\texorpdfstring{\texttt{dumpIdentity(identity)} →
+\texttt{Promise\textless{}IdentityEnvelope\textgreater{}}
+\emph{(advanced)}}{dumpIdentity(identity) → Promise\textless IdentityEnvelope\textgreater{} (advanced)}}\label{dumpidentityidentity-promiseidentityenvelope-advanced}
+
+Serialize a \textbf{node} identity to a JSON-safe envelope (the
+\texttt{privateKey} is exported as base64 PKCS\#8). Loses the in-memory
+\texttt{CryptoKey} handle; reconstruct with \texttt{loadIdentity}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ env }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{dumpIdentity}\NormalTok{(node)}\OperatorTok{;}
+\CommentTok{// \{ id, pubkey, privkey, region: \{ lat, lng \}, createdAt, pow \}}
+\NormalTok{localStorage}\OperatorTok{.}\FunctionTok{setItem}\NormalTok{(}\StringTok{\textquotesingle{}node{-}identity\textquotesingle{}}\OperatorTok{,} \BuiltInTok{JSON}\OperatorTok{.}\FunctionTok{stringify}\NormalTok{(env))}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Throws} \texttt{IdentityError(IDENTITY\_LOAD\_FAILED)} if the
+key can't be exported.
+
+\subsubsection{\texorpdfstring{\texttt{loadIdentity(envelope)} →
+\texttt{Promise\textless{}Identity\textgreater{}}
+\emph{(advanced)}}{loadIdentity(envelope) → Promise\textless Identity\textgreater{} (advanced)}}\label{loadidentityenvelope-promiseidentity-advanced}
+
+Inverse of \texttt{dumpIdentity}. Reconstructs the full node
+\texttt{Identity}, verifying that (a) the stored id matches the
+freshly-derived id and (b) the private key corresponds to the public key
+(a sign→verify probe).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ env }\OperatorTok{=} \BuiltInTok{JSON}\OperatorTok{.}\FunctionTok{parse}\NormalTok{(localStorage}\OperatorTok{.}\FunctionTok{getItem}\NormalTok{(}\StringTok{\textquotesingle{}node{-}identity\textquotesingle{}}\NormalTok{))}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ node }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{loadIdentity}\NormalTok{(env)}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Throws} \texttt{IdentityError}:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{IDENTITY\_INVALID\_FORMAT} --- malformed envelope, id
+  mismatch, or private/public key mismatch.
+\item
+  \texttt{IDENTITY\_LOAD\_FAILED} --- PKCS\#8 import failed.
+\end{itemize}
+
+\begin{quote}
+Author-identity persistence is handled inside
+\texttt{createAuthorIdentity(\{\ persistAs\ \})} --- you don't dump/load
+author identities by hand. \texttt{dumpIdentity}/\texttt{loadIdentity}
+are for node identities (or when you manage your own storage layer).
+\end{quote}
+
+\subsubsection{\texorpdfstring{\texttt{computeNodeId(pubkeyBytes,\ lat,\ lng)}
+→ \texttt{Promise\textless{}string\textgreater{}}
+\emph{(advanced)}}{computeNodeId(pubkeyBytes, lat, lng) → Promise\textless string\textgreater{} (advanced)}}\label{computenodeidpubkeybytes-lat-lng-promisestring-advanced}
+
+\subsubsection{\texorpdfstring{\texttt{computeNodeIdBigInt(pubkeyBytes,\ lat,\ lng)}
+→ \texttt{Promise\textless{}bigint\textgreater{}}
+\emph{(advanced)}}{computeNodeIdBigInt(pubkeyBytes, lat, lng) → Promise\textless bigint\textgreater{} (advanced)}}\label{computenodeidbigintpubkeybytes-lat-lng-promisebigint-advanced}
+
+Derive (or verify) a 264-bit nodeId from a raw public key + region.
+\texttt{computeNodeId} returns the 66-hex form;
+\texttt{computeNodeIdBigInt} returns the BigInt. Used to validate a
+claimed nodeId against a pubkey + region without minting a fresh
+identity.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ id }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{computeNodeId}\NormalTok{(node}\OperatorTok{.}\AttributeTok{pubkey}\OperatorTok{,} \FloatTok{38.0}\OperatorTok{,} \OperatorTok{{-}}\FloatTok{77.0}\NormalTok{)}\OperatorTok{;}
+\BuiltInTok{console}\OperatorTok{.}\FunctionTok{log}\NormalTok{(id }\OperatorTok{===}\NormalTok{ node}\OperatorTok{.}\AttributeTok{id}\NormalTok{)}\OperatorTok{;}   \CommentTok{// true}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{3. AxonaPeer construction +
+lifecycle}\label{axonapeer-construction-lifecycle}
+
+\subsubsection{\texorpdfstring{\texttt{connect(options)} →
+\texttt{Promise\textless{}\{\ peer,\ author,\ nodeIdentity,\ transport,\ status,\ disconnect\ \}\textgreater{}}
+\emph{(kernel 4.16.0; barrel export
+4.48.0)}}{connect(options) → Promise\textless\{ peer, author, nodeIdentity, transport, status, disconnect \}\textgreater{} (kernel 4.16.0; barrel export 4.48.0)}}\label{connectoptions-promise-peer-author-nodeidentity-transport-status-disconnect-kernel-4.16.0-barrel-export-4.48.0}
+
+\textbf{The single bootstrap an application uses.} \texttt{connect()}
+composes the whole startup sequence --- mints the connection identity
+(and, by default, an ephemeral author), builds the web transport +
+\texttt{NeuronNode} + \texttt{AxonaDomain} + \texttt{AxonaPeer},
+\texttt{start()}s, awaits \texttt{peer.ready()}, \textbf{and
+self-integrates the node into the routing mesh}
+(\texttt{peer.integrate()}) --- in the one correct order. It is exported
+from the main barrel (and still from the \texttt{connect.js} subpath):
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ connect \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}          \CommentTok{// also: \textquotesingle{}@axona/protocol/connect.js\textquotesingle{}}
+\KeywordTok{const}\NormalTok{ \{ peer}\OperatorTok{,}\NormalTok{ author}\OperatorTok{,}\NormalTok{ status}\OperatorTok{,}\NormalTok{ disconnect \} }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{connect}\NormalTok{(\{}
+  \DataTypeTok{bridge}\OperatorTok{:} \StringTok{\textquotesingle{}wss://testnet.axona.net\textquotesingle{}}\OperatorTok{,} \DataTypeTok{location}\OperatorTok{:}\NormalTok{ \{ }\DataTypeTok{lat}\OperatorTok{:} \DecValTok{38}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:} \OperatorTok{{-}}\DecValTok{77}\NormalTok{ \} \})}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+Every startup variation is an \textbf{option}, never a reason to drop to
+the constructors below:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Param
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{bridge} & string & \texttt{wss://} bridge URL. Required unless
+\texttt{transport} injected. \\
+\texttt{location} & \texttt{\{\ lat,\ lng\ \}} & The node's real
+location. Required unless \texttt{nodeIdentity} injected. \\
+\texttt{author} & \texttt{true} \textbar{} string \textbar{} identity
+\textbar{} \texttt{false} & \texttt{true} (default) ephemeral author; a
+\textbf{string} → durable author via \texttt{persistAs}; an author
+identity → used as-is; \texttt{false} → no author minted. \\
+\texttt{k} & number (20) & Routing closest-set size. \\
+\texttt{ready} & object \textbar{} \texttt{false} & Forwarded to
+\texttt{peer.ready()}; \texttt{false} skips the wait (\texttt{status} is
+\texttt{null}). \\
+\texttt{transport} & \texttt{Transport} & Inject a custom/sim transport;
+the web transport is only loaded when this is absent. \\
+\texttt{nodeIdentity} & \texttt{Identity} & Inject a durable/pre-minted
+connection key instead of minting one from \texttt{location}. \\
+\texttt{domain} & \texttt{AxonaDomain} & Share \textbf{one} routing
+domain (mesh) across several peers built in the same process. \\
+\texttt{persist} & \texttt{PersistenceAdapter} & Enable
+auto-checkpointing of identity, subscriptions, synaptome, and hosting
+state. \\
+\texttt{rootReplicas} & number & Replication factor for a topic's
+authoritative cohort (advanced tuning). \\
+\texttt{maxPublishBytes} & number & Per-publish cap (clamped to the
+WebRTC-interop floor; advanced tuning). \\
+\texttt{synaptomeMaintain} &
+\texttt{boolean\ \textbackslash{}\textbar{}\ object} & Opt into
+continuous near-quota maintenance (see \texttt{AxonaPeer} below). \\
+\texttt{web} & object & Extra options forwarded to the
+\texttt{webTransport} factory. \\
+\end{longtable}
+}
+
+\texttt{disconnect()} performs \texttt{peer.leave()} +
+\texttt{peer.stop()} + \texttt{transport.stop()}, best-effort.
+
+\begin{quote}
+\textbf{Why not assemble by hand?} The constructors and lifecycle calls
+below are the \textbf{advanced building blocks \texttt{connect()}
+composes} --- documented here for transport authors, sims, and tests,
+not as an application setup path. Hand-assembling a peer is how apps
+silently \textbf{skipped \texttt{peer.integrate()}} and so self-rooted
+their topics as \textbf{singletons}, losing cross-region delivery (a
+real shipped bug). If you build a peer by hand you MUST call
+\texttt{peer.integrate()} after \texttt{start()}/\texttt{ready()} ---
+\texttt{connect()} does it for you.
+\end{quote}
+
+\texttt{AxonaPeer} is the per-node DHT contract implementation --- one
+instance per running node.
+
+\subsubsection{\texorpdfstring{\texttt{new\ AxonaPeer(\{\ nodeIdentity,\ domain,\ transport,\ ...\ \})}
+\emph{(advanced --- \texttt{connect()} builds
+this)}}{new AxonaPeer(\{ nodeIdentity, domain, transport, ... \}) (advanced --- connect() builds this)}}\label{new-axonapeer-nodeidentity-domain-transport-...-advanced-connect-builds-this}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Param
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{node} & \texttt{NeuronNode} & \textbf{required} --- the per-node
+state object (\texttt{\{\ id,\ alive,\ transport,\ synaptome\ \}}). \\
+\texttt{nodeIdentity} & \texttt{Identity} & the connection key (from
+\texttt{createNodeIdentity}). Used for the handshake, routing, and
+signing the node's own actions. It \textbf{never} signs a publish. \\
+\texttt{transport} & \texttt{Transport} & the transport instance
+(web/sim/node). The peer uses it for
+\texttt{send}/\texttt{notify}/\texttt{lookup}. \\
+\texttt{domain} & \texttt{AxonaDomain} & shared routing parameters.
+\textbf{\texttt{domain} or \texttt{engine} is required.} \\
+\texttt{engine} & object & legacy simulator engine; pass instead of
+\texttt{domain} only in sim/tests. \\
+\texttt{axonaManager} & \texttt{AxonaManager} & pre-built pub/sub
+manager; if omitted, resolved on first \texttt{pub}/\texttt{sub}. \\
+\texttt{persist} & \texttt{PersistenceAdapter} & enables
+auto-checkpointing of identity, subscriptions, synaptome, and hosting
+state. \\
+\texttt{maxPublishBytes} & \texttt{number} & per-publish cap; clamped to
+the WebRTC-interop floor (16 KiB) and never above the absolute ingress
+cap. Override only for known-homogeneous fleets. \\
+\texttt{synaptomeMaintain} &
+\texttt{boolean\ \textbackslash{}\textbar{}\ \{\ kNear?,\ intervalMs?,\ maxPerTick?\ \}}
+& \emph{(advanced; v4.9.0)} opt into continuous \textbf{near-quota
+maintenance} --- the peer keeps its \texttt{kNear} (≈5) XOR-nearest
+``successor'' links filled through churn so greedy routing's last mile
+stays complete. \texttt{true} uses the defaults
+\texttt{\{\ kNear:\ 5,\ intervalMs:\ 15000,\ maxPerTick:\ 3\ \}}. Off by
+default; the standard \texttt{axona-peer}/relay builds set it.
+Long-range ``fingers'' are handled separately by the routing anneal. \\
+\end{longtable}
+}
+
+The production path is
+\texttt{\{\ nodeIdentity,\ domain,\ transport\ \}}. The
+\texttt{\{\ engine\ \}} / \texttt{\{\ axonaManager\ \}} forms are for
+the simulator and tests.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ AxonaPeer}\OperatorTok{,}\NormalTok{ AxonaDomain}\OperatorTok{,}\NormalTok{ NeuronNode}\OperatorTok{,}\NormalTok{ createNodeIdentity \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+
+\KeywordTok{const}\NormalTok{ node }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{createNodeIdentity}\NormalTok{(\{ }\DataTypeTok{lat}\OperatorTok{:} \DecValTok{38}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:} \OperatorTok{{-}}\DecValTok{77}\NormalTok{ \})}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ peer }\OperatorTok{=} \KeywordTok{new} \FunctionTok{AxonaPeer}\NormalTok{(\{}
+  \DataTypeTok{nodeIdentity}\OperatorTok{:}\NormalTok{ node}\OperatorTok{,}
+  \DataTypeTok{domain}\OperatorTok{:}       \KeywordTok{new} \FunctionTok{AxonaDomain}\NormalTok{(\{ }\DataTypeTok{k}\OperatorTok{:} \DecValTok{20}\NormalTok{ \})}\OperatorTok{,}
+  \DataTypeTok{node}\OperatorTok{:}         \KeywordTok{new} \FunctionTok{NeuronNode}\NormalTok{(\{ }\DataTypeTok{id}\OperatorTok{:} \BuiltInTok{BigInt}\NormalTok{(}\StringTok{\textquotesingle{}0x\textquotesingle{}} \OperatorTok{+}\NormalTok{ node}\OperatorTok{.}\AttributeTok{id}\NormalTok{)}\OperatorTok{,} \DataTypeTok{lat}\OperatorTok{:} \DecValTok{38}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:} \OperatorTok{{-}}\DecValTok{77}\NormalTok{ \})}\OperatorTok{,}
+\NormalTok{  transport}\OperatorTok{,}
+\NormalTok{\})}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Throws} plain \texttt{Error} if \texttt{node} is missing, or if
+neither \texttt{engine} nor \texttt{domain} is supplied.
+
+\subsubsection{\texorpdfstring{\texttt{peer.start()} →
+\texttt{Promise\textless{}void\textgreater{}}}{peer.start() → Promise\textless void\textgreater{}}}\label{peer.start-promisevoid}
+
+Bring the peer up --- installs wire-level routing handlers, the delivery
+hook, the peer-bound/peer-died eviction handlers, and (if
+\texttt{persist} is wired) hydrates persisted state. Idempotent.
+
+\subsubsection{\texorpdfstring{\texttt{peer.ready(\{\ minPeers?,\ timeoutMs?,\ stableMs?,\ pollMs?\ \})}
+→
+\texttt{Promise\textless{}\{\ ready,\ peers,\ ms,\ reason\ \}\textgreater{}}}{peer.ready(\{ minPeers?, timeoutMs?, stableMs?, pollMs? \}) → Promise\textless\{ ready, peers, ms, reason \}\textgreater{}}}\label{peer.ready-minpeers-timeoutms-stablems-pollms-promise-ready-peers-ms-reason}
+
+Wait for the routing mesh to warm up before you
+\texttt{pub}/\texttt{sub}. \texttt{start()} returns as soon as local
+state is set up, but mesh handshakes complete asynchronously over the
+next few seconds; publishing/subscribing on a cold synaptome routes to
+too few root axons. \texttt{ready()} resolves once the synaptome reaches
+\texttt{minPeers}, or --- failing that --- settles at a \textbf{stable
+non-zero plateau} (unchanged for \texttt{stableMs}), or the
+\texttt{timeoutMs} budget elapses. Use it instead of hand-rolling a
+\texttt{peer.peers().length} / \texttt{node.synaptome.size} poll.
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Param
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Default
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{minPeers} & \texttt{number} & \texttt{4} & Resolve
+\texttt{ready:true} as soon as the synaptome reaches this size. \\
+\texttt{timeoutMs} & \texttt{number} & \texttt{10000} & Upper bound; on
+expiry resolves with \texttt{ready} = (peers \textgreater{} 0). \\
+\texttt{stableMs} & \texttt{number} & \texttt{1500} & If below
+\texttt{minPeers} but non-zero and unchanged this long, resolve
+\texttt{ready:true}
+(\texttt{reason:\textquotesingle{}stable\textquotesingle{}}). \\
+\texttt{pollMs} & \texttt{number} & \texttt{150} & Synaptome poll
+interval. \\
+\end{longtable}
+}
+
+Returns
+\texttt{\{\ ready:boolean,\ peers:number,\ ms:number,\ reason:\textquotesingle{}minPeers\textquotesingle{}\textbar{}\textquotesingle{}stable\textquotesingle{}\textbar{}\textquotesingle{}timeout\textquotesingle{}\ \}}.
+Never rejects --- a cold/isolated start resolves
+\texttt{\{\ ready:false,\ …,\ reason:\textquotesingle{}timeout\textquotesingle{}\ \}}
+so you can surface ``still connecting'' rather than throw.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{start}\NormalTok{()}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ status }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{ready}\NormalTok{()}\OperatorTok{;}          \CommentTok{// defaults: 4 peers or a stable plateau, ≤10s}
+\ControlFlowTok{if}\NormalTok{ (}\OperatorTok{!}\NormalTok{status}\OperatorTok{.}\AttributeTok{ready}\NormalTok{) }\BuiltInTok{console}\OperatorTok{.}\FunctionTok{warn}\NormalTok{(}\StringTok{\textquotesingle{}mesh still warming — publishes may be thin\textquotesingle{}}\NormalTok{)}\OperatorTok{;}
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{integrate}\NormalTok{()}\OperatorTok{;}                     \CommentTok{// REQUIRED in a hand{-}driven lifecycle (connect() does it)}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{\texorpdfstring{\texttt{peer.integrate()} →
+\texttt{Promise\textless{}void\textgreater{}}}{peer.integrate() → Promise\textless void\textgreater{}}}\label{peer.integrate-promisevoid}
+
+Actively integrate a freshly-started node into the routing mesh ---
+\textbf{directed integration}: the node routes a small burst of traffic
+at its XOR-neighbours so \emph{their} routing tables learn it, instead
+of waiting for passive inbound adoption. Call it once after
+\texttt{start()}/\texttt{ready()}. \texttt{connect()} calls it for you;
+a hand-driven lifecycle \textbf{must} call it itself. Skipping it leaves
+the node at the passive-adoption churn floor --- the failure that made
+hand-assembled peers self-root their own topics as \textbf{singletons}
+(no cross-region delivery). Idempotent; a no-op on a node
+\texttt{connect()} already integrated.
+
+\subsubsection{\texorpdfstring{\texttt{peer.stop()} →
+\texttt{Promise\textless{}void\textgreater{}}}{peer.stop() → Promise\textless void\textgreater{}}}\label{peer.stop-promisevoid}
+
+Tear down: release event listeners and the peer-lifecycle hooks.
+Idempotent. (For a graceful network exit, prefer \texttt{peer.leave}.)
+
+\subsubsection{\texorpdfstring{\texttt{peer.join(sponsor?)} →
+\texttt{Promise\textless{}void\textgreater{}}}{peer.join(sponsor?) → Promise\textless void\textgreater{}}}\label{peer.joinsponsor-promisevoid}
+
+Bootstrap into the mesh. Calls \texttt{start()} first if needed, brings
+up the transport, and --- if a \texttt{sponsor} is given --- opens a
+channel to it and seeds the synaptome.
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Param
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{sponsor} & \texttt{string} & 66-char hex nodeId of a known peer.
+Omit to start standalone (inbound connections will populate the
+synaptome). \\
+\end{longtable}
+}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{join}\NormalTok{()}\OperatorTok{;}                 \CommentTok{// standalone; wait for inbound peers}
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{join}\NormalTok{(bridgeNodeIdHex)}\OperatorTok{;}  \CommentTok{// open a channel to a sponsor and seed}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Throws} \texttt{TransportError}:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{TRANSPORT\_NOT\_STARTED} --- \texttt{transport.start} failed,
+  or \texttt{sponsor} is not 66-char hex.
+\item
+  \texttt{TRANSPORT\_PEER\_UNREACHABLE} --- the sponsor isn't reachable.
+\end{itemize}
+
+\subsubsection{\texorpdfstring{\texttt{peer.leave(\{\ drain?,\ notify?,\ timeoutMs?\ \})}
+→
+\texttt{Promise\textless{}void\textgreater{}}}{peer.leave(\{ drain?, notify?, timeoutMs? \}) → Promise\textless void\textgreater{}}}\label{peer.leave-drain-notify-timeoutms-promisevoid}
+
+Graceful shutdown.
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 6\tabcolsep) * \real{0.2500}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Param
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Default
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{notify} & \texttt{boolean} & \texttt{true} & send a
+\texttt{peer-leaving} notification to every synaptome peer so they drop
+us proactively (sub-second handoff instead of heartbeat timeout). \\
+\texttt{drain} & \texttt{boolean} & \texttt{true} & pause briefly for
+in-flight publishes/pulls to settle before closing. \\
+\texttt{timeoutMs} & \texttt{number} & \texttt{5000} & bound on the
+drain wait. \\
+\end{longtable}
+}
+
+Closes the transport last, force-flushes persistence, and stops
+listeners.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{leave}\NormalTok{(\{ }\DataTypeTok{drain}\OperatorTok{:} \KeywordTok{true}\OperatorTok{,} \DataTypeTok{notify}\OperatorTok{:} \KeywordTok{true}\OperatorTok{,} \DataTypeTok{timeoutMs}\OperatorTok{:} \DecValTok{3000}\NormalTok{ \})}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{\texorpdfstring{\texttt{peer.getNodeId()} →
+\texttt{string\ \textbar{}\ bigint}}{peer.getNodeId() → string \textbar{} bigint}}\label{peer.getnodeid-string-bigint}
+
+Returns whatever was passed as \texttt{node.id} at construction time
+(BigInt if you followed the convention).
+
+\subsubsection{\texorpdfstring{\texttt{peer.snapshot()} →
+\texttt{Promise\textless{}object\textgreater{}}}{peer.snapshot() → Promise\textless object\textgreater{}}}\label{peer.snapshot-promiseobject}
+
+Serialize this peer's state to a JSON-safe envelope:
+\texttt{\{\ formatVersion:\ \textquotesingle{}1.0\textquotesingle{},\ snapshotAt,\ wireVersion,\ identity,\ synaptome,\ subscriptions\ \}}.
+Store it however you like (encrypted, synced, custom DB).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ state }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{snapshot}\NormalTok{()}\OperatorTok{;}
+\NormalTok{localStorage}\OperatorTok{.}\FunctionTok{setItem}\NormalTok{(}\StringTok{\textquotesingle{}peer{-}state\textquotesingle{}}\OperatorTok{,} \BuiltInTok{JSON}\OperatorTok{.}\FunctionTok{stringify}\NormalTok{(state))}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{\texorpdfstring{\texttt{AxonaPeer.fromSnapshot(state,\ opts)}
+→ \texttt{Promise\textless{}AxonaPeer\textgreater{}}
+\emph{(static)}}{AxonaPeer.fromSnapshot(state, opts) → Promise\textless AxonaPeer\textgreater{} (static)}}\label{axonapeer.fromsnapshotstate-opts-promiseaxonapeer-static}
+
+Reconstruct a peer from a \texttt{snapshot()} envelope. The returned
+peer is constructed with identity / synaptome pre-loaded, but the
+transport is \textbf{not} started --- call \texttt{peer.join(sponsor?)}
+to bring it up. Subscription \textbf{handlers are not restored}
+(functions don't serialize); the restored list is exposed at
+\texttt{peer.pendingSubscriptions} so you can re-register them with
+\texttt{peer.sub}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ state }\OperatorTok{=} \BuiltInTok{JSON}\OperatorTok{.}\FunctionTok{parse}\NormalTok{(localStorage}\OperatorTok{.}\FunctionTok{getItem}\NormalTok{(}\StringTok{\textquotesingle{}peer{-}state\textquotesingle{}}\NormalTok{))}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ peer  }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ AxonaPeer}\OperatorTok{.}\FunctionTok{fromSnapshot}\NormalTok{(state}\OperatorTok{,}\NormalTok{ \{ domain}\OperatorTok{,}\NormalTok{ node}\OperatorTok{,}\NormalTok{ transport \})}\OperatorTok{;}
+\ControlFlowTok{for}\NormalTok{ (}\KeywordTok{const}\NormalTok{ s }\KeywordTok{of}\NormalTok{ peer}\OperatorTok{.}\AttributeTok{pendingSubscriptions}\NormalTok{) \{}
+  \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{sub}\NormalTok{(s}\OperatorTok{.}\AttributeTok{topic}\OperatorTok{,}\NormalTok{ onMsg}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{since}\OperatorTok{:}\NormalTok{ s}\OperatorTok{.}\AttributeTok{since}\NormalTok{ \})}\OperatorTok{;}
+\NormalTok{\}}
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{join}\NormalTok{()}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Throws} \texttt{TypeError} / \texttt{RangeError} if
+\texttt{state} isn't a \texttt{1.0}-format snapshot object.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{4. Pub/sub}\label{pubsub}
+
+\subsubsection{4.1 Topic addressing}\label{topic-addressing}
+
+\emph{(Folded in from the former standalone ``Topic IDs'' note.)}
+
+A topic is not a bare string --- it's a small \textbf{descriptor}, and
+the topic ID is a hash of that descriptor with a one-byte region prefix:
+
+\begin{verbatim}
+topicId = regionByte || SHA-256(canonical({ owner, name, write }))   // 33 bytes = 66 hex chars
+\end{verbatim}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Field
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Meaning
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{region} & a real geographic cell; becomes the leading byte of
+the ID \\
+\texttt{owner} & an \textbf{Author ID} (a publish key), or absent \\
+\texttt{name} & the human label --- \texttt{"lobby"},
+\texttt{"profile"} \\
+\texttt{write} & \texttt{"open"} or \texttt{"owner"} --- defaults by
+whether \texttt{owner} is set \\
+\end{longtable}
+}
+
+Because the ID is a pure function of those fields, anyone who knows the
+fields computes the identical ID --- no registry, no coordination.
+
+\textbf{The \texttt{region} field accepts a name, hex string, decimal
+string, or number} --- all normalize to the same region byte:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}lobby\textquotesingle{}}\NormalTok{ \}   }\CommentTok{// name}
+\NormalTok{\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}0x89\textquotesingle{}}\OperatorTok{,}   \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}lobby\textquotesingle{}}\NormalTok{ \}   }\CommentTok{// hex string   {-}{-}\textbackslash{}  same topic ID}
+\NormalTok{\{ }\DataTypeTok{region}\OperatorTok{:} \DecValTok{137}\OperatorTok{,}      \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}lobby\textquotesingle{}}\NormalTok{ \}   }\CommentTok{// number       {-}{-}/  (leading byte 0x89)}
+\end{Highlighting}
+\end{Shaded}
+
+Omit \texttt{region} and it defaults to the publisher's own node region
+(top byte of its node ID). Unknown regions throw \texttt{RangeError}.
+
+\textbf{\texttt{write} defaults by whether there's an \texttt{owner}:}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Descriptor
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Resolved \texttt{write}
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Meaning
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{\{\ region,\ name\ \}} (no owner) & \texttt{open} & open lobby
+--- anyone publishes \\
+\texttt{\{\ region,\ owner,\ name\ \}} (no write) &
+\textbf{\texttt{owner}} & owned --- only the owner publishes \\
+\texttt{\{\ region,\ owner,\ name,\ write:\textquotesingle{}owner\textquotesingle{}\ \}}
+& \texttt{owner} & same ID as the row above \\
+\texttt{\{\ region,\ owner,\ name,\ write:\textquotesingle{}open\textquotesingle{}\ \}}
+& \texttt{open} & owner-namespaced, anyone publishes (inbox/wall) \\
+\texttt{\{\ region,\ name,\ write:\textquotesingle{}owner\textquotesingle{}\ \}}
+(no owner) & \texttt{open} & no owner -\textgreater{} \texttt{write}
+ignored \\
+\end{longtable}
+}
+
+Two rules: \textbf{no \texttt{owner} -\textgreater{} the topic is open
+and \texttt{write} is ignored}; \textbf{an \texttt{owner}
+-\textgreater{} \texttt{write} defaults to
+\texttt{\textquotesingle{}owner\textquotesingle{}}} (the safe default
+--- forgetting \texttt{write} can never silently make an owned feed
+world-writable).
+
+\textbf{Share the ID for reading; share the descriptor for writing.}
+\texttt{sub}, \texttt{pull}, and \texttt{metrics} accept the 66-hex ID
+or a descriptor. \texttt{pub} (and the owner op \texttt{kill}) requires
+the descriptor --- a bare ID is rejected, because a hash can't reveal
+its \texttt{owner}, so the ID alone can't prove write authorization.
+
+\paragraph{\texorpdfstring{\texttt{deriveTopicId(descriptor,\ selfRegion?)}
+→
+\texttt{Promise\textless{}string\textgreater{}}}{deriveTopicId(descriptor, selfRegion?) → Promise\textless string\textgreater{}}}\label{derivetopiciddescriptor-selfregion-promisestring}
+
+Compute the 66-hex topic ID for a descriptor --- the same function the
+peer uses internally. This is what you hand to someone so they can
+subscribe.
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Param
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{descriptor} & \texttt{TopicDescriptor} &
+\texttt{\{\ region?,\ owner?,\ name,\ write?\ \}}. \\
+\texttt{selfRegion} &
+\texttt{string\ \textbackslash{}\textbar{}\ number} & fallback region
+when \texttt{descriptor.region} is omitted (the publisher's node
+region). \\
+\end{longtable}
+}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ deriveTopicId \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+
+\KeywordTok{const}\NormalTok{ lobbyId }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{deriveTopicId}\NormalTok{(\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}lobby\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ feedId  }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{deriveTopicId}\NormalTok{(\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{owner}\OperatorTok{:}\NormalTok{ me}\OperatorTok{.}\AttributeTok{authorId}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}profile\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;}
+\CommentTok{// → "89…"  (66 hex chars; leading "89" is the region byte) — share out{-}of{-}band}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Throws} \texttt{TypeError} (empty \texttt{name}),
+\texttt{RangeError} (unknown region, bad \texttt{owner} format, or no
+region and no \texttt{selfRegion}).
+
+\paragraph{\texorpdfstring{\texttt{deriveTopicIdBig(descriptor,\ selfRegion?)}
+→
+\texttt{Promise\textless{}bigint\textgreater{}}}{deriveTopicIdBig(descriptor, selfRegion?) → Promise\textless bigint\textgreater{}}}\label{derivetopicidbigdescriptor-selfregion-promisebigint}
+
+BigInt variant of \texttt{deriveTopicId} (the form kernel internals
+hold). Same parameters and errors.
+
+\paragraph{\texorpdfstring{\texttt{resolveTopic(descriptor,\ selfRegion?)}
+→ \texttt{Promise\textless{}object\textgreater{}}
+\emph{(advanced)}}{resolveTopic(descriptor, selfRegion?) → Promise\textless object\textgreater{} (advanced)}}\label{resolvetopicdescriptor-selfregion-promiseobject-advanced}
+
+The full resolver behind \texttt{deriveTopicId}. Returns the normalized
+descriptor plus the id:
+\texttt{\{\ region\ (code),\ owner,\ name,\ write,\ topicId\ \}}. Use it
+when you need the resolved \texttt{write}/\texttt{region}, not just the
+id.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ r }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{resolveTopic}\NormalTok{(\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{owner}\OperatorTok{:}\NormalTok{ me}\OperatorTok{.}\AttributeTok{authorId}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}profile\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;}
+\CommentTok{// \{ region: 137, owner: \textquotesingle{}\textless{}64{-}hex\textgreater{}\textquotesingle{}, name: \textquotesingle{}profile\textquotesingle{}, write: \textquotesingle{}owner\textquotesingle{}, topicId: \textquotesingle{}89…\textquotesingle{} \}}
+\end{Highlighting}
+\end{Shaded}
+
+\paragraph{\texorpdfstring{\texttt{canonical(value)} → \texttt{string}
+\emph{(advanced)}}{canonical(value) → string (advanced)}}\label{canonicalvalue-string-advanced}
+
+Stable, total, JSON-valid canonical encoding (object keys sorted at
+every level). Two semantically-identical values canonicalize to the same
+bytes across runs and implementations --- the basis of content-addressed
+\texttt{msgId}s and signature stability.
+
+\paragraph{\texorpdfstring{\texttt{sha256Hex(input)} →
+\texttt{Promise\textless{}string\textgreater{}}
+\emph{(advanced)}}{sha256Hex(input) → Promise\textless string\textgreater{} (advanced)}}\label{sha256hexinput-promisestring-advanced}
+
+\texttt{SHA-256} of a string or \texttt{Uint8Array}, returned as
+lowercase hex.
+
+\subsubsection{4.2 publish / subscribe}\label{publish-subscribe}
+
+\paragraph{\texorpdfstring{\texttt{peer.pub(topic,\ message,\ \{\ signWith\ \})}
+→
+\texttt{Promise\textless{}string\textgreater{}}}{peer.pub(topic, message, \{ signWith \}) → Promise\textless string\textgreater{}}}\label{peer.pubtopic-message-signwith-promisestring}
+
+Publish a message to a topic. \textbf{Returns} the 64-char hex
+\texttt{msgId}.
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Arg
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{topic} & \texttt{TopicDescriptor} & \textbf{must be a
+descriptor} --- a bare id is rejected (the storing node needs the
+descriptor to verify the write policy). \\
+\texttt{message} & \texttt{any} & JSON-serializable payload. \\
+\texttt{opts.signWith} &
+\texttt{AuthorIdentity\ \textbackslash{}\textbar{}\ ANONYMOUS} &
+\textbf{required} --- name a signer, or pass the \texttt{ANONYMOUS}
+sentinel to publish unsigned. There is no default author. Authorship is
+\textbf{per call}: one peer serves any number of authors/personas by
+varying \texttt{signWith} --- switching the active user of an app must
+never reconnect the peer. \\
+\end{longtable}
+}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ createAuthorIdentity}\OperatorTok{,}\NormalTok{ ANONYMOUS \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ me }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{createAuthorIdentity}\NormalTok{()}\OperatorTok{;}
+
+\KeywordTok{const}\NormalTok{ id }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{pub}\NormalTok{(\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}lobby\textquotesingle{}}\NormalTok{ \}}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{text}\OperatorTok{:} \StringTok{\textquotesingle{}hi\textquotesingle{}}\NormalTok{ \}}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{signWith}\OperatorTok{:}\NormalTok{ me \})}\OperatorTok{;}
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{pub}\NormalTok{(\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}lobby\textquotesingle{}}\NormalTok{ \}}\OperatorTok{,} \StringTok{\textquotesingle{}anon msg\textquotesingle{}}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{signWith}\OperatorTok{:}\NormalTok{ ANONYMOUS \})}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+For an \textbf{owned} topic, \texttt{signWith} must be the owner key ---
+publishing with any other key throws before it leaves the peer.
+
+\textbf{Maximum size.} The cap is on the \emph{serialized envelope} and
+defaults to the WebRTC-interoperable reliable-delivery floor (16 KiB) so
+any peer on any path can receive it. Chunk larger payloads
+(\texttt{@axona/protocol/std/chunk}) or publish a content-reference and
+transfer bytes out-of-band.
+
+\begin{quote}
+\textbf{Chunking is reliable by default (\texttt{std/chunk}, kernel ≥
+3.6.0).}
+\texttt{publishChunkedBytes(peer,\ bytes,\ \{\ topic,\ signWith,\ name,\ mime\ \})}
+splits a payload into floor-sized messages, publishes them, then
+\textbf{verifies what the mesh actually cached and re-publishes any
+gaps} --- so a \emph{reload} subscriber can reassemble from replay.
+\texttt{peer.pub} is fire-and-forget into the transport buffer, so a
+fast burst would otherwise drop chunks before they cache; the
+verify+repair pass means you do \textbf{not} hand-tune a publish
+throttle. \texttt{receiveChunkedBytes(peer,\ topic,\ \{\ timeoutMs\ \})}
+reassembles and resolves with
+\texttt{\{\ bytes,\ name,\ mime,\ size,\ meta\ \}}, or \textbf{rejects}
+(naming the missing indices) on timeout --- it never hangs. Files are
+capped to the per-topic replay-cache ceiling so you never create a
+transfer a reload joiner can't complete.
+\end{quote}
+
+\begin{quote}
+\textbf{Delivery (4.x).} A publish routes to the topic's K-closest
+\textbf{cohort} and is replicated across it (not a single root), so it
+survives the closest node churning out. A publish is still one-shot
+fire-and-forget --- there is \textbf{no delivery ack to the publisher}
+(the transport identity is deliberately unlinked from the author
+identity) --- but two automatic mechanisms cover the gaps: a
+freshly-joined (``cold'') node re-sends its first publishes a few times
+over \textasciitilde1 s (v4.11.0) so a not-yet-warm routing table
+doesn't strand them, and a background retry re-sends a recent publish
+toward the true root until the publisher observes its own \texttt{msgId}
+land. You do not tune any of this. Since v4.22.0 the cohort also
+converges to the \textbf{union} of its members' history across root
+transitions, so a \texttt{since:\textquotesingle{}all\textquotesingle{}}
+subscriber attaching right after the root moved still replays the full
+timeline, not just the newer half.
+\end{quote}
+
+\textbf{Throws} \texttt{PublishError}:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{PUBLISH\_INVALID\_TOPIC} --- a bare id was passed, or the
+  topic isn't a \texttt{\{\ name,\ …\ \}} object.
+\item
+  \texttt{TOPIC\_REGION\_REQUIRED} --- no region named and the peer has
+  no node region to default to.
+\item
+  \texttt{PUBLISH\_NO\_PUBLISH\_IDENTITY} --- no \texttt{signWith}
+  given.
+\item
+  \texttt{WRITE\_POLICY\_VIOLATION} --- owned topic, signer is not the
+  owner.
+\item
+  \texttt{PUBLISH\_SIGN\_FAILED} --- \texttt{signWith} lacks
+  \texttt{privateKey}/\texttt{pubkeyHex}, or signing failed.
+\item
+  \texttt{PUBLISH\_INVALID\_MESSAGE} --- message isn't
+  JSON-serializable.
+\item
+  \texttt{PUBLISH\_PAYLOAD\_TOO\_LARGE} --- enveloped message exceeds
+  the cap.
+\end{itemize}
+
+\paragraph{\texorpdfstring{\texttt{peer.sub(topic,\ handler,\ \{\ since?\ \})}
+→
+\texttt{Promise\textless{}Subscription\textgreater{}}}{peer.sub(topic, handler, \{ since? \}) → Promise\textless Subscription\textgreater{}}}\label{peer.subtopic-handler-since-promisesubscription}
+
+Subscribe. \texttt{handler} is invoked with the full
+\hyperref[envelope-type]{\texttt{Envelope}} for each delivery.
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Arg
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{topic} &
+\texttt{TopicDescriptor\ \textbackslash{}\textbar{}\ string} & a
+descriptor \textbf{or} a 66-hex topic ID (the shareable read handle). \\
+\texttt{handler} & \texttt{(envelope)\ =\textgreater{}\ void} & called
+per delivery; also receives retraction markers
+\texttt{\{\ deleted:\ true,\ msgId,\ topic\ \}}. \\
+\texttt{opts.since} &
+\texttt{\textquotesingle{}all\textquotesingle{}\ \textbackslash{}\textbar{}\ \textquotesingle{}latest\textquotesingle{}\ \textbackslash{}\textbar{}\ number}
+& replay control (below). \\
+\end{longtable}
+}
+
+\textbf{\texttt{since} modes:}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+\texttt{since}
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+What you get
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+omitted / \texttt{undefined} & live tail only --- future messages. \\
+\texttt{\textquotesingle{}latest\textquotesingle{}} & the most recent
+cached message, then live tail. \\
+\texttt{\textquotesingle{}all\textquotesingle{}} & everything in the
+replay cache, then live tail. \\
+\texttt{\textless{}number\textgreater{}} & messages newer than the
+timestamp (ms epoch), then live tail. \\
+\end{longtable}
+}
+
+\textbf{Returns} a \hyperref[subscription-type]{\texttt{Subscription}};
+call \texttt{.stop()} to cancel.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ sub }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{sub}\NormalTok{(\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}lobby\textquotesingle{}}\NormalTok{ \}}\OperatorTok{,}\NormalTok{ (env) }\KeywordTok{=\textgreater{}}\NormalTok{ \{}
+  \ControlFlowTok{if}\NormalTok{ (env}\OperatorTok{.}\AttributeTok{deleted}\NormalTok{) \{ }\FunctionTok{dropFromUI}\NormalTok{(env}\OperatorTok{.}\AttributeTok{msgId}\NormalTok{)}\OperatorTok{;} \ControlFlowTok{return}\OperatorTok{;}\NormalTok{ \}}
+  \BuiltInTok{console}\OperatorTok{.}\FunctionTok{log}\NormalTok{(env}\OperatorTok{.}\AttributeTok{signerPubkey}\OperatorTok{,}\NormalTok{ env}\OperatorTok{.}\AttributeTok{message}\NormalTok{)}\OperatorTok{;}
+\NormalTok{\}}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{since}\OperatorTok{:} \StringTok{\textquotesingle{}all\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;}
+
+\CommentTok{// or subscribe by shared id:}
+\KeywordTok{const}\NormalTok{ sub2 }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{sub}\NormalTok{(lobbyId}\OperatorTok{,}\NormalTok{ onMsg}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{since}\OperatorTok{:} \StringTok{\textquotesingle{}latest\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;}
+
+\ControlFlowTok{await}\NormalTok{ sub}\OperatorTok{.}\FunctionTok{stop}\NormalTok{()}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Throws} \texttt{SubscribeError(SUBSCRIBE\_HANDLER\_MISSING)}
+(handler not a function); \texttt{PublishError(PUBLISH\_INVALID\_TOPIC)}
+(a string that isn't a valid 66-hex id).
+
+\paragraph{\texorpdfstring{\texttt{peer.unsub(topic)} →
+\texttt{Promise\textless{}\{\ ok,\ removed\ \}\textgreater{}}}{peer.unsub(topic) → Promise\textless\{ ok, removed \}\textgreater{}}}\label{peer.unsubtopic-promise-ok-removed}
+
+Unsubscribe by topic --- the counterpart to \texttt{sub}. Stops
+\textbf{every} local subscription this peer holds for the topic (no need
+to keep the handle) and, once the last one goes, sends the network
+unsubscribe so the topic's roots drop this peer. Self-only by
+construction. Idempotent --- returns
+\texttt{\{\ ok:\ true,\ removed:\ 0\ \}} for a topic you're not on.
+
+Takes a \textbf{descriptor} (it derives the topicId the same way
+\texttt{sub}'s descriptor form does).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ \{ removed \} }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{unsub}\NormalTok{(\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}lobby\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{4.3 pull / metrics}\label{pull-metrics}
+
+\paragraph{\texorpdfstring{\texttt{peer.pull(msgId,\ \{\ topic,\ timeoutMs?\ \})}
+→
+\texttt{Promise\textless{}Envelope\ \textbar{}\ null\textgreater{}}}{peer.pull(msgId, \{ topic, timeoutMs? \}) → Promise\textless Envelope \textbar{} null\textgreater{}}}\label{peer.pullmsgid-topic-timeoutms-promiseenvelope-null}
+
+Fetch one message from the topic's replay cache. Returns \texttt{null}
+on a cache miss (including a message that aged out of the hold window)
+--- that's expected, not an error.
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Arg
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{msgId} & \texttt{string\ \textbackslash{}\textbar{}\ null} &
+64-char hex, \textbf{or \texttt{null}/omitted for the topic's
+most-recent message}. \\
+\texttt{opts.topic} &
+\texttt{TopicDescriptor\ \textbackslash{}\textbar{}\ string} &
+descriptor \textbf{or} 66-hex id. \\
+\texttt{opts.timeoutMs} & \texttt{number} & default \texttt{1000}. \\
+\end{longtable}
+}
+
+\textbf{Nearest-replica reads (v4.11.1+).} A pull is answered by the
+\textbf{first replica the request reaches} --- a cohort member, a child
+relay, or a \texttt{host()} node --- not necessarily the topic's root.
+This lowers latency, spreads reads off the root, and lets a pull that
+would otherwise strand toward the root be served by any cache-holder it
+passes. Two consistency tiers:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{\texttt{pull(msgId)}} --- \emph{exact}.
+  \texttt{msgId\ =\ H(publisher‖message)}, so a nearer copy \textbf{is}
+  the copy; you always get that specific immutable message (or
+  \texttt{null}).
+\item
+  \textbf{pull-latest} (\texttt{msgId} null) --- \emph{recent,
+  eventually-consistent}. You get whatever newest that first replica
+  holds, which may be a beat behind the root's very newest until the
+  cohort converges. This is deliberate: it keeps a heavily-polled
+  ``current value'' read from making the root a throughput bottleneck.
+  If you need the linearizable newest, pull a specific \texttt{msgId}.
+\end{itemize}
+
+A cache-holding replica has not tombstoned the message (a \texttt{kill}
+drops it from cache), so a pull never returns a killed message. A
+successful pull slides the message's hold time forward (bounded by the
+48 h ceiling).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ env    }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{pull}\NormalTok{(msgId}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{topic}\OperatorTok{:}\NormalTok{ feedId \})}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ latest }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{pull}\NormalTok{(}\KeywordTok{null}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{topic}\OperatorTok{:}\NormalTok{ feedId \})}\OperatorTok{;}   \CommentTok{// most recent on the topic}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Throws} \texttt{PullError}:
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{PULL\_INVALID\_MSGID} --- a non-null \texttt{msgId} that isn't
+  64-char hex.
+\item
+  \texttt{PULL\_AXONS\_UNREACHABLE} --- the manager can't service the
+  request.
+\end{itemize}
+
+\paragraph{\texorpdfstring{\texttt{peer.metrics(topic,\ \{\ timeoutMs?\ \})}
+→
+\texttt{Promise\textless{}metricsObj\textgreater{}}}{peer.metrics(topic, \{ timeoutMs? \}) → Promise\textless metricsObj\textgreater{}}}\label{peer.metricstopic-timeoutms-promisemetricsobj}
+
+A one-shot read of a topic's latest published metric snapshot --- for
+\textbf{any} topic, open or owned. Metrics are \textbf{demand-driven}
+(v4.12.0): subscribing to \texttt{metricTopic(T)} --- which
+\texttt{metrics()} does internally --- sends a renewable
+\emph{metrics-on} lease toward the data topic's root, and \textbf{any
+node that roots the topic} (relay or ordinary client peer alike) then
+publishes a signed snapshot to that \emph{open} metric topic every
+\textasciitilde20 s while at least one metric subscriber remains.
+\texttt{metrics()} collects whatever arrives (or is replayed from the
+cache) during its short window and returns the freshest view. Owned
+topics' metrics are \textbf{public too} --- anyone who can derive the id
+can read them --- so there is no owner gate.
+
+\begin{quote}
+\textbf{Cold-topic note.} Publication starts \emph{on demand}, and since
+v4.16.1 the root answers a freshly armed lease \textbf{immediately} ---
+the first snapshot rides back at routing latency (\textasciitilde0.3 s
+measured on testnet), normally inside the default 1500 ms collection
+window. Under churn (the root re-homing at that instant) it can take a
+few seconds; if the window closes empty the call returns
+\texttt{stale:\ true} --- retry, widen the window, or --- better ---
+keep a standing \texttt{sub(metricTopic(T),\ …)} and treat metrics as
+the stream it is. If \emph{any} peer watched the topic's metrics within
+the 48 h hold window, replay serves the last cached snapshot immediately
+regardless.
+\end{quote}
+
+\textbf{Cohort-aware (v4.10.1).} Under the K-closest cohort model every
+co-hosting root publishes its own snapshot, so \texttt{metrics()}
+collects them over the window and \textbf{aggregates}:
+\texttt{subscribers} is \textbf{summed} (each root reports only its own
+subscriber subset, so the sum is the topic-wide total), while
+\texttt{current\_count}, \texttt{seq}, and \texttt{bytes} are
+\textbf{maxed} (they converge across the cohort via anti-entropy; max
+tolerates a lagging member). \texttt{cohortSize} tells you how many
+roots reported.
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Arg
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{topic} &
+\texttt{TopicDescriptor\ \textbackslash{}\textbar{}\ string} & the
+\textbf{data} topic --- descriptor \textbf{or} 66-hex id. \\
+\texttt{opts.timeoutMs} & \texttt{number} & how long to collect cohort
+snapshots; default \texttt{1500}. \\
+\end{longtable}
+}
+
+\textbf{Returns:}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{\{}
+\NormalTok{  current\_count}\OperatorTok{:} \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// live (non{-}expired, non{-}killed) messages retained now — max across cohort}
+\NormalTok{  seq}\OperatorTok{:}           \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// dense message counter: monotonic high{-}water of total events ever}
+                               \CommentTok{//   emitted on the topic (kills included) — max across cohort}
+\NormalTok{  subscribers}\OperatorTok{:}   \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// topic{-}wide subscriber total — summed across the cohort}
+\NormalTok{  bytes}\OperatorTok{:}         \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// live cached envelope bytes — max across cohort}
+\NormalTok{  publishes}\OperatorTok{:}     \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// (v4.41.0) advisory throughput: distinct messages ever cached at this}
+                               \CommentTok{//   root (real messages, NOT kills); monotonic, maxed across the cohort.}
+                               \CommentTok{//   On a peer/root running \textless{}4.41.0 this is still 0.}
+\NormalTok{  ts}\OperatorTok{:}            \DataTypeTok{number}\OperatorTok{|}\DataTypeTok{null}\OperatorTok{;}  \CommentTok{// freshest snapshot timestamp}
+\NormalTok{  signer}\OperatorTok{:}        \DataTypeTok{string}\OperatorTok{|}\DataTypeTok{null}\OperatorTok{;}  \CommentTok{// the freshest snapshot envelope\textquotesingle{}s signerPubkey (provenance)}
+\NormalTok{  cohortSize}\OperatorTok{:}    \DataTypeTok{number}\OperatorTok{;}       \CommentTok{// \# of distinct roots that reported a snapshot}
+\NormalTok{  stale}\OperatorTok{:}         \DataTypeTok{boolean}\OperatorTok{;}      \CommentTok{// true ⇒ no snapshot seen (no metrics publisher roots this topic)}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+Use \texttt{seq} for total-ever (published + killed),
+\texttt{current\_count} for currently-live, and their gap to spot churn.
+\texttt{subscribers} is a topic-wide count for UX, not billing. All
+values are advisory.
+
+\begin{quote}
+\textbf{A real zero vs.~``no data yet'' --- read \texttt{stale}, not the
+counters.} The numbers alone can't tell you which you have.
+\texttt{stale:\ true} (⟺ \texttt{cohortSize:\ 0}, \texttt{ts:\ null},
+\texttt{signer:\ null}) means \textbf{no snapshot arrived} in the window
+--- every field reads 0 only because nothing reported, \emph{not}
+because the topic is empty. This is exactly what you get calling
+\texttt{metrics()} immediately after \texttt{pub()}: the first snapshot
+rides a demand-driven lease and may land a beat later, so the
+synchronous read races it. A result with \texttt{stale:\ false},
+\texttt{cohortSize\ ≥\ 1}, and a real \texttt{ts}/\texttt{signer} is a
+\textbf{genuine} reading --- its zeros are true current values
+(\texttt{current\_count:\ 0} = the cache really is empty;
+\texttt{bytes:\ 0} at a just-promoted root = nothing tallied there yet).
+\textbf{Never read a \texttt{stale} result as ``zero activity.''} For a
+live view, don't poll right after publishing --- keep a standing
+\texttt{sub(metricTopic(T),\ …)} and treat metrics as the stream it is.
+\end{quote}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ m }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{metrics}\NormalTok{(\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}lobby\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;}
+\ControlFlowTok{if}\NormalTok{ (}\OperatorTok{!}\NormalTok{m}\OperatorTok{.}\AttributeTok{stale}\NormalTok{) }\BuiltInTok{console}\OperatorTok{.}\FunctionTok{log}\NormalTok{(}\VerbatimStringTok{\textasciigrave{}}\SpecialCharTok{$\{}\NormalTok{m}\OperatorTok{.}\AttributeTok{subscribers}\SpecialCharTok{\}}\VerbatimStringTok{ subscribers, }\SpecialCharTok{$\{}\NormalTok{m}\OperatorTok{.}\AttributeTok{current\_count}\SpecialCharTok{\}}\VerbatimStringTok{ live (}\SpecialCharTok{$\{}\NormalTok{m}\OperatorTok{.}\AttributeTok{seq}\SpecialCharTok{\}}\VerbatimStringTok{ total), }\SpecialCharTok{$\{}\NormalTok{m}\OperatorTok{.}\AttributeTok{cohortSize}\SpecialCharTok{\}}\VerbatimStringTok{ roots\textasciigrave{}}\NormalTok{)}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{quote}
+\textbf{For a live dashboard, prefer \texttt{sub(metricTopic(T),\ …)}
+directly} (below) --- one standing subscription gives you the latest
+snapshot plus a rolling history. \texttt{metrics()} is the convenience
+one-shot. Trust is \textbf{advisory}: the metric topic is open, so check
+\texttt{signer} if you need provenance (pin to a known relay key).
+\end{quote}
+
+\paragraph{\texorpdfstring{\texttt{metricTopic(dataTopicId)} →
+\texttt{TopicDescriptor} \emph{(subscribe to metrics --- the live
+path)}}{metricTopic(dataTopicId) → TopicDescriptor (subscribe to metrics --- the live path)}}\label{metrictopicdatatopicid-topicdescriptor-subscribe-to-metrics-the-live-path}
+
+The producer side of the convention. Compute the derived, open metric
+topic with \texttt{metricTopic()} and \texttt{sub()} it --- \textbf{your
+subscription is what turns publishing on}: it routes a renewable
+\emph{metrics-on} lease to the data topic's root, and while the lease is
+fresh the root publishes a signed snapshot every \textasciitilde20 s,
+for \textbf{both open and owned} data topics. You get the latest
+snapshot via replay-on-subscribe plus every update --- one subscription
+instead of a poll --- and, because snapshots are ordinary messages that
+age out at the 48 h hold ceiling, a \textbf{rolling \textasciitilde48 h
+history for free} to plot trends. This is also how you subscribe to an
+\textbf{owned} topic's metrics without owning it.
+
+\textbf{When snapshots arrive.} The timing contract (since v4.16.1):
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{First snapshot: at routing latency.} The root answers the
+  moment your subscription's lease arms --- \textbf{\textasciitilde0.3 s
+  measured on testnet}, arriving with (or before) your data-topic
+  replay, whether or not anyone has ever published or watched. Allow a
+  few seconds if the root churns at exactly that moment (it must re-home
+  first). If any peer watched this topic's metrics within the last 48 h,
+  replay hands you the most recent snapshot immediately as well.
+\item
+  \textbf{Cadence:} one snapshot every \textbf{\textasciitilde20 s} per
+  rooting node, for as long as at least one metric subscriber remains.
+\item
+  \textbf{Shut-off:} the lease lapses \textbf{\textasciitilde70 s} after
+  the last metric subscriber unsubscribes; publishing stops until demand
+  returns.
+\item
+  \textbf{Silence is \emph{unknown}, not zero.} Until the first snapshot
+  (or your data replay) arrives, don't render ``no activity'' as a
+  definitive answer; a \texttt{current\_count:\ 0} snapshot is the real
+  ``nothing here.''
+\end{itemize}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ deriveTopicId}\OperatorTok{,}\NormalTok{ metricTopic \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+
+\KeywordTok{const}\NormalTok{ id }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{deriveTopicId}\NormalTok{(\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}lobby\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;}
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{sub}\NormalTok{(}\FunctionTok{metricTopic}\NormalTok{(id)}\OperatorTok{,}\NormalTok{ (env) }\KeywordTok{=\textgreater{}}\NormalTok{ \{}
+  \KeywordTok{const}\NormalTok{ m }\OperatorTok{=} \BuiltInTok{JSON}\OperatorTok{.}\FunctionTok{parse}\NormalTok{(env}\OperatorTok{.}\AttributeTok{message}\NormalTok{)}\OperatorTok{;}
+  \CommentTok{// \{ topic, ts, by, signer, current\_count, seq, subscribers, bytes \}}
+  \FunctionTok{render}\NormalTok{(m}\OperatorTok{.}\AttributeTok{subscribers}\OperatorTok{,}\NormalTok{ m}\OperatorTok{.}\AttributeTok{current\_count}\NormalTok{)}\OperatorTok{;}
+\NormalTok{\}}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{since}\OperatorTok{:} \StringTok{\textquotesingle{}all\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;}   \CommentTok{// since:\textquotesingle{}all\textquotesingle{} → latest snapshot + the rolling history}
+\end{Highlighting}
+\end{Shaded}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+name
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+returns
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{metricTopic(dataTopicId)} & \texttt{TopicDescriptor} & open
+topic
+\texttt{\{\ region,\ name:\ \textquotesingle{}axona:metric:\textquotesingle{}\ +\ id\ \}}.
+Pass the \textbf{resolved 66-hex} id
+(\texttt{await\ deriveTopicId(desc)}), not the descriptor. Region byte
+is inherited from the data topic. \\
+\texttt{isMetricTopic(descriptor)} & \texttt{boolean} & true if a topic
+is itself a metric topic (the recursion guard a relay uses). \\
+\texttt{isMetricTopicName(name)} / \texttt{dataTopicIdOf(descriptor)} &
+\texttt{boolean} / \texttt{string\textbackslash{}\textbar{}null} &
+name-prefix test; inverse (metric topic → data id). \\
+\texttt{METRIC\_NAMESPACE} & \texttt{string} & the frozen reserved
+prefix \texttt{\textquotesingle{}axona:metric:\textquotesingle{}}. \\
+\end{longtable}
+}
+
+Trust is \textbf{advisory}: the metric topic is open (anyone may publish
+to it), so treat a snapshot as a hint --- if you need to, pin trust to a
+known relay's \texttt{env.signerPubkey}. The protocol does not prove a
+snapshot is authoritative.
+
+\subsubsection{4.4 owner + creator ops:
+kill}\label{owner-creator-ops-kill}
+
+These take a \textbf{descriptor} (not a bare id) and a signer via
+\texttt{\{\ signWith\ \}}.
+
+\paragraph{\texorpdfstring{\texttt{peer.kill(topic,\ msgId,\ \{\ signWith\ \})}
+→
+\texttt{Promise\textless{}\{\ ok\ \}\textgreater{}}}{peer.kill(topic, msgId, \{ signWith \}) → Promise\textless\{ ok \}\textgreater{}}}\label{peer.killtopic-msgid-signwith-promise-ok}
+
+Retract a message you published --- ``unsend''. Authorized by
+\textbf{authorship}: the roots accept the kill only if its signer
+matches the signer of the cached message, so you can only kill messages
+\textbf{you} signed. The kill is distributed to the topic's
+\textbf{K-closest cohort} (v4.10.0), not one root: every cohort member
+drops it from its replay cache, tombstones the \texttt{msgId}, and every
+internal history transfer (hand-off, catch-up, backup replication)
+carries that tombstone --- so a late subscriber attaching to any cohort
+member can't be served the killed copy. Subscribers get a delete marker
+(\texttt{\{\ deleted:\ true,\ msgId,\ topic\ \}}).
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Arg
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{topic} & \texttt{TopicDescriptor} & the topic the message was
+published to. \\
+\texttt{msgId} & \texttt{string} & \textbf{required} 64-char hex (the
+value \texttt{pub} returned). \\
+\texttt{opts.signWith} & \texttt{AuthorIdentity} & the \textbf{same
+author key} that published the message. \\
+\end{longtable}
+}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ id }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{pub}\NormalTok{(\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}lobby\textquotesingle{}}\NormalTok{ \}}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{text}\OperatorTok{:} \StringTok{\textquotesingle{}oops\textquotesingle{}}\NormalTok{ \}}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{signWith}\OperatorTok{:}\NormalTok{ me \})}\OperatorTok{;}
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{kill}\NormalTok{(\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}lobby\textquotesingle{}}\NormalTok{ \}}\OperatorTok{,}\NormalTok{ id}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{signWith}\OperatorTok{:}\NormalTok{ me \})}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{quote}
+\textbf{Common mistake (seen in the field):}
+\texttt{peer.kill(msgId,\ \{\ signWith\ \})} --- omitting the topic. A
+kill routes to the topic's roots, so it needs the descriptor exactly
+like \texttt{pub}/\texttt{sub} do; there is no id-only form. The
+descriptor is always the first argument.
+\end{quote}
+
+\begin{quote}
+Best-effort redaction, not a cryptographic un-send: a subscriber who
+already has the plaintext can keep it; an anonymous message has no
+provable creator and \textbf{cannot} be killed.
+\end{quote}
+
+\textbf{Throws} \texttt{KillError}: \texttt{KILL\_INVALID\_MSGID} (bad
+msgId), \texttt{KILL\_SIGN\_FAILED} (no/invalid \texttt{signWith}, or
+signing failed). A network that can't authorize the kill is \textbf{not}
+an error --- it just won't take effect.
+
+\begin{quote}
+\textbf{Removed in v4.3.0: \texttt{peer.unpub()} and
+\texttt{peer.touch()}.} \texttt{kill(topic,\ msgId)} is now the single
+retraction primitive --- retract individual messages you signed.
+(\texttt{unpub} cleared a whole owned-topic queue; \texttt{touch} was a
+hold-time keep-alive. Both are gone --- a topic's queue empties
+naturally as messages age out at the 48 h hold ceiling, and a
+still-relevant message is kept current by re-publishing.)
+\texttt{touch()} remains callable as a no-op for source compatibility
+but does nothing; do not use it.
+\end{quote}
+
+\subsubsection{4.5 hosting: host / unhost}\label{hosting-host-unhost}
+
+\paragraph{\texorpdfstring{\texttt{peer.host(topic?,\ opts?)} →
+\texttt{Promise\textless{}\{\ ok,\ scope,\ topicId?\ \}\textgreater{}}}{peer.host(topic?, opts?) → Promise\textless\{ ok, scope, topicId? \}\textgreater{}}}\label{peer.hosttopic-opts-promise-ok-scope-topicid}
+
+Store and serve a topic for other peers \textbf{without subscribing} ---
+the relay / infrastructure primitive. The node becomes a willing
+root/replica (publishes land on it, subscribers pull replays from it)
+but registers \textbf{no handler} and delivers nothing to a local app.
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{peer.host()} --- host this node's \textbf{own keyspace
+  neighborhood}: get recruited as a root for whatever topics land near
+  this node's id (``host whatever lands near me''). The zero-config
+  relay mode; returns
+  \texttt{\{\ ok:\ true,\ scope:\ \textquotesingle{}keyspace\textquotesingle{}\ \}}.
+\item
+  \texttt{peer.host(topic)} --- host one specific topic (descriptor).
+  Returns
+  \texttt{\{\ ok:\ true,\ scope:\ \textquotesingle{}topic\textquotesingle{},\ topicId\ \}}.
+\end{itemize}
+
+Wire-compatible with every kernel (reuses \texttt{subscribe-k}),
+respects the proximity gate, and is idempotent.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{host}\NormalTok{()}\OperatorTok{;}                                          \CommentTok{// headless relay}
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{host}\NormalTok{(\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}pow{-}results\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;} \CommentTok{// host one topic}
+\end{Highlighting}
+\end{Shaded}
+
+\paragraph{\texorpdfstring{\texttt{peer.unhost(topic?,\ opts?)} →
+\texttt{Promise\textless{}\{\ ok,\ scope\ \}\textgreater{}}}{peer.unhost(topic?, opts?) → Promise\textless\{ ok, scope \}\textgreater{}}}\label{peer.unhosttopic-opts-promise-ok-scope}
+
+Counterpart to \texttt{host}. \texttt{unhost()} turns off keyspace
+hosting; \texttt{unhost(topic)} drops one hosted topic. Does
+\textbf{not} touch your subscriptions. Idempotent.
+
+\paragraph{\texorpdfstring{\texttt{peer.rootedTopics()} →
+\texttt{Array\textless{}\{\ topicId,\ descriptor,\ current\_count,\ seq,\ subscribers,\ bytes\ \}\textgreater{}}
+\emph{(infra)}}{peer.rootedTopics() → Array\textless\{ topicId, descriptor, current\_count, seq, subscribers, bytes \}\textgreater{} (infra)}}\label{peer.rootedtopics-array-topicid-descriptor-current_count-seq-subscribers-bytes-infra}
+
+Synchronous, local-only introspection of the topics this node currently
+\textbf{roots} --- each with its signed topic descriptor (recovered from
+a cached envelope, or \texttt{null} for an empty/cold role) and a
+locally-computed snapshot (\texttt{current\_count}, \texttt{seq}, this
+member's \texttt{subscribers} subset, \texttt{bytes}). No network
+(unlike \texttt{metrics()}). This is the read side that powers the relay
+metric-publish loop (§4.3): walk it, skip \texttt{isMetricTopic(d)} and
+non-open descriptors, and \texttt{pub(metricTopic(topicId),\ …)} for the
+rest. Returns \texttt{{[}{]}} on a routing-only peer with no
+\texttt{AxonaManager}.
+
+\subsubsection{4.6 topic limits}\label{topic-limits}
+
+Every topic's replay queue is bounded:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Max messages} --- up to \texttt{CACHE\_MAX} (\textbf{1024})
+  per topic, also bounded by a 16 MB byte ceiling on the cache. When
+  full, the lowest-ordered message (by signed \texttt{seq}) is evicted
+  deterministically. (Configurable per peer via the
+  \texttt{replayCacheSize} constructor option; a value of 1 is a
+  \emph{retained/latest-value} slot --- pair it with
+  \texttt{peer.pull(null,\ …)}.)
+\item
+  \textbf{Hold time} --- default 24 h, hard ceiling 48 h. A message past
+  its hold is swept (stops being delivered or pulled). A \texttt{pull}
+  or \texttt{touch} slides the hold forward, bounded by the ceiling.
+\item
+  \textbf{Per-publisher quota (open topics only)} --- one publisher
+  occupies at most ¼ of the queue, so a flooder can't evict everyone
+  else. Owner-gated topics aren't quota'd.
+\end{itemize}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{5. Direct messaging}\label{direct-messaging}
+
+1:1 messages between specific peers, bypassing pub/sub.
+\texttt{targetId} is the 66-char hex nodeId; the peer must already be in
+the synaptome.
+
+\subsubsection{\texorpdfstring{\texttt{peer.send(targetId,\ message)} →
+\texttt{Promise\textless{}reply\textgreater{}}}{peer.send(targetId, message) → Promise\textless reply\textgreater{}}}\label{peer.sendtargetid-message-promisereply}
+
+Request/response. Resolves to whatever the recipient's
+\texttt{onMessage} handler returns.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ reply }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ alice}\OperatorTok{.}\FunctionTok{send}\NormalTok{(bobIdHex}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{kind}\OperatorTok{:} \StringTok{\textquotesingle{}ping\textquotesingle{}}\OperatorTok{,} \DataTypeTok{body}\OperatorTok{:} \StringTok{\textquotesingle{}hi\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Throws} \texttt{TypeError} if \texttt{targetId} isn't 66-char
+hex.
+
+\subsubsection{\texorpdfstring{\texttt{peer.notify(targetId,\ message)}
+→
+\texttt{Promise\textless{}void\textgreater{}}}{peer.notify(targetId, message) → Promise\textless void\textgreater{}}}\label{peer.notifytargetid-message-promisevoid}
+
+Fire-and-forget. Resolves once enqueued, not when delivered.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ControlFlowTok{await}\NormalTok{ alice}\OperatorTok{.}\FunctionTok{notify}\NormalTok{(bobIdHex}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{kind}\OperatorTok{:} \StringTok{\textquotesingle{}typing\textquotesingle{}}\OperatorTok{,} \DataTypeTok{user}\OperatorTok{:} \StringTok{\textquotesingle{}alice\textquotesingle{}}\NormalTok{ \})}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Throws} \texttt{TypeError} if \texttt{targetId} isn't 66-char
+hex.
+
+\subsubsection{\texorpdfstring{\texttt{peer.onMessage(handler)} →
+\texttt{void}}{peer.onMessage(handler) → void}}\label{peer.onmessagehandler-void}
+
+Register the single inbound direct-message handler. Calling it again
+\textbf{replaces} the previous handler. Signature
+\texttt{(senderId,\ message)\ =\textgreater{}\ reply\ \textbar{}\ void}:
+a returned value resolves the sender's \texttt{send()}; for
+\texttt{notify()} callers the return is discarded.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{peer}\OperatorTok{.}\FunctionTok{onMessage}\NormalTok{(}\KeywordTok{async}\NormalTok{ (senderIdHex}\OperatorTok{,}\NormalTok{ message) }\KeywordTok{=\textgreater{}}\NormalTok{ \{}
+  \ControlFlowTok{switch}\NormalTok{ (message}\OperatorTok{?.}\AttributeTok{kind}\NormalTok{) \{}
+    \ControlFlowTok{case} \StringTok{\textquotesingle{}ping\textquotesingle{}}\OperatorTok{:}   \ControlFlowTok{return}\NormalTok{ \{ }\DataTypeTok{reply}\OperatorTok{:} \StringTok{\textquotesingle{}pong\textquotesingle{}}\NormalTok{ \}}\OperatorTok{;}   \CommentTok{// resolves send()}
+    \ControlFlowTok{case} \StringTok{\textquotesingle{}typing\textquotesingle{}}\OperatorTok{:} \BuiltInTok{console}\OperatorTok{.}\FunctionTok{log}\NormalTok{(senderIdHex}\OperatorTok{,} \StringTok{\textquotesingle{}typing\textquotesingle{}}\NormalTok{)}\OperatorTok{;} \ControlFlowTok{return}\OperatorTok{;}  \CommentTok{// notify discards}
+\NormalTok{  \}}
+\NormalTok{\})}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\texttt{senderId} is the transport-authenticated sender, surfaced as
+66-hex.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{6. Mesh introspection +
+events}\label{mesh-introspection-events}
+
+\subsubsection{\texorpdfstring{\texttt{peer.peers()} →
+\texttt{string{[}{]}}}{peer.peers() → string{[}{]}}}\label{peer.peers-string}
+
+Current synaptome membership as 66-char hex strings.
+
+\subsubsection{\texorpdfstring{\texttt{peer.onPeerJoin(handler)} →
+\texttt{()\ =\textgreater{}\ void}}{peer.onPeerJoin(handler) → () =\textgreater{} void}}\label{peer.onpeerjoinhandler-void}
+
+Fires when a peer is admitted to the synaptome. Handler receives
+\texttt{(peerIdHex,\ event)}. Returns an unsubscribe function.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ off }\OperatorTok{=}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{onPeerJoin}\NormalTok{((id}\OperatorTok{,}\NormalTok{ ev) }\KeywordTok{=\textgreater{}} \BuiltInTok{console}\OperatorTok{.}\FunctionTok{log}\NormalTok{(}\StringTok{\textquotesingle{}admitted\textquotesingle{}}\OperatorTok{,}\NormalTok{ id}\OperatorTok{,}\NormalTok{ ev}\OperatorTok{?.}\AttributeTok{addedBy}\NormalTok{))}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{\texorpdfstring{\texttt{peer.onPeerLeave(handler)} →
+\texttt{()\ =\textgreater{}\ void}}{peer.onPeerLeave(handler) → () =\textgreater{} void}}\label{peer.onpeerleavehandler-void}
+
+Symmetric --- fires on eviction (TTL, churn, explicit unbind). Same
+signature.
+
+\subsubsection{\texorpdfstring{\texttt{peer.lookup(targetKey)} →
+\texttt{Promise\textless{}lookupResult\textgreater{}}}{peer.lookup(targetKey) → Promise\textless lookupResult\textgreater{}}}\label{peer.lookuptargetkey-promiselookupresult}
+
+Iterative XOR-routed walk to find \texttt{targetKey} (typically a peer
+ID, but any 264-bit key works). \texttt{targetKey} is a BigInt.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ r }\OperatorTok{=} \ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{lookup}\NormalTok{(}\BuiltInTok{BigInt}\NormalTok{(}\StringTok{\textquotesingle{}0x\textquotesingle{}} \OperatorTok{+}\NormalTok{ targetHex))}\OperatorTok{;}
+\CommentTok{// \{ found: boolean, hops: number, time: number /* ms */, path: bigint[] \}}
+\end{Highlighting}
+\end{Shaded}
+
+Returns \texttt{null} if the node isn't alive.
+
+\subsubsection{\texorpdfstring{\texttt{peer.health()} →
+\texttt{healthObj}}{peer.health() → healthObj}}\label{peer.health-healthobj}
+
+A cheap synchronous diagnostic snapshot --- safe to poll on a UI tick:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{peer}\OperatorTok{.}\FunctionTok{health}\NormalTok{()}\OperatorTok{;}
+\CommentTok{// \{}
+\CommentTok{//   nodeId, synaptomeSize, peers: [...], subscriptions,}
+\CommentTok{//   axonRoles: [\{ topic, isRoot, children, cacheSize \}],}
+\CommentTok{//   hosting:   \{ keyspace, topics \} | null,}
+\CommentTok{//   wireVersion, started,}
+\CommentTok{//   transport: \{ boundCount, meshChannels, meshOpen, meshBound, bridgeState \} | null,}
+\CommentTok{//   meshDegraded: boolean,}
+\CommentTok{//   admission: \{                       // kernel 4.46.0+}
+\CommentTok{//     seated, saturated, refusals,}
+\CommentTok{//     capacity: \{                      // kernel 4.47.0+ — MEASURED, not counted}
+\CommentTok{//       roles, overdue, overdueFrac, unserviced, worstAgeMs,}
+\CommentTok{//       servicePressure,               // worstAgeMs / DROP\_MS}
+\CommentTok{//       tickLagMs, tickLagMaxMs, tickDurMs, tickStalls,}
+\CommentTok{//       helloPressure,                 // tickLag / HELLO\_DEADLINE\_MS}
+\CommentTok{//     \},}
+\CommentTok{//   \},}
+\CommentTok{// \}}
+\end{Highlighting}
+\end{Shaded}
+
+\texttt{admission} reports whether this node will accept new roles, and
+why not. \texttt{seated} is false during the post-join grace period;
+\texttt{saturated} is true when the node is at capacity.
+
+\textbf{\texttt{capacity} is measured, never counted.} \texttt{roles} is
+inventory, not a limit --- production nodes routinely run several
+hundred. The two numbers that mean something are the \emph{pressures},
+each a ratio against a real protocol deadline:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Field
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Meaning
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Saturated at
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{servicePressure} & age of the least-recently-serviced role ÷
+\texttt{DROP\_MS} & ≥ 0.6 \\
+\texttt{helloPressure} & observed tick lag ÷
+\texttt{HELLO\_DEADLINE\_MS} & ≥ 0.6 \\
+\end{longtable}
+}
+
+A node holding 400 roles that services all of them on time is
+\textbf{healthy}. A node holding 40 that cannot is \textbf{saturated}.
+Poll the pressures, not \texttt{roles.length} --- an earlier release
+used a role \emph{count} as the predicate and it was meaningless,
+because the ceiling was exceeded twelvefold in ordinary operation.
+
+\textbf{Refusal is normal, and refusal is not loss.} A node that
+declines a role logs it; a declined message is forwarded to a node that
+can take it. If there is no such node the message stops and is logged
+\texttt{undeliverable} rather than being retried forever --- see the
+Services Guide on the bridge fence for the one case where refusal is
+absolute.
+
+\texttt{meshDegraded\ ===\ true} (open channels materially exceed
+authenticated binds) is the routing-truth signal --- a single tick can
+be a mid-handshake transient; a value that stays \texttt{true} across
+polls is the real warning. \texttt{transport} is \texttt{null} on
+sim/node transports, populated on web.
+
+\subsubsection{\texorpdfstring{\texttt{peer.onLog(level,\ handler)} →
+\texttt{()\ =\textgreater{}\ void}}{peer.onLog(level, handler) → () =\textgreater{} void}}\label{peer.onloglevel-handler-void}
+
+Subscribe to structured log events. \textbf{The level comes first}
+(\texttt{\textquotesingle{}debug\textquotesingle{}\ \textbar{}\ \textquotesingle{}info\textquotesingle{}\ \textbar{}\ \textquotesingle{}warn\textquotesingle{}\ \textbar{}\ \textquotesingle{}error\textquotesingle{}});
+handler is \texttt{(msg,\ context?)\ =\textgreater{}\ void}. Returns an
+unsubscribe function.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ off }\OperatorTok{=}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{onLog}\NormalTok{(}\StringTok{\textquotesingle{}warn\textquotesingle{}}\OperatorTok{,}\NormalTok{ (msg}\OperatorTok{,}\NormalTok{ ctx) }\KeywordTok{=\textgreater{}} \BuiltInTok{console}\OperatorTok{.}\FunctionTok{warn}\NormalTok{(msg}\OperatorTok{,}\NormalTok{ ctx))}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Throws} \texttt{TypeError} on an invalid level or non-function
+handler.
+
+\subsubsection{\texorpdfstring{\texttt{peer.onError(handler)} →
+\texttt{()\ =\textgreater{}\ void}}{peer.onError(handler) → () =\textgreater{} void}}\label{peer.onerrorhandler-void}
+
+Fires on background \texttt{AxonaError} emissions (transport failures
+during heartbeat, persistence warnings) the kernel surfaces
+asynchronously rather than throwing. Returns an unsubscribe function.
+
+\subsubsection{\texorpdfstring{\texttt{peer.onUpgradeRequired(handler)}
+→
+\texttt{()\ =\textgreater{}\ void}}{peer.onUpgradeRequired(handler) → () =\textgreater{} void}}\label{peer.onupgraderequiredhandler-void}
+
+Fires on a wire-version handshake mismatch, with the
+\texttt{UpgradeRequiredError} carrying
+\texttt{\{\ reason,\ serverVersion,\ clientVersion,\ downloadUrl\ \}}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{peer}\OperatorTok{.}\FunctionTok{onUpgradeRequired}\NormalTok{((err) }\KeywordTok{=\textgreater{}} \FunctionTok{showUpgradeBanner}\NormalTok{(err}\OperatorTok{.}\AttributeTok{context}\OperatorTok{.}\AttributeTok{downloadUrl}\NormalTok{))}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{7. Envelopes + verification}\label{envelopes-verification}
+
+The kernel builds and verifies envelopes for you inside
+\texttt{peer.pub} / \texttt{peer.sub}. These low-level helpers are for
+verifying what you consume, signing a DM payload by hand, or testing.
+
+\subsubsection{\texorpdfstring{\texttt{buildEnvelope(\{\ topic,\ message,\ ts?,\ seq?,\ identity,\ sign?\ \})}
+→
+\texttt{Promise\textless{}Envelope\textgreater{}}}{buildEnvelope(\{ topic, message, ts?, seq?, identity, sign? \}) → Promise\textless Envelope\textgreater{}}}\label{buildenvelope-topic-message-ts-seq-identity-sign-promiseenvelope}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 4\tabcolsep) * \real{0.3333}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Param
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Type
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{topic} & \texttt{TopicDescriptor} & the descriptor --- signed,
+so the signature binds the exact write policy. \\
+\texttt{message} & \texttt{any} & JSON-serializable. \\
+\texttt{ts} & \texttt{number} & ms timestamp; defaults to
+\texttt{Date.now()}. \\
+\texttt{seq} & \texttt{number} & per-publisher monotonic sequence
+(default \texttt{0}; \texttt{peer.pub} supplies a real value). \\
+\texttt{identity} & \texttt{AuthorIdentity} & required when
+\texttt{sign:\ true}. \\
+\texttt{sign} & \texttt{boolean} & default \texttt{true}. \\
+\end{longtable}
+}
+
+\textbf{Returns} an \hyperref[envelope-type]{\texttt{Envelope}}. The
+signature covers a domain-tagged core
+(\texttt{axona:pubsub-envelope:v2}).
+
+\textbf{Throws} \texttt{TypeError} if \texttt{identity} lacks
+\texttt{privateKey}/\texttt{pubkeyHex} when \texttt{sign:\ true}.
+
+\subsubsection{\texorpdfstring{\texttt{verifyEnvelope(envelope)} →
+\texttt{Promise\textless{}\{\ ok,\ reason?,\ signed\ \}\textgreater{}}}{verifyEnvelope(envelope) → Promise\textless\{ ok, reason?, signed \}\textgreater{}}}\label{verifyenvelopeenvelope-promise-ok-reason-signed}
+
+Verify the signature against the domain-tagged
+\texttt{(seq,\ ts,\ topic,\ message)} core and that \texttt{msgId}
+matches. \textbf{Returns a result object, not a boolean} --- check
+\texttt{.ok}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ res }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{verifyEnvelope}\NormalTok{(env)}\OperatorTok{;}
+\ControlFlowTok{if}\NormalTok{ (}\OperatorTok{!}\NormalTok{res}\OperatorTok{.}\AttributeTok{ok}\NormalTok{) }\BuiltInTok{console}\OperatorTok{.}\FunctionTok{warn}\NormalTok{(}\StringTok{\textquotesingle{}forged/invalid\textquotesingle{}}\OperatorTok{,}\NormalTok{ env}\OperatorTok{.}\AttributeTok{msgId}\OperatorTok{,}\NormalTok{ res}\OperatorTok{.}\AttributeTok{reason}\NormalTok{)}\OperatorTok{;}
+\CommentTok{// res.signed === false for a valid unsigned envelope (res.ok === true)}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{quote}
+A common mistake: \texttt{if\ (!(await\ verifyEnvelope(env)))} is always
+false --- the return value is a truthy object. Always test \texttt{.ok}.
+\end{quote}
+
+\texttt{reason} (when \texttt{!ok}) is one of \texttt{not\_an\_object},
+\texttt{missing\_msgId}, \texttt{missing\_ts}, \texttt{missing\_topic},
+\texttt{missing\_message}, \texttt{missing\_seq},
+\texttt{missing\_signerPubkey}, \texttt{unknown\_signature\_scheme},
+\texttt{wrong\_key\_or\_signature\_length}, \texttt{bad\_signature},
+\texttt{bad\_msgid}. \texttt{verifyEnvelope} checks signature + msgId
+but \textbf{not} freshness (the legitimate replay path serves cached
+history).
+
+\subsubsection{\texorpdfstring{\texttt{computeMsgId(\{\ publisher?,\ message\ \})}
+→
+\texttt{Promise\textless{}string\textgreater{}}}{computeMsgId(\{ publisher?, message \}) → Promise\textless string\textgreater{}}}\label{computemsgid-publisher-message-promisestring}
+
+Stand-alone msgId computation matching \texttt{buildEnvelope}:
+\texttt{sha256(canonical(\{\ publisher,\ message\ \}))}, where
+\texttt{publisher} is the signer's pubkey (or \texttt{null} for
+anonymous). Time and seq are deliberately not folded in.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ msgId }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{computeMsgId}\NormalTok{(\{ }\DataTypeTok{publisher}\OperatorTok{:}\NormalTok{ env}\OperatorTok{.}\AttributeTok{signerPubkey}\OperatorTok{,} \DataTypeTok{message}\OperatorTok{:}\NormalTok{ env}\OperatorTok{.}\AttributeTok{message}\NormalTok{ \})}\OperatorTok{;}
+\BuiltInTok{console}\OperatorTok{.}\FunctionTok{log}\NormalTok{(msgId }\OperatorTok{===}\NormalTok{ env}\OperatorTok{.}\AttributeTok{msgId}\NormalTok{)}\OperatorTok{;}   \CommentTok{// true}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{\texorpdfstring{\texttt{checkFreshness(envelope,\ \{\ now?,\ maxSkewMs?\ \})}
+→
+\texttt{\{\ ok,\ reason?\ \}}}{checkFreshness(envelope, \{ now?, maxSkewMs? \}) → \{ ok, reason? \}}}\label{checkfreshnessenvelope-now-maxskewms-ok-reason}
+
+Test whether an envelope's signed \texttt{ts} is within the freshness
+window (\texttt{MAX\_PUBLISH\_SKEW\_MS}, 5 min by default). Live-publish
+ingress enforces this in the kernel; call it yourself only if you need
+the check on a path the kernel doesn't gate.
+
+\subsubsection{Envelope constants}\label{envelope-constants}
+
+\begin{itemize}
+\tightlist
+\item
+  \texttt{ENVELOPE\_DOMAIN} ---
+  \texttt{\textquotesingle{}axona:pubsub-envelope:v2\textquotesingle{}}
+  (signature domain tag).
+\item
+  \texttt{MAX\_PUBLISH\_SKEW\_MS} --- \texttt{300000} (the freshness
+  window).
+\end{itemize}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{8. Errors}\label{errors}
+
+All thrown errors inherit from \texttt{AxonaError}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{class}\NormalTok{ AxonaError }\KeywordTok{extends} \BuiltInTok{Error}\NormalTok{ \{}
+  \DataTypeTok{code}\OperatorTok{:}\NormalTok{     string}\OperatorTok{;}   \CommentTok{// stable UPPER\_SNAKE identifier — switch on this, not message}
+\NormalTok{  cause}\OperatorTok{?:}   \BuiltInTok{Error}\OperatorTok{;}
+\NormalTok{  context}\OperatorTok{?:}\NormalTok{ object}\OperatorTok{;}   \CommentTok{// machine{-}readable details}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+Subclasses and their codes:
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Class
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Codes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{IdentityError} & \texttt{IDENTITY\_KEYGEN\_FAILED},
+\texttt{IDENTITY\_LOAD\_FAILED}, \texttt{IDENTITY\_INVALID\_FORMAT} \\
+\texttt{TransportError} & \texttt{TRANSPORT\_NOT\_STARTED},
+\texttt{TRANSPORT\_PEER\_UNREACHABLE}, \texttt{TRANSPORT\_TIMEOUT},
+\texttt{TRANSPORT\_CHANNEL\_CLOSED},
+\texttt{TRANSPORT\_HELLO\_FAILED} \\
+\texttt{PublishError} & \texttt{PUBLISH\_INVALID\_TOPIC},
+\texttt{PUBLISH\_SIGN\_FAILED}, \texttt{PUBLISH\_NO\_PUBLISH\_IDENTITY},
+\texttt{TOPIC\_REGION\_REQUIRED}, \texttt{WRITE\_POLICY\_VIOLATION},
+\texttt{PUBLISH\_REPLICATION\_FAILED},
+\texttt{PUBLISH\_PAYLOAD\_TOO\_LARGE},
+\texttt{PUBLISH\_INVALID\_MESSAGE} \\
+\texttt{SubscribeError} & \texttt{SUBSCRIBE\_INVALID\_TOPIC},
+\texttt{SUBSCRIBE\_ATTACH\_FAILED},
+\texttt{SUBSCRIBE\_HANDLER\_MISSING} \\
+\texttt{KillError} & \texttt{KILL\_INVALID\_TOPIC},
+\texttt{KILL\_INVALID\_MSGID}, \texttt{KILL\_SIGN\_FAILED} \\
+\texttt{UnpubError} & \texttt{UNPUB\_INVALID\_TOPIC},
+\texttt{UNPUB\_PUBLIC\_TOPIC}, \texttt{UNPUB\_SIGN\_FAILED} \\
+\texttt{TouchError} & \texttt{TOUCH\_INVALID\_TOPIC},
+\texttt{TOUCH\_INVALID\_MSGID}, \texttt{TOUCH\_SIGN\_FAILED} \\
+\texttt{PullError} & \texttt{PULL\_INVALID\_MSGID},
+\texttt{PULL\_AXONS\_UNREACHABLE} \\
+\texttt{MetricsError} & \texttt{METRICS\_AXONS\_UNREACHABLE} \\
+\texttt{UpgradeRequiredError} & \texttt{UPGRADE\_REQUIRED} (bridge close
+code 4426) \\
+\end{longtable}
+}
+
+The full taxonomy is in \texttt{ErrorCodes}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ ErrorCodes \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+\BuiltInTok{console}\OperatorTok{.}\FunctionTok{log}\NormalTok{(ErrorCodes}\OperatorTok{.}\AttributeTok{WRITE\_POLICY\_VIOLATION}\NormalTok{)}\OperatorTok{;}  \CommentTok{// \textquotesingle{}WRITE\_POLICY\_VIOLATION\textquotesingle{}}
+\end{Highlighting}
+\end{Shaded}
+
+Switch on \texttt{.code}, not \texttt{.message}:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ControlFlowTok{try}\NormalTok{ \{ }\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{pub}\NormalTok{(topic}\OperatorTok{,}\NormalTok{ msg}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{signWith}\OperatorTok{:}\NormalTok{ me \})}\OperatorTok{;}\NormalTok{ \}}
+\ControlFlowTok{catch}\NormalTok{ (err) \{}
+  \ControlFlowTok{if}\NormalTok{ (err}\OperatorTok{.}\AttributeTok{code} \OperatorTok{===}\NormalTok{ ErrorCodes}\OperatorTok{.}\AttributeTok{WRITE\_POLICY\_VIOLATION}\NormalTok{) \{ }\CommentTok{/* not the owner */}\NormalTok{ \}}
+  \ControlFlowTok{else} \ControlFlowTok{if}\NormalTok{ (err}\OperatorTok{.}\AttributeTok{code} \OperatorTok{===}\NormalTok{ ErrorCodes}\OperatorTok{.}\AttributeTok{PUBLISH\_NO\_PUBLISH\_IDENTITY}\NormalTok{) \{ }\CommentTok{/* name a signer */}\NormalTok{ \}}
+  \ControlFlowTok{else} \ControlFlowTok{throw}\NormalTok{ err}\OperatorTok{;}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{Wire-format helpers}\label{wire-format-helpers}
+
+{\def\LTcaptype{none} % do not increment counter
+\begin{longtable}[]{@{}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}
+  >{\raggedright\arraybackslash}p{(\linewidth - 2\tabcolsep) * \real{0.5000}}@{}}
+\toprule\noalign{}
+\begin{minipage}[b]{\linewidth}\raggedright
+Symbol
+\end{minipage} & \begin{minipage}[b]{\linewidth}\raggedright
+Notes
+\end{minipage} \\
+\midrule\noalign{}
+\endhead
+\bottomrule\noalign{}
+\endlastfoot
+\texttt{isWireError(obj)} → \texttt{boolean} & does this look like an
+over-the-wire \texttt{AxonaError}? \\
+\texttt{fromWire(obj)} → \texttt{AxonaError} & reconstruct the typed
+error (unknown classes fall back to \texttt{AxonaError}). \\
+\texttt{err.toWire()} → \texttt{object} &
+\texttt{\{\ \_\_axonaError:\ true,\ class,\ code,\ message,\ context\ \}}. \\
+\end{longtable}
+}
+
+Errors thrown inside a remote \texttt{onMessage} (reached via
+\texttt{peer.send}) survive serialization with their class and code
+intact.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{9. Persistence}\label{persistence}
+
+\subsubsection{\texorpdfstring{\texttt{PersistenceAdapter} (abstract
+class)}{PersistenceAdapter (abstract class)}}\label{persistenceadapter-abstract-class}
+
+The storage contract. Implement it to plug in your own backend.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{class}\NormalTok{ PersistenceAdapter \{}
+  \KeywordTok{async} \FunctionTok{load}\NormalTok{(key)        \{ }\CommentTok{/* → previously{-}saved value or null */}\NormalTok{ \}}
+  \KeywordTok{async} \FunctionTok{save}\NormalTok{(key}\OperatorTok{,}\NormalTok{ value) \{ }\CommentTok{/* persist value */}\NormalTok{ \}}
+  \KeywordTok{async} \KeywordTok{delete}\NormalTok{(key)      \{ }\CommentTok{/* remove key */}\NormalTok{ \}}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+Pass an instance as the \texttt{persist} option of the
+\texttt{AxonaPeer} constructor; the peer auto-checkpoints identity,
+subscriptions, synaptome, and hosting state.
+
+\subsubsection{\texorpdfstring{\texttt{InMemoryPersistence}}{InMemoryPersistence}}\label{inmemorypersistence}
+
+Reference implementation (environment-neutral) used by tests and by the
+default \texttt{persist:\ false} path.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ AxonaPeer}\OperatorTok{,}\NormalTok{ InMemoryPersistence \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ peer }\OperatorTok{=} \KeywordTok{new} \FunctionTok{AxonaPeer}\NormalTok{(\{ nodeIdentity}\OperatorTok{,}\NormalTok{ domain}\OperatorTok{,}\NormalTok{ node}\OperatorTok{,}\NormalTok{ transport}\OperatorTok{,}
+  \DataTypeTok{persist}\OperatorTok{:} \KeywordTok{new} \FunctionTok{InMemoryPersistence}\NormalTok{() \})}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{\texorpdfstring{\texttt{FilePersistence} /
+\texttt{IndexedDBPersistence} (sub-path
+imports)}{FilePersistence / IndexedDBPersistence (sub-path imports)}}\label{filepersistence-indexeddbpersistence-sub-path-imports}
+
+Platform-specific implementations --- sub-path imports only (so neither
+pulls \texttt{node:fs} into a browser bundle nor
+\texttt{globalThis.indexedDB} into Node):
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ FilePersistence \}      }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol/persistence/file.js\textquotesingle{}}\OperatorTok{;}      \CommentTok{// Node}
+\ImportTok{import}\NormalTok{ \{ IndexedDBPersistence \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol/persistence/indexeddb.js\textquotesingle{}}\OperatorTok{;} \CommentTok{// browser}
+
+\KeywordTok{const}\NormalTok{ peer }\OperatorTok{=} \KeywordTok{new} \FunctionTok{AxonaPeer}\NormalTok{(\{ nodeIdentity}\OperatorTok{,}\NormalTok{ domain}\OperatorTok{,}\NormalTok{ node}\OperatorTok{,}\NormalTok{ transport}\OperatorTok{,}
+  \DataTypeTok{persist}\OperatorTok{:} \KeywordTok{new} \FunctionTok{FilePersistence}\NormalTok{(\{ }\DataTypeTok{dir}\OperatorTok{:} \StringTok{\textquotesingle{}./state\textquotesingle{}}\NormalTok{ \}) \})}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Transport + protocol
+surface}\label{transport-protocol-surface-1}
+
+\begin{quote}
+\textbf{You probably don't need this part.} Everything an application
+calls is in the Application surface (§§1--9). These sections are for
+people implementing transports, embedding the kernel, or building
+tooling.
+\end{quote}
+
+\subsection{10. Contracts}\label{contracts}
+
+Abstract base classes that transports / DHT implementations extend.
+Application code rarely uses these directly.
+
+\subsubsection{\texorpdfstring{\texttt{Transport} (abstract
+class)}{Transport (abstract class)}}\label{transport-abstract-class}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{class}\NormalTok{ MyTransport }\KeywordTok{extends}\NormalTok{ Transport \{}
+  \KeywordTok{async} \FunctionTok{start}\NormalTok{(localNodeId)         \{\}}
+  \KeywordTok{async} \FunctionTok{stop}\NormalTok{()                     \{\}}
+  \KeywordTok{async} \FunctionTok{send}\NormalTok{(peerId}\OperatorTok{,}\NormalTok{ type}\OperatorTok{,}\NormalTok{ body)   \{\}   }\CommentTok{// request/response}
+  \KeywordTok{async} \FunctionTok{notify}\NormalTok{(peerId}\OperatorTok{,}\NormalTok{ type}\OperatorTok{,}\NormalTok{ body) \{\}   }\CommentTok{// fire{-}and{-}forget}
+  \KeywordTok{async} \FunctionTok{openConnection}\NormalTok{(peerId)     \{\}}
+  \KeywordTok{async} \FunctionTok{closeConnection}\NormalTok{(peerId)    \{\}}
+  \FunctionTok{isConnected}\NormalTok{(peerId)              \{\}}
+  \FunctionTok{getLatency}\NormalTok{(peerId)               \{\}   }\CommentTok{// RTT ms or {-}1}
+  \FunctionTok{onRequest}\NormalTok{(type}\OperatorTok{,}\NormalTok{ handler)         \{\}}
+  \FunctionTok{onNotification}\NormalTok{(type}\OperatorTok{,}\NormalTok{ handler)    \{\}}
+  \FunctionTok{onPeerDied}\NormalTok{(handler)              \{\}}
+\NormalTok{\}}
+\end{Highlighting}
+\end{Shaded}
+
+Full surface in \texttt{@axona/protocol/contracts/Transport.js}.
+
+\subsubsection{\texorpdfstring{\texttt{DHT} (abstract
+class)}{DHT (abstract class)}}\label{dht-abstract-class}
+
+The per-node routing/pub-sub contract \texttt{AxonaPeer} implements
+(\texttt{getSelfId}, \texttt{findKClosest}, \texttt{routeMessage},
+\texttt{sendDirect}, \texttt{onRoutedMessage}, \texttt{lookup}, \ldots).
+
+\subsubsection{\texorpdfstring{\texttt{BootstrapService} (abstract
+class)}{BootstrapService (abstract class)}}\label{bootstrapservice-abstract-class}
+
+For peer discovery (signaling brokers, seed lists, DNS-SD). Rarely
+needed by app code.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{11. Sim transport}\label{sim-transport}
+
+In-process router for tests + simulators. Environment-neutral, ships in
+the main barrel.
+
+\subsubsection{\texorpdfstring{\texttt{new\ SimNetwork(\{\ latencyFn?\ \})}}{new SimNetwork(\{ latencyFn? \})}}\label{new-simnetwork-latencyfn}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ SimNetwork \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ net }\OperatorTok{=} \KeywordTok{new} \FunctionTok{SimNetwork}\NormalTok{()}\OperatorTok{;}                          \CommentTok{// 0 ms edges}
+\KeywordTok{const}\NormalTok{ net2 }\OperatorTok{=} \KeywordTok{new} \FunctionTok{SimNetwork}\NormalTok{(\{ }\DataTypeTok{latencyFn}\OperatorTok{:}\NormalTok{ () }\KeywordTok{=\textgreater{}} \DecValTok{50}\NormalTok{ \})}\OperatorTok{;}  \CommentTok{// 50 ms each way}
+\end{Highlighting}
+\end{Shaded}
+
+\subsubsection{\texorpdfstring{\texttt{simTransport(\{\ network,\ identity,\ heartbeatMs?,\ ...\ \})}
+→
+\texttt{SimTransport}}{simTransport(\{ network, identity, heartbeatMs?, ... \}) → SimTransport}}\label{simtransport-network-identity-heartbeatms-...-simtransport}
+
+Factory that builds + wires a \texttt{SimTransport} onto a
+\texttt{SimNetwork}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ SimNetwork}\OperatorTok{,}\NormalTok{ simTransport \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ network }\OperatorTok{=} \KeywordTok{new} \FunctionTok{SimNetwork}\NormalTok{()}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ t }\OperatorTok{=} \FunctionTok{simTransport}\NormalTok{(\{ network}\OperatorTok{,} \DataTypeTok{identity}\OperatorTok{:}\NormalTok{ node}\OperatorTok{,} \DataTypeTok{heartbeatMs}\OperatorTok{:} \DecValTok{0}\NormalTok{ \})}\OperatorTok{;}
+\ControlFlowTok{await}\NormalTok{ t}\OperatorTok{.}\FunctionTok{start}\NormalTok{(node}\OperatorTok{.}\AttributeTok{id}\NormalTok{)}\OperatorTok{;}
+\ControlFlowTok{await}\NormalTok{ t}\OperatorTok{.}\FunctionTok{openConnection}\NormalTok{(other}\OperatorTok{.}\AttributeTok{id}\NormalTok{)}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\texttt{heartbeatMs:\ 0} disables heartbeats (recommended for tests).
+\texttt{SimTransport} is also exported directly for
+\texttt{new\ SimTransport(\{...\})}.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{12. Web transport}\label{web-transport}
+
+The production browser transport (a WebSocket to the bridge for
+bootstrap + signaling, plus a WebRTC mesh). Sub-path import:
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ webTransport \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol/transport/web/index.js\textquotesingle{}}\OperatorTok{;}
+
+\KeywordTok{const}\NormalTok{ transport }\OperatorTok{=} \FunctionTok{webTransport}\NormalTok{(\{}
+  \DataTypeTok{bridgeUrl}\OperatorTok{:}   \StringTok{\textquotesingle{}wss://testnet.axona.net\textquotesingle{}}\OperatorTok{,}  \CommentTok{// or wss://bridge.axona.net (production)}
+  \DataTypeTok{identity}\OperatorTok{:}\NormalTok{    node}\OperatorTok{,}                       \CommentTok{// from createNodeIdentity — signs the handshake}
+  \DataTypeTok{peerVersion}\OperatorTok{:} \StringTok{\textquotesingle{}4.48.0\textquotesingle{}}\OperatorTok{,}                   \CommentTok{// your app version (gated by the bridge)}
+  \DataTypeTok{reconnect}\OperatorTok{:}   \KeywordTok{true}\OperatorTok{,}
+\NormalTok{\})}\OperatorTok{;}
+\ControlFlowTok{await}\NormalTok{ transport}\OperatorTok{.}\FunctionTok{start}\NormalTok{()}\OperatorTok{;}                  \CommentTok{// resolves after the bridge handshake}
+\end{Highlighting}
+\end{Shaded}
+
+Beyond the \texttt{Transport} contract it exposes an observability
+surface: \texttt{transport.bridgeState}, \texttt{bridgeInfo},
+\texttt{bridgeRtt}, \texttt{bridgeNodeId}, \texttt{onBridgeState(cb)},
+\texttt{onWelcome(cb)}, \texttt{boundPeers()}, \texttt{reconnectNow()}.
+
+Each mesh link's \texttt{axona/5} proof is bound to its DTLS certificate
+fingerprint, so a fingerprint-rewriting bridge cannot transparently MITM
+``direct'' peer traffic --- the bridge is trusted for signaling only.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{13. Handshake}\label{handshake}
+
+Wire-version handshake helpers used by transports on a fresh signaling
+channel. Most app code never touches these --- they're plumbed into the
+transport factories.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{buildClientHello}\NormalTok{(\{ version}\OperatorTok{,}\NormalTok{ wireVersion}\OperatorTok{?,}\NormalTok{ capabilities}\OperatorTok{?}\NormalTok{ \})          }\CommentTok{// → client → server frame}
+\FunctionTok{buildServerHello}\NormalTok{(\{ version}\OperatorTok{,}\NormalTok{ wireVersion}\OperatorTok{?,}\NormalTok{ minPeerVersion}\OperatorTok{,}\NormalTok{ downloadUrl \}) }\CommentTok{// → server → client frame}
+\FunctionTok{parseHello}\NormalTok{(frame)                                                   }\CommentTok{// → parsed hello}
+\FunctionTok{parseVersion}\NormalTok{(str)                                                   }\CommentTok{// → \{ major, minor, patch \}}
+\FunctionTok{compareVersions}\NormalTok{(a}\OperatorTok{,}\NormalTok{ b)                                               }\CommentTok{// → {-}1 | 0 | 1}
+\FunctionTok{wireCompatible}\NormalTok{(a}\OperatorTok{,}\NormalTok{ b)                                                }\CommentTok{// → boolean}
+\FunctionTok{performClientHandshake}\NormalTok{(channel}\OperatorTok{,}\NormalTok{ opts)                               }\CommentTok{// → handshake result}
+\FunctionTok{performServerHandshake}\NormalTok{(channel}\OperatorTok{,}\NormalTok{ opts)}
+\end{Highlighting}
+\end{Shaded}
+
+The constants \texttt{WIRE\_VERSION}, \texttt{KERNEL\_VERSION},
+\texttt{UPGRADE\_CLOSE\_CODE} come from the same module --- see
+\hyperref[23-constants]{§23}.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{14. Authenticated-identity handshake
+(axona/5)}\label{authenticated-identity-handshake-axona5}
+
+Re-exported so consumers driving their own channel lifecycle (the
+bridge's embedded peer, custom transports) can build/verify
+authenticated hellos with the same primitive the web transport uses.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{buildAuthHello}\NormalTok{(opts)                  }\CommentTok{// → signed hello proving nodeId ownership}
+\FunctionTok{verifyAuthHello}\NormalTok{(hello}\OperatorTok{,}\NormalTok{ opts)          }\CommentTok{// → verification result}
+\FunctionTok{pubkeyMatchesNodeId}\NormalTok{(pubkey}\OperatorTok{,}\NormalTok{ nodeId)   }\CommentTok{// → boolean (BIND check)}
+\FunctionTok{makeNonce}\NormalTok{()                           }\CommentTok{// → fresh challenge nonce}
+\FunctionTok{cbvFromNonces}\NormalTok{(}\OperatorTok{...}\NormalTok{)                    }\CommentTok{// → channel{-}binding value from nonces}
+\FunctionTok{cbvFromFingerprints}\NormalTok{(}\OperatorTok{...}\NormalTok{)              }\CommentTok{// → channel{-}binding value from DTLS fingerprints}
+\NormalTok{AUTH\_PROTO                            }\CommentTok{// \textquotesingle{}axona/5\textquotesingle{}}
+\end{Highlighting}
+\end{Shaded}
+
+The proof binds (BIND: pubkey hashes to the id), (POSSESS: Ed25519
+signature), and (CHANNEL: bound to this live connection) so a captured
+proof can't be replayed onto another link.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{15. Bridge directory}\label{bridge-directory}
+
+Bridges advertise on a public topic; clients collect them at launch and
+fail over.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{BRIDGE\_DIRECTORY\_TOPIC               }\CommentTok{// \textquotesingle{}axona:bridge{-}directory\textquotesingle{}}
+\NormalTok{BRIDGE\_ENTRY\_MAX\_AGE\_MS              }\CommentTok{// 48 h}
+\FunctionTok{buildBridgeEntry}\NormalTok{(\{ url}\OperatorTok{,}\NormalTok{ lat}\OperatorTok{,}\NormalTok{ lng}\OperatorTok{,}\NormalTok{ label}\OperatorTok{?,}\NormalTok{ ver}\OperatorTok{?,}\NormalTok{ turn}\OperatorTok{?,}\NormalTok{ ts}\OperatorTok{?}\NormalTok{ \})  }\CommentTok{// → directory entry}
+\FunctionTok{validateBridgeEntry}\NormalTok{(msg)             }\CommentTok{// → boolean (well{-}formed + fresh)}
+\FunctionTok{rankBridges}\NormalTok{(\{ }\OperatorTok{...}\NormalTok{ \})                 }\CommentTok{// → ordered candidate list (reputation + proximity)}
+\FunctionTok{haversineKm}\NormalTok{(a}\OperatorTok{,}\NormalTok{ b)                    }\CommentTok{// → great{-}circle km between two \{ lat, lng \}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ BRIDGE\_DIRECTORY\_TOPIC}\OperatorTok{,}\NormalTok{ buildBridgeEntry \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ entry }\OperatorTok{=} \FunctionTok{buildBridgeEntry}\NormalTok{(\{ }\DataTypeTok{url}\OperatorTok{:} \StringTok{\textquotesingle{}wss://bridge.axona.net\textquotesingle{}}\OperatorTok{,} \DataTypeTok{lat}\OperatorTok{:} \DecValTok{38}\OperatorTok{,} \DataTypeTok{lng}\OperatorTok{:} \OperatorTok{{-}}\DecValTok{77}\NormalTok{ \})}\OperatorTok{;}
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{pub}\NormalTok{(\{ }\DataTypeTok{name}\OperatorTok{:}\NormalTok{ BRIDGE\_DIRECTORY\_TOPIC}\OperatorTok{,} \DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\NormalTok{ \}}\OperatorTok{,}\NormalTok{ entry}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{signWith}\OperatorTok{:}\NormalTok{ me \})}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{16. Low-level pub/sub
+builders}\label{low-level-pubsub-builders}
+
+The signed wire record behind \texttt{peer.kill}. Apps use
+\texttt{peer.kill}; this is for protocol implementors and custom roots.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{buildKill}\NormalTok{(\{ topicId}\OperatorTok{,}\NormalTok{ msgId}\OperatorTok{,}\NormalTok{ ts}\OperatorTok{?,}\NormalTok{ seq}\OperatorTok{?,}\NormalTok{ identity \})                       }\CommentTok{// → signed kill}
+\FunctionTok{verifyKill}\NormalTok{(kill)                                                          }\CommentTok{// → verification result}
+\NormalTok{KILL\_DOMAIN     }\CommentTok{// \textquotesingle{}axona:pubsub{-}kill:v1\textquotesingle{}}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{quote}
+The \texttt{unpub} wire record was \textbf{removed in v4.3.0} (kill is
+the single retraction primitive). \texttt{touch} is \textbf{deprecated}
+--- its handler is a no-op; the \texttt{buildTouch}/\texttt{verifyTouch}
+helpers remain only for wire back-compat.
+\end{quote}
+
+\texttt{AxonaManager} (the pub/sub state machine), \texttt{AxonaDomain},
+\texttt{NeuronNode}, \texttt{Synapse}, \texttt{Subscription},
+\texttt{DHTNode}, and \texttt{GEO\_CELL\_BITS} (= 8) are also exported
+for implementors building custom engines.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Low-level utilities}\label{low-level-utilities-1}
+
+\begin{quote}
+\textbf{Internals.} Pure helpers the kernel itself is built from. Apps
+import these only for unusual jobs (custom signing, ID math, region
+tables).
+\end{quote}
+
+\subsection{17. Ed25519 helpers}\label{ed25519-helpers}
+
+Web Crypto Ed25519 wrappers --- useful for signing/verifying outside
+\texttt{buildEnvelope}.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{const}\NormalTok{ \{ publicKey}\OperatorTok{,}\NormalTok{ privateKey \} }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{generateKeyPair}\NormalTok{(\{ }\DataTypeTok{extractable}\OperatorTok{:} \KeywordTok{true}\NormalTok{ \})}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ pubHex  }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{exportPublicKey}\NormalTok{(publicKey)}\OperatorTok{;}   \CommentTok{// 64{-}char hex}
+\KeywordTok{const}\NormalTok{ pubKey  }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{importPublicKey}\NormalTok{(pubBytesOrHex)}\OperatorTok{;}
+\KeywordTok{const}\NormalTok{ sig     }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{sign}\NormalTok{(privateKey}\OperatorTok{,}\NormalTok{ dataBytes)}\OperatorTok{;}  \CommentTok{// Uint8Array(64)}
+\KeywordTok{const}\NormalTok{ ok      }\OperatorTok{=} \ControlFlowTok{await} \FunctionTok{verify}\NormalTok{(pubKeyOrBytes}\OperatorTok{,}\NormalTok{ dataBytes}\OperatorTok{,}\NormalTok{ sig)}\OperatorTok{;}
+
+\KeywordTok{const}\NormalTok{ signer   }\OperatorTok{=} \FunctionTok{makeSigner}\NormalTok{(privateKey)}\OperatorTok{;}   \CommentTok{// (bytes) =\textgreater{} Promise\textless{}sig\textgreater{}}
+\KeywordTok{const}\NormalTok{ verifier }\OperatorTok{=} \FunctionTok{makeVerifier}\NormalTok{(pubKey)}\OperatorTok{;}      \CommentTok{// (bytes, sig) =\textgreater{} Promise\textless{}boolean\textgreater{}}
+\end{Highlighting}
+\end{Shaded}
+
+Implementation-agnostic: substitute \texttt{@noble/ed25519} on runtimes
+without Web Crypto Ed25519 (Chrome \textless110, Safari \textless17,
+Firefox \textless130, Node \textless20).
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{18. Hex / ID math}\label{hex-id-math}
+
+264-bit identifier math --- nodeId and topicId share the same keyspace
+(\texttt{{[}8-bit\ S2\ prefix{]}\ \textbar{}\textbar{}\ {[}256-bit\ hash{]}}).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{ID\_BITS                     }\CommentTok{// 264}
+\NormalTok{HASH\_BITS                   }\CommentTok{// 256}
+\NormalTok{S2\_BITS                     }\CommentTok{// 8}
+\NormalTok{HEX\_CHARS                   }\CommentTok{// 66}
+\NormalTok{MAX\_ID                      }\CommentTok{// BigInt (2**264 {-} 1)}
+\NormalTok{MAX\_HASH                    }\CommentTok{// BigInt (2**256 {-} 1)}
+\NormalTok{MAX\_S2                      }\CommentTok{// 255}
+
+\FunctionTok{toHex}\NormalTok{(bigint)               }\CommentTok{// → 66{-}char lowercase hex}
+\FunctionTok{fromHex}\NormalTok{(hex)                }\CommentTok{// → BigInt}
+\FunctionTok{isHexId}\NormalTok{(s)                  }\CommentTok{// → boolean (valid 66{-}char hex id)}
+\FunctionTok{assembleId}\NormalTok{(s2Prefix}\OperatorTok{,}\NormalTok{ hash)  }\CommentTok{// → BigInt — 8{-}bit prefix || 256{-}bit hash}
+\FunctionTok{extractS2Prefix}\NormalTok{(idBig)      }\CommentTok{// → number 0..255 (top byte)}
+\FunctionTok{extractHash}\NormalTok{(idBig)          }\CommentTok{// → BigInt (bottom 256 bits)}
+\FunctionTok{s2PrefixOfHex}\NormalTok{(hex)          }\CommentTok{// → number 0..255}
+\FunctionTok{xorDistance}\NormalTok{(a}\OperatorTok{,}\NormalTok{ b)           }\CommentTok{// → BigInt}
+\FunctionTok{stratumOf}\NormalTok{(a}\OperatorTok{,}\NormalTok{ b)             }\CommentTok{// → 0..264 — leading{-}zero count of (a \^{} b)}
+\FunctionTok{clz264}\NormalTok{(bigint)              }\CommentTok{// → 0..264 — leading{-}zero count}
+\FunctionTok{randomU256}\NormalTok{()                }\CommentTok{// → BigInt — cryptographically random}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{19. S2 geographic cells}\label{s2-geographic-cells}
+
+The 8-bit S2 cell that occupies the top byte of every id. The cellId
+matches the top 8 bits of Google S2's level-3 cell ID (full interop).
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{geoCellId}\NormalTok{(lat}\OperatorTok{,}\NormalTok{ lng}\OperatorTok{,}\NormalTok{ bits)   }\CommentTok{// → integer — S2 cell ID at the given bit depth}
+\FunctionTok{geoCellCenter}\NormalTok{(cellId)       }\CommentTok{// → \{ lat, lng \} — cell center}
+\FunctionTok{geoCellCorners}\NormalTok{(cellId)      }\CommentTok{// → corner coordinates}
+\FunctionTok{geoCellFace}\NormalTok{(cellId)         }\CommentTok{// → 0..5 — which cube face}
+\FunctionTok{geoCellSubCenters}\NormalTok{(cellId)   }\CommentTok{// → [center0, center1] — the two level{-}3 sub{-}cell centers}
+\FunctionTok{geoCellHalf}\NormalTok{(lat}\OperatorTok{,}\NormalTok{ lng)       }\CommentTok{// → 0 | 1 — which sub{-}cell a point falls in}
+\FunctionTok{isValidCellId}\NormalTok{(cellId)       }\CommentTok{// → boolean (in [0, 192))}
+\NormalTok{S2\_FACES                    }\CommentTok{// 6}
+\NormalTok{S2\_CELL\_COUNT               }\CommentTok{// 192}
+\NormalTok{S2\_RESERVED\_FROM            }\CommentTok{// 192}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{20. Region names}\label{region-names}
+
+Each of the 192 region codes carries exactly one human-readable name, so
+a region always presents the same label. Where a cell straddles ocean
+and land the land name wins; a multi-country cell takes its dominant
+city.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{REGION\_NAMES                  }\CommentTok{// frozen string[] indexed by code [0,192)}
+\FunctionTok{regionName}\NormalTok{(code)              }\CommentTok{// → string | null     e.g. regionName(0x89) → \textquotesingle{}useast\textquotesingle{}}
+\FunctionTok{regionNames}\NormalTok{(code)             }\CommentTok{// → [name] | null      deprecated one{-}element shim}
+\FunctionTok{regionCode}\NormalTok{(name)              }\CommentTok{// → number | null      inverse (canonical code for a multi{-}cell name)}
+\FunctionTok{resolveRegion}\NormalTok{(nameOrCode)     }\CommentTok{// → number | null      accepts \textquotesingle{}useast\textquotesingle{} | \textquotesingle{}0x89\textquotesingle{} | \textquotesingle{}137\textquotesingle{} | 137}
+\FunctionTok{regionNameForLatLng}\NormalTok{(lat}\OperatorTok{,}\NormalTok{ lng) }\CommentTok{// → string             region name for a coordinate}
+\FunctionTok{regionCenter}\NormalTok{(nameOrCode)      }\CommentTok{// → \{ lat, lng \} | null cell center (default placement for topics)}
+\NormalTok{POPULATED\_REGIONS             }\CommentTok{// frozen [\{ code, name \}] for every non{-}open{-}ocean cell}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ regionCode}\OperatorTok{,}\NormalTok{ regionCenter}\OperatorTok{,}\NormalTok{ POPULATED\_REGIONS \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+\FunctionTok{regionCode}\NormalTok{(}\StringTok{\textquotesingle{}useast\textquotesingle{}}\NormalTok{)}\OperatorTok{;}         \CommentTok{// 137}
+\FunctionTok{regionCenter}\NormalTok{(}\StringTok{\textquotesingle{}useast\textquotesingle{}}\NormalTok{)}\OperatorTok{;}       \CommentTok{// \{ lat, lng \} — mint a node identity in a region}
+\NormalTok{POPULATED\_REGIONS}\OperatorTok{.}\AttributeTok{length}\OperatorTok{;}     \CommentTok{// count of real, inhabited cells (for a region picker)}
+\end{Highlighting}
+\end{Shaded}
+
+Names match \texttt{/\^{}{[}a-z0-9\_{]}\{1,8\}\$/}; open-ocean cells are
+\texttt{\textless{}ocean3\textgreater{}\_\textless{}hex\textgreater{}}
+(\texttt{pac\_68}, \texttt{atl\_0a}, \ldots) and are excluded from
+\texttt{POPULATED\_REGIONS}.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{21. Geo helpers}\label{geo-helpers}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\FunctionTok{haversine}\NormalTok{(lat1}\OperatorTok{,}\NormalTok{ lng1}\OperatorTok{,}\NormalTok{ lat2}\OperatorTok{,}\NormalTok{ lng2)        }\CommentTok{// → km between two points}
+\FunctionTok{roundTripLatency}\NormalTok{(lat1}\OperatorTok{,}\NormalTok{ lng1}\OperatorTok{,}\NormalTok{ lat2}\OperatorTok{,}\NormalTok{ lng2) }\CommentTok{// → ms — rough fiber estimate}
+\FunctionTok{randomU32}\NormalTok{()                               }\CommentTok{// → 0..2**32 {-} 1}
+\end{Highlighting}
+\end{Shaded}
+
+The remaining \texttt{geo.js} helpers (continent detection, XOR
+routing-table builders, etc.) are reachable via
+\texttt{@axona/protocol/utils/geo.js}.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{22. Proof-of-work
+scaffolding}\label{proof-of-work-scaffolding}
+
+E-1 / Stage 2 transport + publish PoW. \textbf{Inert at difficulty 0}
+--- every nonce is \texttt{\textquotesingle{}\textquotesingle{}} and
+verification passes trivially until difficulty is raised. Apps don't
+normally touch these; identities carry their PoW nonce automatically.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{POW\_DOMAIN                                   }\CommentTok{// \textquotesingle{}axona:pow:v1\textquotesingle{}}
+\NormalTok{POW\_DIFFICULTY                               }\CommentTok{// \{ transport: 0, publish: 0 \} (frozen defaults)}
+\FunctionTok{powDifficulty}\NormalTok{(role)                          }\CommentTok{// → current difficulty for \textquotesingle{}transport\textquotesingle{} | \textquotesingle{}publish\textquotesingle{}}
+\FunctionTok{setPowDifficulty}\NormalTok{(role}\OperatorTok{,}\NormalTok{ n)                    }\CommentTok{// set difficulty (testing / calibration)}
+\FunctionTok{resetPowDifficulty}\NormalTok{()                         }\CommentTok{// restore defaults}
+\FunctionTok{powMint}\NormalTok{(\{ pubkeyHex}\OperatorTok{,}\NormalTok{ role}\OperatorTok{?,}\NormalTok{ difficulty}\OperatorTok{?,}\NormalTok{ maxTries}\OperatorTok{?}\NormalTok{ \})  }\CommentTok{// → Promise\textless{}nonce string\textgreater{}}
+\FunctionTok{powVerify}\NormalTok{(\{ pubkeyHex}\OperatorTok{,}\NormalTok{ nonce}\OperatorTok{,}\NormalTok{ role}\OperatorTok{?,}\NormalTok{ difficulty}\OperatorTok{?}\NormalTok{ \})    }\CommentTok{// → Promise\textless{}boolean\textgreater{}}
+\FunctionTok{powBits}\NormalTok{(\{ pubkeyHex}\OperatorTok{,}\NormalTok{ nonce}\OperatorTok{,}\NormalTok{ role}\OperatorTok{?}\NormalTok{ \})         }\CommentTok{// → Promise\textless{}number\textgreater{} leading{-}zero bits of the puzzle hash}
+\FunctionTok{powCalibrate}\NormalTok{(\{ ms}\OperatorTok{?}\NormalTok{ \})                        }\CommentTok{// → Promise\textless{}calibration\textgreater{} bits/ms estimate}
+\end{Highlighting}
+\end{Shaded}
+
+The puzzle hashes
+\texttt{H(domain\ \textbar{}\textbar{}\ role\ \textbar{}\textbar{}\ pubkey\ \textbar{}\textbar{}\ nonce)}
+--- difficulty is on a \textbf{separate puzzle hash, never on the node
+address}, so raising it introduces no keyspace skew.
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{23. Constants}\label{constants}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{WIRE\_VERSION         }\CommentTok{// \textquotesingle{}4.0\textquotesingle{}      — wire format major.minor (bridges gate on this)}
+\NormalTok{KERNEL\_VERSION       }\CommentTok{// \textquotesingle{}4.48.0\textquotesingle{}   — kernel semver (npm release tag)}
+\NormalTok{AUTH\_PROTO           }\CommentTok{// \textquotesingle{}axona/5\textquotesingle{}  — authenticated{-}identity handshake tag}
+\NormalTok{UPGRADE\_CLOSE\_CODE   }\CommentTok{// 4426       — WebSocket close code for a version mismatch}
+\NormalTok{ENVELOPE\_DOMAIN      }\CommentTok{// \textquotesingle{}axona:pubsub{-}envelope:v2\textquotesingle{}}
+\NormalTok{MAX\_PUBLISH\_SKEW\_MS  }\CommentTok{// 300000     — freshness window (5 min)}
+\NormalTok{ID\_BITS              }\CommentTok{// 264}
+\NormalTok{HEX\_CHARS            }\CommentTok{// 66}
+\end{Highlighting}
+\end{Shaded}
+
+\texttt{WIRE\_VERSION} is what bridges enforce gates against;
+\texttt{KERNEL\_VERSION} is informational.
+
+\subsubsection{\texorpdfstring{\texttt{ANONYMOUS}
+(sentinel)}{ANONYMOUS (sentinel)}}\label{anonymous-sentinel}
+
+The sentinel for an intentionally unsigned publish. Anonymity must be
+explicit --- omitting a signer is an error, never silent anonymity.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\ImportTok{import}\NormalTok{ \{ ANONYMOUS \} }\ImportTok{from} \StringTok{\textquotesingle{}@axona/protocol\textquotesingle{}}\OperatorTok{;}
+\ControlFlowTok{await}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{pub}\NormalTok{(\{ }\DataTypeTok{region}\OperatorTok{:} \StringTok{\textquotesingle{}useast\textquotesingle{}}\OperatorTok{,} \DataTypeTok{name}\OperatorTok{:} \StringTok{\textquotesingle{}lobby\textquotesingle{}}\NormalTok{ \}}\OperatorTok{,}\NormalTok{ msg}\OperatorTok{,}\NormalTok{ \{ }\DataTypeTok{signWith}\OperatorTok{:}\NormalTok{ ANONYMOUS \})}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{Appendix: version history for
+migrators}\label{appendix-version-history-for-migrators}
+
+\emph{(Only relevant if you have code from an earlier kernel line. New
+readers: skip.)}
+
+\subsubsection{What changed in v4.39.0--v4.48.0 (2026-07-24; v4.48.0 on
+testnet)}\label{what-changed-in-v4.39.0v4.48.0-2026-07-24-v4.48.0-on-testnet}
+
+\textbf{No new API --- a bootstrap consolidation.} \texttt{connect()} is
+now the single documented way to bring up a peer: it self-integrates the
+node (\texttt{peer.integrate()}) as part of startup, and it accepts
+every option an app could need (\texttt{bridge}, \texttt{location},
+\texttt{author}, \texttt{k}, \texttt{ready}, \texttt{transport},
+\texttt{nodeIdentity}, \texttt{domain}, \texttt{persist},
+\texttt{rootReplicas}, \texttt{maxPublishBytes},
+\texttt{synaptomeMaintain}, \texttt{web}) so no application ever drops
+to the constructors. \texttt{connect} is now also exported from the
+\textbf{main barrel}
+(\texttt{import\ \{\ connect\ \}\ from\ \textquotesingle{}@axona/protocol\textquotesingle{}}),
+not only the \texttt{connect.js} subpath. The constructors +
+\texttt{peer.start}/\texttt{join}/\texttt{ready}/\texttt{integrate} are
+reclassified as advanced building blocks \texttt{connect()} composes ---
+hand-assembling a peer \emph{without} \texttt{peer.integrate()} was how
+apps self-rooted their topics as singletons; that integration step is no
+longer easy to miss. Existing signatures are unchanged.
+
+\subsubsection{What changed in v4.28.0--v4.38.0 (2026-07-23; v4.38.0 on
+testnet and
+production)}\label{what-changed-in-v4.28.0v4.38.0-2026-07-23-v4.38.0-on-testnet-and-production}
+
+\textbf{One additive API} --- \texttt{setAuthorClass} /
+\texttt{getAuthorClass} --- everything else is behavioral: read-path
+resilience, bridge independence, and departure correctness, each pinned
+by a deterministic test and a production-shaped soak. Existing
+signatures are unchanged.
+
+\begin{itemize}
+\item
+  \textbf{Read-repair (v4.30.0--v4.36.0).} A read now survives a
+  topic-closest node that is reachable-but-degraded or gone: the request
+  escalates past dead or degraded holders, and a stuck subscriber
+  repairs from the cohort. \texttt{pull(msgId)} is still \emph{exact}
+  and pull-latest still \emph{eventually-consistent} --- you simply get
+  an answer more often under churn. No call-site change.
+\item
+  \textbf{Leave-order handoff (v4.29.0).} A departing root now hands off
+  its history \emph{before} it announces the departure (was the reverse,
+  which dropped the hand-off). Clean \texttt{leave()}s no longer lose
+  the tail of a topic's history.
+\item
+  \textbf{Bridge independence + vitality graduation (v4.37.0--v4.38.0).}
+  When the signaling bridge graduates an established peer to free a
+  slot, that peer keeps its WebRTC mesh instead of collapsing to zero. A
+  third-party \texttt{peer-left} can no longer evict a peer from another
+  peer's mesh; only a peer's own authenticated departure or its
+  channel's own vitality retires it. The bridge now graduates the
+  best-meshed node it can most afford to lose. Transparent to
+  \texttt{peer.*} callers.
+\item
+  \textbf{Signed author-class (additive, \texttt{setAuthorClass} /
+  \texttt{getAuthorClass}).} A voluntary, signed provenance claim bound
+  to an \textbf{author} key ---
+  \texttt{\textquotesingle{}human\textquotesingle{}},
+  \texttt{\textquotesingle{}agent\textquotesingle{}},
+  \texttt{\textquotesingle{}service\textquotesingle{}},
+  \texttt{\textquotesingle{}bridge\textquotesingle{}}, or
+  \texttt{\textquotesingle{}relay\textquotesingle{}}. It is \textbf{not
+  a gate}: the kernel never reads it before routing, and its absence
+  resolves to \texttt{\textquotesingle{}unstated\textquotesingle{}},
+  never a default. Carried as a self-signed attestation on the author's
+  owner-only profile topic, so it is discoverable from an Author ID
+  alone.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{peer}\OperatorTok{.}\FunctionTok{setAuthorClass}\NormalTok{(cls}\OperatorTok{,}\NormalTok{ \{ signWith}\OperatorTok{,}\NormalTok{ operator}\OperatorTok{?,}\NormalTok{ operatorSignWith}\OperatorTok{?,}\NormalTok{ label}\OperatorTok{?}\NormalTok{ \})}
+\NormalTok{  → }\BuiltInTok{Promise}\OperatorTok{\textless{}}\NormalTok{\{ msgId}\OperatorTok{,}\NormalTok{ attestation \}}\OperatorTok{\textgreater{}}
+\CommentTok{//   cls: \textquotesingle{}human\textquotesingle{} | \textquotesingle{}agent\textquotesingle{} | \textquotesingle{}service\textquotesingle{} | \textquotesingle{}bridge\textquotesingle{} | \textquotesingle{}relay\textquotesingle{}}
+\CommentTok{//   signWith: the AuthorIdentity to declare for and sign with.}
+
+\NormalTok{peer}\OperatorTok{.}\FunctionTok{getAuthorClass}\NormalTok{(authorId}\OperatorTok{,}\NormalTok{ \{ timeoutMs }\OperatorTok{=} \DecValTok{1000}\NormalTok{ \})}
+\NormalTok{  → }\BuiltInTok{Promise}\OperatorTok{\textless{}}\NormalTok{\{ }\KeywordTok{class}\OperatorTok{,}\NormalTok{ operator}\OperatorTok{,}\NormalTok{ operatorVerified}\OperatorTok{,}\NormalTok{ label}\OperatorTok{?,}\NormalTok{ ts}\OperatorTok{?}\NormalTok{ \}}\OperatorTok{\textgreater{}}
+\CommentTok{//   authorId: 64{-}hex Author ID (== signerPubkey). Pulls + verifies the}
+\CommentTok{//   author\textquotesingle{}s attestation; any missing/invalid/unparseable result is}
+\CommentTok{//   \{ class: \textquotesingle{}unstated\textquotesingle{} \} — never a wrong default.}
+\end{Highlighting}
+\end{Shaded}
+
+  Apps that badge or filter by human/agent should resolve via
+  \texttt{getAuthorClass} (keyed on the authenticated
+  \texttt{signerPubkey}), not on any in-body field, and render
+  \texttt{\textquotesingle{}unstated\textquotesingle{}} normally rather
+  than hiding it.
+\end{itemize}
+
+\subsubsection{What changed in v4.23.0--v4.27.1 (2026-07-17 roll;
+v4.27.1 promoted to
+production)}\label{what-changed-in-v4.23.0v4.27.1-2026-07-17-roll-v4.27.1-promoted-to-production}
+
+\textbf{No API change} --- the whole span is internal: region naming,
+role lifecycle, and load hardening.
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Canonical regions (v4.23.0).} Ocean/uninhabited region codes
+  fold to their nearest populated cell (\texttt{canonicalRegion}), and
+  regions carry human-readable animal names. Descriptor-visible behavior
+  unchanged --- any region you could name before still resolves.
+\item
+  \textbf{Acked leave-handoff (v4.24.0--v4.24.1).} A departing root's
+  history hand-off is now acknowledged and retried (was
+  fire-and-forget), with a cohort-spray fallback.
+\item
+  \textbf{Explicit role natures (v4.25.0--v4.26.0).} Internal refactor
+  phases: a node's per-topic role (ROOT / CHILD / BACKUP / HOLDER) is
+  explicit and audited, and per-node role state is bounded (backup
+  eviction).
+\item
+  \textbf{Join-storm hardening (v4.27.0--v4.27.1).} A (re)joining relay
+  is seeded with role state gradually (sender pacing + bounded
+  time-sliced ingest) and a node whose mesh dissolves re-bootstraps from
+  the bridge. Fixes the production failure where a rejoining
+  infrastructure node was firehosed into event-loop starvation and
+  evicted. Invariant I-11: \emph{bulk work never starves liveness.}
+\end{itemize}
+
+\subsubsection{What changed in v4.17.0--v4.22.0 (2026-07-14 roll;
+v4.21.0 promoted to
+production)}\label{what-changed-in-v4.17.0v4.22.0-2026-07-14-roll-v4.21.0-promoted-to-production}
+
+\textbf{No API change at all} --- every release in this span is
+behavioral: root lifecycle, departure, and history-convergence work,
+validated by an overnight production-shaped soak per release.
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Root election + reconciliation (v4.17.0--v4.19.2).} Faster
+  promotion when a topic's root churns out; wrong root claims converge
+  without flapping (strictly-closer beacon deferral, periodic root
+  self-verification, and guards for unmeshed and cross-region edge
+  cases). One durable root per topic, kept true under churn.
+\item
+  \textbf{Departure-side durability (v4.19.4--v4.19.5).}
+  \texttt{peer.leave()} now hands off \textbf{every} rooted topic's
+  history inside its time bound (parallel heir resolution + an
+  iterative-lookup fallback for thin-tabled leavers), and the heir can
+  no longer defer its claim back to the node that just left. A burst
+  publisher's topics survive its departure intact.
+\item
+  \textbf{Kernel consolidation (v4.19.6--v4.21.0).} The refactor
+  program: a frozen invariants contract (\texttt{INVARIANTS.md}), every
+  root transition through one state machine (\texttt{rootClaim.js}), and
+  the pub/sub manager split along its seams. Structural only ---
+  verified behavior-preserving.
+\item
+  \textbf{Split-history union (v4.22.0).} After a root transition, the
+  old and new holders converge to the \textbf{union} of cache +
+  tombstones (the subscribe now advertises its oldest stamp so a root
+  pulls history that sits \emph{below} its own high-water; roots
+  union-ingest cohort pushes). Closes the last known replay gap: a fresh
+  \texttt{since:\textquotesingle{}all\textquotesingle{}} subscriber
+  attaching mid-transition received only the post-transition half
+  (\textasciitilde1 in 15 root transitions); soak-validated to
+  full-timeline recovery.
+\end{itemize}
+
+\subsubsection{What changed in v4.12.0--v4.16.1 (2026-07-02 testnet
+roll)}\label{what-changed-in-v4.12.0v4.16.1-2026-07-02-testnet-roll}
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{\texttt{connect()} (v4.16.0; barrel export + single-bootstrap
+  consolidation v4.48.0)} --- the one-call bootstrap above; no other API
+  change.
+\item
+  \textbf{Immediate metrics answer (v4.16.1)} --- a topic root publishes
+  the FIRST metric snapshot the moment a metrics lease arms, so it
+  arrives at routing latency (measured \textasciitilde0.3 s on testnet)
+  instead of on the next 5 s tick. Cadence (\textasciitilde20 s) and
+  lease (\textasciitilde70 s) unchanged.
+\item
+  \textbf{Demand-driven metrics (v4.12.0)} --- snapshots publish to
+  \texttt{metricTopic(T)} only while a subscriber's lease is fresh;
+  \texttt{peer.metrics()} unchanged. The relay's old push-metrics loop
+  is retired. See the timing contract in §4.3.
+\item
+  \textbf{Region-occupancy rule (v4.13.0, gated OFF in v4.15.0)} --- the
+  kernel can enforce region-homogeneous topic service
+  (\texttt{configureRegionLock(\{\ enforce\ \})}); disabled by default
+  until regional coverage justifies it.
+\item
+  \textbf{BigInt id invariant (v4.14.0)} --- internal ids validated at
+  one gate (\texttt{asId}); \texttt{NeuronNode}/\texttt{Synapse} now
+  accept hex ids directly. \texttt{asId} exported.
+\end{itemize}
+
+\subsubsection{What changed in the 4.x line (since
+v3.6.0)}\label{what-changed-in-the-4.x-line-since-v3.6.0}
+
+The \textbf{public API surface is unchanged} from v3.6.0 --- same
+identity factories, topic descriptors, and
+\texttt{pub}/\texttt{sub}/\texttt{pull}/\texttt{kill}/\texttt{host}
+signatures. The 4.x work is a routing-and-reliability rewrite
+\emph{under} that surface, so existing code keeps working while delivery
+gets more robust:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Routing-only axonic-tree pub/sub (v3.14, clean break).} Topics
+  route to an emergent root (the live node XOR-closest to the topic id)
+  with no separate overlay to maintain. Behavioral only --- no call
+  changed.
+\item
+  \textbf{K-closest cohort distribution (v4.10.0).} A topic's
+  authoritative state (messages \emph{and} retractions) is replicated
+  across the closest-K nodes, not one root. A \texttt{kill} reaches the
+  whole cohort and internal transfers carry their tombstones, so a
+  killed message can't resurface to a late subscriber, and a publish
+  survives the root churning out.
+\item
+  \textbf{Metrics rebuilt (v4.10.1).}
+  \texttt{rootedTopics()}/\texttt{peer.metrics()} were silently dead
+  across early 4.x; rebuilt with two new fields ---
+  \textbf{\texttt{seq}} (dense message counter) and
+  \textbf{\texttt{cohortSize}} --- and cohort-aware aggregation (see
+  §4.3).
+\item
+  \textbf{Cold-publish burst (v4.11.0).} A freshly-joined node's first
+  publishes are automatically re-sent a few times over the first second,
+  so a cold-start publish isn't lost while the routing table warms. No
+  app action --- \texttt{pub} is unchanged.
+\item
+  \textbf{Nearest-replica reads (v4.11.1+).} \texttt{pull} is answered
+  by the first replica the request reaches instead of always the root:
+  exact for \texttt{pull(msgId)}, and \emph{recent}
+  (eventually-consistent) for pull-latest, which spreads a hot read path
+  off the root (see §4.3).
+\end{itemize}
+
+\subsubsection{What changed since v2.x}\label{what-changed-since-v2.x}
+
+The pub/sub and identity surfaces were redesigned in the v3 line. If you
+are migrating, the load-bearing differences are:
+
+\begin{itemize}
+\tightlist
+\item
+  \textbf{Two identity factories.}
+  \texttt{createNodeIdentity(\{\ lat,\ lng\ \})} mints the
+  \emph{connection} key (the nodeId); \texttt{createAuthorIdentity()}
+  mints a location-free \emph{authorship} key (the Author ID). The old
+  single \texttt{deriveIdentity()} is gone.
+\item
+  \textbf{Topics are descriptors, not strings.} A topic is
+  \texttt{\{\ region?,\ owner?,\ name,\ write?\ \}}. \texttt{peer.pub}
+  takes the descriptor; \texttt{peer.sub} / \texttt{pull} /
+  \texttt{metrics} take the descriptor \textbf{or} a 66-hex topic ID.
+  There is no \texttt{publisher}/\texttt{publishId} argument anywhere.
+\item
+  \textbf{Signing is explicit per publish.}
+  \texttt{peer.pub(topic,\ message,\ \{\ signWith\ \})} requires a
+  signer --- an author identity or the \texttt{ANONYMOUS} sentinel.
+  There is no default author, the node key never signs publishes, and
+  there is no \texttt{sign:\ false}.
+\item
+  \textbf{The envelope carries the topic descriptor.} A signed publish
+  binds the exact \texttt{\{\ region,\ owner,\ name,\ write\ \}}, so a
+  storing node recomputes the topic ID and enforces the write policy
+  (\texttt{signer\ ===\ owner} for owned topics).
+\end{itemize}
+
+\begin{center}\rule{0.5\linewidth}{0.5pt}\end{center}
+
+\subsection{A word on stability}\label{a-word-on-stability}
+
+\texttt{@axona/protocol} 4.x is stable for the application surface
+(§§1--9). The transport + protocol surface (§§10--16) is stable but
+expect occasional additions. Low-level utilities (§§17--23) may grow but
+won't change incompatibly.
+
+For changelog and migration notes, see
+\url{https://github.com/axona-net/axona-protocol/releases}.
+
+\end{document}
