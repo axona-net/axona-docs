@@ -18,11 +18,11 @@ optional.)
 
 - [Quick Start](Quick-Start-v4.48.0.md) — a working roundtrip in 5 minutes. Do it first.
 - [API Reference](Axona-API-Reference-v4.48.0.md) — every signature, exactly.
-- [AI Grounding](Axona-AI-Grounding-v4.30.0.md) — building with an AI assistant? Hand it this file.
+- [AI Grounding](Axona-AI-Grounding-v4.48.0.md) — building with an AI assistant? Hand it this file.
 - [Services Guide](Axona-Services-Guide-v4.48.0.md) — running bridges and relays (you can skip this for a long time).
 
 > **Building with an AI?** Most Axona apps are. Paste
-> [Axona-AI-Grounding-v4.30.0.md](Axona-AI-Grounding-v4.30.0.md) into your
+> [Axona-AI-Grounding-v4.48.0.md](Axona-AI-Grounding-v4.48.0.md) into your
 > assistant's context and it will know every rule in this guide. Keep this
 > guide for *you* — it explains the why.
 

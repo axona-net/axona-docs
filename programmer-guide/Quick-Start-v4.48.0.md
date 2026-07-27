@@ -13,7 +13,7 @@ message, and logs what comes back.
 
 Companion documents:
 
-- [Programmer Guide](Axona-Programmer-Guide-v4.38.0.md) — the five ideas + recipes for real apps.
+- [Programmer Guide](Axona-Programmer-Guide-v4.48.0.md) — the five ideas + recipes for real apps.
 - [API Reference](Axona-API-Reference-v4.48.0.md) — every exported symbol.
 - [AI Grounding](Axona-AI-Grounding-v4.48.0.md) — building with an AI assistant? Hand it this file.
 
@@ -188,7 +188,7 @@ descriptor fields. That ID-matching is the rule you can't break — same
 | Own a feed only you can write | `{ region, owner: me.authorId, name: 'profile' }` (write defaults to `'owner'`) |
 | Share a read-only handle | `await deriveTopicId(descriptor)` -> hand out the 66-hex ID; `sub`/`pull`/`metrics` accept it |
 | Run against production | set `BRIDGE = 'wss://bridge.axona.net'` (same 4.x line; a separate network from testnet) |
-| See the full mental model | [Programmer Guide](Axona-Programmer-Guide-v4.38.0.md) |
+| See the full mental model | [Programmer Guide](Axona-Programmer-Guide-v4.48.0.md) |
 | Look up a specific symbol | [API Reference](Axona-API-Reference-v4.48.0.md) |
 
 ## Troubleshooting

@@ -6,7 +6,7 @@
 CRITICAL). **Relates to:** the bridge directory (kernel
 [`bridgeDirectory.js`](https://github.com/axona-net/axona-protocol/blob/main/src/bridgeDirectory.js),
 SECURITY-CHANGELOG v2.42.0); the Synopsis claim *"no one address to block"*;
-[Gates-to-Gradients 1 — Costly identity](Gates-to-Gradients-1-Costly-Identity-v0.1.md);
+[Gates-to-Gradients 1 — Costly identity](Gates-to-Gradients-1-Costly-Identity-v0.2.md);
 the red-team [punch list](../red%20team/red-team-punchlist-v2.43.0.md) (G-1).
 
 ---

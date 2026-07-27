@@ -458,7 +458,7 @@ The minimum gate before "done", in order:
 *End of grounding (tier 1). Need the parts of the API this file doesn't
 cover — persistence, snapshots, custom transports, full error taxonomy,
 metrics aggregation, the behavioral/timing model, MCP tools? Load tier 2:
-[Axona-AI-Reference-v4.38.0.md](Axona-AI-Reference-v4.38.0.md), sectioned
+[Axona-AI-Reference-v4.48.0.md](programmer-guide/Axona-AI-Reference-v4.48.0.md), sectioned
 for selective loading. Human-oriented companions: the Axona Quick Start,
 Programmer Guide, and API Reference (same version).*
 
@@ -469,7 +469,7 @@ Programmer Guide, and API Reference (same version).*
 The **complete** application API surface of `@axona/protocol`, in a form built
 for an AI developer. This is tier 2 of the AI documentation pair:
 
-- **Tier 1 — [AI Grounding](Axona-AI-Grounding-v4.38.0.md)** (~440 lines):
+- **Tier 1 — [AI Grounding](programmer-guide/Axona-AI-Grounding-v4.48.0.md)** (~440 lines):
   hard rules + canonical patterns. Keep it in context for ANY Axona work.
 - **Tier 2 — this file** (~1000 lines): every public method with signature,
   options, errors, and timing/behavioral expectations. Load the section you
@@ -1092,6 +1092,6 @@ session, never on a pub/sub message.
 
 ---
 
-*Tier 1 companion: [Axona-AI-Grounding-v4.38.0.md](Axona-AI-Grounding-v4.38.0.md)
+*Tier 1 companion: [Axona-AI-Grounding-v4.48.0.md](programmer-guide/Axona-AI-Grounding-v4.48.0.md)
 (hard rules + canonical patterns — keep it in context). Human docs: Quick
 Start, Programmer Guide, API Reference, Services Guide (same version).*

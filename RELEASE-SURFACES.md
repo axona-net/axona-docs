@@ -133,14 +133,34 @@ and nothing in any other repo knows. On 2026-07-27 it bit three times independen
 2. `axona-protocol/README.md`'s six doc links → **all six 404** (`-v4.27.1`, `-v4.30.0`)
 3. `axona-protocol/README.md`'s install command → `#v4.38.0`, **ten releases stale**
 
-Renaming the programmer-guide set is therefore never a one-repo operation. After any
-doc re-version, verify the links actually resolve rather than assuming:
+Renaming the programmer-guide set is therefore never a one-repo operation.
+
+**This is now guarded by CI.** `scripts/check-links.mjs` resolves every link
+against a real axona-docs checkout on disk — deterministic, no network, no rate
+limits. It runs in `axona-docs`, `axona-protocol`, `axona-bridge` and `axona-web`
+on push and PR, **plus weekly on a schedule** in the consumer repos: a rename can
+land in axona-docs alone, and those repos would otherwise have no commit to
+trigger on.
+
+Run it yourself before pushing a docs cycle:
 
 ```bash
-curl -s -o /dev/null -w "%{http_code}\n" "https://raw.githubusercontent.com/axona-net/axona-docs/main/programmer-guide/<file>.md"
+node axona-docs/scripts/check-links.mjs . --docs-root ../axona-docs
 ```
 
-Anything other than `200` is a live broken link on a public surface.
+Two deliberate policies:
+
+- **`vendor/` is skipped.** A vendored axona-protocol carries its own README;
+  fixing a link there is pointless because the next re-vendor overwrites it.
+  Stale vendored links are a re-vendor problem, and the fix is to re-vendor.
+- **`history/`, `team-updates/` and `red team/` warn but never fail.** They are
+  snapshots in time — a v2.51 team update correctly references what existed at
+  v2.51, and "fixing" it would falsify the record. They stay visible as warnings
+  so nothing is hidden, but they cannot turn CI red, because a build that is red
+  for reasons nobody may fix is a build that gets muted.
+
+`axona-peer` is deliberately **not** wired up: it is frozen, and adding CI to it
+would be a change to a repo that must not change.
 
 ---
 

@@ -481,6 +481,6 @@ the Services Guide.
 *End of grounding (tier 1). Need the parts of the API this file doesn't
 cover — persistence, snapshots, custom transports, full error taxonomy,
 metrics aggregation, the behavioral/timing model, MCP tools? Load tier 2:
-[Axona-AI-Reference-v4.38.0.md](Axona-AI-Reference-v4.38.0.md), sectioned
+[Axona-AI-Reference-v4.48.0.md](Axona-AI-Reference-v4.48.0.md), sectioned
 for selective loading. Human-oriented companions: the Axona Quick Start,
 Programmer Guide, and API Reference (same version).*

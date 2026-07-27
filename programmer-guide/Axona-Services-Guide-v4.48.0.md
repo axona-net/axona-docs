@@ -24,7 +24,7 @@ browser tab is open, this is the document for you.
   one or the other; pick with `RELAY_NETWORK`/`BRIDGE_URL` (§3).
 - **Companion docs**:
   - [Quick Start](Quick-Start-v4.48.0.md) · [Programmer Guide](Axona-Programmer-Guide-v4.48.0.md) · [API Reference](Axona-API-Reference-v4.48.0.md) — the library.
-  - [AI Grounding](Axona-AI-Grounding-v4.30.0.md) — building with an AI assistant.
+  - [AI Grounding](Axona-AI-Grounding-v4.48.0.md) — building with an AI assistant.
   - [Architecture](../architecture/Axona-Architecture.tex) — how the bridge + transport work under the hood.
 
 > **Library vs. services.** A *peer* is the unit the library gives you: an

@@ -18,7 +18,7 @@ below is verified against the v4.48.0 kernel source.
 Companion documents:
 
 - [Quick Start](Quick-Start-v4.48.0.md) — 5-minute working roundtrip.
-- [Programmer Guide](Axona-Programmer-Guide-v4.38.0.md) — mental model +
+- [Programmer Guide](Axona-Programmer-Guide-v4.48.0.md) — mental model +
   worked example + pitfalls.
 - [Security changelog](../SECURITY-CHANGELOG.md) — what each kernel
   version protects.
