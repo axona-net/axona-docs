@@ -16,6 +16,44 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel v4.49.0 — 2026-07-28 — a health surface that can report ill health, without handing out targets
+
+A node's public health endpoint reported the literal string `ok`,
+unconditionally, forever. It could not express any other state. Two conditions
+that stopped a node doing its maintenance work were therefore invisible from
+outside: a node configured never to take responsibility for a topic could have its
+entire maintenance loop stop on its first pass, silently, for the life of the
+process; and a node that had absorbed one momentary stall — a pause, a burst of
+arrivals, a device sleeping for a minute — treated that single worst moment as its
+permanent condition and went on refusing work it was fully able to do, having
+recovered completely. Both are now fixed, and both are now observable.
+
+**What is protected.** Availability, and the operator's ability to tell a healthy
+node from a broken one. A node that refuses a responsibility now records the
+refusal and carries on maintaining everything else, rather than stopping. Load
+pressure is measured over a recent window rather than an all-time worst case, so a
+node that has recovered is treated as recovered and resumes accepting work. The
+all-time worst value is kept for diagnosis, where it informs but decides nothing.
+Separately, a class of internal write that could fail while looking exactly like a
+success now fails loudly and identifiably — a discarded write is no longer
+indistinguishable from a completed one.
+
+**Disclosure was deliberately split.** Detailed capacity, responsibility counts
+and refusal counts describe *where and when* pressure on a node would succeed —
+useful to an operator, and equally useful to someone probing for a node to
+overload. The public endpoint therefore discloses a single derived verdict —
+healthy, degraded, or unknown — and nothing more; the detail is available only to
+an authenticated operator. An absent or unreadable health surface reports
+*unknown*, never *healthy*, so a missing answer is never mistaken for a good one.
+The operator check itself was moved to a constant-time comparison over fixed-size
+digests that fails closed when no credential is configured.
+
+**Why it matters beyond this one endpoint.** Silence is not success. A health
+surface that cannot report ill health is not a health surface, and a check that
+always answers `ok` is indistinguishable from no check at all.
+
+---
+
 ## Kernel v4.45.0 — 2026-07-26 — durability: an acknowledgement now means the history was actually kept
 
 When a node leaves, it hands each topic's history to the successor nearest that
