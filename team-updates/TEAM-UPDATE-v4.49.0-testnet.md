@@ -6,29 +6,57 @@
 
 ---
 
-## Revision note — the first version of this document understated the scope
+## Revision note — a correction, and then a correction to the correction
 
-As first written, this update described 4.49.0 as three silent-failure fixes.
-That is true of the 4.49.0 *commit* and misleading about the 4.49.0 *release*,
-because prod is on 4.43.0 and promoting means shipping the whole range:
+**Round 1 (2026-07-29, wrong).** This document was revised to argue that
+promoting 4.49.0 meant shipping the whole 4.44→4.49 range, including a new
+admission-control subsystem, because production was on 4.43.0.
 
-| | |
-|---|---|
-| 4.44.0 | mass-leaver handoff ack-window scaling (re-land) |
-| 4.45.0 | a HANDOFFACK must claim only what is HELD |
-| **4.46.0** | **axonic admission control — a node can say "no" to a role** |
-| **4.47.0** | **capacity is MEASURED, not counted** |
-| 4.48.0 | a declined message with nowhere to go TERMINATES |
-| 4.49.0 | Phase A/B — the three fixes below |
+**Round 2 (2026-07-29, verified).** Production is on **4.48.0**, on both bridges.
+Read from the live endpoints, not from notes:
 
-**4.46 and 4.47 are a new subsystem, and A1/A2 are repairs to defects inside it.**
-`claimReachable` could dereference null only because 4.46 taught nodes to refuse;
-`helloPressure` could latch only because 4.47 made capacity a measurement. So this
-is not a bugfix line — it changes how load is placed across the network.
+```
+bridge.axona.net       version 2.101.0   kernelVersion 4.48.0
+bridge-west.axona.net  version 2.101.0   kernelVersion 4.48.0
+```
 
-Anyone reading the original framing would reasonably have concluded "three small
-fixes, low risk, promote." That is the wrong basis for the decision, and correcting
-it is the reason this revision exists.
+The 4.43.0 figure came from a stale deployment note and was never checked against
+the running service. Round 1's argument was therefore built on a false premise,
+and the framing it overrode — *4.49.0 is three silent-failure fixes* — was right
+all along.
+
+**What that changes, and it is not a small thing.** 4.46 and 4.47 are not a
+subsystem awaiting promotion; they are **already carrying production traffic**.
+Which means the two defects 4.49.0 fixes are *live on both production bridges
+right now*:
+
+- **A1.** `claimReachable` dereferences null on a `neverRoot` node. A bridge is
+  `neverRoot`. So on both prod bridges, the first time any node refuses a role,
+  `refreshTick` throws into its own swallowing `catch` and the maintenance tick
+  dies — silently, for the life of the process.
+- **A2.** `helloPressure` latches. A single stall pins a prod node at `saturated`
+  permanently.
+- **B2.** Prod healthz returns `"status": "ok"` — the hardcoded literal, not a
+  verdict. **Production currently has no health signal.** The `ok` above is the
+  bug, not a reassurance.
+
+So 4.49.0 is a small-delta bugfix release against defects presently in production,
+not a risky new subsystem. That is a materially easier decision than Round 1
+described, and it makes the case for shipping *sooner*, not more cautiously.
+
+The record of both rounds is kept deliberately: the lesson is not which version
+prod was on, it is that a version claim used to size a release must be read from
+the running service.
+
+| | on prod today (4.48.0) | added by 4.49.0 |
+|---|---|---|
+| 4.46 admission control | ✅ running | — |
+| 4.47 capacity as measurement | ✅ running | — |
+| 4.48 declined-message termination | ✅ running | — |
+| A1 `claimReachable` null-deref | ❌ **defect live** | fixed |
+| A2 `helloPressure` latch | ❌ **defect live** | fixed |
+| B1 persist namespace throws | ❌ silent | fixed |
+| B2 real healthz verdict | ❌ literal `ok` | fixed |
 
 ---
 
@@ -152,7 +180,7 @@ digests, failing closed when unconfigured — the comparison was already
 | bridge | 2.103.0 | testnet.axona.net | **live** |
 | relay | 0.92.0 | 40-node local fleet, region eagle | **live** |
 | axona-peer | 4.38.0 | — | FROZEN, deliberately untouched |
-| **production** | **4.43.0** | bridge.axona.net east/west | **unchanged** |
+| **production** | **4.48.0** (bridge 2.101.0) | bridge.axona.net east + west | **unchanged — verified live 2026-07-29** |
 
 `BRIDGE_DIRECTORY=off` verified in the live testnet process environment, with zero
 advertise events since restart. The testnet bridge does not advertise.
@@ -332,15 +360,23 @@ the ticket describes a latency shape, and the real finding is a loss rate.
 
 ### The recommendation, and why staged
 
-**Promote 4.44→4.49 to production, bridges first, then relays one droplet at a
+**Promote 4.48 → 4.49 to production, bridges first, then relays one droplet at a
 time.**
 
-The order is not ceremony. A bridge is `neverRoot`, so admission control barely
-applies to it — a bridge is the *lowest-risk* surface for the new subsystem, and
-simultaneously the *only* surface where A1's defect lives, since A1 is precisely
-the null-dereference on a `neverRoot` node. Bridges therefore give the highest
-information per unit of risk: the first non-zero `refusals.bridge` on production
-is the first time A1's repaired path executes anywhere, ever.
+Note the delta, corrected: prod already runs 4.48.0, so this ships **A1, A2, B1
+and B2 only** — four fixes, no new mechanism. See the revision note.
+
+The order is not ceremony, and the reason is sharper than it was under the wrong
+premise. A bridge is `neverRoot`, which makes it simultaneously the *lowest-risk*
+surface (admission control barely applies — a bridge never roots) and **the exact
+place A1's defect lives**, since A1 is the null-dereference on a `neverRoot` node.
+Both prod bridges are running that defect today. Bridges are therefore where the
+fix is most needed and where shipping it costs least.
+
+One consequence worth stating: `refusals.bridge` was 0 for all 10h31m of the soak,
+so A1's repaired path has never executed anywhere. The first non-zero refusal on a
+production bridge will be its first execution — and on 4.48.0 that same event is
+what silently kills `refreshTick` today.
 
 1. **East bridge.** Watch `refusals.bridge` and `status`. A non-zero refusal that
    does *not* kill `refreshTick` is A1 confirmed in the wild — the evidence this
