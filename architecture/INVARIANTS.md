@@ -1,9 +1,18 @@
 # Axona Kernel — Invariants & Structural Rules
-*v1.0 — 2026-07-25 · extracted from the root-system refactor (v0.2 Phases 1–8), adopted as the standard for all subsequent restructuring.*
-*Deployed kernel as of 2026-07-25: **prod 4.41.0** · **testnet 4.39.0**. Version
-numbers below (e.g. "repairPlane.js, 4.42.0") name the release a fix LANDED IN —
-they are provenance, not a claim that it is running. 4.42.0 is tagged and HELD;
-testnet was rolled back to 4.39.0 on 2026-07-25. `/healthz` is the only truth.*
+*v1.1 — 2026-07-29 · extracted from the root-system refactor (v0.2 Phases 1–8), adopted as the standard for all subsequent restructuring.*
+
+*Deployed kernel as of 2026-07-29: **prod 4.49.0** (bridge 2.103.0, relay 0.92.0 —
+both bridges and all 9 backbone relays) · **testnet 4.49.0**. Version numbers
+below (e.g. "repairPlane.js, 4.42.0") name the release a fix LANDED IN — they are
+provenance, not a claim that it is running.*
+
+> **`/healthz` is the only truth, and this is not a slogan.** On 2026-07-29 the
+> figure "prod runs 4.43.0" was taken from a deployment note rather than the
+> endpoint. Prod was on 4.48.0. A release was sized as four versions of new
+> subsystem when it was four bugfixes, and the error survived a full review pass
+> because every reader trusted the same note. **Any version claim used to size,
+> gate, or justify work must be read from the running service at the time of
+> writing.** Recorded as process rule P6 below.
 
 Every rule here is either **fenced** (a named test fails if it regresses) or **declared unfenced** (the honest drift backlog). A rule that isn't a test drifts — the un-tabled `READ_REPAIR` policy proved it within weeks of the sync engine shipping.
 
@@ -95,7 +104,27 @@ Three independent doors enforce it, and it is worth knowing all three so nobody
    self-root. HARD tier — the `admitted-despite` floor may never override it.
 
 A design draft (Saturation-and-Admission v0.5) proposed softening (3) when the
-alternative was data loss. Rejected 2026-07-27. See that doc for the correction,
+alternative was data loss. Rejected 2026-07-27.
+
+**What B12 means for role delegation (added 2026-07-29).** The scorecard's M21
+proposes that a node which cannot take a role *appoints* one that can, and the
+bridge is its motivating case — production now measures ~15 refusals/minute/bridge
+at steady state, so the demand is real. B12 does not forbid that, but it
+**decides its shape**, and this is worth stating before the design is written:
+
+- The **proxy** variant — the bridge keeps beaconing as root and forwards every
+  SUB/PUB to a manager — makes the bridge a *forwarder for topic traffic*. Door 1
+  (`AxonaPeer.js:647`, "bridge is signaling infra, not a topic root/forwarder")
+  forbids exactly that. **Proxy delegation is ruled out by B12.**
+- The **referral** variant — the deputy is beaconed as the root, readers converge
+  on it directly, and the bridge leaves the data path after introduction — is
+  consistent with B12 and with the bridgeless-connection result (4.17.2).
+
+So the fork M21 left open is already closed for the bridge case: **referral, not
+proxy.** A delegating bridge must exit the path, not sit in it. Whether the
+*grant* can be made independently checkable (e.g. by declaring `neverRoot` on the
+wire) is still open and must be settled before implementation — an unverifiable
+grant is a topic-capture primitive, not a delegation. See that doc for the correction,
 including a reroute-loop claim that turned out to be speculation — a `'consumed'`
 return ends the walk, and the bridge's own re-send finds a relay.
 
@@ -132,10 +161,20 @@ not see four of those five.
 - **No behavior change without a disproof** — a failing repro (smoke or live) precedes every fix; the repro becomes the fence.
 - **Mechanism freeze during refactor phases** — incident response is (a) revert, or (b) a minimal guard tagged with an issue ID and a removal date. No new mechanisms.
 - **Mixed-version compat statement required** for any change touching wire-adjacent behavior (prod runs multiple kernel versions simultaneously — observed 4.35 peers during 4.41).
+- **P6 — Read deployed versions from the running service.** Any version used to size, gate, or justify work comes from `/healthz` (or the equivalent live surface) at the time of writing, never from a note, a memory, or a previous document. Cost of the miss: a release mis-sized by four versions, uncaught through a full review pass (2026-07-29).
 - **Verify per-claim, not per-narrative** (added after the Finding-0 correction: half the mass-leaver battle was already fought in code; reviews must check each numeric claim against source).
 
 ## Drift backlog (declared unfenced)
 1. S4 shape-freeze test for `makeRole()` (assert no undeclared fields appear on live roles after a soak pass).
 2. S6 one-clock fence — lands with the refreshTick decomposition.
 3. B11 explicit tier-order assertion (currently only exercised indirectly).
-4. `s2PrefixOfHex` hardcodes an 8-bit region prefix read — correct while `regionBits === 8`; documented in `smoke_hexid.js`, would misread under a non-default `configureKeyspace({regionBits})`.
+4. **Metric names must match their referents.** Two live cases: `servicePressure`
+   structurally pinned at 0.028 while a node held 546 roles at 200% CPU; and
+   `axona_status` reporting the synaptome under the name `mesh` (`synaptomeSize`
+   and `peers` are the same set counted twice, and neither counts live WebRTC
+   channels) — which produced a false "the mesh collapsed" report during the
+   2026-07-29 prod deploy, i.e. a claim that the bridge is on the data path, the
+   opposite of B12. **No operator surface currently exposes live channel count**,
+   so "did the mesh survive?" cannot be answered from outside. Needs a fence and
+   a rename.
+5. `s2PrefixOfHex` hardcodes an 8-bit region prefix read — correct while `regionBits === 8`; documented in `smoke_hexid.js`, would misread under a non-default `configureKeyspace({regionBits})`.
