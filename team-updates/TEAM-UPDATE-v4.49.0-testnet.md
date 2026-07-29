@@ -150,7 +150,7 @@ digests, failing closed when unconfigured — the comparison was already
 |---|---|---|---|
 | kernel | 4.49.0 | tag `v4.49.0` → `789f4bd` | pushed |
 | bridge | 2.103.0 | testnet.axona.net | **live** |
-| relay | 0.92.0 | — | pushed, no fleet running |
+| relay | 0.92.0 | 40-node local fleet, region eagle | **live** |
 | axona-peer | 4.38.0 | — | FROZEN, deliberately untouched |
 | **production** | **4.43.0** | bridge.axona.net east/west | **unchanged** |
 
@@ -216,6 +216,146 @@ the 4.48.0 commit and `node_modules` still held 4.48.0. Only removing
 The command's own report was not evidence. The installed `KERNEL_VERSION` was.
 Likewise the release tag was verified by asking the **remote** what `v4.49.0`
 peels to (`789f4bd`), not by trusting the push output.
+
+---
+
+## VERDICT — 10h31m soak complete, 2026-07-29 12:31 UTC
+
+**Recommendation: promote, staged, bridges first.** The reasoning, the numbers it
+rests on, and the three things this run did *not* establish, are below.
+
+### What ran
+
+40 relays (relay 0.92.0, kernel 4.49.0, region eagle) against the testnet bridge
+2.103.0, 02:00 → 12:31 UTC. 126 operator-healthz samples at 5-minute cadence; 41
+cold-topic delivery probes at 15-minute cadence, each spawning two fresh peers on
+a never-before-used topic and departing — modest deliberate churn on top of
+whatever the fleet did by itself. Droplet load ~0.1 throughout; the droplet ran
+the bridge only, so none of this is a starved-box measurement.
+
+### The admission-control subsystem behaved
+
+| | |
+|---|---|
+| samples | 126 |
+| relays | 40, every sample |
+| `saturated` | **never** |
+| `status` | **`ok`, every sample** |
+| `refusals.bridge` | **0, every sample** |
+| `tickLagMaxMs` | median 2 ms, max 93 ms |
+
+Nothing was refused, nothing saturated, nothing reported degraded, for ten and a
+half hours on a fleet holding real roles. That is the claim 4.46/4.47 needed and
+did not have when this document was first written.
+
+### A2 works, at the scale we could reach
+
+`tickLagMaxMs` spiked and decayed repeatedly — 33→1, 43→1, 49→1, 32→1 — against
+all-time peaks of 44 and later 93. **On 4.48.0 those were one variable**; the
+first 44 ms stall would have pinned the reading at 44 for the life of the process
+and, at a large enough value, pinned the node at `saturated` forever. The decay
+is demonstrated.
+
+**What is still not demonstrated: recovery from actual saturation.** The largest
+lag seen was 93 ms — helloPressure ≈ 0.02 against a 0.6 threshold. Nothing came
+within an order of magnitude of saturating. A2's *mechanism* is confirmed; A2's
+*headline claim* ("a node that recovers is treated as recovered") remains
+inferred from the mechanism, not observed.
+
+### A1 was never exercised. Not once.
+
+`refusals.bridge` was **0 in all 126 samples**. The repaired code path — the one
+where `claimReachable` used to dereference null and silently kill `refreshTick` —
+was never taken, because no node ever refused a role to this bridge.
+
+So A1 ships to production on the strength of its fence and its reasoning, with
+zero live evidence behind it. That is worth saying plainly rather than letting a
+clean soak imply otherwise, and it directly shapes the rollout order below.
+
+### An unplanned test we did not design
+
+At **06:06:57 UTC** systemd cleanly stopped and restarted the bridge — `Result=success`,
+`ExecMainStatus=0`, `NRestarts=0`, no OOM, 35.7 MB peak on a 458 MB box. Not a
+crash; something on the droplet (unattended-upgrades or similar) restarted the
+unit. That is its own finding — **the testnet droplet restarts services on a
+schedule nobody chose, which silently segments any long soak** — and should be
+pinned down before the next overnight run.
+
+It also handed us a free experiment: the bridge vanished, all 40 relays
+reconnected, and **the very next probe was 3/3 at 2772 ms**. Full bridge loss,
+recovered inside ~70 seconds, no delivery cost. Consistent with the bridgeless-path
+claim, on an event we did not stage.
+
+Consequence for reading the table above: the 126 samples span two processes
+(4h07m + 6h24m). Neither reported degraded. The 3-hour #333 cadence was cleared
+by the first process alone, and again by the second.
+
+### Delivery — the honest part
+
+```
+                probes   delivered        median latency
+ALL                41   110/123  89.4%   p50 2697 ms
+  pre-restart      16    42/48   87.5%   p50 2765 ms
+  post-restart     25    68/75   90.7%   p50 2686 ms
+```
+
+Latency is overwhelmingly tight: **35 of 41 probes under 3 s**, clustered 2507–2900 ms.
+Four landed 3–10 s (3649, 5261, 7090, 7101). Two landed ≥10 s (14333, 15742) —
+**both in the first 47 minutes**, and the slow mode has not recurred in the nine
+and a half hours since.
+
+Two corrections to what earlier drafts of this section said:
+
+1. **The distribution is not bimodal.** An earlier reading called it two discrete
+   modes with nothing between. With 41 probes there is a tight mode near 2.7 s and
+   a thin tail. "Nothing between" described eleven samples, not the system.
+2. **Loss is independent of latency.** Four of the ten incomplete probes came in
+   at nominal speed — 02:16 (1/3, 2701 ms), 04:04 (2/3, 2765 ms), 08:26 (2/3,
+   2671 ms), 11:01 (1/3, 2676 ms). The tidy story that slowness explains the
+   misses is wrong.
+
+So there is a **~10.6% cold-topic loss that is not explained by anything measured
+here**, present from 16 minutes into the run and steady across both processes.
+This range is not obviously the cause — but there is no 4.43.0 A/B on this fleet,
+so it is **unattributed, not exonerated**. #406 should be re-scoped around it:
+the ticket describes a latency shape, and the real finding is a loss rate.
+
+### Gates, as they actually resolved
+
+| Gate | Result |
+|---|---|
+| Delivery recovers as the mesh settles | **Yes** for the ≥10 s mode (gone after 02:47); the ~10% loss did not |
+| Survive the 3-hour #333 cadence | **Cleared**, twice, plus an unplanned restart |
+| Rollback signal: roles up, delivery flat | **Did not materialise** — nothing refused, nothing saturated |
+| A/B on #406 | **Not run.** Re-scoped, see above |
+| Throttle bridge `role-refused` logging | **Moot** — zero refusals in 10h31m |
+
+### The recommendation, and why staged
+
+**Promote 4.44→4.49 to production, bridges first, then relays one droplet at a
+time.**
+
+The order is not ceremony. A bridge is `neverRoot`, so admission control barely
+applies to it — a bridge is the *lowest-risk* surface for the new subsystem, and
+simultaneously the *only* surface where A1's defect lives, since A1 is precisely
+the null-dereference on a `neverRoot` node. Bridges therefore give the highest
+information per unit of risk: the first non-zero `refusals.bridge` on production
+is the first time A1's repaired path executes anywhere, ever.
+
+1. **East bridge.** Watch `refusals.bridge` and `status`. A non-zero refusal that
+   does *not* kill `refreshTick` is A1 confirmed in the wild — the evidence this
+   soak could not produce.
+2. **West bridge**, after east settles.
+3. **Relay backbone**, one droplet at a time, watching role counts against
+   delivery between each.
+
+Do **not** block promotion on the ~10% loss question. Testnet cannot settle it —
+40 laptop relays is not the population — and the loss predates any evidence tying
+it to this range. Run the #406 A/B on testnet in parallel with the prod rollout
+rather than in front of it.
+
+**Rollback signal, unchanged:** role counts climbing without delivery improving,
+or any `saturated` that does not clear within a few refresh ticks.
 
 ---
 
