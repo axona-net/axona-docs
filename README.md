@@ -72,7 +72,7 @@ are doing about the parts that fall short.
 | Doc | What it is |
 |---|---|
 | [**INVARIANTS.md**](architecture/INVARIANTS.md) | The rules, and whether each is *fenced* by a named test or honestly declared unfenced. Structural rules (how we build), behavioral invariants (what must always hold — region is an optimization; a bridge is a bridge; transport identity never persists), process rules, and the drift backlog. Start here before changing kernel behaviour. |
-| [**Architecture Health Scorecard v1.2**](architecture/Axona-Architecture-Health-Scorecard-v1.2.md) | Per-subsystem health, the refactor plan, and the full working record behind it: four code surveys, two external review passes, and the production field report from the 4.49.0 deploy. v1.0/v1.1 remain as earlier baselines. |
+| [**Architecture Health Scorecard v2.0**](architecture/Axona-Architecture-Health-Scorecard-v2.0.md) | Per-subsystem health measured at kernel 4.49.0, what the refactor has completed and what it measurably changed, what is still wrong, and the sequenced plan with its gates. Written for reviewers who need to judge the plan rather than take it on trust. Earlier versions (v1.0–v1.2) are in `history/architecture/`. |
 
 ### For programmers
 
