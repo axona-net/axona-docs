@@ -1,8 +1,34 @@
 # Team Update — kernel v4.49.0 on testnet
 
-**Date:** 2026-07-28
+**Date:** 2026-07-28, revised 2026-07-29 (see *Revision note*)
 **Kernel:** 4.49.0 · **Bridge:** 2.103.0 · **Relay:** 0.92.0
 **Environment:** testnet only. Production remains on 4.43.0 — this is **not** promoted.
+
+---
+
+## Revision note — the first version of this document understated the scope
+
+As first written, this update described 4.49.0 as three silent-failure fixes.
+That is true of the 4.49.0 *commit* and misleading about the 4.49.0 *release*,
+because prod is on 4.43.0 and promoting means shipping the whole range:
+
+| | |
+|---|---|
+| 4.44.0 | mass-leaver handoff ack-window scaling (re-land) |
+| 4.45.0 | a HANDOFFACK must claim only what is HELD |
+| **4.46.0** | **axonic admission control — a node can say "no" to a role** |
+| **4.47.0** | **capacity is MEASURED, not counted** |
+| 4.48.0 | a declined message with nowhere to go TERMINATES |
+| 4.49.0 | Phase A/B — the three fixes below |
+
+**4.46 and 4.47 are a new subsystem, and A1/A2 are repairs to defects inside it.**
+`claimReachable` could dereference null only because 4.46 taught nodes to refuse;
+`helloPressure` could latch only because 4.47 made capacity a measurement. So this
+is not a bugfix line — it changes how load is placed across the network.
+
+Anyone reading the original framing would reasonably have concluded "three small
+fixes, low risk, promote." That is the wrong basis for the decision, and correcting
+it is the reason this revision exists.
 
 ---
 
@@ -131,8 +157,20 @@ digests, failing closed when unconfigured — the comparison was already
 `BRIDGE_DIRECTORY=off` verified in the live testnet process environment, with zero
 advertise events since restart. The testnet bridge does not advertise.
 
-No testnet relay fleet is running, so this deploy is bridge-only. A meaningful
-testnet soak needs ≥40 nodes; below that the number would not mean anything.
+### Fleet — added 2026-07-29 ~02:00 UTC
+
+The first deploy was **bridge-only**, which meant the new admission-control
+subsystem had never run with nodes that actually hold roles. A bridge is
+`neverRoot`; it is the one machine on which admission control barely applies. So
+the deploy proved the least interesting half.
+
+Now running: **40 relays** (relay 0.92.0, kernel 4.49.0, region eagle), each
+meshed to ~30 peers, **69 roles distributed**, max 6 on any single relay. Brought
+up in three staggered waves to avoid re-creating the #332 join-storm.
+
+The droplet is deliberately **bridge-only** — running relays on the same 1-vCPU
+box is what made earlier soaks droplet-bound and unreadable as kernel signals.
+Droplet load 0.10 throughout, so what follows is not a measure of a starved box.
 
 ---
 
@@ -181,14 +219,61 @@ peels to (`789f4bd`), not by trusting the push output.
 
 ---
 
+## Soak in progress — first results, 2026-07-29
+
+Sampling the bridge's operator admission block every 5 min and a cold-topic
+delivery probe every 15 min. Three samples and one probe at the time of writing;
+**these are early numbers on a mesh minutes old, not a verdict.**
+
+```
+time      relays status sat  bridgeRef lagMax lagPeak
+02:00:50    40     ok   false    0        2      44
+02:05:53    40     ok   false    0       30      44
+02:10:56    40     ok   false    0        2      44
+
+probe 02:00:50   2/3 delivered   median 15742 ms
+```
+
+**A2: the window demonstrably decays.** `tickLagMaxMs` moves (2 → 30 → 2) while
+`tickLagPeakMs` holds 44. On 4.48.0 these were one number and it would have read
+44 for the life of the process. That is the mechanism working.
+
+**A2 is still NOT fully proven.** 44 ms is helloPressure ≈ 0.009, nowhere near the
+0.6 saturation threshold. The claim "a node that recovers is treated as recovered"
+needs a stall past ~3000 ms that then falls back. Not observed. Not claimed.
+
+**A1 remains unexercised live.** `refusals.bridge` is 0 across all samples — the
+bridge has not yet been topic-closest to anything, so the repaired path has not
+been taken. If it stays 0, A1 is supported by its fence and by reasoning, not by
+observation, and this document should keep saying so.
+
+**The probe is the line to watch.** 2/3 at ~15.7 s against 15/15 at ~200 ms–10 s
+on the bridge-only deploy, same kernel and bridge and region. Directionally that
+is the rollback signal — more role-holders, delivery no better. It is also one
+point at n=3 taken five minutes into convergence, on a path already measured as
+bimodal (#406) before any fleet existed. Both readings are live; the next few
+hours decide which.
+
+---
+
 ## Before promoting to production
 
-1. An A/B on issue #406 — is the bimodal cold-topic path new, or long-standing?
-2. A soak long enough for `tickLagMaxMs` and `tickLagPeakMs` to diverge, which is
-   the only live evidence A2 works.
-3. Named rollback signal: **browser-peer role counts rising without a matching
-   improvement in delivery.** That would mean A2 opened admission on nodes that
-   cannot actually serve, and is the failure mode this release could plausibly
-   introduce.
-4. Open call: whether to throttle the bridge's `role-refused` logging (~0.5
+1. **Delivery recovers as the mesh settles.** If it stays ~2/3 with roles
+   climbing, that is the rollback signal and 4.49.0 does not go to prod.
+2. An A/B on issue #406 — is the bimodal cold-topic path new, or long-standing?
+3. **Survive the 3-hour mark.** 4.24.0 was also a role-placement change that
+   looked fine and collapsed the backbone under churn on a ~3h cadence (#333).
+   That is the specific precedent this range has to beat.
+4. Named rollback signal: **role counts rising without a matching improvement in
+   delivery.** That would mean admission is opening on nodes that cannot serve.
+5. Open call: whether to throttle the bridge's `role-refused` logging (~0.5
    lines/s) before it ships to production.
+
+**A caveat on gate 1 that was missing from the first version.** An earlier draft
+said "soak before prod." Testnet lacks the scale for a soak that means anything —
+this 40-node fleet is a laptop, and prod is where the real population is. Some
+evidence can therefore *only* come from prod, and insisting on it beforehand is
+insisting on the impossible. The honest sequencing is: take the low-risk surface
+first (bridges never root, so admission control barely applies to them, and A1's
+defect is armed on exactly those machines), then the relay backbone one droplet at
+a time with the rollback signal watched between each.
