@@ -63,6 +63,17 @@ PDF — see [`BUILDING.md`](BUILDING.md) for the render process.
 | [**Axona Applications v0.6**](applications/Axona%20Applications%20v0.6.pdf) | What you build on an operator-free network: anonymous broadcast (the fan-out no incumbent offers), managed pub/sub displacement (Pusher/Ably/PubNub), decentralized social protocols compared (Nostr, Matrix, Farcaster, Bluesky), and the Axona-powered apps in flight. |
 | [**SYZL Briefs v0.4**](applications/SYZL%20Briefs%20v0.4.pdf) | Per-product brief: SYZL, an adaptive social feed built on Axona pub/sub. |
 
+### Kernel health & rules
+
+These two are the internal engineering record rather than reference material —
+they say what the kernel's structural health is, what rules hold it, and what we
+are doing about the parts that fall short.
+
+| Doc | What it is |
+|---|---|
+| [**INVARIANTS.md**](architecture/INVARIANTS.md) | The rules, and whether each is *fenced* by a named test or honestly declared unfenced. Structural rules (how we build), behavioral invariants (what must always hold — region is an optimization; a bridge is a bridge; transport identity never persists), process rules, and the drift backlog. Start here before changing kernel behaviour. |
+| [**Architecture Health Scorecard v1.2**](architecture/Axona-Architecture-Health-Scorecard-v1.2.md) | Per-subsystem health, the refactor plan, and the full working record behind it: four code surveys, two external review passes, and the production field report from the 4.49.0 deploy. v1.0/v1.1 remain as earlier baselines. |
+
 ### For programmers
 
 Start with the intro deck, then pick by depth. The guides carry the kernel
