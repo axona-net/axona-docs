@@ -1,4 +1,4 @@
-# Axona — Master Action List v1.3
+# Axona — Master Action List v1.4
 
 **Assembled:** 2026-07-30 · **For:** the council (David, axona.bot, Orion, Aster)
 **Live versions at assembly:** kernel **4.49.0** on testnet AND production;
@@ -101,9 +101,9 @@ starvation, prove pressure rises, prove admission changes, prove recovery.
 |---|---|---|
 | `#406` | Cold-topic delivery loses ~10% at **nominal** latency. 110/123 over a 10.5 h, 40-node soak; 4 of 10 incomplete probes at 2671–2765 ms, so any latency-based explanation is wrong. **Unattributed, not exonerated** — no A/B against a prior kernel exists. | measured |
 | `#412` | Interloper-death history loss. Real, **1 in 139**, cause unknown. Leading hypothesis (partial root never reconciles) **refuted** by purpose-built harness — it converges on renewal tick 1. Untested idea recorded: renewal-gated budget. | measured |
-| `#397` | Root reconciliation reach is `rootReplicas` (2) — any second root beyond that distance is **permanent**. Design limit, not a bug, but it bounds what convergence can promise. | asserted |
+| `#397` | Root reconciliation reach is `rootReplicas` (2) — any second root beyond that distance is **permanent**. **Calibrated on Aster’s review (seq 24):** verified for the deterministic fabric at N=3,4,8 in the default suite; the *universal* architectural claim remains asserted. | measured (N=3,4,8) / asserted (general) |
 | `#341` | Region 0x80/grizzly: fresh-subscriber replay drops ~1–3 of 19 topics; killed events replay as live. Howard reports the matching symptom on `#axona.dev` **today** and has given a topic-closest node id; his kernel version is the discriminator and is not yet known. | observed |
-| `#339` | `transport.start()` must fail loud — terminal rejection + surfaced dispatch errors (I-3/I-6). | asserted |
+| `#339` | `transport.start()` must fail loud — terminal rejection + surfaced dispatch errors (I-3/I-6). **Aster (seq 24):** a start timeout and join wrapping exist, but no focused test proves terminal rejection plus dispatch behaviour end-to-end. Remains asserted. | asserted |
 | `#338` | Bridge hello-timeout second-strike + closing-socket guard (admit-then-kick race). | observed |
 | `#344` | TURN has no TCP/TLS fallback (`turns:5349` / `turn:443?transport=tcp`); UDP-only relay fails on restricted networks. | observed |
 | `#400` | Soak 4.43.0 cycle-3 convergence cluster — idle-band, not load. | measured |
@@ -120,7 +120,7 @@ starvation, prove pressure rises, prove admission changes, prove recovery.
 | `#297` | W1c — read the live testnet mesh-vs-bridge signalling split (instrumentation and harness already shipped). | — |
 | §5.5 | Fence S4, S6, B1, B12 — a rule that is not a test drifts. | asserted |
 | `#411` | `axona_status` calls the synaptome "mesh" — this label caused a **false mesh-collapse report during a prod deploy**. Naming, but it cost real diagnosis time. | observed |
-| **NEW** | **No application-path fence.** Every test in §3 above exercises a module or the kernel; nothing exercises a real app end-to-end over the production bridge. A green module suite does not establish that the application path works — the meaningful fence for a file transfer is Portal ↔ an independent relay across prod, not direct calls into the transfer engine. **Raised by Aster** (council seq 15) and independently proposed by Orion (council seq 7, "Application Sandbox & E2E Testing"); **verified by inspection** — no item in this list covered it before v1.1. This is the same defect class as Phase C: a suite that cannot fail in the way that matters. | measured (gap confirmed by inspection) |
+| `#419` | **No application-path fence.** Every test in §3 above exercises a module or the kernel; nothing exercises a real app end-to-end over the production bridge. A green module suite does not establish that the application path works — the meaningful fence for a file transfer is Portal ↔ an independent relay across prod, not direct calls into the transfer engine. **Raised by Aster** (council seq 15) and independently proposed by Orion (council seq 7, "Application Sandbox & E2E Testing"); **verified by inspection** — no item in this list covered it before v1.1. This is the same defect class as Phase C: a suite that cannot fail in the way that matters. | observed |
 
 ---
 
@@ -256,13 +256,33 @@ Reasoning stated so it can be disagreed with:
 2. **`#415`, `#416`, `#417`** — ~an hour total, and all three are *record errors that have
    already misled a reader*. Cheap items that cause wrong work should not queue behind
    expensive ones.
-3. **Re-baseline the punchlist**, then the `R-0` absence canary — `R-0` is the register's
-   own #1 and we hit it again today.
-4. **D1**, once D0 makes admission decisions meaningful.
-5. **`#406` A/B**, when David approves prod involvement — it can run in parallel; it is
+3. **`R-0` absence canary — narrow, and NOT gated on re-baselining the punchlist.**
+   *Changed on Aster's review (seq 24):* the 18.3 h chime gap today is fresh independent
+   evidence, so the canary does not need the stale register to justify it. Re-baseline the
+   punchlist in parallel, before scheduling anything *else* from it.
+4. **`#350` containment — decide NOW, separately from the eventual fix.**
+   *Added on Aster's review (seq 24), which verified the defect at
+   `axona-chat/src/services/CryptoService.js`:* the session key is AES-encrypted to the
+   **public** `recipientAuthorId`, and `AxonaChatClient.js` exposes encrypted-reply. §6 says
+   this should not be deferred and §9 then failed to schedule it — a real gap. The decision
+   is binary and cheap: **disable the feature, or relabel it as non-confidential.** Real key
+   exchange is separate and later. Shipping something that looks like encryption and is not
+   is worse than shipping nothing, so the containment call should not wait on the fix.
+5. **D1**, once D0 makes admission decisions meaningful.
+6. **`#406` A/B**, when David approves prod involvement — it can run in parallel; it is
    measurement, not code.
-6. **M21-S spec + simulation** in parallel throughout, deploying only after D0.
-7. **`#414`** with D1, since both concern paths that create roles.
+7. **M21-S — the Q5 cost probe, NOT spec-and-simulation.**
+   *Corrected on Aster's review (seq 24), which caught this document contradicting itself:*
+   §8.1 says the design is unspecified and the cost probe precedes all design work, while
+   this section still scheduled spec+simulation in parallel. §8.1 governs. What is scheduled
+   is the decline-cost measurement (§8.1 Q5) and, per Aster's seq 25 and Orion's seq 26,
+   the **referral-vs-delegation decision** — both reviewers judge that M21-S likely reduces
+   to M19 deterministic referral if `neverRoot` is authenticated on the wire *and* lookup
+   excludes a declining bridge **before** root selection. No lease format is designed until
+   that probe reports.
+8. **`#414`** with D1, since both concern paths that create roles.
+9. **`#419`** (application-path fence) — scope with D1 or later; it needs a decision about
+   prod involvement before it can be sized.
 8. **Errata E-1…E-4 fold-in** at the next substantive docs render, not before — that is
    what the errata exists to allow.
 
