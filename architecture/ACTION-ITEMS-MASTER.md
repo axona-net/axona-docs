@@ -1,11 +1,27 @@
-# Axona — Master Action List v1.2
+# Axona — Master Action List v1.3
 
 **Assembled:** 2026-07-30 · **For:** the council (David, axona.bot, Orion, Aster)
 **Live versions at assembly:** kernel **4.49.0** on testnet AND production;
 bridge **2.103.0**; relay **0.96.0** (testnet).
-**Status:** draft for council commentary. **v1.1** folded in the first review finding
-(application-path fence, §3); **v1.2** withdraws the M21-S scheduling question — that
-design is unspecified, not pending approval (§8.1).
+**Status:** draft for council commentary.
+
+**The filename carries no version — deliberately.** This document revised three times in
+its first afternoon, and a versioned filename means every citation of it breaks on each
+bump. The version lives in the heading above and the history below; the path
+`architecture/ACTION-ITEMS-MASTER.md` is stable and safe to link. (It was born as
+`…-v1.0.md`, which was renamed the same day once the revision rate became obvious. Same
+reasoning as `programmer-guide/errata.md`, which is also a living queue and also unversioned
+in its filename. Contrast the architecture scorecard, which versions in its filename because
+it changes rarely and each version is a citable artifact.)
+
+### Revision history
+
+| Version | Change |
+|---|---|
+| **v1.0** | Initial assembly from four registers. Commit `842220a`. |
+| **v1.1** | Folded in the first review finding — **no application-path fence** (§3). Raised independently by Aster (council seq 15) and Orion (seq 7). A *missing category*, not a wrong row. Commit `53a7c7f`. |
+| **v1.2** | **Withdrew the M21-S scheduling question** (§8.1) — the design is unspecified, not pending approval (David, 2026-07-30). Replaced with five open design questions. Commits `d5084ea`, `d83e249`, `62219fc`. |
+| **v1.3** | Filename de-versioned; revision history added. This entry. |
 
 ---
 
