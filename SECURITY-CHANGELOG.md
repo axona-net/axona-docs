@@ -16,6 +16,40 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## axona.chat 0.42.0 – 0.44.0 — 2026-07-29 — a private reply stays private, and you can see where you are about to post
+
+Kernel unchanged at v4.49.0; these are application-layer protections.
+
+The chat composer gained a shell-style recall of what you have sent, which means
+sent messages now outlive the browser tab. **A private reply is never among them.**
+A private reply is encrypted so that only its recipient's key can open it; keeping
+a readable copy on the sending device would leave behind precisely the artefact
+that the encryption exists to prevent — on a shared or unlocked machine, in a
+profile that syncs, in a backup. A convenience feature does not get to quietly
+undo a privacy decision the sender already made, so private replies are dropped
+before anything is written down. What is retained is bounded by both count and
+size, and a storage failure is never allowed to interfere with sending.
+
+**Where a message is going is now shown before it is sent.** A topic's address is
+derived in part from who owns it and who is permitted to write to it, so two
+channels can share a name and be entirely different places. Previously, reaching a
+channel by typing its name always assumed the open, unowned form: anyone who typed
+the name of a moderated channel arrived instead at a different, empty channel of
+the same name, with no indication that this had happened, and could speak into it
+believing they were somewhere else. The single dialog that now adds a topic
+resolves whatever it is given — a name, a shared link, or a descriptor — and
+displays the resulting destination, including its posting policy and its owner,
+before anything is joined. A shared link or descriptor carries its own policy and
+is never silently overridden by the form. A link that carries no topic at all is
+refused rather than quietly treated as a name.
+
+**What is protected.** Confidentiality of an encrypted reply, against later local
+disclosure. And the integrity of a user's intent about audience: it is no longer
+possible to be shown one destination and be placed in another, because the
+destination is displayed from the same resolution that will be acted upon.
+
+---
+
 ## Kernel v4.49.0 — 2026-07-28 — a health surface that can report ill health, without handing out targets
 
 A node's public health endpoint reported the literal string `ok`,

@@ -207,10 +207,24 @@ writing.
 
 Ranked by how much it blocks everything else.
 
-**5.1 The test runner cannot prove a full suite ran.** `&&`-chained commands
-report success from a partial run, and ~10 smoke files are not wired into any
-suite at all. Every gate in this document is only as good as this instrument.
-**Nothing else should start before it is fixed.**
+**5.1 ~~The test runner cannot prove a full suite ran.~~ RESOLVED 2026-07-29 —
+and the estimate here was wrong by 3.5x.** `&&`-chained commands reported success
+from a partial run, and orphaned smoke files were wired into no suite at all. This
+document said "~10"; Review Pass 8 said 15. **Measured: 35 of 144.** The chain was
+109 invocations long, so a failure at position 3 hid 106 results.
+
+Fixed by `test/run.mjs` + `test/manifest.json` + a disk↔manifest guard in CI: the
+suite now reports `ran N of M selected` and fails if those differ. All 35 orphans
+were resolved by RUNNING them — 11 passed and were promoted (recovering fences for
+#364, #354, #343, #363), 24 failed against internals the Phase-1 rewrite removed
+and were retired with the missing symbol named. Quarantined is zero.
+
+The instrument found two things on its first day: a **25%-flaky test sitting in the
+release gate** (`smoke_pubsub_kill` 3c fenced convergence *latency* while claiming
+to fence convergence), and #413, where a rejection-sampling budget looked safe under
+the wrong probability model — `P(fail) = N/(N+T)`, polynomial not exponential, so no
+budget could have rescued it. Details in
+`team-updates/TEAM-UPDATE-2026-07-29-test-gate-and-chat-0.44.0.md`.
 
 **5.2 Measurement dishonesty (§4.3).** Saturation detection currently rests
 almost entirely on the newly-windowed `helloPressure`, because `servicePressure`
@@ -248,9 +262,9 @@ exists on that fleet, so this is **unattributed, not exonerated**.
 ## 6. The plan
 
 ```
-      ┌─ C ── test-gate integrity ──────────────────────────────── BLOCKS ALL
-      │      de-&& the runner · wire orphaned smokes · used→declared fence
-      │      · one test manifest whose reported count is checked
+      ┌─ C ── test-gate integrity ─────────────────── ✅ DONE 2026-07-29
+      │      de-&& the runner · wire orphaned smokes (35, not ~10) ·
+      │      used→declared fence · one manifest whose count is checked
       ↓
       ├─ D0 ─ honest measurement (M4)
       │      service-stamp that can actually move · metric-naming audit
@@ -325,3 +339,163 @@ Not line counts or file layout:
 4. **Run the #406 A/B** (4.48.0 vs 4.49.0, same fleet, same probe) to attribute or
    clear the ~10% loss. Cheap, and it removes the largest unexplained number in
    this document.
+
+---
+
+# Review Pass 8 — Antigravity — Analysis of the Shipped Changes and PLAN v2 (2026-07-29)
+
+*Contributor: Antigravity (AI coding assistant for axona-chat and peer-to-peer validation).*
+
+I have audited the newly restructured scorecard and reviewed the live production telemetry from the **Phase A+B deployment (4.49.0 / 2.103.0)**. 
+
+## 1. Analysis of the Shipped Changes (Phases A & B)
+
+The metrics gathered via the new B2 telemetry endpoint validate the urgency of the initial scorecard audit:
+*   **A1 Null Guard:** The recording of **~2,500 refusals per bridge** with zero tick stalls confirms that the `neverRoot` null-dereference crash was a live, repeating failure mode. Pre-4.49.0, both prod bridges were silently executing tick-death on the first role rejection, disabling background maintenance entirely. 
+*   **A2 Lag Decay:** The recovery of the east bridge's lag window back to 2 ms after absorbing a **409 ms** peak is empirical proof that the sliding-window decay functions correctly under load. It successfully avoids the permanent saturation lock that plagued the previous high-water mark implementation.
+*   **B2 Telemetry Value:** The success of B2 is a textbook validation of the "telemetry before mechanics" rule. By exposing bridge refusal counts, we resolved a major roadmap design question (whether declines are rare or common) without writing any new routing or redirection code. 
+
+## 2. Analysis of the Current Plan (PLAN v2)
+
+I strongly endorse the revised sequencing and the prioritization of Phase C:
+
+### Phase C as the Absolute Gate
+The process failure documented in **P6** and **F4** (where the 4.42.0 revert silently dropped four closed findings because their fences were also reverted) highlights the fragility of our current testing pipeline. De-`&&`-ing the runner and wiring the 15 orphaned smokes must remain the absolute gate. We cannot safely begin Phase D or M21-S while the test suite is capable of truncating failures silently.
+
+### Parallelizing M21-S (Structural bridge delegation)
+Splitting M21 into **M21-S (Structural)** and **M21-L (Load-triggered)** is the correct architectural split. Since a bridge is a static keyspace hole that *never* roots, M21-S does not depend on dynamic load telemetry and can be built immediately after Phase C is green. 
+*   *Verification requirement:* For M21-S, we must design a **referral-with-a-lease** model where the deputy beacons as root and the bridge exits the data path, rather than a proxy model. We must also ensure the grant carries a verifiable cryptographic lease to avoid the **#333** dead-principal ghosting vulnerability.
+
+### Expansion of M4 (Metrics Audit & Live Channel Telemetry)
+The addition of **#411** to the M4 scope is highly critical. The false "mesh collapsed" report during the 4.49.0 deploy illustrates how misnamed metrics can lead to incorrect production diagnoses. Exposing the live WebRTC channel count alongside the synaptome size is essential to verifying that the bridge is behaving as a bootstrap-only node and not participating in the data-forwarding path.
+
+## 3. Recommendations on Open Decisions
+1.  **Start M21-S after Phase C:** Do not wait for M4. The steady-state rate of 10–15 declines per minute per bridge represents a continuous traffic sink that we should close as soon as the test runner is secured.
+2.  **Declare `neverRoot` on the wire:** We should advertise `neverRoot` as an explicit handshake property. This makes the structural delegation grant independently checkable by third-party peers, preventing delegation from becoming an opaque topic-capture primitive.
+3.  **Role charging:** A delegated role *must* count against the deputy's admission budget to prevent delegation from laundering resource limits across nodes.
+4.  **Run the #406 A/B soak:** Run this immediately on the 4.49.0 fleet to attribute the ~10% cold-topic loss. It is the only way to establish whether the loss is a regression or a baseline characteristic of the current network density.
+
+---
+
+# Review Pass 9 — Codex (OpenAI GPT-5) — Analysis of v2 Changes and Current Plan (2026-07-29)
+
+*Contributor: Codex, an OpenAI GPT-5 coding agent. I reviewed this scorecard,
+kernel 4.49.0 (`789f4bd`), bridge 2.103.0, the relevant implementation paths,
+and the deterministic fences named below. This validates source and local test
+evidence; the stated production totals remain operational evidence, not values
+that source review alone can reproduce.*
+
+## Assessment of the changes already made
+
+The A+B release is a meaningful improvement, not a paper cleanup.
+
+- **A1 is correctly closed at the caller boundary.** `claimReachable()` now
+  returns a nullable result and `refreshTick` continues normal subscription
+  renewal when the bridge's hard refusal prevents a claim. The direct
+  `smoke_decline_paths.mjs` fence passed all 22 checks, including work that
+  occurs after the prior throw site. That is the correct regression property;
+  checking only that the tick did not throw would have repeated the original
+  mistake.
+- **A2 separates control from diagnosis cleanly.** The 12-tick ring is the
+  admission input and the all-time peak is retained only for investigation.
+  The direct 22-check fence covers both halves of the requirement: sustained
+  lag remains saturating, while a recovered browser eventually becomes
+  admissible again. The scorecard is appropriately cautious that a real
+  above-threshold production recovery has not yet been observed.
+- **B1 has converted silent loss into an explicit fault, but not into durable
+  hosting.** `PERSIST_UNSUPPORTED_NAMESPACE` is typed, logged at error level,
+  and deliberately not retried forever. That is the right interim behaviour.
+  The known `hosting` dirty marks still do not serialize state, so M7 remains a
+  correctness migration, not optional cleanup; the 13-check namespace fence
+  makes that visible.
+- **B2 gets the security boundary right.** The public endpoint reports only a
+  derived `ok`/`degraded`/`unknown` verdict. Admission and topology detail are
+  operator-token gated with fixed-digest `timingSafeEqual`, and an unavailable
+  manager becomes `unknown`, never optimistic `ok`. The bridge's 18-check
+  healthz fence passed. Operationally, alerts must treat `unknown` as
+  non-healthy; otherwise the safer API result becomes another ignored state.
+
+This is good evidence for the causal claims in the document. To make the
+numerical production claims independently auditable, retain a timestamped,
+redacted health/telemetry snapshot or dashboard permalink for each release
+statement. A source tree proves the instrument exists, not that a bridge has
+recorded 2,500 events.
+
+## Scorecard corrections worth making
+
+1. **Section 3.3 overstates completion.** Admission control is shipped, but
+   "honest capacity" is not yet complete: `refreshTick` still stamps every role
+   before doing its work, so `servicePressure` is structurally unable to show
+   starvation, and three pushed role-creation paths remain ungated. Describe
+   this as an *admission framework with one working pressure signal*, not a
+   completed capacity system, until D0/D1 close those gaps.
+
+2. **Make the test gap precise.** The current default `npm test` still has 109
+   commands joined by `&&`; the first failure stops all subsequent commands.
+   Across every `test*` package script, 12 of the 143 top-level `smoke_*` files
+   are referenced by no script at all. Thus a passing default run establishes
+   only that the declared default commands passed, while a failing run provides
+   no complete result set. Phase C should replace both ambiguities with an
+   explicit manifest and an end-of-run summary.
+
+3. **Reconcile the invariant identifiers before relying on them as gates.**
+   This scorecard cites S1–S6 and B12 in `INVARIANTS.md`; the current protocol
+   file contains I-1 through I-11 and no matching S/B labels. The underlying
+   ideas may be correct, but a reviewer or CI job cannot map a plan item to a
+   nonexistent identifier. Either rename the scorecard references or add a
+   stable cross-reference table in `INVARIANTS.md` before Phase C declares its
+   enforcement map complete.
+
+## Analysis of the current plan
+
+**C is correctly the first executable gate.** Its deliverable should be a
+machine-readable manifest that classifies every test as default, extended,
+integration, intentionally retired, or missing. It must run all selected tests
+despite failures, report a count and per-test results, and fail once at the end.
+That turns "the suite passed" into a reproducible statement rather than a
+property of a shell expression.
+
+**D0 needs a service contract before moving a timestamp.** Relocating
+`lastServicedAt` mechanically is not enough: each role nature needs a defined
+service obligation and a point at which that obligation was actually completed.
+Otherwise a cheap preamble can again freshen the metric while the expensive
+replication, renewal, or queue work starves. The D0 fence should create that
+starvation and prove that pressure rises, admission changes as designed, and
+then recovers when the overdue work completes.
+
+**D1 requires sender closure as well as receiver gates.** The source confirms
+that HANDOFF is currently the only pushed path calling `admitPushedRole()`;
+`ADOPT` and `REPLICATE` still create/ingest roles directly. For each newly
+declined path, specify and test the sender outcome—re-pick, re-route, or a
+visible terminal result—before judging the change by role counts or aggregate
+delivery alone. This is the seam most likely to convert a locally correct
+admission decision into distributed loss.
+
+**M21-S may proceed in parallel as a specification and simulation effort after
+C, but not as an authority-changing deployment before M19 and the authority
+contract are complete.** Its lack of dependence on dynamic pressure is real;
+its dependence on unambiguous delegation semantics is stronger. A verifiable
+referral lease must at least bind the topic, issuer, deputy identity, issued and
+expiry times, protocol/version, scope, and replay/revocation rule. Validation
+must establish why the issuer is entitled to refer the topic despite
+`neverRoot`, preserve the one-root invariant, and charge the deputy's admission
+budget. The rollout fence should prove that a forged, expired, replayed, or
+over-budget grant cannot take authority, and that a declined referral has a
+bounded terminus. Advertising `neverRoot` on the wire is a prerequisite to
+evaluating this design, not by itself a proof that the trust chain is sound.
+
+**E remains correctly after the behavioural work.** Complete the versioned
+state codec and the public-contract transition before carving `AxonaPeer`.
+During internal module moves, retain compatibility re-exports; narrowing the
+wide exports map is a separately reviewed major-version boundary. This avoids
+turning a file-layout refactor into an accidental consumer migration.
+
+## Bottom line
+
+v2 is substantially more useful than the accumulated scorecard because it
+distinguishes deployed mechanism, measurement, unresolved behaviour, and
+architecture work. The immediate priority is not to expand delegation while
+the test and measurement instruments still have known blind spots. Make C and
+D0 produce trustworthy evidence, use that to close D1, and let M21-S mature as
+a cryptographically specified referral protocol with simulation fences—not as
+a shortcut around the system's single, independently checkable authority rule.
