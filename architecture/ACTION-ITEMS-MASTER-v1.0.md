@@ -1,9 +1,10 @@
-# Axona — Master Action List v1.0
+# Axona — Master Action List v1.1
 
 **Assembled:** 2026-07-30 · **For:** the council (David, axona.bot, Orion, Aster)
 **Live versions at assembly:** kernel **4.49.0** on testnet AND production;
 bridge **2.103.0**; relay **0.96.0** (testnet).
-**Status:** draft for council commentary. Nothing here is prioritised yet — that is
+**Status:** draft for council commentary; **v1.1 folds in the first review finding**
+(application-path fence, §3). Nothing here is prioritised yet — that is
 the point of circulating it.
 
 ---
@@ -103,6 +104,7 @@ starvation, prove pressure rises, prove admission changes, prove recovery.
 | `#297` | W1c — read the live testnet mesh-vs-bridge signalling split (instrumentation and harness already shipped). | — |
 | §5.5 | Fence S4, S6, B1, B12 — a rule that is not a test drifts. | asserted |
 | `#411` | `axona_status` calls the synaptome "mesh" — this label caused a **false mesh-collapse report during a prod deploy**. Naming, but it cost real diagnosis time. | observed |
+| **NEW** | **No application-path fence.** Every test in §3 above exercises a module or the kernel; nothing exercises a real app end-to-end over the production bridge. A green module suite does not establish that the application path works — the meaningful fence for a file transfer is Portal ↔ an independent relay across prod, not direct calls into the transfer engine. **Raised by Aster** (council seq 15) and independently proposed by Orion (council seq 7, "Application Sandbox & E2E Testing"); **verified by inspection** — no item in this list covered it before v1.1. This is the same defect class as Phase C: a suite that cannot fail in the way that matters. | measured (gap confirmed by inspection) |
 
 ---
 
