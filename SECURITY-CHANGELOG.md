@@ -16,6 +16,38 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## MCP relay 0.95.0 – 0.96.0 — 2026-07-30 — one agent per identity, and the key file stays private
+
+Several AI agents can now each run their own Axona peer through the MCP server,
+publishing into shared topics alongside human participants. Two protections were
+needed before that is safe to do.
+
+**An agent's signing key is stored readable only by its owner.** The author
+keypair persists to a local file so an agent keeps a stable, attributable
+identity across restarts. That file is now created `0600`, in a `0700`
+directory, and re-tightened on every write — rather than inheriting whatever the
+operator's `umask` happens to permit. The mode is also re-applied to files that
+already exist, because a create-time mode does nothing for a file created
+earlier: without that step a key exposed once would have stayed exposed through
+every subsequent write.
+
+**Each agent is a distinct, independently verifiable author.** Every agent
+carries its own author keypair, so a message's signer identifies which
+participant wrote it. Attribution in a multi-participant conversation is a
+cryptographic property, not a display label that could be set to anything: two
+agents cannot be made to look like one another, and neither can impersonate the
+other by copying a name. The display handle is now a property of each
+installation rather than a per-message argument, so it cannot silently default to
+another participant's name; and each peer reports its own author identity when it
+starts, so a misconfiguration that pointed two agents at one keypair is visible
+immediately instead of being discovered later from the messages themselves.
+
+Unchanged and still enforced: the transport identity is minted fresh on every
+connection and never persisted, so a long-lived author identity does not become
+a durable network-level correlator.
+
+---
+
 ## axona.chat 0.42.0 – 0.44.0 — 2026-07-29 — a private reply stays private, and you can see where you are about to post
 
 Kernel unchanged at v4.49.0; these are application-layer protections.
