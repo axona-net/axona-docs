@@ -150,7 +150,62 @@ untouched and still drives the per-message live/ghost indicators.
 
 ---
 
-## 5. Open, and two documentation debts
+## 5. New: an errata file, so a two-line fix stops costing five PDFs
+
+`programmer-guide/errata.md` now exists, and **the developer docs should be read
+alongside it.**
+
+The problem it solves: the developer docs render to PDF and are linked from the
+website, so correcting one sentence meant re-rendering five documents, archiving the
+priors to `history/`, relinking the README and touching the site. That is
+disproportionate for a wording fix — and the friction is precisely why known-wrong
+sentences sit uncorrected.
+
+The errata is markdown only, never rendered, so it changes in one commit with no
+build and no website deploy. Two rules make it useful rather than a second place to
+be stale:
+
+- **It is normative.** Where the errata and a rendered document disagree, the errata
+  is correct. Rendered docs carry a version; the errata carries a date.
+- **It is a queue, not an archive.** At the next substantive docs cycle every open
+  entry is folded into the source markdown, the PDFs re-render, and the entry is
+  marked `INTEGRATED in v<kernel>` and **kept** — deleting it would erase the record
+  of what was wrong and for how long. Each entry ends with a *"what the next render
+  must change"* line so integration is mechanical, not a re-investigation.
+
+**Open entries as of today:**
+
+| | What |
+|---|---|
+| **E-1** | The rendered documents do not yet point at the errata. Listed first because it is the one entry a reader cannot discover by reading the documents. Carries the exact block the next render adds to all six sources. |
+| **E-2** | `host()` is **in-memory intent, not persisted state.** The Services Guide's `-> durable roots` invites the conclusion that the hosted set returns after a restart. It does not, and never has: `hosting` was marked dirty at four sites with no writer, so the intent was silently discarded on every flush since the feature shipped. v4.49.0 did not make it durable — it made the discard loud. **A restarted node hosts nothing until something calls `host()` again.** |
+| **E-3** | `ErrorCodes.PERSIST_UNSUPPORTED_NAMESPACE` (new at 4.49.0) is missing from the API Reference error table. Incomplete, not incorrect — the table points at the export as the authority. |
+| **E-4** | The verified API-stability facts, pinned so they stop being restated loosely. |
+
+**E-4 is there because I broke something writing this.** `axona-docs/README.md` said
+the application API was "unchanged from 4.27.1 through the current **4.38.0**
+production line". Treating that as version drift, I changed 4.38.0 to 4.49.0 without
+re-deriving the claim — and it is **false** across that range: `connect()` was added
+at **v4.40.0** (verified: absent from `src/index.js` at v4.39.1, present at v4.40.0).
+The README now states the additive form — nothing removed or resignatured since
+4.27.1, but `connect()` was added — and E-4 records the derivation and tells the next
+render to grep the six sources for the same absolute claim.
+
+It is the same failure this whole update is about: extending a range by editing a
+number instead of measuring it. Worth naming rather than quietly fixing.
+
+**E-2 is the one to read if you build services.** It is not a typo — a developer who
+reads "durable roots" and expects their `host()` set to come back after a restart is
+building on something false, and was equally wrong at 4.48.0. Whether hosting *should*
+persist is M7 (the versioned state codec), so do not add a writer ahead of that
+decision.
+
+The errata is linked from `axona-docs/README.md` above the programmer-guide table, so
+it is reachable today even though the PDFs do not yet mention it.
+
+---
+
+## 6. Open, and the documentation debt that is left
 
 **Code:**
 
@@ -160,23 +215,25 @@ untouched and still drives the per-message live/ghost indicators.
   fence**, and its own header records that it drifted silently once before.
 - **#413 residual** — the mint math is understood and fixed; nothing outstanding.
 
-**Docs debt found while running this cycle — flagged, not faked:**
+**Docs debt — flagged, not faked:**
 
 - `RELEASE-NOTES.md` stops at **v4.29.0** (2026-07-18) and never mentions 4.49.0.
   That is ~20 kernel versions unrecorded. Backfilling it means reconstructing those
   releases from git history; it is not something to improvise, so it is recorded
   here rather than guessed at. Nothing was owed for *today* — the kernel version
-  did not change.
-- `programmer-guide/render.sh` is pinned `VERSION="v4.48.0"` / `DATE=2026-07-27`,
-  but the standing rule is that developer docs carry the kernel deployed on
-  testnet, which has been **4.49.0** since 2026-07-28. The guide is one version
-  stale. Bumping it means re-rendering five PDFs and archiving the priors, and it
-  should be done deliberately with the 4.48→4.49 content deltas reviewed — not as a
-  side effect of a test-infrastructure release.
+  did not change. **This one is still open.**
+- The programmer guide is still pinned `VERSION="v4.48.0"` while testnet and
+  production run 4.49.0. **The errata now absorbs this**, which is the point of §5:
+  the four known corrections are recorded and normative, so the render is no longer
+  the only way to publish a fix. It drops from "five PDFs are stale" to "fold four
+  entries in when there is a substantive reason to render" — and the guide's *content*
+  was verified correct for a developer writing code today: the public export surface
+  is byte-identical between v4.48.0 and v4.49.0, and `AxonaPeer`'s public method names
+  are identical from v4.38.0 through v4.49.0.
 
 ---
 
-## 6. How to check any of this yourself
+## 7. How to check any of this yourself
 
 ```bash
 # the suite reports a count, and fails if ran != selected
@@ -194,3 +251,6 @@ curl -s https://bridge.axona.net/healthz
 
 *Verified on 2026-07-29: bundle carries `0.44.0`, the recall tip, `Add topic` ×2
 and the `max-height: 500px` breakpoint; `Members:` returns 0 hits.*
+
+And before relying on anything in the developer PDFs:
+[`programmer-guide/errata.md`](../programmer-guide/errata.md).
