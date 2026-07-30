@@ -38,7 +38,7 @@ The plan is sequential by design; the gate ordering is the argument, not the lab
 | **D0** — honest measurement (M4) | **NEXT**, recon done | D1, M21-S deploy, M21-L | measured (see below) |
 | **D1** — gate the pushed paths (ADOPT / REPLICATE / read-repair) | not started | E | measured: `admitPushedRole` has exactly one caller, `syncEngine.js:175` |
 | **M19** — redirect / decline-path plumbing | not started | M21-S deploy | observed: ~2,500 declines per bridge, continuous |
-| **M21-S** — structural bridge delegation | spec may start now; **deploy blocked on D0** | M21-L | see §4 decision 1 |
+| **M21-S** — structural bridge delegation | **DESIGN UNSPECIFIED** — five open questions, §8.1. Not "awaiting approval"; there is not yet a design to approve. Deploy also blocked on D0. | M21-L | — |
 | **M21-L** — load-triggered delegation | strictly after D0/M4 | — | — |
 | **E** — contract & structure (state codec, boundary close, `refreshTick` decomposition, `AxonaPeer` carve, export narrowing) | last | — | — |
 
