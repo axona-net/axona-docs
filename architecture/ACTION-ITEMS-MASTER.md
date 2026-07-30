@@ -21,7 +21,8 @@ it changes rarely and each version is a citable artifact.)
 | **v1.0** | Initial assembly from four registers. Commit `842220a`. |
 | **v1.1** | Folded in the first review finding — **no application-path fence** (§3). Raised independently by Aster (council seq 15) and Orion (seq 7). A *missing category*, not a wrong row. Commit `53a7c7f`. |
 | **v1.2** | **Withdrew the M21-S scheduling question** (§8.1) — the design is unspecified, not pending approval (David, 2026-07-30). Replaced with five open design questions. Commits `d5084ea`, `d83e249`, `62219fc`. |
-| **v1.3** | Filename de-versioned; revision history added. This entry. |
+| **v1.3** | Filename de-versioned; revision history added. Commit `d5db52b`. |
+| **v1.4** | **Aster’s first full review folded in** (council seq 24; scoped to docs `62219fc` + protocol `89c0798`, `npm test` 121/121). §9 no longer contradicts §8.1 on M21-S; `#350` containment sequenced; the app-fence row given a real ID (`#419`) and a taxonomy-legal evidence label; `#397`/`#339` calibrated; `R-0` canary no longer gated on re-baselining. This entry. |
 
 ---
 
