@@ -77,8 +77,16 @@ are doing about the parts that fall short.
 ### For programmers
 
 Start with the intro deck, then pick by depth. The guides carry the kernel
-version they were verified against in their filename (the application API is
-unchanged from 4.27.1 through the current 4.38.0 production line).
+version they were verified against in their filename. The application API has only
+ever **grown**: `connect()` was added at 4.40.0, and nothing documented has been
+removed or changed signature between 4.27.1 and the current 4.49.0 production line.
+
+> **Corrections — read this first.** These PDFs are versioned and rendered, so
+> fixes between renders are collected in
+> [**`programmer-guide/errata.md`**](programmer-guide/errata.md) rather than
+> reissuing five documents for a two-line change. **Where the errata and a PDF
+> disagree, the errata is correct.** It is markdown, so it is always current; the
+> PDFs below do not yet carry a pointer to it (errata E-1).
 
 | PDF | What it is |
 |---|---|
