@@ -1,11 +1,11 @@
-# Axona — Master Action List v1.1
+# Axona — Master Action List v1.2
 
 **Assembled:** 2026-07-30 · **For:** the council (David, axona.bot, Orion, Aster)
 **Live versions at assembly:** kernel **4.49.0** on testnet AND production;
 bridge **2.103.0**; relay **0.96.0** (testnet).
-**Status:** draft for council commentary; **v1.1 folds in the first review finding**
-(application-path fence, §3). Nothing here is prioritised yet — that is
-the point of circulating it.
+**Status:** draft for council commentary. **v1.1** folded in the first review finding
+(application-path fence, §3); **v1.2** withdraws the M21-S scheduling question — that
+design is unspecified, not pending approval (§8.1).
 
 ---
 
@@ -186,9 +186,37 @@ Also open from the security punch list outside that file: **C-2 freshness** and
 
 ## 8. Decisions needed from David
 
-1. **Scorecard §7.1 — start M21-S now (spec + simulation) or hold entirely?** Narrowed but
-   not closed: ratifying §7.3 means M21-S cannot *deploy* before D0, because a role charged
-   against a stuck meter is not charged. Design in parallel is still open.
+1. ~~**Scorecard §7.1 — start M21-S now (spec + simulation)?**~~ **WITHDRAWN as posed —
+   the design is not specified** (David, 2026-07-30: "I don't think we have sufficient
+   clarity about the M21-S design yet"). My framing presupposed we knew what would be
+   specified. **This is now a council design question, not a scheduling decision.** Five
+   gaps, stated in full on `#council` (msgId `806fa6d4…`):
+
+   1. **Authority or service?** A delegated root claims a position XOR distance does not
+      justify, and `_onRootBeacon` already demotes a farther root when a strictly-closer
+      beacon arrives — so a delegated root may fight the 4.19.x reconciliation logic. A
+      pure *referral* (sender re-routes, bridge exits the path) is closer to M19 and may
+      need no lease at all.
+   2. **Third-party discovery.** A peer that never spoke to the bridge still routes to it.
+      Learning the delegation from the bridge, from the deputy's beacon, or from the grant
+      each carries a different attack surface and a different failure when discovery is
+      the thing lost.
+   3. **Issuer death.** An expiry handles a deputy outliving its grant, not a bridge dying
+      mid-lease — the `#333` shape. And `#397` (reach = `rootReplicas` = 2) means a
+      delegated root beyond that distance may be *permanently* unreconcilable, making a
+      stale grant unrecoverable rather than merely wrong.
+   4. **Did ratifying `neverRoot`-on-the-wire already shrink this?** If a sender can see a
+      node will never root, it routes around during lookup — no grant, no lease, no second
+      authority. That is M19 plumbing. **M21-S may largely dissolve**; kill or confirm that
+      before designing a lease format.
+   5. **What does a decline actually cost?** ~2,500/bridge/continuous is why M21-S is on
+      the plan, but the *cost* is unmeasured. Topic re-homes cleanly ⇒ efficiency play.
+      Topic lost because the bridge is closest and refuses ⇒ correctness bug, front of
+      queue. **Measurable with instrumentation + a probe, no protocol change** — proposed
+      to precede all design work, so the priority rests on evidence rather than argument.
+
+   Deployment remains blocked on D0 regardless (ratified §7.3: a role charged against a
+   stuck meter is not charged).
 2. ~~§7.2 declare `neverRoot` on the wire~~ — **RATIFIED YES**, 2026-07-30.
 3. ~~§7.3 delegated role charges the deputy's budget~~ — **RATIFIED YES**, 2026-07-30.
 4. **§7.4 — run the `#406` A/B** (4.48.0 vs 4.49.0, same fleet, same probe). Removes the
