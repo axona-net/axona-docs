@@ -332,10 +332,30 @@ Not line counts or file layout:
 1. **Start M21-S after C, or hold all delegation until M4?** Measured demand
    (~2,500 declines per bridge, continuous) argues for starting; the
    second-authority-source risk argues for care in *design*, not delay in *start*.
-2. **Declare `neverRoot` on the wire?** Prerequisite to answering whether a
-   structural grant can be made independently checkable — §4.2.
-3. **Does a delegated role count against the deputy's admission budget?** It must,
-   or delegation becomes a budget-laundering primitive.
+   **STILL OPEN, but narrowed by decision 3.** Charging a delegated role against the
+   deputy's budget means M21-S cannot *deploy* before D0 gives that budget a signal
+   that moves — a grant charged against a stuck meter is not charged at all. Design
+   and simulation can proceed in parallel with D0; deployment cannot precede it.
+2. ~~**Declare `neverRoot` on the wire?**~~ **RATIFIED YES — David, 2026-07-29.**
+   Both Passes 8 and 9 arrived at this independently, and the reasoning is the same
+   from either side: today `neverRoot` conflates a *local policy* with a *silent
+   decline*, so a peer cannot distinguish "this node will never root" from "this
+   node did not answer." Declaring it makes a structural delegation grant
+   independently checkable by a third party — which is the property the whole
+   authority model rests on — and it turns ~2,500 refusals per bridge from an
+   invisible traffic sink into an advertised fact a sender can route around.
+   **This is a prerequisite for evaluating M21-S, not evidence that its trust chain
+   is sound** (Pass 9). Wire work lands under M19/M21-S, not D0.
+3. ~~**Does a delegated role count against the deputy's admission budget?**~~
+   **RATIFIED YES — David, 2026-07-29.** Unanimous across both passes. A delegated
+   role MUST charge the deputy's admission budget, or delegation becomes a
+   budget-laundering primitive: a saturated node sheds pressure by granting roles
+   away, the deputy accepts work it has no headroom for, and both nodes report
+   healthy while the cohort starves. **Consequence for D0:** the deputy's budget has
+   to be a number that can actually move before it can be charged against — which is
+   exactly `servicePressure`, and exactly what §3.3/D0 says is structurally stuck.
+   So this ratification makes D0 a hard prerequisite of M21-S, tightening the
+   sequencing beyond what Pass 8 proposed.
 4. **Run the #406 A/B** (4.48.0 vs 4.49.0, same fleet, same probe) to attribute or
    clear the ~10% loss. Cheap, and it removes the largest unexplained number in
    this document.
