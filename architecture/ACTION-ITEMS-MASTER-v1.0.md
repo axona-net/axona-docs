@@ -75,7 +75,7 @@ starvation, prove pressure rises, prove admission changes, prove recovery.
 | 5.3 | boundary leaks (shared crypto/serialisation misfiled in `pubsub/`; `exports` map opens every sub-path, ~65 tests import internals) | **open → E** |
 | 5.4 | `AxonaPeer.js` 4,372 LOC + `refreshTick` orchestration; root *triggering* diffused across ~a dozen guards | **open → E** |
 | 5.5 | rules declared but unfenced — S4 (closed shapes), S6 (one clock), B1 region-lock default, B12 bridge ends with empty `axonRoles` | **open** |
-| 5.6 | ~10% cold-topic loss, unattributed (`#406`) | **open**, needs the A/B in §4 decision 4 |
+| 5.6 | ~10% cold-topic loss, unattributed (`#406`) | **open**, needs the A/B in **§8 decision 4** |
 
 ---
 
