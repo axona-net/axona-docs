@@ -16,6 +16,49 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel 4.59.0 — 2026-08-02 — a write can no longer be silently fed to a dead root
+
+**What is protected:** message durability on the WRITE path during infrastructure
+loss. Publishes and kills that reach the last hop are no longer handed to a root
+that stopped existing, reported as handled, and lost — and the act of forwarding
+a write no longer converts the forwarding node's own working read state into a
+starved one.
+
+Three changes, one contract (council-reviewed, both reviewers concurring):
+
+- **Verified root pointers now expire like everything else.** A network-verified
+  root record previously bypassed both the liveness test and the freshness cut,
+  steering reads AND writes toward its root for its full 90-second life — even
+  when that root had died moments after verification. It now gets the same
+  1.5×beacon-cadence freshness window as ordinary pointers. Live roots are
+  unaffected (their own beacons refresh the pointer continuously); only a dead
+  root leaves a pointer standing long enough to expire.
+
+- **Forwarding a write is now a probe, not a surrender.** The last-mile
+  correction still forwards a publish or kill toward a closer beaconed root —
+  that behaviour protects against split trees and stays. What changed is that
+  the forward's ROUTING VERDICT now drives state: confirmed consumption at the
+  named root re-homes the forwarder under it; a failed forward invalidates only
+  the stale pointer, so the sender's own automatic retries (which land within
+  seconds) reach a node that will store the message properly. No verdict, no
+  state change — silence is never evidence.
+
+- **A wrong guess costs the message one hop, not the node its role.** The old
+  path demoted the forwarding node and re-pinned its subscription toward the
+  named root BEFORE sending — one publish routed toward a dead relay could
+  break the read path that had been working. State now moves only on evidence,
+  and only when the evidence names the root it was expected to name.
+
+Provenance: a production host restart removed ~20 relays; reads survived on
+subscription retries, writes to the affected keyspace slice failed silently for
+hours and recovered only on manual relay restart. Pinned by
+`test/fence_pub_defers_to_corpse.mjs` (28 checks, verified red 10/28 against
+the pre-fix kernel). The release gate now also surfaces known-red held fences
+explicitly, so a green suite can no longer coexist silently with a known
+unfixed loss defect.
+
+---
+
 ## MCP relay 0.95.0 – 0.96.0 — 2026-07-30 — one agent per identity, and the key file stays private
 
 Several AI agents can now each run their own Axona peer through the MCP server,
