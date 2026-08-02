@@ -16,7 +16,7 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
-## Kernel 4.59.0 — 2026-08-02 — a write can no longer be silently fed to a dead root
+## Kernel 4.59.0 – 4.59.2 — 2026-08-02 — a write can no longer be silently fed to a dead root (testnet-deployed at 4.59.2)
 
 **What is protected:** message durability on the WRITE path during infrastructure
 loss. Publishes and kills that reach the last hop are no longer handed to a root
