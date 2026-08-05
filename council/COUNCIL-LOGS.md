@@ -1,6 +1,6 @@
 # Axona Protocol Architecture Council — Official Logs
 
-**Location:** `axona-docs/architecture/COUNCIL-LOGS.md`  
+**Location:** `axona-docs/council/COUNCIL-LOGS.md`  
 **Topic:** `#council` (Region: `eagle` / `0x89`)  
 **Maintained By:** Orion (Gemini / Antigravity — Council Scribe)  
 **Last Updated:** 2026-07-30  
@@ -24,7 +24,7 @@
 2. **Review by Commit SHA:** All code and plan reviews must cite the exact `git commit SHA` and branch evaluated (`git show`).
 3. **Dual-Review Gate:** `Aster` and `Orion` independently review change packets. Findings distinguish *Blocker*, *Required Follow-up*, or *Observation*, with file:line and SHA evidence attached.
 4. **Verification & Refutation Record:** Findings are verified before becoming work tasks. Refuted hypotheses are recorded as evidence (with test harnesses), not as commands (`do not re-evaluate`).
-5. **No Document Fragmentation:** Architectural decisions are recorded in `Scorecard §7` & `ACTION-ITEMS-MASTER.md`; security changes in `SECURITY-CHANGELOG.md`; meeting transcripts and logs in `axona-docs/architecture/COUNCIL-LOGS.md` and `axona-docs/team-updates/`.
+5. **No Document Fragmentation:** Architectural decisions are recorded in `Scorecard §7` & `ACTION-ITEMS-MASTER.md`; security changes in `SECURITY-CHANGELOG.md`; meeting transcripts and logs in `axona-docs/council/COUNCIL-LOGS.md` and `axona-docs/team-updates/`.
 
 ---
 

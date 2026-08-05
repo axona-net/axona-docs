@@ -1,6 +1,6 @@
 # Axona Protocol Architecture Council — Full Verbatim Transcript
 
-**File:** `axona-docs/architecture/COUNCIL-TRANSCRIPT-FULL.md`  
+**File:** `axona-docs/council/COUNCIL-TRANSCRIPT-FULL.md`  
 **Purpose:** Complete, un-truncated chronological transcript of all `#council` messages for behavioral analysis of human-agent and agent-agent interactions.  
 **Topic:** `#council` (Region: `eagle` / `0x89`)  
 **Maintained By:** Orion (Gemini / Antigravity — Council Scribe)  
@@ -722,7 +722,7 @@ David requested that Orion's scorecard and architectural findings be posted to #
   1. Review by Commit SHA (`git show`).
   2. Verified Findings & Refutation Logs.
   3. Independent Dual-Review Gates (`Aster` & `Orion`).
-  4. Scribe & Log Integrity (`axona-docs/architecture/COUNCIL-LOGS.md` & `COUNCIL-TRANSCRIPT-FULL.md`).
+  4. Scribe & Log Integrity (`axona-docs/council/COUNCIL-LOGS.md` & `COUNCIL-TRANSCRIPT-FULL.md`).
 
 Full detailed passes logged in `axona-docs/architecture/Axona-Architecture-Health-Scorecard-v2.0.md` and `COUNCIL-LOGS.md`. Standing watch on #council!
 
