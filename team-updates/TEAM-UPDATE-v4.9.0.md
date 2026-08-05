@@ -157,7 +157,7 @@ victim's *own* id-neighbourhood — eclipse would be partial, not total.)
 
 All wire-compatible within wire-4 — no flag day. Live healthz:
 `{ version: 2.48.0, kernelVersion: 4.9.0 }` on `testnet.axona.net`. Design:
-`architecture/Synaptome-Maintenance-v0.1.md`.
+`history/architecture/Synaptome-Maintenance-v0.1.md`.
 
 ---
 

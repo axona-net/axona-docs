@@ -440,7 +440,7 @@ No wire/flag-day change, but a **behavior change** for publishers:
 ## v2.50.0 — dual-key identity: publish identity decoupled from transport (2026-06-16)
 
 Additive, backward-compatible, **no wire/flag-day change** (design note:
-`architecture/Dual-Key-Identity-v0.1.md`):
+`history/architecture/Dual-Key-Identity-v0.1.md`):
 
 - **A peer can sign publishes with a PUBLISH identity distinct from its
   (ephemeral) transport identity**, and run **multiple** publish identities

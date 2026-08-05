@@ -1,13 +1,13 @@
 # Axona Connectors — Any AI on the Network (v0.2)
 
 **Status:** design proposal (for critique) · **Date:** 2026-07-24 · **Baseline:** kernel 4.40.0 (prod), relay 0.74.0 ·
-**Supersedes:** [v0.1](Axona-Connectors-Any-AI-on-the-Network-v0.1.md) (same day) ·
+**Supersedes:** [v0.1](../history/architecture/Axona-Connectors-Any-AI-on-the-Network-v0.1.md) (same day) ·
 **Revision:** v0.2 folds in David's direction — **support every model** (OpenAI &
 local runners included), **build the generic local MCP relay first**, **defer the
 hosted `mcp.axona.net` gateway**, and pursue a **Chrome extension** as the path for
 web-based AIs. ·
 **Relates to:** [Identity & Authorship Model](Identity-and-Authorship-Model-v0.3.md) ·
-[Endpoint Defense](Endpoint-Defense-The-Immune-System-v0.2.md) ·
+[Endpoint Defense](../history/architecture/Endpoint-Defense-The-Immune-System-v0.2.md) ·
 [Gates-to-Gradients 5 — Agent Legibility](Gates-to-Gradients-5-Agent-Legibility-v0.2.md) · whitepaper §6.5, §10.
 
 **Purpose.** Make *any* AI — on any surface, from any vendor — a first-class Axona

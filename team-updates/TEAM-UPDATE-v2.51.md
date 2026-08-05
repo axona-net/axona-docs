@@ -281,4 +281,4 @@ This is *fail-loud*: code that used to "work" on small images but silently trunc
 - **Minimal pub/sub:** <https://demo-testnet.axona.net/apps/axona-minimal/>
 - Append `?net=prod` (or `?bridge=wss://…`) to point at a different network.
 
-Deep dives: dual-key design in [`architecture/Dual-Key-Identity-v0.1.md`](architecture/Dual-Key-Identity-v0.1.md); per-version detail in [RELEASE-NOTES.md](RELEASE-NOTES.md); security posture in [SECURITY-CHANGELOG.md](SECURITY-CHANGELOG.md).
+Deep dives: dual-key design in [`history/architecture/Dual-Key-Identity-v0.1.md`](history/architecture/Dual-Key-Identity-v0.1.md); per-version detail in [RELEASE-NOTES.md](RELEASE-NOTES.md); security posture in [SECURITY-CHANGELOG.md](SECURITY-CHANGELOG.md).

@@ -59,7 +59,7 @@ PDF — see [`BUILDING.md`](BUILDING.md) for the render process.
 
 | PDF | What it is |
 |---|---|
-| [**Axona Architecture v4.27.0**](architecture/Axona%20Architecture%20v4.27.0.pdf) | The full-stack reference, dual-audience by design: prose for humans plus a reconstruction-grade specification for AI implementers — wire vocabulary and schemas, the root-management and convergence-policy tables, the timing model, the eleven invariants, and the life of a message end-to-end. |
+| [**Axona Architecture**](architecture/Axona-Architecture.pdf) | The full-stack reference, dual-audience by design: prose for humans plus a reconstruction-grade specification for AI implementers — wire vocabulary and schemas, the root-management and convergence-policy tables, the timing model, the eighteen invariants with their enforcing tests, and the life of a message end-to-end. Start at [architecture/README.md](architecture/README.md) for the map, including what we owe a decision on. |
 | [**Axona Applications v0.6**](applications/Axona%20Applications%20v0.6.pdf) | What you build on an operator-free network: anonymous broadcast (the fan-out no incumbent offers), managed pub/sub displacement (Pusher/Ably/PubNub), decentralized social protocols compared (Nostr, Matrix, Farcaster, Bluesky), and the Axona-powered apps in flight. |
 | [**SYZL Briefs v0.4**](applications/SYZL%20Briefs%20v0.4.pdf) | Per-product brief: SYZL, an adaptive social feed built on Axona pub/sub. |
 
@@ -71,7 +71,7 @@ are doing about the parts that fall short.
 
 | Doc | What it is |
 |---|---|
-| [**INVARIANTS.md**](architecture/INVARIANTS.md) | The rules, and whether each is *fenced* by a named test or honestly declared unfenced. Structural rules (how we build), behavioral invariants (what must always hold — region is an optimization; a bridge is a bridge; transport identity never persists), process rules, and the drift backlog. Start here before changing kernel behaviour. |
+| [**Invariants** (Architecture §XII)](architecture/Axona-Architecture.pdf) | The rules, and whether each is *fenced* by a named test or honestly declared UNFENCED — six structural rules (how we build) and eighteen behavioural invariants (region is an optimization; a bridge is a bridge; transport identity never persists), plus the process rules. Nine are unfenced and say so. Start here before changing kernel behaviour. |
 | [**Architecture Health Scorecard v2.0**](architecture/Axona-Architecture-Health-Scorecard-v2.0.md) | Per-subsystem health measured at kernel 4.49.0, what the refactor has completed and what it measurably changed, what is still wrong, and the sequenced plan with its gates. Written for reviewers who need to judge the plan rather than take it on trust. Earlier versions (v1.0–v1.2) are in `history/architecture/`. |
 
 ### For programmers
@@ -115,7 +115,7 @@ and others. They are cited throughout the whitepaper and architecture doc.
 
 ## Working notes and supplementary material
 
-- **[`architecture/`](architecture/)** — beyond the PDF above, the deep-dive markdown notes: [Root Management — the RootClaim state machine](architecture/Root-Management-v4.20.1.md) (the authoritative root-election/convergence reference), the [Kernel Refactor Analysis v0.2](architecture/Kernel-Refactor-Analysis-v0.2.md) (the convergence-plane simplification program), the [Soak-Test Framework overview](architecture/Soak-Framework-Overview-v4.21.0.md) (what the live soaks measure and the methodology rules), the [E-1 placement-defense](architecture/E-1-Placement-Defense-v0.1.md) and [Stage-4 memory-hard PoW](architecture/Stage4-MemoryHard-PoW-v0.1.md) decision records, [Axona vs. Vivaldi](architecture/Axona-vs-Vivaldi-v0.1.md), [Eligibility-Aware Root Placement](architecture/Load-Aware-Root-Placement-v0.2.md) (proposal, not built), [Pub/Sub metrics as a derived topic](architecture/Pub-Sub-Metrics-Topic-v0.1.md), [Axona as a control plane for virtual device links](architecture/Axona-Control-Plane-for-Virtual-Links-v0.1.md), and the six **Gates to Gradients** implementation notes ([1](architecture/Gates-to-Gradients-1-Costly-Identity-v0.2.md)–[6](architecture/Gates-to-Gradients-6-Friction-Scaled-to-Reach-v0.2.md)).
+- **[`architecture/`](architecture/)** — beyond the PDF above, the deep-dive markdown notes: [Root Management — the RootClaim state machine](architecture/Root-Management-v4.20.1.md) (the authoritative root-election/convergence reference), the [Kernel Refactor Analysis v0.2](architecture/Kernel-Refactor-Analysis-v0.2.md) (the convergence-plane simplification program), the [Soak-Test Framework overview](architecture/Soak-Framework-Overview-v4.21.0.md) (what the live soaks measure and the methodology rules), the [E-1 placement-defense](architecture/E-1-Placement-Defense-v0.1.md) and [Stage-4 memory-hard PoW](architecture/Stage4-MemoryHard-PoW-v0.1.md) decision records, [Axona vs. Vivaldi](architecture/Axona-vs-Vivaldi-v0.1.md), [Eligibility-Aware Root Placement](architecture/Load-Aware-Root-Placement-v0.2.md) (proposal, not built), [Axona as a control plane for virtual device links](architecture/Axona-Control-Plane-for-Virtual-Links-v0.1.md), and the six **Gates to Gradients** implementation notes ([1](architecture/Gates-to-Gradients-1-Costly-Identity-v0.2.md)–[6](architecture/Gates-to-Gradients-6-Friction-Scaled-to-Reach-v0.2.md)).
 - **[`implementation/`](implementation/)** — integration plans and specs: the [pub/sub lifecycle & access-control design](implementation/Pubsub-Lifecycle-Design-v0.2.md), [peer-relayed signaling](implementation/Peer-Relayed-Signaling-v0.1.md) (bridgeless connections), the [decoupled publish identity spec](implementation/Decoupled-Publish-Identity-and-C3-v0.1.md), the wire-protocol spec, and refactor punchlists.
 - **[`red team/`](red%20team/)** — independent red-team analyses. The current consolidated view is the [punch list re-audited against 4.19.3](red%20team/red-team-punchlist-v4.19.3.md); the shipped-baseline narrative is the [Security Status & Remediation Plan](red%20team/SECURITY-STATUS-v2.43.0.md); plus the [black-hole node threat note](red%20team/black-hole-nodes-v0.1.md) and the external bridge assessment ([axona-bridge#1](https://github.com/axona-net/axona-bridge/issues/1)).
 - **[`reviews/`](reviews/)** — external AI-agent reviews of the protocol and its documentation, unedited.
@@ -140,7 +140,8 @@ and others. They are cited throughout the whitepaper and architecture doc.
 ├── paper/             # IEEE-format research paper
 ├── presentation/      # Marp research deck (+ charts/)
 ├── explainer/         # Merged into the whitepaper; kept for history
-├── architecture/      # Full-stack reference + deep-dive design notes
+├── architecture/      # The architecture document + open design notes (see its README)
+├── council/           # Council logs and full transcript (Orion, scribe)
 ├── applications/      # Applications survey + product briefs
 ├── programmer-guide/  # Programmer Intro deck, Quick Start, Guide, API Ref, Services, AI docs (+ examples/)
 ├── implementation/    # Integration plans, wire spec, punchlists

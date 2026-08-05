@@ -84,7 +84,7 @@ The why-codes are the complete vocabulary of root-state changes:
 Three guards decide every claim/yield question. They live on the machine, not
 at the call sites, so a new rule is added **here** — never as a new check at
 another flip site (the pre-4.20 pattern that produced the patch-interaction
-bug class; see `Kernel-Refactor-Analysis-v0.1.md` §2A).
+bug class; see `history/architecture/Kernel-Refactor-Analysis-v0.1.md` §2A).
 
 ### 3.1 `liveCloserRoot(topic, {requireReachable})` — the defer gate
 
@@ -365,7 +365,7 @@ election once the mesh forms and routes the SUB to the true root.
 
 ---
 *History: consolidated in kernel 4.20.0 (refactor Phase 1,
-`Kernel-Refactor-Analysis-v0.1.md`) from mechanisms introduced across
+`history/architecture/Kernel-Refactor-Analysis-v0.1.md`) from mechanisms introduced across
 4.11.0 (replication), 4.17–4.18.2 (fallback + election-by-subscription),
 4.19.0–4.19.2 (defer gates, self-verification, alone-in-the-dark), and
 4.19.4–4.19.5 (departure rules). 4.20.1 added the dead-upstream pin sweep

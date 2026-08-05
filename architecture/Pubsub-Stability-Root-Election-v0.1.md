@@ -82,7 +82,7 @@ on the **same** root, or you get split-brain (worse than baseline). Pure XOR is
 consistent because distance is objective; **stability is locally observed and
 differs per observer**, so naive "most-stable near me" diverges.
 
-Resolution — reuse the existing **root beacon** (Pubsub-Root-Beacon-v0.1) as the
+Resolution — reuse the existing **root beacon** (history/architecture/Pubsub-Root-Beacon-v0.1.md) as the
 single source of truth:
 
 1. The incumbent root advertises its **stability** in its beacon (new optional
