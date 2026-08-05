@@ -13,6 +13,7 @@
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{xcolor}
+\usepackage{array}
 \usepackage{booktabs}
 \usepackage{microtype}
 \usepackage{fancyhdr}
@@ -69,11 +70,17 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad DRAFT toward v4.59.2 \quad 2026-08-03\par}
-{\footnotesize\itshape revision in progress: sections A--E and the Ship of
-Theseus are drafted against kernel 4.59.2 as deployed on testnet; the
-durability section awaits the soak verdict; detail sweeps pending.
-Written for human readers and AI implementers alike\par}
+{\small An Axona Architecture Note \quad v4.59.2 \quad 2026-08-05\par}
+\vspace{1.2em}
+{\footnotesize
+Written against \texttt{@axona/protocol} \textbf{v4.59.2}, commit
+\texttt{30664923e844}, deployed on testnet and production.\\
+Bridge \texttt{2.105.1} \quad Relay \texttt{v0.100.0}\par}
+\vspace{0.8em}
+{\footnotesize\itshape
+For human readers and AI implementers alike. Section~II states what this
+document does \emph{not} yet let you build; read it before relying on
+anything here for a clean-room implementation.\par}
 \end{center}
 \vfill
 \null
@@ -102,21 +109,104 @@ Written for human readers and AI implementers alike\par}
 \vspace{1em}
 
 % =====================================================================
-% I. HOW TO READ THIS DOCUMENT
+% I. WHAT THIS NETWORK IS FOR
+% =====================================================================
+\section{What This Network Is For}\label{sec:thesis}
+
+\newthought{Axona is a communication network with no owner} --- no company,
+no server, no place in the middle where anyone sits who could read, rank,
+charge, throttle, or forbid. Not because an operator promises restraint, but
+because by construction there is nowhere for one to be. It runs in
+production on ordinary phones, browsers, and laptops.
+
+The keystone is one design choice: \textbf{authorship is a signature, not an
+account.} Who is speaking is a key the speaker holds. Where they are and how
+they connect is a separate fact the network never links to it. The network
+moves signed bytes between endpoints and does nothing else --- so it
+\emph{cannot act on} what you say. It cannot rank it, suppress it, or reveal
+who you are, because it was never told and never needed to know.
+
+That is the whole property. Everything below is machinery for keeping it
+true under churn, partition, and load.
+
+\marginnote{This section is deliberately short and deliberately first. An
+implementer who knows only the frames will make locally reasonable choices
+that violate the thesis --- adding a return address to make debugging
+easier, caching an identity to save a round trip. Those choices are the
+failure mode this section exists to prevent.}
+
+\subsection{What the thesis has already decided}
+
+These follow from the property above, not from taste. An implementation that
+breaks one is not a variant of Axona; it is a different network wearing the
+same wire format. Each has been re-litigated at least once and settled.
+
+\begin{itemize}\itemsep2pt
+\item \textbf{The signed envelope discloses \emph{who}, never \emph{where}.}
+  No node id, no region, no address in the envelope --- ever. This was
+  proposed twice for good-looking reasons and reverted twice. The routing
+  wrapper is a different object with different rules
+  (\S\ref{sec:notclaimed}).
+\item \textbf{Transport identity does not persist.} A stable node id across
+  restarts is a correlator, and a correlator plus an IP is a physical
+  location. Restart must yield a different node id. Author identity is the
+  opposite: it persists, because provenance is the point.
+\item \textbf{Region is an optimization, never a wall.} The geographic byte
+  places traffic; it never gates admission or capability. A sparse region
+  must roll over to its neighbours rather than refuse service. A node that
+  cannot be served locally is still served.
+\item \textbf{No content-based anything in the kernel.} No ranking, no
+  content filtering, no priority by payload. The kernel does not model what
+  a message says and must not acquire the ability. Moderation is a
+  subscriber-side choice over signed objects, never a network-side one.
+\item \textbf{Retraction is the author's, not the network's.} A creator can
+  kill their own message and the network will carry the tombstone. Nobody
+  else can, and there is no operator who could be compelled to.
+\item \textbf{No accounts, no directory, no operator.} Bootstrap uses
+  bridges, and a bridge is a convenience that the protocol must survive
+  losing. If any mechanism here only works while a bridge is up, that is a
+  defect, not a design.
+\end{itemize}
+
+\subsection{What it costs}
+
+A network that cannot be made to take sides cannot be made to take the right
+side either. The same property that lets a researcher under sanctions
+collaborate as an equal lets a disinformation campaign route around every
+attempt to slow it. It gives AI agents from different vendors somewhere to
+meet as peers, and it gives a misaligned agent the same place on the same
+terms.
+
+This document does not resolve that, and no clever framing should be
+expected to. The judgement is that a tool no one can control is worth
+building for the same reason humanity kept fire and built hearths and fire
+brigades rather than giving it back --- and that the answer to such a tool is
+not a central authority who controls it, since that only rebuilds the
+intermediary the design set out to remove.
+
+Where this note is silent and you must choose, choose the option that keeps
+the network unable to act on content, unable to link authorship to location,
+and able to keep running when any particular participant vanishes. That
+ordering has settled every genuine ambiguity so far.
+
+% =====================================================================
+% II. HOW TO READ THIS DOCUMENT
 % =====================================================================
 \section{How to Read This Document}
 
 This note is two documents sharing one text. Read as prose, it explains
 what Axona is and why each mechanism exists --- every rule in this system
 was paid for by a specific failure, and the failures are named. Read as a
-specification, it contains everything needed to \emph{reconstruct} the
-protocol without access to the source: identifier derivations
+specification, it contains the architectural model and the current wire
+contract: identifier derivations
 (\S\ref{sec:identity}), the complete wire vocabulary with payload schemas
 (\S\ref{sec:wire}, \S\ref{sec:pubsub}), the root-management decision table
 (\S\ref{sec:roots}), the timing model (\S\ref{sec:timing}), and the
 invariants any implementation must uphold (\S\ref{sec:invariants}).
 Section~\ref{sec:reconstruction} is addressed directly to an implementer
---- human or AI --- and orders the work.
+--- human or AI --- and orders the work. It will not yet carry you to a
+peer that interoperates byte-for-byte with the deployed network;
+\S\ref{sec:notclaimed} says exactly where it stops.
 
 Three conventions. \emph{Normative} material (schemas, constants,
 invariants, algorithms) appears in tables and numbered rules; prose around
@@ -127,14 +217,80 @@ every constant is given with its value \emph{and} its reason --- a
 constant whose reason you don't know is one you will mis-tune.
 
 \marginnote{Companion notes: \emph{Root Management (RootClaim state
-machine)} for the full election deep-dive; \texttt{INVARIANTS.md} in the
-kernel repo, mapping each invariant to its enforcing regression test; the
-\emph{Kernel Refactor Analysis} for how the code reached its current
-shape; the \emph{Soak-Test Framework} overview for how the live network
-is characterized.}
+machine)} for the full election deep-dive; the \emph{Kernel Refactor
+Analysis} for how the code reached its current shape; the
+\emph{Soak-Test Framework} overview for how the live network is
+characterized. The invariants used to live in a separate
+\texttt{INVARIANTS.md} --- in two separate files, in fact, under two
+numbering schemes. They are now \S\ref{sec:invariants} of this document
+and nowhere else.}
 
 % =====================================================================
-% II. THE SYSTEM IN ONE PAGE
+% III. WHAT THIS DOCUMENT DOES NOT CLAIM
+% =====================================================================
+\section{What This Document Does Not Claim}\label{sec:notclaimed}
+
+A specification that overstates itself is worse than one that stops early,
+because the reader cannot tell which parts to trust. On 2026-08-04 a
+reconstruction audit read the previous revision against the v4.59.2 source
+and found five claims the code does not support. They are corrected in the
+sections below. This table is where they live now, so that no reader has
+to discover them by building the wrong thing.
+
+\vspace{0.5em}
+\begin{fullwidth}
+\small
+\begin{tabular}{@{}p{0.14\linewidth}p{0.44\linewidth}p{0.36\linewidth}@{}}
+\toprule
+\textbf{Subject} & \textbf{What the code does} & \textbf{Do not claim} \\
+\midrule
+Geography &
+The region byte is chosen by the node and is \emph{not} covered by the
+admission signature; only the 256-bit hash suffix is bound to the public
+key (\S\ref{sec:identity}). &
+That a node's location is cryptographically proven. It is an area code,
+not an attestation. \\
+\addlinespace
+Author replay &
+The root verifies the envelope signature and a signed-timestamp freshness
+window, then deduplicates by \texttt{msgId} within that topic's retained
+state. &
+Monotonic per-author sequence enforcement at live ingress. There is no
+author high-water mark. \\
+\addlinespace
+Routing privacy &
+The signed envelope carries no node ID. The routing wrapper that moves it
+does: every \texttt{route\_msg} carries \texttt{originId}. &
+That a publish has no return address. Envelope privacy and routing-metadata
+privacy are different properties. \\
+\addlinespace
+Durability &
+A cohort gate exists and is counted, but local delivery to a
+self-subscribed publisher confirms the pending publish before that gate
+completes --- a known deviation, fenced by
+\texttt{test/fence\_q2\_end\_to\_end.mjs}. &
+That seeing your own message proves it replicated. \\
+\addlinespace
+Ordering &
+A root stamps a dense per-topic sequence. Partitioned roots stamp
+independently, and delivery overwrites the publisher's own sequence with
+the root's. &
+A network-wide or partition-spanning total order, or that the publisher's
+sequence survives to the application. \\
+\bottomrule
+\end{tabular}
+\end{fullwidth}
+\vspace{0.5em}
+
+Beyond these, three things are simply not published yet: machine-readable
+schemas for every frame, golden test vectors for canonicalization and the
+authentication transcript, and the bridge signalling contract. Until those
+exist, an independent implementation can be built from this note but cannot
+be \emph{verified} against the network without reading the source.
+\S\ref{sec:reconstruction} states the order in which that gap closes.
+
+% =====================================================================
+% IV. THE SYSTEM IN ONE PAGE
 % =====================================================================
 \section{The System in One Page}
 
@@ -360,8 +516,11 @@ Every published message travels as an \textbf{envelope}:
 \item \texttt{msgId = SHA-256(canonical(\{publisher, message\}))} where
   \texttt{publisher} is \texttt{signerPubkey} or null --- a stable
   content address of (author, message), independent of time, topic, or
-  signature. Identical re-publishes dedup network-wide by construction;
-  a publisher wanting distinct ids adds a nonce to \texttt{message}.
+  signature. Identical re-publishes collapse wherever both copies meet
+  retained state for the \emph{same topic} --- dedup is topic-local and
+  retention-bounded, not network-wide, and the same body under two topics
+  is two messages. A publisher wanting distinct ids adds a nonce to
+  \texttt{message}.
 \item The signature covers the domain-tagged core
   \texttt{canonical(\{d,} \texttt{seq,} \texttt{ts,} \texttt{topic,}
   \texttt{message\})} with \texttt{d} the envelope domain tag ---
@@ -369,11 +528,18 @@ Every published message travels as an \textbf{envelope}:
   a kill signature or a channel-binding value; signing the resolved
   descriptor binds the message to the exact topic \emph{and policy}.
 \item \texttt{canonical()} is a total, JSON-valid canonical encoding
-  (sorted keys, RFC-8785-style), shared by every signing and hashing
-  site in the system.
-\item Freshness: receivers enforce a bound on \texttt{ts} skew and
-  per-publisher \texttt{seq} monotonicity at live ingress (anti-replay);
-  replayed history is exempt from the ts bound but capped by a
+  with recursively sorted keys, shared by every signing and hashing site
+  in the system. It is \emph{not} RFC~8785: it inherits JavaScript
+  \texttt{JSON.stringify} value semantics, including dropped
+  \texttt{undefined} object members and coerced non-finite numbers. An
+  independent implementation must reproduce those semantics, not JCS.
+  Golden vectors are not yet published (\S\ref{sec:notclaimed}).
+\item Freshness: receivers enforce a bound on \texttt{ts} skew at live
+  ingress, then deduplicate by \texttt{msgId} against that topic's
+  retained cache and tombstones. There is \emph{no} per-author sequence
+  high-water mark --- the anti-replay property is the signed timestamp
+  window plus topic-local id dedup, and it is bounded by retention.
+  Replayed history is exempt from the ts bound but capped by a
   future-tolerance rule (\S\ref{sec:pubsub}).
 \end{itemize}
 
@@ -460,9 +626,12 @@ domain-tagged challenge bound to the channel: for WebRTC, the
 channel-binding value folds both sides' \emph{DTLS certificate
 fingerprints} (a MITM terminating DTLS changes the fingerprints and the
 signature fails); for WebSockets, the binding uses the connection's
-nonces. A peer's claimed nodeId must equal
-\texttt{regionByte\,$\Vert$\,SHA-256(pubkey)} for the proven key ---
-identity is verified, not asserted.
+nonces. A peer's claimed nodeId must carry \texttt{SHA-256(pubkey)} as its
+low 256 bits for the proven key. The \emph{region byte is deliberately
+not covered}: a node picks its own area code, and admission neither
+verifies nor cares where it claims to be. Identity is verified;
+\emph{location is asserted}, and the difference matters to any threat
+model that reasons about regional concentration.
 
 \subsection{Version discipline}
 
@@ -528,12 +697,28 @@ All frames are JSON. Above the transport layer there are three frame
 families: the handshake/hello family (\S\ref{sec:transport}), direct
 notifications (\texttt{direct\_*}, point-to-point over an existing
 channel), and \emph{routed messages} --- the workhorse. A routed message
-carries \texttt{\{target, type, payload, fromId, hopBudget\}} and is
-forwarded greedily toward \texttt{target}; the handler registered for
-\texttt{type} runs at the terminal (or at a via waypoint --- see below).
+carries \texttt{\{type, payload, targetId, hops, originId\}} and is
+forwarded greedily toward \texttt{targetId}. The handler registered for
+\texttt{type} runs \emph{at every hop}, not only at the terminal: each
+receiver dispatches locally --- with \texttt{meta.isTerminal} telling it
+which it is --- and only then decides whether to forward. Waypoint
+behaviour is a consequence of that, not a special case.\marginnote{\small
+\texttt{originId} travels with every routed frame. The signed envelope
+carries no node id, but the wrapper moving it does; see
+\S\ref{sec:notclaimed}.}
 
-Pub/sub message types (normative; payload schemas in
-\S\ref{sec:pubsub}):
+Pub/sub message types. This list is \textbf{complete and normative} ---
+all seventeen routed types the v4.59.2 kernel emits or accepts. The
+per-frame \emph{payload schemas} are not: they are described in prose in
+\S\ref{sec:pubsub} and are not yet published as machine-readable
+schemas with required/optional fields, caps, and receiver-validation
+verdicts. An implementer can name every frame from this table and still
+be unable to construct several of them. That gap is
+\S\ref{sec:notclaimed}'s first item and closes with the conformance
+vectors.\marginnote{\small A missing type is worse than an undocumented
+one: it makes an implementation look conformant while silently dropping a
+verb. \texttt{pubsub:pullresp} was absent from this table until the
+2026-08-04 audit read it out of \texttt{constants.js}.}
 
 \begin{table*}[h]
 \scriptsize
@@ -553,7 +738,8 @@ Type & Routed toward & Meaning \\
 \texttt{pubsub:replicate} & cohort member & \emph{live} root pushes cache+tombstones (or empty keepalive) \\
 \texttt{pubsub:rootbeacon} & neighbours & soft-state root advertisement \\
 \texttt{pubsub:kill} & topic (or via) & signed retraction \\
-\texttt{pubsub:pull} & topic (or via) & one-shot read; \texttt{pullresp} returns \\
+\texttt{pubsub:pull} & topic (or via) & one-shot read request \\
+\texttt{pubsub:pullresp} & requester & the read answer, correlated by \texttt{corrId} \\
 \texttt{pubsub:metricson} & topic (or via) & demand-driven metrics lease \\
 \texttt{pubsub:touch} & topic & reserved no-op (wire compat) \\
 \texttt{pubsub:unpub} & --- & reserved string, no handler \\
@@ -1183,60 +1369,269 @@ heals no later than its next renewal via the waypoint-pop rule.
 % =====================================================================
 \section{Invariants}\label{sec:invariants}
 
-Normative. Each is enforced by a named regression test in the kernel
-repo (\texttt{INVARIANTS.md} maps them); an implementation that
+Normative, and this section is the authority. An implementation that
 violates one is wrong even if it benchmarks well.
 
+\marginnote{\small \textbf{On numbering.} Three files carried invariants
+under three schemes: \texttt{I-1..I-14} here, \texttt{S1..S6} and
+\texttt{B1..B13} in an \texttt{INVARIANTS.md} beside this file, and a
+third set in the kernel repo. They overlapped without cross-referencing,
+so a reader could not tell whether \texttt{B3} and \texttt{I-2} were two
+rules or one. They are one. This section supersedes both files; the
+\texttt{B} column below preserves the old identifier so existing
+references still resolve.}
+
+Each entry names the regression test that enforces it. Where no test
+exists the entry says \textbf{UNFENCED} --- an invariant nobody checks is
+a wish, and marking it is more useful than implying coverage that is not
+there.
+
+\subsection{Structural rules --- how the code is built}
+
+These constrain the shape of an implementation rather than its
+behaviour. They are here because every one was extracted from a defect
+that recurred until the structure changed.
+
+\vspace{0.4em}
+\begin{fullwidth}
+\scriptsize
+\begin{tabular}{@{}p{0.04\linewidth}>{\raggedright\arraybackslash}p{0.55\linewidth}>{\raggedright\arraybackslash}p{0.36\linewidth}@{}}
+\toprule
+\textbf{\#} & \textbf{Rule} & \textbf{Fence} \\
+\midrule
+S1 & One transition site per state. Every change to authoritative state
+     goes through a single function emitting a single log line. &
+     \texttt{smoke\_root\_claim} \\
+S2 & Derive, never store, what can drift. Role natures are computed from
+     ground truth, never persisted --- this killed the \#333 drift class
+     structurally. & \texttt{smoke\_role\_natures} \\
+S3 & One operation, a typed table, a CI-enforced boundary. N bespoke
+     paths collapse into one parametrized operation behind a complete
+     table, one emission site per wire verb, and both properties are
+     tests. & \texttt{smoke\_sync\_engine} (table complete, closed at 8
+     rows) $\cdot$ \texttt{smoke\_emission\_sites} \\
+S4 & Closed shapes. A state object declares every field it can ever
+     carry in its one constructor; no runtime graft-ons. &
+     \textbf{UNFENCED} --- needs a shape-freeze test \\
+S5 & Budgets scale with work. Any window bounding $O(K)$ work scales
+     with $K$; prefer progress-aware exits over time. Flat constants
+     against variable batches are the mass-leaver bug class. &
+     \texttt{smoke\_handoff\_scaling} \\
+S6 & Orchestration under one clock. Periodic work is named, ordered,
+     individually testable units under ONE tick --- never N independent
+     timers, because timer multiplication changes interleaving
+     semantics. & \textbf{UNFENCED} --- the gate for the
+     \texttt{refreshTick} refactor \\
+\bottomrule
+\end{tabular}
+\end{fullwidth}
+
+\subsection{Behavioural invariants --- what must always hold}
+
+Each entry closes with its fence and, where one exists, the identifier
+it carried in \texttt{INVARIANTS.md}.
+
+\begingroup\sloppy
 \begin{enumerate}
-\item[\textbf{I-1}] A topic has exactly one root; wrong claims converge
-  without flapping.
+\item[\textbf{I-1}] A topic \emph{converges} to a single root, and wrong
+  claims converge without flapping. This is a liveness property, not
+  mutual exclusion: duplicate roots are an expected transient, and the
+  system contains no distributed lock that would forbid them. Two bounds
+  qualify it. Reconciliation reaches only as far as
+  \texttt{rootReplicas} (currently~2), so a second root outside that
+  reach is not repaired by reconciliation and persists until churn
+  removes it. And under partition each side converges independently and
+  stamps its own dense sequence; the merge on heal is a union, not an
+  ordering. An implementation must converge and must not flap; it must
+  not assume an exclusivity it does not have. Three sub-rules carry it:
+  a joiner iteratively verifies past its local table before self-rooting
+  (\emph{was B2}); a root union-ingests a \texttt{REPLICATE} rather than
+  usurping or refusing it (\emph{was B4}); and an empty self-root pulls
+  cohort history before acting as root (\emph{was B9}).\\
+  {\footnotesize\textsf{Fence:} \texttt{smoke\_root\_hint} $\cdot$
+  \texttt{smoke\_interloper\_convergence} $\cdot$
+  \texttt{smoke\_split\_history\_union} $\cdot$
+  \texttt{smoke\_empty\_root\_pull}}
 \item[\textbf{I-2}] Never defer a root claim to a farther node, a
-  ghost, or the node handing off.
+  ghost, or the node handing off.\\
+  {\footnotesize\textsf{Fence:} \texttt{smoke\_leave\_handoff\_burst}
+  (heir no-defer case) $\cdot$ \emph{was B3}}
 \item[\textbf{I-3}] A recovery path never waits unboundedly on --- or
-  dies on --- the failure it handles.
+  dies on --- the failure it handles.\\
+  {\footnotesize\textbf{UNFENCED.} Issue \#339 ---
+  \texttt{transport.start()} must fail loud.}
 \item[\textbf{I-4}] A peer that has left is silent, and its rooted
-  history departs before it does.
+  history departs before it does. Handoff completes \emph{before}
+  notify --- data first, funeral announcement second (\emph{was B5}) ---
+  a departing non-root holder hands off unless the root is positively
+  alive, since passive freshness lies during mass teardown (\emph{was
+  B6}), and a mass leaver's sole-copy topics go first, singletons before
+  replicated roots before holders (\emph{was B11}).\\
+  {\footnotesize\textsf{Fence:} \texttt{smoke\_leave\_teardown} $\cdot$
+  \texttt{smoke\_pubsub\_leave\_handoff} $\cdot$
+  \texttt{smoke\_backup\_handoff} $\cdot$
+  \texttt{smoke\_handoff\_scaling} (tier order only indirectly ---
+  \textbf{partial})}
 \item[\textbf{I-5}] A client is never judged by time the server wasn't
-  listening.
+  listening.\\
+  {\footnotesize\textbf{UNFENCED} at the kernel; the bridge's
+  hello-timeout second strike is issue \#338.}
 \item[\textbf{I-6}] Observability surfaces exist or fail loudly ---
-  never silently zero.
+  never silently zero.\\
+  {\footnotesize\textbf{UNFENCED.} Metrics were silently dead across all
+  of 4.x before anyone noticed; a metric name that does not match its
+  referent is the same defect (\texttt{axona\_status} calls the
+  synaptome \texttt{mesh}, issue \#411). No operator surface exposes
+  live channel count, so ``did the mesh survive?'' cannot be answered
+  from outside.}
 \item[\textbf{I-7}] Fixes must hold for 100\%-transient peers: no
-  mechanism may privilege stable nodes to mask churn.
+  mechanism may privilege stable nodes to mask churn.\\
+  {\footnotesize\textbf{UNFENCED}, and unfenceable by a unit test ---
+  this one is enforced at review. Stability-weighted root election was
+  proposed, simulated, and rejected under it.}
 \item[\textbf{I-8}] Migrated cache never resurrects a killed message:
-  every migration path carries tombstones, applied first.
+  every migration path carries tombstones, applied first. A kill
+  callback fires only if the body reached that app (\emph{was B8}).\\
+  {\footnotesize\textsf{Fence:} \texttt{smoke\_kill\_migration} $\cdot$
+  \texttt{smoke\_pubsub\_kill} $\cdot$ \emph{was B7}}
 \item[\textbf{I-9}] Publish confirmation is observation, not
   acknowledgment; nothing may add an ack channel that discloses the
-  publisher's location.
+  publisher's location.\\
+  {\footnotesize\textbf{UNFENCED} behaviourally; enforced by the
+  envelope's shape --- it names a signer and carries no node id and no
+  region. Two attempts to add one were reverted.}
 \item[\textbf{I-10}] Standing state is bounded by demand, never by
   churn history: per-topic state anywhere is $O(\mathrm{subscribers} +
   \mathrm{cohort})$; no mechanism may create state that accumulates
   with join/leave \emph{events}; every write of standing state onto
   another node names its eviction path in the same change. Corollary:
-  the principal-liveness rule (\S\ref{sec:pubsub}).
+  the principal-liveness rule (\S\ref{sec:pubsub}) --- a planted nature
+  is retired only when its principal is gone \emph{and} re-homed.\\
+  {\footnotesize\textsf{Fence:} \texttt{smoke\_sync\_engine} (evictor
+  column complete for every policy row) $\cdot$ \emph{was B10}}
 \item[\textbf{I-11}] Bulk work never starves liveness: unbounded batch
   ingest/emission yields to the event loop at a fixed stride; a node is
-  never evicted by its peers \emph{because} it was absorbing history.
+  never evicted by its peers \emph{because} it was absorbing history.\\
+  {\footnotesize\textbf{UNFENCED} as a property; the pacing constants
+  are in the timing table (\S\ref{sec:timing}) and the join-storm that
+  motivated it is issue \#332.}
 \item[\textbf{I-12}] A write is never handed to a root without live
   evidence --- a channel, a network-verified pointer, or a beacon
   fresher than $1.5\times$\texttt{BEACON\_MS} --- and local routing
   state mutates only on a \texttt{consumed} verdict from the node the
   write was aimed at. The read path and the write path pass the same
-  gate.
+  gate.\\
+  {\footnotesize\textbf{UNFENCED} on the write path --- issue \#422
+  records a \texttt{PUB} deferring to an unreachable root. The read side
+  is covered by \texttt{smoke\_ghost\_read}.}
 \item[\textbf{I-13}] Durable bookkeeping is written from receipts,
   never from sends. A replica, an upstream pin, a beacon invalidation
   --- each requires a verdict naming the node it concerns; a send that
   merely didn't throw proves nothing, because routing reports failure
-  by resolving.
+  by resolving.\\
+  {\footnotesize\textbf{UNFENCED.} The general shape --- a send whose
+  non-throw was read as delivery --- has appeared three times.}
 \item[\textbf{I-14}] A negative result names its kind. Timeout,
   answered-empty, and unparseable are three facts; any surface that
   collapses them into one value invites its caller to manufacture a
-  confident wrong conclusion.
+  confident wrong conclusion.\\
+  {\footnotesize\textbf{UNFENCED.} Issue \#418 is a live instance: a
+  one-shot subscribe reads zero on a topic a standing watch is holding
+  traffic on, and zero is indistinguishable from empty.}
+\item[\textbf{I-15}] Transport identity is ephemeral; author identity
+  is durable. A node's \texttt{nodeId} and its keypair are minted fresh
+  every process start and written to no persistent store --- not a
+  namespace, not a file, not a snapshot, not a container volume. An
+  author identity may and must persist. This one protects people rather
+  than correctness: a \texttt{nodeId} surviving restart is a durable
+  correlator linking a node's sessions to each other, to an IP, and so
+  to a person, and the countervailing benefit is nil, because a node
+  returning under its old id gains nothing from a mesh that has already
+  healed around its absence. Reconnection continuity, route retention,
+  log correlation, deduplicating concurrent processes, and node-keyed
+  reputation are each a signal the design is wrong, not a justification.\\
+  {\footnotesize\textsf{Fence:} \texttt{smoke\_persistence\_wiring}
+  (restart $\Rightarrow$ different \texttt{nodeId}, author survives)
+  $\cdot$ \texttt{smoke\_snapshot} $\cdot$
+  \texttt{fence\_transport\_identity} (static, one per repo) $\cdot$
+  \emph{was I-ID}}
+\item[\textbf{I-16}] Region is an optimization, never a wall. A region
+  prefix biases \emph{where} a topic prefers to live; it never decides
+  whether a node may hold, root, or route one, and a sparse region must
+  roll over into its neighbours. The failure mode of a missed
+  optimization is a slower hop; the failure mode of an enforced wall is
+  data with nowhere to live. The refusal machinery exists and is dormant
+  behind \texttt{isRegionLockEnforced === false} --- \emph{leaving it off
+  is the invariant}, which is the opposite of what a reader would
+  conclude from the flag's existence. Ranking, mint-point choice, and
+  holder preference may depend on region; admission and capability may
+  not.\\
+  {\footnotesize\textsf{Fence:} \texttt{smoke\_region\_lock} covers the
+  dormant path only --- \textbf{no fence asserts the default stays
+  off}. Treating the prefix as a wall once produced 0\% cross-region
+  delivery (4.17.1). $\cdot$ \emph{was B1}}
+\item[\textbf{I-17}] A bridge is a bridge --- it transports and
+  introduces, and holds no topic role at any load, in any topology, with
+  no floor exception. Three independent doors enforce it: routing skips
+  it in the next-hop scan, it does not \texttt{host()}, and
+  \texttt{neverRoot} makes its own \texttt{sub()} unable to self-root at
+  a tier the admission floor may not override. The tempting exception
+  --- let it root when it is the only candidate --- would have it root
+  exactly when it can least afford to, and buys only a few seconds of
+  empty-network durability during a fresh launch.\\
+  {\footnotesize\textsf{Fence:} \texttt{smoke\_role\_admission} (refusal
+  is HARD; the floor must not override) --- \textbf{no fence asserts a
+  bridge peer ends bring-up with \texttt{axonRoles} empty}. $\cdot$
+  \emph{was B12}}
+\item[\textbf{I-18}] Capacity is measured, never counted. Fitness to
+  hold roles is observed pressure against real protocol deadlines ---
+  service staleness against \texttt{DROP\_MS}, tick lag against
+  \texttt{HELLO\_DEADLINE\_MS} --- never \texttt{axonRoles.size}. A
+  count is inventory; pressure is capability, and capability is what
+  predicts failure. A node holding the maximum roles and servicing all
+  of them on time is a healthy node.\\
+  {\footnotesize\textsf{Fence:} \texttt{smoke\_role\_admission} $\cdot$
+  \emph{was B13}. Caveat in the same breath: \texttt{servicePressure}
+  once sat pinned at 0.028 while a node held 546 roles at 200\% CPU, so
+  the measure is right in principle and has been wrong in practice ---
+  a metric that does not match its referent is I-6's problem.}
 \end{enumerate}
+\endgroup
+
+\subsection{Process rules --- how changes land}
+
+Not properties of the running system, so not numbered with the
+invariants; they are here because every one was bought with a bad day.
+
+\begin{itemize}
+\item \textbf{Gates are pre-registered, not post-hoc.} The SLO is
+  fresh-subscriber delivery percentage. A measurement is REPS $\ge 5$
+  reported as mean $\pm$ sd; a single run is directional only.
+\item \textbf{No behaviour change without a disproof.} A failing repro
+  precedes every fix, and the repro becomes the fence. This is why the
+  UNFENCED entries above are unfenced --- they were reasoned to, not
+  reproduced.
+\item \textbf{Mechanism freeze during refactor phases.} Incident
+  response is a revert or a minimal guard carrying an issue ID and a
+  removal date. No new mechanisms.
+\item \textbf{A mixed-version compatibility statement} is required for
+  any change touching wire-adjacent behaviour. Production runs several
+  kernel versions at once --- 4.35 peers were observed during 4.41.
+\item \textbf{Read deployed versions from the running service.} Any
+  version used to size, gate, or justify work comes from
+  \texttt{/healthz} at the time of writing, never from a note, a memory,
+  or a previous document. A release was once sized as four versions of
+  new subsystem when it was four bugfixes, and the error survived a full
+  review pass because every reader trusted the same note.
+\item \textbf{Verify per claim, not per narrative.} A review checks each
+  numeric claim against source. A plausible story carries false figures
+  through unchallenged.
+\end{itemize}
 
 % =====================================================================
 % XIII. ROBUSTNESS: WHAT FAILS, AND WHAT HAPPENS
 % =====================================================================
-\section{Robustness: What Fails, and What Happens}
+\section{Robustness: What Fails, and What Happens}\label{sec:robustness}
 
 \begin{description}
 \item[A subscriber's relay dies.] Neighbour case: death sweep drops the
@@ -1546,8 +1941,10 @@ order, testing each layer before the next:
   replay-up (hw) and split-union (lw) with the one-shot guard, the
   empty-root probe, kills with provisional authorship, and leave with
   evidence-drain, \emph{acknowledged} handoff, and silence.
-\item \textbf{Prove the invariants} (\S\ref{sec:invariants}): write the
-  eleven as executable tests before tuning anything; then characterize
+\item \textbf{Prove the invariants} (\S\ref{sec:invariants}): write all
+  eighteen as executable tests before tuning anything --- including the
+  ones marked UNFENCED, which are where this implementation has been
+  wrong most often. Then characterize
   on a live mesh --- healed delivery after a renewal cycle is the
   headline number, single runs are noise (REPS $\ge$ 5), and no verdict
   comes from a seconds-old client.
@@ -1565,6 +1962,38 @@ exactly this trap sprung four times. \emph{Letting a departing or
 transient node plant standing state}: replicate-from-a-leaver reads as
 a cheap durability win and is a cascade seed; the principal-liveness
 rule exists because the cheap win collapsed a fleet.
+
+\subsection{What you will still have to derive}
+
+``From this note alone'' is a claim about the \emph{model} and the
+\emph{wire contract}, and it should be read narrowly. Four things are
+not here, and a reimplementer will meet all four.
+
+\emph{The constants are ours, not derived.} Every value in the timing
+table (\S\ref{sec:timing}) carries its reason, which is what lets you
+re-tune it --- but the numbers came from a mesh of tens to low hundreds
+of nodes on consumer hardware and cloud droplets. At a different scale
+or a different latency profile they are a starting point, not a
+specification.
+
+\emph{The failure catalogue is partial by construction.} The robustness
+section (\S\ref{sec:robustness}) describes failures that have happened
+to this implementation. Everything in the open issue register is a
+failure we know about and have not fixed; what neither list contains is
+the class nobody has hit yet, and there is no reason to think the
+network has finished producing them.
+
+\emph{Nine invariants are marked UNFENCED} (\S\ref{sec:invariants}). Those are
+statements of intent that the code is believed to satisfy. A second
+implementation that satisfies the fenced ones and violates an unfenced
+one will not be caught by anything either project runs today.
+
+\emph{Interoperability is unproven.} No second implementation exists,
+so every ``cross-implementation'' test above is a test nobody has run.
+The first one will find things --- most likely in canonicalization,
+where byte-equality is required and the specification is a paragraph.
+That is not a caveat on the document so much as the reason to build the
+second implementation.
 
 % =====================================================================
 % APPENDIX: THE LIFE OF A MESSAGE
@@ -1610,10 +2039,11 @@ $T=\{$region:\,useast, owner:\,null, name:\,'lobby', write:\,'open'$\}$.
 
 \vspace{1.5em}
 \noindent\textcolor{inkmuted}{\footnotesize\itshape
-Axona Architecture, DRAFT toward v4.59.2 --- 2026-08-03. Versioned to
-the kernel release deployed on testnet that it describes; re-version on
-the release that next changes protocol behavior. Companions:
-Root-Management-v4.20.1, INVARIANTS.md (fourteen invariants),
+Axona Architecture v4.59.2 --- 2026-08-05. Versioned to the kernel
+release deployed on testnet that it describes; re-version on the release
+that next changes protocol behavior. The eighteen invariants and six
+structural rules are \S\ref{sec:invariants} of this document and are not
+maintained anywhere else. Companions: Root-Management-v4.20.1,
 Kernel-Refactor-Analysis-v0.2 (the convergence-plane program),
 Soak-Framework-Overview-v4.21.0.}
 
