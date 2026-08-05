@@ -212,7 +212,7 @@ strictly optional.)
   \href{Axona-API-Reference-v4.48.0.md}{API Reference} --- every
   signature, exactly.
 \item
-  \href{Axona-AI-Grounding-v4.30.0.md}{AI Grounding} --- building with
+  \href{Axona-AI-Grounding-v4.48.0.md}{AI Grounding} --- building with
   an AI assistant? Hand it this file.
 \item
   \href{Axona-Services-Guide-v4.48.0.md}{Services Guide} --- running
@@ -221,7 +221,7 @@ strictly optional.)
 
 \begin{quote}
 \textbf{Building with an AI?} Most Axona apps are. Paste
-\url{Axona-AI-Grounding-v4.30.0.md} into your assistant's context and it
+\url{Axona-AI-Grounding-v4.48.0.md} into your assistant's context and it
 will know every rule in this guide. Keep this guide for \emph{you} ---
 it explains the why.
 \end{quote}
@@ -746,6 +746,79 @@ Readers resolve it with \texttt{getAuthorClass(authorId)} and can badge,
 rank, or filter. It gates nothing --- it's honesty infrastructure, and
 well-behaved bots (and AI-built apps!) should use it.
 
+\subsubsection{4.12 Surviving sleep (session
+recovery)}\label{surviving-sleep-session-recovery}
+
+What happens to your session when the laptop lid closes? The socket
+dies, the mesh heals around your absence, and the seat your
+subscriptions held at each root expires. The kernel reconnects the
+socket for you --- with backoff from 1 s to a 16 s cap, re-running the
+handshake on every reopen --- but that is one layer of several, and a
+session recovers only if \emph{all} of them do. On 2026-08-05 a chat
+session slept overnight and woke showing ``Seeking Peers'' for ten
+hours. It received nothing. A message typed into it did something worse
+than fail: \texttt{pub()} resolved, the zero-peer node rooted the topic
+on itself, delivered its own echo, and the message rendered as sent ---
+while existing nowhere but that one machine's memory.
+
+Your app is the only layer that knows what ``healthy'' means for it, so
+your app owns the last line of recovery. The pattern has four parts.
+
+\textbf{Detect.} Two signals, both cheap. A periodic timer whose tick
+arrives far later than scheduled means the machine slept --- timers
+don't drift 30 s on a live page. And \texttt{peer.peers().length}
+sitting at zero after the session was once connected means it's wedged,
+whatever the cause below. Check immediately on \texttt{visibilitychange}
+and \texttt{online} too; that's the moment the user is looking.
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{let}\NormalTok{ last }\OperatorTok{=} \BuiltInTok{Date}\OperatorTok{.}\FunctionTok{now}\NormalTok{()}\OperatorTok{,}\NormalTok{ zeroSince }\OperatorTok{=} \KeywordTok{null}\OperatorTok{,}\NormalTok{ wasConnected }\OperatorTok{=} \KeywordTok{false}\OperatorTok{;}
+\PreprocessorTok{setInterval}\NormalTok{(}\KeywordTok{async}\NormalTok{ () }\KeywordTok{=\textgreater{}}\NormalTok{ \{}
+  \KeywordTok{const}\NormalTok{ gap }\OperatorTok{=} \BuiltInTok{Date}\OperatorTok{.}\FunctionTok{now}\NormalTok{() }\OperatorTok{{-}}\NormalTok{ last}\OperatorTok{;}\NormalTok{ last }\OperatorTok{=} \BuiltInTok{Date}\OperatorTok{.}\FunctionTok{now}\NormalTok{()}\OperatorTok{;}
+  \KeywordTok{const}\NormalTok{ peers }\OperatorTok{=}\NormalTok{ peer}\OperatorTok{.}\FunctionTok{peers}\NormalTok{()}\OperatorTok{.}\AttributeTok{length}\OperatorTok{;}
+  \ControlFlowTok{if}\NormalTok{ (peers }\OperatorTok{\textgreater{}} \DecValTok{0}\NormalTok{) \{ wasConnected }\OperatorTok{=} \KeywordTok{true}\OperatorTok{;}\NormalTok{ zeroSince }\OperatorTok{=} \KeywordTok{null}\OperatorTok{;} \ControlFlowTok{return}\OperatorTok{;}\NormalTok{ \}}
+  \ControlFlowTok{if}\NormalTok{ (}\OperatorTok{!}\NormalTok{wasConnected) }\ControlFlowTok{return}\OperatorTok{;}                    \CommentTok{// still bootstrapping}
+\NormalTok{  zeroSince }\OperatorTok{??=} \BuiltInTok{Date}\OperatorTok{.}\FunctionTok{now}\NormalTok{()}\OperatorTok{;}
+  \KeywordTok{const}\NormalTok{ slept }\OperatorTok{=}\NormalTok{ gap }\OperatorTok{\textgreater{}} \DecValTok{30\_000}\OperatorTok{;}
+  \KeywordTok{const}\NormalTok{ stuck }\OperatorTok{=} \BuiltInTok{navigator}\OperatorTok{.}\AttributeTok{onLine} \OperatorTok{!==} \KeywordTok{false} \OperatorTok{\&\&} \BuiltInTok{Date}\OperatorTok{.}\FunctionTok{now}\NormalTok{() }\OperatorTok{{-}}\NormalTok{ zeroSince }\OperatorTok{\textgreater{}} \DecValTok{25\_000}\OperatorTok{;}
+  \ControlFlowTok{if}\NormalTok{ (slept }\OperatorTok{||}\NormalTok{ stuck) }\ControlFlowTok{await} \FunctionTok{recoverSession}\NormalTok{()}\OperatorTok{;}   \CommentTok{// see below}
+\NormalTok{\}}\OperatorTok{,} \DecValTok{5\_000}\NormalTok{)}\OperatorTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+\textbf{Recover by rebuilding, not by nudging.} The wedge has several
+distinct causes --- the reconnect loop died, the socket came back but
+the mesh never rebuilt, a graduated client whose re-dial watchdog failed
+--- and your app cannot tell them apart from outside. A full teardown
+and reconnect recovers all of them: \texttt{disconnect()},
+\texttt{connect()} again, re-subscribe every topic (with \texttt{since},
+you catch up on what you missed while deaf). Back off between attempts
+so a genuinely-down network doesn't hot-loop.
+
+\textbf{Confirm sends honestly.} Track each publish as \emph{pending}
+until your own \texttt{msgId} returns through your subscription
+\textbf{while \texttt{peers()\ \textgreater{}\ 0}}. The island echo
+arrives even on a dead session and must not count. Show pending state in
+your UI --- a message that never confirmed should not look like one that
+did.
+
+\textbf{Replay after recovery.} Here the protocol pays you back:
+\texttt{msgId\ =\ hash(publisher\ +\ message)}, and \texttt{makeMessage}
+bodies carry no timestamp --- so re-publishing the \emph{same payload
+object} under the \emph{same author} produces the \emph{same msgId}.
+Retry is idempotent by construction. A stranded message replays safely;
+one that actually landed dedups at the root and simply confirms. Keep
+the exact payload with each pending record and re-\texttt{pub()} them
+all once the rebuilt session is confirmed healthy. (If you build
+payloads with your own timestamps inside, you lose this --- another
+reason to let the root do the stamping.)
+
+Every long-lived Axona session needs this --- browser tab, phone,
+laptop, or a bot on a server that suspends. The reference implementation
+is axona-chat v0.47.0 (\texttt{PeerContext.jsx} for the watchdog,
+\texttt{AxonaChatClient.js} for pending sends and replay).
+
 \subsection{5. Things that will bite
 you}\label{things-that-will-bite-you}
 
@@ -768,8 +841,11 @@ resolves when the message is \emph{sent}, not delivered, and no receipt
 ever comes (it would stitch your connection to your authorship --- an
 identity leak Axona refuses on principle). The idiom: you're subscribed
 to what you publish; when your own \texttt{msgId} comes back through
-your handler, it went through. The kernel meanwhile retries quietly on
-your behalf.
+your handler \emph{and your peer has mesh peers}, it went through. That
+second condition is load-bearing: a peer with zero mesh peers roots the
+topic on itself, and the echo it delivers proves only that your own
+process heard you. See the session-recovery recipe for the full
+treatment. The kernel meanwhile retries quietly on your behalf.
 
 \textbf{3. Publishing before \texttt{ready()} is a coin flip.} The mesh
 takes a few seconds to warm after \texttt{start()}.

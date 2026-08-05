@@ -434,6 +434,72 @@ Readers resolve it with `getAuthorClass(authorId)` and can badge, rank, or
 filter. It gates nothing — it's honesty infrastructure, and well-behaved
 bots (and AI-built apps!) should use it.
 
+### 4.12 Surviving sleep (session recovery)
+
+What happens to your session when the laptop lid closes? The socket dies,
+the mesh heals around your absence, and the seat your subscriptions held
+at each root expires. The kernel reconnects the socket for you — with
+backoff from 1 s to a 16 s cap, re-running the handshake on every reopen —
+but that is one layer of several, and a session recovers only if *all* of
+them do. On 2026-08-05 a chat session slept overnight and woke showing
+"Seeking Peers" for ten hours. It received nothing. A message typed into
+it did something worse than fail: `pub()` resolved, the zero-peer node
+rooted the topic on itself, delivered its own echo, and the message
+rendered as sent — while existing nowhere but that one machine's memory.
+
+Your app is the only layer that knows what "healthy" means for it, so
+your app owns the last line of recovery. The pattern has four parts.
+
+**Detect.** Two signals, both cheap. A periodic timer whose tick arrives
+far later than scheduled means the machine slept — timers don't drift
+30 s on a live page. And `peer.peers().length` sitting at zero after the
+session was once connected means it's wedged, whatever the cause below.
+Check immediately on `visibilitychange` and `online` too; that's the
+moment the user is looking.
+
+```js
+let last = Date.now(), zeroSince = null, wasConnected = false;
+setInterval(async () => {
+  const gap = Date.now() - last; last = Date.now();
+  const peers = peer.peers().length;
+  if (peers > 0) { wasConnected = true; zeroSince = null; return; }
+  if (!wasConnected) return;                    // still bootstrapping
+  zeroSince ??= Date.now();
+  const slept = gap > 30_000;
+  const stuck = navigator.onLine !== false && Date.now() - zeroSince > 25_000;
+  if (slept || stuck) await recoverSession();   // see below
+}, 5_000);
+```
+
+**Recover by rebuilding, not by nudging.** The wedge has several distinct
+causes — the reconnect loop died, the socket came back but the mesh never
+rebuilt, a graduated client whose re-dial watchdog failed — and your app
+cannot tell them apart from outside. A full teardown and reconnect
+recovers all of them: `disconnect()`, `connect()` again, re-subscribe
+every topic (with `since`, you catch up on what you missed while deaf).
+Back off between attempts so a genuinely-down network doesn't hot-loop.
+
+**Confirm sends honestly.** Track each publish as *pending* until your own
+`msgId` returns through your subscription **while `peers() > 0`**. The
+island echo arrives even on a dead session and must not count. Show
+pending state in your UI — a message that never confirmed should not look
+like one that did.
+
+**Replay after recovery.** Here the protocol pays you back:
+`msgId = hash(publisher + message)`, and `makeMessage` bodies carry no
+timestamp — so re-publishing the *same payload object* under the *same
+author* produces the *same msgId*. Retry is idempotent by construction. A
+stranded message replays safely; one that actually landed dedups at the
+root and simply confirms. Keep the exact payload with each pending record
+and re-`pub()` them all once the rebuilt session is confirmed healthy.
+(If you build payloads with your own timestamps inside, you lose this —
+another reason to let the root do the stamping.)
+
+Every long-lived Axona session needs this — browser tab, phone, laptop,
+or a bot on a server that suspends. The reference implementation is
+axona-chat v0.47.0 (`PeerContext.jsx` for the watchdog,
+`AxonaChatClient.js` for pending sends and replay).
+
 ## 5. Things that will bite you
 
 Learn these here rather than in production. The first five are the classic
@@ -450,7 +516,11 @@ shared `topics.js` with functions like `room(name)` ends this bug forever.
 message is *sent*, not delivered, and no receipt ever comes (it would
 stitch your connection to your authorship — an identity leak Axona
 refuses on principle). The idiom: you're subscribed to what you publish;
-when your own `msgId` comes back through your handler, it went through.
+when your own `msgId` comes back through your handler *and your peer has
+mesh peers*, it went through. That second condition is load-bearing: a
+peer with zero mesh peers roots the topic on itself, and the echo it
+delivers proves only that your own process heard you. See the
+session-recovery recipe for the full treatment.
 The kernel meanwhile retries quietly on your behalf.
 
 **3. Publishing before `ready()` is a coin flip.** The mesh takes a few
