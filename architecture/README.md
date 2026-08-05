@@ -37,6 +37,18 @@ for revisit. They are ordered by how soon the answer is needed, not by size.
 
 ### Near — the network is already asking
 
+**[Session Supervisor](Session-Supervisor-v0.1.md)** · *design, nothing
+implemented; council round pending.* A session that dies without exiting —
+sleep, suspension, a frozen tab — wakes deaf and stays deaf, and a publish
+from it self-roots on an island while rendering as sent. Captured live
+2026-08-05. The kernel owns each recovery layer but nobody owns the session;
+this proposes a supervisor on the one clock: detect (tick gap, empty
+synaptome after ever-connected), rebuild behind a stable `AxonaPeer` (fresh
+nodeId per I-15, subscriptions re-seated with watermarks), and an honest
+confirmation surface so an island echo can no longer read as delivery. One
+question is left deliberately open for the council: what exactly-once means
+when the only prior delivery was self-stamped.
+
 **[Saturation and Admission](Saturation-and-Admission-v0.1.md)** · *design,
 nothing implemented.* A node accepts every role handed to it, caches without a
 global ceiling, evicts silently, and can never decline. Production measures
