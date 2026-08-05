@@ -69,9 +69,11 @@
 {\large David A.~Smith\par}
 {\itshape\small Axona.net\par}
 \vspace{2em}
-{\small An Axona Architecture Note \quad v4.27.0 \quad 2026-07-16\par}
-{\footnotesize\itshape describes kernel 4.27.0 as deployed on testnet;
-written for human readers and AI implementers alike\par}
+{\small An Axona Architecture Note \quad DRAFT toward v4.59.2 \quad 2026-08-03\par}
+{\footnotesize\itshape revision in progress: sections A--E and the Ship of
+Theseus are drafted against kernel 4.59.2 as deployed on testnet; the
+durability section awaits the soak verdict; detail sweeps pending.
+Written for human readers and AI implementers alike\par}
 \end{center}
 \vfill
 \null
@@ -169,14 +171,18 @@ Everything else is built from that one primitive:
   publisher.
 \end{itemize}
 
-One bridge server exists per network --- for \emph{signaling only}: it
-introduces new peers so they can open direct connections. It is
-bootstrap infrastructure, not a data-path relay; two peers with
-established mesh connections continue exchanging messages if every
-bridge is down,\marginnote{Proven live 2026-07-12: a fresh authenticated
-data channel formed between two peers with the bridge process dead,
-signaling relayed over the mesh (19/19, bulk 100\%).} and new
-connections can even be signaled across the existing mesh.
+A network has any number of bridge servers, each for \emph{signaling
+only}: a bridge introduces new peers so they can open direct
+connections. Bridges federate by
+uplinking to each other as ordinary peers, advertise themselves on a
+public directory topic, and clients rank the directory and fail over
+(\S\ref{sec:transport}). A bridge is bootstrap infrastructure, not a
+data-path relay; two peers with established mesh connections continue
+exchanging messages if every bridge is down,\marginnote{Proven live
+2026-07-12: a fresh authenticated data channel formed between two peers
+with the bridge process dead, signaling relayed over the mesh (19/19,
+bulk 100\%).} and new connections can even be signaled across the
+existing mesh.
 
 The design bets on one asymmetry, everywhere: \emph{wrong claims that
 self-correct are cheaper than coordination that prevents them}. Roots
@@ -213,7 +219,7 @@ Layer & Repo / package & Role \\
 Kernel & \texttt{@axona/protocol} & identity, routing, transports, pub/sub \\
 Bridge & \texttt{axona-bridge} & WebSocket signaling + TURN minting; embedded peer \\
 Relay & \texttt{axona-relay} & headless supernode (hosting, metrics, ops CLI) \\
-Peer app & \texttt{axona-peer} & reference browser application (axona.net) \\
+Reference app & \texttt{axona-chat} & reference browser application (axona.chat) \\
 Simulator & \texttt{dht-sim} & 1K--50K-node simulation over the vendored kernel \\
 \bottomrule
 \end{tabular}
@@ -316,16 +322,25 @@ topicId = regionByte
 \end{lstlisting}
 
 \noindent with the region byte resolved by rule: an explicit
-\texttt{region} wins; otherwise, if \texttt{owner} is present, the region
-is \emph{derived from the owner key} (\texttt{keyDerivedRegion}: hash the
-authorId into the list of canonical regions) so an author's topics
-are discoverable from the authorId alone; otherwise the derivation
-throws (\texttt{TOPIC\_REGION\_REQUIRED}). Whichever rule fires, the
-resulting byte passes through \texttt{canonicalRegion()}, so a topic can
-never be anchored at an unpopulated cell. Because the write policy is
-folded into the hash, a topic's policy is not mutable state --- a root
-recomputes the id from the signed descriptor and enforces
-\texttt{write:'owner'} statelessly.
+\texttt{region} wins; otherwise the \emph{publisher's own node region}
+is used; otherwise the derivation throws
+(\texttt{TOPIC\_REGION\_REQUIRED}). The region is \textbf{never} derived
+from the author key --- the author has no location, and hashing the
+authorId into a region would dump every one of an author's topics into
+one arbitrary cell, a hotspot. (An earlier design did exactly that and
+was removed in 3.1.0.) Whichever rule fires, the resulting byte passes
+through \texttt{canonicalRegion()}, so a topic can never be anchored at
+an unpopulated cell.
+
+\texttt{write} defaults on whether an owner is named, and the default
+is the safe one: no owner $\rightarrow$ the topic is necessarily
+\texttt{'open'} (any passed \texttt{write} is ignored); owner named
+$\rightarrow$ \texttt{'owner'} unless \texttt{'open'} is passed
+explicitly (an owner-namespaced inbox anyone may post to). Forgetting
+\texttt{write} on an owned feed must not leave it world-writable
+(3.2.0). Because the write policy is folded into the hash, a topic's
+policy is not mutable state --- a root recomputes the id from the signed
+descriptor and enforces \texttt{write:'owner'} statelessly.
 
 \subsection{Messages (content-addressed, author-signed)}
 
@@ -409,8 +424,21 @@ split-brain (fixed 4.17.1) and is now an explicit anti-pattern.
 Departed peers are marked dead immediately on channel loss (eviction,
 graceful-leave notify) and skipped by routing; reachability to a
 \emph{newcomer} lives in its neighbours' tables and is healed by inbound
-traffic --- which is why cold publishers deliberately re-send
+traffic --- which is why cold publishers re-send by design
 (\S\ref{sec:timing}) rather than waiting to be found.
+
+One property of greedy routing surprises every instrument pointed at
+it: \textbf{a routed message need not touch the wire at all}. The
+origin resolves its next hop and, finding none closer than itself,
+delivers locally at hop zero --- so when a publisher happens to be the
+topic-closest node, its publish is consumed in-process and no PUB frame
+exists anywhere. This is correct, it is how a solo node roots its own
+topics, and it happens to roughly one publish in $N$ on an $N$-node
+network, at random, by topology. A test that asserts ``a publish
+produces traffic'' is therefore wrong one time in $N$; a packet capture
+at the publisher shows the \emph{replication} frames that follow and
+none of the publish itself. Measure delivery at a subscriber, never
+presence on a wire.
 
 % =====================================================================
 % VI. TRANSPORTS AND THE BRIDGE
@@ -442,7 +470,7 @@ Two version axes ride the hello frames. \texttt{WIRE\_VERSION} (currently
 \texttt{4.0}) partitions hermetically on its major --- wire-3.x and
 wire-4.x reject each other at both the bridge gate and the peer-peer
 handshake, because 4.x changed convergence and replay semantics.
-\texttt{KERNEL\_VERSION} (currently \texttt{4.27.0}) is informative and
+\texttt{KERNEL\_VERSION} (currently \texttt{4.59.2}) is informative and
 surfaced at every runtime surface (healthz, welcome, UI) --- an
 observability rule, not a gate; wire-compatible kernels interoperate
 freely, and deploys are staggered on exactly that property.
@@ -465,6 +493,18 @@ sequence in one call. After bootstrap the bridge is optional:
 \emph{mesh-relayed signaling} routes SDP/ICE across existing data
 channels, so new direct connections form bridge-free, and existing
 connections never depended on it.
+
+The bridge can also say so out loud. A meshed client is a slot the
+bridge no longer needs, so the bridge closes it with a
+\emph{graduation} code (4200). A client holding at least the
+graduation floor of authenticated mesh peers keeps its mesh and stops
+reconnecting; a watchdog re-dials the bridge only if the mesh later
+thins. A client that was not actually meshed reconnects immediately ---
+which makes the whole scheme self-correcting, so the bridge can
+graduate optimistically and let the client's own state decide. Before
+4.35.0 the client read the graduation close as a failure and tore its
+mesh down to zero peers on the way out --- the bridge politely
+dismissing a student and the student burning down the school.
 
 Bridges self-advertise on the public topic
 \texttt{axona:bridge-directory} (each bridge \texttt{host()}s and
@@ -530,7 +570,7 @@ the oldest self-healing rule in the system --- \emph{a dead waypoint
 always falls through to the topic id and re-seats} --- and it is
 load-bearing: pinned subscriptions to departed relays heal by exactly
 this mechanism, and any analysis that forgets it will wrongly predict
-deadlocks.\marginnote{An external review did precisely this in July
+deadlocks.\marginnote{An external review made exactly this error in July
 2026; the trace is in the Root-Management review response.}
 
 \textbf{The topic decision.} Every topic-addressed handler first
@@ -589,10 +629,69 @@ HOLDER & hosted / app-subscribed & renew; advertise \texttt{hw} & unhost / unsub
 The natures compose (a HOLDER may be ROOT; a BACKUP is also a CHILD
 while its principal lives), but every write of a role onto a node must
 identify which nature it creates and therefore which evictor applies.
-The one production collapse this system has suffered was precisely a
-nature nobody had modeled --- a BACKUP whose principal was already
-gone, created by a departing node, whose subscribe obligation ran
-forever with no eviction path in sight (\S\ref{sec:invariants}, I-10).
+The first production collapse this system suffered was a nature nobody
+had modeled --- a BACKUP whose principal was already gone, created by a
+departing node, whose subscribe obligation ran forever with no eviction
+path in sight (\S\ref{sec:invariants}, I-10).
+
+\subsection{Admission: a node can say no}
+
+The neuromorphic layer has had capacity discipline from the start: a
+hard synaptome budget (50), a refusal path, and breadth-then-depth
+spreading under the cap. The axonic layer had none of it --- no budget,
+no refusal, no spreading. David's pointer was exact: ``the system does
+a pretty good job of spreading connections at the neuromorphic layer;
+we need to do something similar on the axonic side.'' The bill for the
+gap arrived on 2026-07-26: nine production relays on three 961\,MB
+droplets, per-relay role counts of 325, 431, 523 and climbing past
+720, memory at 86--92\%, five of the nine locked out of the bridge ---
+the join-storm spiral, fed by nodes that could not decline the roles
+drowning them.
+
+Since 4.46.0 every role acquisition passes \texttt{canAcceptRole()}:
+one gate, four reasons, two tiers. \textbf{Bridge} is the hard tier and
+the floor may never override it --- a bridge is transport and
+introduction, nothing else; \texttt{host()} was removed from bridges
+and \texttt{sub()} kept rooting anyway, so a soft tier here would
+reopen that door on a timer. The soft tier: \textbf{not-seated} (a
+node under 90\,s old \emph{or} without a routable non-bridge neighbour
+--- not a bare timer, because the locked-out relays sat at 0 open
+channels and 58 bound, and a timer would hand roles to exactly those
+nodes the moment it expired), \textbf{saturated}, and \textbf{paced}
+(more than 4 new roles this tick). Every reason is a property of the
+node's \emph{own} state, self-declared and self-limiting: refusal can
+only make a node hold less, never acquire what it is not closest to.
+It is not an exception to the address rule.
+
+\textbf{The floor is mandatory.} If every candidate refuses, nobody
+roots --- and both soft reasons can do that fleet-wide. A simultaneous
+restart puts everyone in grace; a loaded backbone makes everyone
+saturated; both happened on production the same day. So a soft refusal
+with no alternative candidate is admitted anyway and logged
+\texttt{admitted-despite}. A grace period that can partition the
+network is worse than no grace period.
+
+\textbf{From a count to a measurement.} The original ceiling was
+\texttt{MAX\_ROLES} $=$ 96, and production disproved it as an
+instrument: relays ran 184 to 1{,}182 roles --- seven to twelve times
+the ceiling --- because the mandatory floor must admit every terminal
+role or drop the message. The count carries no information: 96 idle
+roles is nothing, 96 hot ones may be fatal, and the same count means
+different things on different hardware. David's question --- ``can a
+node measure its ability to manage the roles it has?'' --- replaced
+the count with pressure measured against real protocol deadlines, at
+the points where obligations actually complete (4.47--4.53). The
+metric's own first version could not report failure: it stamped every
+role serviced at the \emph{top} of the tick, before any work, and read
+zero while a role sat 95\,s past its 60\,s replication deadline. The
+stamp moved to completion.
+
+\textbf{CAVEAT: this surface is not finished.} Refusal exists and is
+fenced; pressure is measured where obligations complete; what is
+\emph{partial} is the feedback from measured pressure back into
+admission and shedding. The health scorecard tracks the gap; a reader
+should treat ``a node can say no'' as shipped and ``a node sheds load
+before failing'' as in progress.
 
 \subsection{Subscribe: attach, renew, re-home}
 
@@ -651,6 +750,14 @@ idempotent throughout because roots dedup by msgId. Cold publishers
 (\S\ref{sec:timing}) --- each send both integrates the newcomer and gets
 a fresh shot at the true root.
 
+En route, a relay holding a beacon for a closer root \emph{forwards}
+the PUB rather than deferring to it: the send resolves to a verdict
+before any local state moves, and only a \texttt{consumed} verdict from
+the named root re-pins anything (\S\ref{sec:roots}, \emph{Writes
+forward on receipts}). A publish handed to a corpse must teach the
+sender something; before 4.59.0 it taught nothing and took the
+sender's routing state with it.
+
 \subsection{Convergence: one operation, many policies}
 
 Everything that moves topic data in this system is \emph{one operation}
@@ -684,6 +791,7 @@ empty-root probe & cohort+path $\to$ root & root born empty & any history & firs
 cohort replication & root $\to$ 2 closest & change / new member / 60\,s & full state, else \emph{keepalive} & signature match \\
 handoff & leaver $\to$ heir & \texttt{leave()} & full state & \textsc{ack}; 2 rounds + 1 fallback \\
 union-at-root & root $\gets$ any root & REPLICATE arrives & the sender's state & idempotent merge \\
+read-repair & cohort $\to$ stuck subscriber & renewals stall, holder degraded & since-floor delta & first ingest \\
 pull & replica $\to$ reader & on demand & one message & one answer \\
 \bottomrule
 \end{tabular}
@@ -766,9 +874,15 @@ converges.
 
 \texttt{pull(topic, msgId?)} is a one-shot read answered by the
 \emph{first replica} the routed request reaches (by-msgId is exact by
-content address; pull-latest is deliberately ``recent, not necessarily
-newest'' --- hot read paths spread across the cohort instead of
-hammering the root). \texttt{metrics} are demand-driven: a
+content address; pull-latest is ``recent, not necessarily newest'' ---
+hot read paths spread across the cohort instead of hammering the root).
+A pull that returns nothing says \emph{which} nothing: a responder
+answered and holds nothing, nobody answered in time, or a reply arrived
+and would not parse. These used to collapse into one null, and every
+consumer above manufactured a confident negative from it --- one such
+null cost a full day of misdiagnosis against a channel that was serving
+19 subscribers throughout (4.55.0). Three different facts deserve three
+different values. \texttt{metrics} are demand-driven: a
 \texttt{metricson} routed like a SUB arms a renewable 70\,s lease at
 the root, which then publishes signed snapshots
 \texttt{\{topic, ts, by, current\_count, seq, subscribers, bytes\}} to
@@ -831,11 +945,56 @@ property: a lying beacon cannot divert traffic outward); otherwise
 liveness evidence is required, strongest first: a \texttt{verified}
 pointer (network-confirmed by iterative lookup, TTL 90\,s), a
 channel-verified direct neighbour (opens \emph{instantly} on churn ---
-the dead root's channel drop is the gate), or --- only for the loose
-mode used by PUB/KILL --- a beacon heard within 30\,s (a live root
-re-beacons every 20\,s; silence is death). SUB, METRICSON, promotion,
-and post-handoff use the strict mode: seating infrastructure demands
-channel or network evidence.
+the dead root's channel drop is the gate), or a beacon heard within
+$1.5\times$\texttt{BEACON\_MS} = 30\,s (a live root re-beacons every
+20\,s; silence is death). The freshness cut applies to \emph{every}
+form of beacon evidence, verified pointers included. It did not always:
+until 4.59.0 a \texttt{verified} pointer bypassed the cut, so one stale
+pointer to a dead root could steer traffic at a corpse for as long as
+the pointer lived. SUB, METRICSON, promotion, and post-handoff use the
+strict mode: seating infrastructure demands channel or network
+evidence.
+
+\subsection{Writes forward on receipts, not on faith}
+
+Reads and writes used to pass different gates, and the asymmetry cost a
+production outage. On 2026-08-02 a host restart took out most of a
+relay fleet; reads kept working for the surviving holders, because
+\texttt{\_onSub} demanded channel evidence before deferring --- but
+\texttt{\_onPub} and \texttt{\_onKill} deferred to any beaconed root
+with no liveness test at all. One stale beacon ate every write to its
+slice for hours while six of the eight holders sat alive and willing.
+The read path checked its evidence; the write path trusted a pointer.
+
+Since 4.59.0 a PUB or KILL toward a beaconed root is a
+\emph{forward}, not a defer, and the distinction is load-bearing:
+
+\begin{itemize}
+\item \textbf{Dispatch first, mutate on receipt.} The old defer demoted
+  the local role and re-pinned upstream \emph{before} sending --- so a
+  publish toward a dead relay both vanished and left the sender wired
+  to the corpse. Now nothing about local role or upstream state moves
+  until the dispatch verdict resolves \texttt{consumed} \emph{and}
+  \texttt{atNode} names the root the forward was aimed at. A failed
+  send moves nothing; the sender's own retries then route by the
+  ordinary rules.
+\item \textbf{A failed verdict revokes only what it tested.} A forward
+  that fails invalidates the one beacon record it was built on ---
+  matched by root identity \emph{and} capture time --- and nothing
+  else. A verdict that captured no record has no deletion authority: it
+  describes a probe of a pointer the node never held, and a
+  newer-generation beacon that arrived mid-flight survives it
+  (4.59.2). Without the strict match, one slow failure could erase the
+  fresh pointer that had just replaced the stale one.
+\end{itemize}
+
+Both halves are fenced (\texttt{fence\_pub\_defers\_to\_corpse}, red
+against the pre-fix kernel, green after), and measured live: on the
+testnet fleet, writes issued 5 seconds after a root's SIGKILL --- inside
+the freshness window, the exact regime that ate the 2026-08-02 writes
+--- delivered 30 of 30, in each of two runs against different victims.
+Writes at the 30\,s boundary the criterion actually demands: also 30 of
+30.
 
 \subsection{The evidence planes}
 
@@ -850,10 +1009,23 @@ every root re-checks its own claim with the same iterative lookup
 subscribers use --- at 6\,s after forming (the fresh-topic race window),
 then every 45\,s, batched 3 per tick, never awaited inside the tick.
 Finding a strictly-closer live node seeds a \texttt{verified} pointer
-and demotes. \textbf{Death sweeps}: when a peer's channel closes or it
+and demotes. This whole plane depends on the DHT adapter returning a
+real \texttt{LookupResult}: the default adapter used to return a bare
+id while every consumer read \texttt{r.path}, so self-verification and
+the iterative escapes were silent no-ops on \emph{every} standalone
+peer --- present in the code, absent from the network --- until 4.28.1. \textbf{Death sweeps}: when a peer's channel closes or it
 announces leave, every beacon naming it \emph{and every upstream pin on
 it} is purged, with the pinned subscription's renewal clock reset ---
 re-homing is next-tick, and the reachable-root fallback re-arms.
+\textbf{The replica ledger}: \texttt{role.replicas} is durability
+bookkeeping --- it decides whether a topic counts as safely replicated
+and whether history survives the root leaving --- and it records a
+backup only on a \emph{verified dispatch}: the replicate resolved
+\texttt{consumed} at the named node. It used to record on the strength
+of a local call that had not thrown, and routing does not throw --- it
+reports failure by resolving. Measured before the 4.57.0 fix: thirteen
+replicate sends, all failed, ledger reading \texttt{replicas:\,2}. A
+ledger written from intentions is not a ledger.
 
 \subsection{The fallback asymmetry}
 
@@ -865,8 +1037,8 @@ demote it within one period; deferring wrongly strands the topic
 forever. When the mesh is bare (no non-bridge neighbours), a self-SUB
 terminal claims nothing --- ``terminal at self'' on an unmeshed node is
 isolation, not closeness; the seat is held and the fast renewal re-runs
-the decision once meshed. Publish-side is deliberately not gated: a
-genuinely solo node still roots its own publish.
+the decision once meshed. Publish-side is not gated, by design: a solo
+node still roots its own publish.
 
 % =====================================================================
 % X. LIFECYCLE: JOIN AND LEAVE
@@ -874,37 +1046,74 @@ genuinely solo node still roots its own publish.
 \section{Lifecycle: Join and Leave}\label{sec:lifecycle}
 
 \textbf{Join}: \texttt{connect(\{bridge, identity?\})} performs the
-bridge bootstrap of \S\ref{sec:transport}, resolves the directory, and
-returns a started peer. Reachability ripens over the first seconds as
-inbound traffic writes the newcomer into neighbours' tables; the cold
-publisher burst and the fast renewal floor are shaped around exactly
-this window.
+bridge bootstrap of \S\ref{sec:transport}, resolves the directory,
+\emph{self-integrates}, and returns a started peer. There is no second
+call to make and no hidden step --- \texttt{connect()} is the single,
+complete entry point (4.40.0), and the completeness was bought the hard
+way. Self-integration --- \texttt{findKClosest(self)} plus opened,
+authenticated channels to the results, the primitive that lifts a
+newcomer from the passive-adoption floor (sim-validated: 7--27\%
+reachability without it, 95--98\% with) --- used to run only on the
+sponsored \texttt{join(sponsor)} path. The two one-call paths every
+real application uses, \texttt{connect()} and no-sponsor
+\texttt{join()}, both skipped it (4.39.0). So applications sat at the
+churn floor and self-rooted their topics as singletons in sparse
+regions: fresh subscribers read nothing, publishers stranded on leave
+--- and the one application that worked, worked only because it called
+the integration primitive by hand. An entry point that requires a
+manual step to work is not an entry point. Reachability still ripens
+over the first seconds as inbound traffic writes the newcomer into
+neighbours' tables; the cold publisher burst and the fast renewal floor
+are shaped around exactly this window.
 
 \textbf{Leave} (\texttt{leave(\{timeoutMs\})}) is a contract with three
-promises, each bought by an incident:
+promises, each bought by an incident --- and the \emph{order} of the
+promises is itself the contract. \texttt{leave()} used to announce the
+departure first. Receivers hard-close the leaver's channels on that
+signal (the proactive re-anchor fast path), so every routed
+\texttt{handoff} that followed found no route, terminated back at the
+sender, and was silently discarded --- captured live as 173 of 173
+leave handoffs boomeranging with zero acks. Every topic whose only copy
+rode a handoff died with the leaver, deterministically, about 10\% of
+publishes. The courtesy call announced the death before the will was
+read. The order is now drain, hand off, \emph{then} notify (4.32.0),
+and no promise below may be reordered past another:
 \begin{enumerate}
 \item \emph{Drain on evidence}: poll until the pending publish/kill maps
   are empty --- a confirmed publish departs instantly, an unconfirmed one
   gets the caller's full window (never a hidden cap). Internal waits are
   ref'd timers: Node must not exit mid-leave.
-\item \emph{Hand off every rooted topic, confirmed}: for each rooted,
-  cache-bearing topic, resolve an heir \emph{and a runner-up} --- local
-  K-closest first, falling back to the \emph{iterative} lookup when the
-  leaver's table is thin (the fresh burst-publisher case) --- with 8
-  resolutions in flight; then send \texttt{pubsub:handoff \{topicId,
-  msgs, dels, from\}} in \emph{acknowledged rounds}: all unacked heirs
-  per round, one shared 700\,ms ack window, two rounds. The heir
-  replies \texttt{handoffack}; fire-and-forget silently dropped a
-  topic's last copy whenever the one send didn't land (diagnosed in the
-  field as 40/40 confirmation failures). A topic still unacked after
-  the rounds gets \emph{one} fallback \texttt{handoff} to the runner-up
-  --- worst case two proper holders whose caches union --- and
-  \emph{never} a \texttt{replicate}: acks are a race against load, so
-  ``unacked'' usually means ``acked late,'' and a departing node
-  spraying replica state plants backups of a dead principal (the
-  principal-liveness rule; violating it collapsed the backbone twice).
-  \texttt{from} names the leaver so the heir purges the leaver's ghost
-  beacon and never defers its new claim back to it.
+\item \emph{Hand off every last copy, confirmed}: for each cache-bearing
+  topic the leaver ROOTS \emph{or holds as a BACKUP}, resolve an heir
+  \emph{and a runner-up} --- in-region first (an out-of-region holder is
+  durable but unfindable by routed reads), local K-closest, falling
+  back to the \emph{iterative} lookup when the leaver's table is thin
+  (the fresh burst-publisher case) --- with 8 resolutions in flight,
+  singleton roots first, the whole handoff bounded in proportion to the
+  role count (cap 60\,s). Rooted-only handoff was the
+  \textsc{handoff\_gap}: under churn a copy cascades root
+  $\to$ backup, the backup departs, and the last copy dies with a node
+  that never considered it worth handing off --- 100\% of a
+  field-measured 9--13\% restart loss classified as exactly this
+  (4.31.0). Then send \texttt{pubsub:handoff \{topicId, msgs, dels,
+  from\}} in \emph{acknowledged rounds}: all unacked heirs per round, a
+  shared 700\,ms ack window scaled under load, two rounds. The heir
+  replies \texttt{handoffack} --- and the ack claims only what the heir
+  \emph{holds}. The ingest path had five silent early-returns, and the
+  ack said \texttt{\{topicId\}} regardless, so an heir that rejected
+  half a batch acked byte-identically to one that took all of it; the
+  leaver then exempted the topic from every retry and departed with the
+  rejected half (4.45.0). Fire-and-forget was worse still: it dropped a
+  topic's last copy whenever the one send didn't land (40/40
+  confirmation failures in the field). A topic still unacked after the
+  rounds gets \emph{one} fallback \texttt{handoff} to the runner-up ---
+  worst case two proper holders whose caches union --- and \emph{never}
+  a \texttt{replicate}: acks are a race against load, so ``unacked''
+  usually means ``acked late,'' and a departing node spraying replica
+  state plants backups of a dead principal (the principal-liveness
+  rule; violating it collapsed the backbone twice). \texttt{from} names
+  the leaver so the heir purges the leaver's ghost beacon and never
+  defers its new claim back to it.
 \item \emph{Then silence}: notify peers in parallel (they run the death
   sweep immediately), stop the tick, clear all retry state. A peer that
   has left sends nothing --- and the network stops listening for it.
@@ -946,7 +1155,7 @@ replicate full-push backstop & 60\,s & delta gate: keepalives between; anti-entr
 replicate full-push budget & 32/tick & join-storm pacing: seed a newcomer over ticks, not in one (I-11) \\
 ingest queue / slice & 4096 / 8\,ms & bulk verify can't monopolize the loop; overflow drops newest (logged) \\
 mesh re-warm & $<$3 peers $\times$ 3 ticks, 60\,s cooldown & a dissolved mesh re-runs self-integration \\
-handoff ack window / rounds & 700\,ms / 2 & confirmed departure inside \texttt{leave()}'s bound \\
+handoff ack window / rounds & 700\,ms base (load-scaled) / 2 & confirmed departure; whole handoff $\propto$ roles, cap 60\,s \\
 backup eviction (re-homed idle) & 60\,s & bounds set growth only; never fires while electable \\
 empty-root probe & 800\,ms, 5\,s, $\le$3, fan 4 & delay / re-try / cap / fanout; quench on ingest \\
 pending TTL / tries & 30\,s / 6 & bounded retry; $\mathrm{loss}^7$ negligible at 30\% \\
@@ -964,9 +1173,10 @@ Convergence intuition: a wrong claim inside the beacon basin corrects
 within $\le$20\,s; outside it, $\le$6\,s fresh / $\le$45\,s steady; a
 deferral to an unreachable node resolves in $\sim$6\,s; a dead root's
 influence ends at channel-close for neighbours and $\le$30\,s
-otherwise; a subscriber whose neighbour upstream dies re-homes next
-tick; a backed-off subscriber heals no later than its next renewal via
-the waypoint-pop rule.
+otherwise --- and since 4.59.0 that bound governs \emph{writes} as well
+as reads, because both pass the same gate (I-12); a subscriber whose
+neighbour upstream dies re-homes next tick; a backed-off subscriber
+heals no later than its next renewal via the waypoint-pop rule.
 
 % =====================================================================
 % XII. INVARIANTS
@@ -1006,6 +1216,21 @@ violates one is wrong even if it benchmarks well.
 \item[\textbf{I-11}] Bulk work never starves liveness: unbounded batch
   ingest/emission yields to the event loop at a fixed stride; a node is
   never evicted by its peers \emph{because} it was absorbing history.
+\item[\textbf{I-12}] A write is never handed to a root without live
+  evidence --- a channel, a network-verified pointer, or a beacon
+  fresher than $1.5\times$\texttt{BEACON\_MS} --- and local routing
+  state mutates only on a \texttt{consumed} verdict from the node the
+  write was aimed at. The read path and the write path pass the same
+  gate.
+\item[\textbf{I-13}] Durable bookkeeping is written from receipts,
+  never from sends. A replica, an upstream pin, a beacon invalidation
+  --- each requires a verdict naming the node it concerns; a send that
+  merely didn't throw proves nothing, because routing reports failure
+  by resolving.
+\item[\textbf{I-14}] A negative result names its kind. Timeout,
+  answered-empty, and unparseable are three facts; any surface that
+  collapses them into one value invites its caller to manufacture a
+  confident wrong conclusion.
 \end{enumerate}
 
 % =====================================================================
@@ -1019,11 +1244,49 @@ violates one is wrong even if it benchmarks well.
   renewal routes toward the corpse, pops at the live terminal, re-seats
   at the true root, and the deliver re-pins --- worst case one renewal
   interval.
+\item[The topic-closest node is alive but useless.] Dead is the easy
+  case --- the channel drops and everything sweeps. A \emph{degraded}
+  holder answers the transport and fails the protocol, so nothing
+  sweeps and a subscriber can renew into it forever. Read escalation
+  (4.33.0) probes past dead \emph{and} degraded holders, and
+  stuck-subscriber read-repair (4.36.0) lets the cohort push the
+  since-floor delta to a subscriber whose renewals stall against a
+  holder that will not serve --- quenched on first ingest, one row in
+  the policy table. The A/B under packet loss is the receipt: 4.36
+  against 4.35, same loss rate, read-repair carried the difference.
+  The bridge departure hints that shipped alongside are marked
+  TEMPORARY in the source and carry a reachability guard; a permanent
+  mechanism must not lean on the bridge (\S\ref{sec:transport}).
 \item[The root dies abruptly.] Its beacons are swept by neighbours; the
   warm cohort already holds cache+tombstones; the closest backup's next
   renewal terminates at itself and it promotes, gap-free; the rest
   re-home under it. Singleton topics survive because replication is
-  proactive, not reactive.
+  proactive, not reactive. Writes in flight ride the forward contract:
+  a send at the corpse fails to a verdict, the sender's pending retry
+  re-routes, and the stale beacon is cut at $1.5\times$ the beacon
+  period even if nothing sweeps it sooner. Measured on the live fleet:
+  30 of 30 writes issued 5\,s after a SIGKILL delivered, twice, against
+  different victims.
+\item[A stale beacon names a corpse.] The pre-4.59 failure mode, and
+  the one that cost 2026-08-02's production writes: the pointer
+  outlives the node, and everything routed by it vanishes while the
+  node's neighbours still answer reads. Now every beacon path ---
+  verified pointers included --- carries the 30\,s freshness cut, a
+  forward that fails revokes exactly the pointer it tested, and no
+  verdict deletes a pointer it never captured. The corpse's influence
+  over writes ends with its beacon's freshness, not with luck.
+\item[A send fails without a sound.] Routing does not throw ---
+  \texttt{routeMessage} reports failure by \emph{resolving}
+  \texttt{\{consumed:\,false\}} --- so a caller that discards the
+  promise cannot tell delivery from silence, and no try/catch will ever
+  tell it. The containment lives in one place: every emission path
+  returns the verdict, a transport error becomes a failure verdict of
+  the same shape, and a rejecting transport cannot kill the process
+  (4.57.1). Callers that ignore the result stay safe; callers that read
+  it get the truth. The 4.49.0 class --- a node dead in every duty while
+  its health endpoint reads fine, bought by one swallowed
+  \texttt{TypeError} in the repair tick --- is fenced against
+  recurrence.
 \item[The root leaves gracefully.] Handoff pushes history to heirs
   (parallel, timeout-raced, thin-table lookup fallback); heirs never
   defer back to the leaver.
@@ -1069,6 +1332,92 @@ violates one is wrong even if it benchmarks well.
 \end{description}
 
 % =====================================================================
+% XIII-B. THE SHIP OF THESEUS
+% =====================================================================
+\section{The Ship of Theseus: Durability Under Replacement}\label{sec:theseus}
+
+Replace every plank of a ship, one at a time, and ask whether the same
+ship remains. Replace every node of an Axona network, one at a time,
+and the question stops being philosophy: does the data survive? The
+preceding section lists the mechanisms; this one reports what happens
+when a 200-node fleet is replaced end to end, node by node, with the
+mechanisms doing their work. The numbers are from the theseus harness
+(dht-sim, 200 nodes, 32 topics per run, 10 messages per topic,
+replacement interval as the independent variable); single runs are
+noise, so every figure is aggregated across repetitions.
+
+\textbf{Loss comes in whole topics.} Across every arm measured --- soft
+and hard, thousands of topics --- a topic read back after full
+replacement is either complete or empty, never partial. The cohort
+replicates full state; a survivor has everything or was never in the
+cohort at all. This granularity is the fact the rest of the model
+hangs on, and it is why the durability question reduces to one event:
+does a topic's last warm holder die before anyone notices.
+
+\textbf{Graceful replacement loses nothing.} With \texttt{leave()} ---
+handoff before announcement, \S\ref{sec:lifecycle} --- loss was 0.000\%
+across 180 runs, 1,890 topics, 60,165 messages, at every replacement
+speed measured. The Ship of Theseus sails home intact, provided each
+plank is removed by a carpenter and not by cannon fire.
+
+\textbf{Abrupt replacement is a race, and the clock is the killer.}
+Kill nodes with no handoff --- SIGKILL, the cannon --- and loss appears,
+governed by timing rather than placement: 2.2\% of topics at a
+1.2\,s replacement interval, falling roughly 30-fold as the interval
+stretches 16-fold (log-log slope $-1.28$), toward zero as replacement
+slows past the cohort's own re-check pace. Nodes died in random order,
+so the victims scattered across the address space; kill in address
+order and a topic can lose its whole cohort at once. 2.2\% is the good
+case.
+
+\textbf{Holder count is a proxy, not a cause.} Per-death, across 904
+single-death topics: one warm backup lost 25.0\%, two lost 8.9\%
+($\pm$2.3, n$=$616), three lost 0\% (n$=$202). Read alone, that table
+says ``add a replica.'' The controlled comparison says otherwise:
+raising \texttt{ROOT\_REPLICAS} from 2 to 3 roughly halved loss at the
+cost of 50\% more replication traffic --- and installed no floor.
+Worse for the simple story, topics holding three warm backups in the
+3-replica arm still lost 11.2\% under identical churn while the
+2-replica arm's three-backup topics lost nothing. The count was
+standing in for something else: a \emph{quiet, well-connected
+neighbourhood} whose members hear about the death in time. Durability
+is not how many copies exist. It is whether the survivors' next
+conversation happens before the next death.
+
+\textbf{Communication is the substrate.} That reading was David's
+conjecture --- the network is built around information flow, so a
+network that talks more survives more --- and two measurements back
+it. First, the renewal asymmetry: backups re-check their principal
+every tick, ungated at 5\,s, while ordinary subscribers back off from
+5\,s to 60\,s; the cohort talks twelve times as often as the
+subscriber population, and the cohort is what survives. Second,
+directed integration: a newcomer becomes reachable only when traffic
+arrives \emph{at} it, writing it into its neighbours' tables --- about
+4 directed packets per newcomer achieved what two and a half times as
+much undirected warmup traffic did. The lever on durability is the
+rate of the right conversations, not the size of the crew.
+
+\textbf{The live fleet agrees, with a tail.} On the 26-relay testnet
+fleet (kernel 4.59.2), the census reads a median of three warm holders
+per topic --- root plus two backups, as configured --- but 2 of 30
+freshly-minted topics sat at two holders before any churn at all, and
+the tail widened to 6 of 30 under sequential kills. Six targeted
+deaths (the largest role-holders, 90\,s apart) lost nothing: 30 of 30
+topics replayed complete. Six deaths cannot observe a per-death rate
+of a few percent on a thin tail; the sim's 904 deaths could, and did.
+The thin tail is where the loss lives. Watch it in hours, not
+minutes.
+
+\textbf{What this means for operating a fleet:} call \texttt{leave()}
+on every shutdown you control; roll one node at a time with the
+replacement already live; treat abrupt mass death as the one event
+the protocol does not yet promise to absorb, and measure it before
+trusting it. The open design limit is recorded rather than hidden:
+root reconciliation reaches only the \texttt{ROOT\_REPLICAS} cohort,
+so a duplicate root that forms beyond it is permanent until re-rooted
+--- a known limit, tracked, not yet paid for.
+
+% =====================================================================
 % XIV. THE APPLICATION API
 % =====================================================================
 \section{The Application API}\label{sec:api}
@@ -1091,7 +1440,18 @@ PersistenceAdapter (IndexedDB, file, memory). Topic arguments are
 descriptors (\S\ref{sec:identity}); \texttt{signWith} takes an author
 identity or the \texttt{ANONYMOUS} sentinel. Applications render
 message bodies through \texttt{std/message} and move bulk bytes through
-\texttt{std/chunk} (10\,KB chunks under the 15\,KB reliable floor).
+\texttt{std/chunk} (10\,KB chunks under the 15\,KB reliable floor;
+chunked receive returns per-file msgIds so a transfer can later be
+\texttt{kill}ed).
+
+Two return-shape facts, each the residue of a confident-false-negative:
+\texttt{pull} returns the \emph{full envelope} --- msgId, stamp, signer,
+body --- not the bare body; the bare-body shape made every publish
+confirmation built on it read \texttt{null} and fail forever (4.29.0).
+And \texttt{metrics().publishes} is a real throughput counter; it was
+wired to nothing and reported zero for the life of the 4.x line until
+4.41.0 --- an observability surface that existed and silently lied,
+the exact class I-6 forbids.
 
 % =====================================================================
 % XV. SECURITY MODEL
@@ -1123,15 +1483,17 @@ may join the two.
 \section{Production Deployment}
 
 Two isolated networks, partitioned hermetically by wire major.
-\textbf{Production}: bridges east (\texttt{bridge.axona.net}, NYC) and
-west (\texttt{bridge-west.axona.net}, SFO), Dockerized, federated by
-uplink; a nine-relay backbone (three droplets $\times$ three relays:
-SFO/NYC/TOR) running keyspace hosting; the reference app at
-\texttt{axona.net}. \textbf{Testnet}: the staging line
-(\texttt{testnet.axona.net} bridge + apps) --- every kernel release
-soaks here first; prod promotion is a deliberate, evidence-gated step
-(full suite, external axonSpec gate, settled-mesh soak acceptance, and
-the standing runbook). Every component surfaces its
+\textbf{Production} runs three kinds of standing infrastructure, and
+the doc describes their natures rather than their addresses: multiple
+\emph{bridges} (Dockerized, federated by uplink, advertising on the
+directory topic) spread across regions; a \emph{relay backbone} ---
+groups of keyspace-hosting relays in several geographic regions, so no
+single region's outage removes the majority of standing holders; and
+the reference application, \texttt{axona.chat}. \textbf{Testnet} is
+the staging network --- its own bridge and apps, hermetically separate
+--- and every kernel release soaks there first; prod promotion is a
+deliberate, evidence-gated step (full suite, external axonSpec gate,
+settled-mesh soak acceptance, and the standing runbook). Every component surfaces its
 \texttt{KERNEL\_VERSION} at a runtime-inspectable surface; deploys are
 staggered and judged only after the mesh settle window, never by
 one-shot fresh clients.
@@ -1248,10 +1610,11 @@ $T=\{$region:\,useast, owner:\,null, name:\,'lobby', write:\,'open'$\}$.
 
 \vspace{1.5em}
 \noindent\textcolor{inkmuted}{\footnotesize\itshape
-Axona Architecture v4.27.0 --- 2026-07-16. Versioned to the kernel
-release deployed on testnet that it describes; re-version on the release
-that next changes protocol behavior. Companions: Root-Management-v4.20.1,
-INVARIANTS.md (eleven invariants), Kernel-Refactor-Analysis-v0.2 (the
-convergence-plane program), Soak-Framework-Overview-v4.21.0.}
+Axona Architecture, DRAFT toward v4.59.2 --- 2026-08-03. Versioned to
+the kernel release deployed on testnet that it describes; re-version on
+the release that next changes protocol behavior. Companions:
+Root-Management-v4.20.1, INVARIANTS.md (fourteen invariants),
+Kernel-Refactor-Analysis-v0.2 (the convergence-plane program),
+Soak-Framework-Overview-v4.21.0.}
 
 \end{document}

@@ -90,7 +90,7 @@ the architecture scorecards, `implementation/`, and everything in `team-updates/
 | Site | Repo | Mechanism | Notes |
 |---|---|---|---|
 | **axona.net** | `axona-web` | Pages from `main`, `CNAME` in repo | Hosts the whitepaper mirror + doc links |
-| **demo.axona.net** | `axona-protocol` | Pages from `main`, `CNAME` in repo | `apps/` — minimal, share, pow-bench |
+| **demo.axona.net** | `axona-protocol` | Pages from `main`, `CNAME` in repo | `apps/` — minimal, share, pow-bench **AND `examples/`** — minimal-pubsub-browser, minimal-pubsub, s2-region-visualizer |
 | **axona.chat** | `axona-chat` | Pages via `.github/workflows/deploy.yml` | Custom domain is a **Pages setting**, not a repo `CNAME` |
 | **axona-share** (standalone) | `axona-share` | Pages via `.github/workflows/pages.yml` | `axona-net.github.io/axona-share` |
 | **testnet.axona.net** | droplet `161.35.234.165` | `git pull` on three `testnet` checkouts | bridge + peer app + demo-testnet |
@@ -98,6 +98,30 @@ the architecture scorecards, `implementation/`, and everything in `team-updates/
 **Deploy branches:** work happens on `testnet`, live sites build from `main`. Web
 and prod repos need `git push origin testnet:main` as well as
 `git push origin testnet`. (`axona-relay` and `dht-sim` are testnet-only.)
+
+### 2a. The `?v=` cache-bust tags — automated, do not hand-edit
+
+The browser apps import kernel modules as `/src/index.js?v=<version>`. That tag is
+what makes a returning browser re-fetch instead of replaying what it cached last
+release. It used to be hand-edited and it drifted: on 2026-08-04 the live apps
+carried `?v=4.49.0` and `examples/minimal-pubsub-browser` carried `?v=4.24.0`
+while the server served 4.59.2.
+
+**This drift is invisible to a `curl` check.** A cold fetch has no cache and
+reports the new version; a returning browser runs the old modules. Verifying a
+deploy with `curl` — which is what was done — cannot see it.
+
+`examples/` was absent from the table above, which is why it rotted furthest.
+A surface not listed here is a surface that will go stale.
+
+```bash
+node scripts/sync-cachebust.mjs          # rewrite every tag from package.json
+node scripts/sync-cachebust.mjs --check  # exit 1 on drift
+```
+
+`npm test` runs `--check` first and refuses to run the suite on drift, so the
+tags can no longer rot silently. `package.json` is the single source; the script
+is the only writer.
 
 **The whitepaper lives in TWO repos.** Edit the source in `axona-docs/whitepaper`,
 render, then **copy the fresh PDF into `axona-web/whitepaper/` and push `main`** —
