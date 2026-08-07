@@ -16,6 +16,25 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel 4.60.0 – 4.61.0 — 2026-08-07 — connectivity failures surface instead of degrading silently (production-deployed)
+
+**What is protected:** a user's knowledge of their own connectivity.
+
+Two changes, one principle. First, TURN credentials now refresh in-band before
+their 2-hour TTL expires, so a long-lived node no longer loses its relay path
+mid-session with nothing in the log but a quiet ICE failure (issues #44/#45).
+Second, `connect()` throws `MeshUnreachableError` when the mesh wait ends with
+zero live WebRTC channels — reaching the bridge and nothing else previously
+looked like success while every message went nowhere. The override is explicit:
+`allowBridgeOnly: true`, which stamps `status.initialBridgeOnly` and logs a
+`bridge-only` warning so the degraded state is visible to the app and its user
+(issue #46, council-reviewed).
+
+What this does not do: the gate is a connect-time snapshot, not a runtime
+monitor — a mesh that dies later is issue #438's territory. Promoted to both
+production bridges and the 18-relay backbone on 2026-08-07 after Stage-4
+acceptance on testnet.
+
 ## Kernel 4.59.0 – 4.59.2 — 2026-08-02 — a write can no longer be silently fed to a dead root (testnet-deployed at 4.59.2)
 
 **What is protected:** message durability on the WRITE path during infrastructure
