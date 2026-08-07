@@ -16,7 +16,7 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
-## Kernel 4.60.0 – 4.61.0 — 2026-08-07 — connectivity failures surface instead of degrading silently (production-deployed)
+## Kernel 4.60.0 – 4.61.2 — 2026-08-07 — connectivity failures surface instead of degrading silently (production-deployed at 4.61.2)
 
 **What is protected:** a user's knowledge of their own connectivity.
 
@@ -30,10 +30,16 @@ looked like success while every message went nowhere. The override is explicit:
 `bridge-only` warning so the degraded state is visible to the app and its user
 (issue #46, council-reviewed).
 
-What this does not do: the gate is a connect-time snapshot, not a runtime
-monitor — a mesh that dies later is issue #438's territory. Promoted to both
-production bridges and the 18-relay backbone on 2026-08-07 after Stage-4
-acceptance on testnet.
+Same-day revision: the 4.61.0 gate judged live channels at the instant the
+synaptome warm-up resolved, which the bridge satisfies in under a millisecond
+— every `minPeers` caller threw on every load (a ~45-minute production
+outage). 4.61.1/4.61.2 make the contract atomic: one monotonic deadline (the
+caller's own ready timeout) covers warm-up and live-mesh admission, the gate
+resolves on the first live bind, and it throws only when that deadline
+expires with zero channels (issue #48, council-reviewed). What this does not
+do: the gate is a connect-time snapshot, not a runtime monitor — a mesh that
+dies later is issue #438's territory. Promoted to both production bridges,
+the 18-relay backbone, and the reference apps on 2026-08-07.
 
 ## Kernel 4.59.0 – 4.59.2 — 2026-08-02 — a write can no longer be silently fed to a dead root (testnet-deployed at 4.59.2)
 
