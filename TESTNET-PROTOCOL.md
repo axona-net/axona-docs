@@ -1,9 +1,9 @@
 # Testnet Test Protocol
 
 **File:** `axona-docs/TESTNET-PROTOCOL.md`
-**Kernel version on testnet:** 4.61.0 (re-version this header whenever the
+**Kernel version on testnet:** 4.61.2 (re-version this header whenever the
 deployed testnet kernel changes — held or undeployed releases do not count)
-**Standing decision (David, 2026-08-07):** the M1 relay fleet is the designated
+**Standing decision (David, 2026-08-07):** the M4 relay fleet is the designated
 test fleet for testnet verification, at a standing size of **26 relays**. Three
 relays made every placement, heir, and routing choice trivial — with a
 replication cohort of K=3, three candidates means no selection at all.
@@ -31,7 +31,7 @@ Measured 2026-08-07. Re-verify before trusting; state drifts.
 | Bridge | droplet `161.35.234.165` (`testnet.axona.net`), `/opt/axona-bridge`, systemd `axona-bridge.service` | the only enabled service on the droplet; healthz reports `version` + `kernelVersion` |
 | Demo apps | droplet `/var/www/axona-demo-testnet` (an `axona-protocol` testnet checkout) | serves the demo + example apps with `?v=` cache-bust markers |
 | Peer app | droplet `/var/www/axona-peer-testnet` | FROZEN at v4.38.0 — never updated, never part of a deploy |
-| Relay fleet | **the M1 Mac**, `axona-relay/` — there are NO droplet relays | started with `start-fleet.sh`, updated with `roll-fleet.sh`; slots run `src/index.js`, logs in `relay-logs/relay-<n>.log` |
+| Relay fleet | **the M4 Mac** (the machine these ops scripts run on; the "M1" is a separate remote Mac), `axona-relay/` — there are NO droplet relays | started with `start-fleet.sh`, updated with `roll-fleet.sh`; slots run `src/index.js`, logs in `relay-logs/relay-<n>.log` |
 | TURN | coturn behind the bridge stack | credentials minted by the bridge (2h TTL, in-band refresh since 4.60.x) |
 | Directory | opted out | the testnet bridge never advertises (`BRIDGE_DIRECTORY=off`) — an independent island by design |
 
@@ -39,7 +39,7 @@ A dormant `/opt/axona-relay` checkout sits on the droplet (relay v0.100.0, no
 systemd unit — residue of the 2026-08-03 acceptance-gate work). It runs
 nothing. Delete it or promote it deliberately; do not mistake it for a fleet.
 
-### The M1 fleet, precisely
+### The M4 fleet, precisely
 
 - **Cold start:** `N=26 bash start-fleet.sh` — the standing size is 26
   (David, 2026-08-07; the script's own default is still 3, so pass N
@@ -66,7 +66,7 @@ ones passed on the exact refs being deployed.
 
 ### Stage 1 — Pre-deploy gates (local, all green before anything ships)
 
-- **Kernel:** `npm test` — the manifest suite (137 tests at 4.61.0). The
+- **Kernel:** `npm test` — the manifest suite (137 tests at 4.61.2). The
   manifest guard fails the run if any test file on disk is unwired or any
   entry is missing. `sync-cachebust --check` must be green so app `?v=`
   markers match the kernel version.
@@ -107,9 +107,9 @@ find credentials" above 1% of allocations; admitted peers dropping while the
 socket count holds; healthz version drift; a connect-failure spike from
 clients that should mesh.
 
-### Stage 4 — Fleet-based behavioral acceptance (the M1 fleet)
+### Stage 4 — Fleet-based behavioral acceptance (the M4 fleet)
 
-The bridge alone cannot exercise the mesh path. Stand the M1 fleet up (or
+The bridge alone cannot exercise the mesh path. Stand the M4 fleet up (or
 roll it to the new refs if it is already running), then drive live behavior:
 
 - **Warm-topic delivery** — verify pub/sub against a standing topic
@@ -166,7 +166,7 @@ separate, David-gated act and is out of scope for this page.
   upgrade available to this protocol.
 - **The droplet's dormant relay checkout** needs a decision: delete, or
   promote into a real second-region relay under systemd.
-- **Fleet coverage between deploys is thin** — the M1 fleet is stood up for
+- **Fleet coverage between deploys is thin** — the M4 fleet is stood up for
   verification, not kept hot continuously; between runs, testnet is
   bridge-only.
 - The refactor plan's **Phase 0 golden traces** will become the
