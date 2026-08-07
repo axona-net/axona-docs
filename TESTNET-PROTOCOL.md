@@ -4,7 +4,9 @@
 **Kernel version on testnet:** 4.61.0 (re-version this header whenever the
 deployed testnet kernel changes — held or undeployed releases do not count)
 **Standing decision (David, 2026-08-07):** the M1 relay fleet is the designated
-test fleet for testnet verification.
+test fleet for testnet verification, at a standing size of **26 relays**. Three
+relays made every placement, heir, and routing choice trivial — with a
+replication cohort of K=3, three candidates means no selection at all.
 
 ---
 
@@ -39,9 +41,10 @@ nothing. Delete it or promote it deliberately; do not mistake it for a fleet.
 
 ### The M1 fleet, precisely
 
-- **Cold start:** `bash start-fleet.sh` — defaults `N=3`, `REGION=eagle`,
-  `BRIDGE=wss://testnet.axona.net`; hosts keyspace 0x89 and runs the
-  metric-publish loop. Override with env: `N=26 bash start-fleet.sh`.
+- **Cold start:** `N=26 bash start-fleet.sh` — the standing size is 26
+  (David, 2026-08-07; the script's own default is still 3, so pass N
+  explicitly). `REGION=eagle`, `BRIDGE=wss://testnet.axona.net`; hosts
+  keyspace 0x89 and runs the metric-publish loop.
   The launcher verifies its own artifact: node is resolved before any slot
   starts, and after a settle every slot must be alive AND have written this
   launch's startup banner, or the script exits 1. It also kills any prior
