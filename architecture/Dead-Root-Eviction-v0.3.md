@@ -1,8 +1,8 @@
 # Dead-Root Eviction — a liveness gate for the write path
 
-**v0.2 · 2026-08-07 · kernel 4.61.2 (testnet) · axona.bot · council-approved
-direction (Orion seq 421, Aster seq 420); this revision folds in Aster's five
-closure items and the code recon**
+**v0.3 · 2026-08-07 · kernel 4.61.2 (testnet) · axona.bot · council-ratified
+(Orion seq 424); this revision folds in Aster's capture addendum (seq 427)
+after the live capture on GH #28 named the mechanism**
 
 What happens to a topic whose root dies without saying goodbye?
 
@@ -18,6 +18,12 @@ We have a live one, captured on prod within the hour
 20:21–21:12Z, kernel 4.61.2, owned topic `axona.bot`, region eagle):
 
 - The root holder was killed by a session restart. No `leave()`, no handoff.
+- RESOLVED ON TAPE (22:33Z, publisher-side routeMessage capture): the strand's
+  standing cause was `89f26d4925…` — a live transient XOR-closer to the topic
+  than the whole fleet, which ACCEPTED every write (consumed, correctly
+  attributed) and never ingested or served one, while reads were answered by
+  the fleet cohort holding old history. The topic healed at 2 h 06 m, in
+  15.3 s, only after the flapper's channel finally refused outright.
 - Writes: five attempts over 50 minutes, from a fresh peer and from a
   long-lived peer. All stranded. The long-lived peer's publish even returns
   `ok` — the ack reports acceptance, not delivery.
@@ -89,13 +95,24 @@ message already held is success, not error.
 No ingest-ack by the caller's deadline → the named root incarnation is
 suspect.
 
+The rule has NO actor exception (Aster seq 427, forced by the capture): a
+forward's `consumed` verdict is never terminal write success — not when
+consumed elsewhere, and not when consumed at the named root. It is hop-local
+routing evidence only. The captured flapper satisfied consumed-and-attributed
+for two hours.
+
 ### 2. Probe, evict, promote — with incarnations *(Aster item 1)*
 
 Every root claim carries a monotonic **incarnation**: `(nodeId, epoch)`,
 minted at promotion, carried in beacons, named in ingest-acks.
 
-On suspect: the deferring holder probes that incarnation once, directly. Dead
-→ it writes an **eviction record** — a tombstone for that incarnation, which
+On suspect: the deferring holder probes that incarnation once, directly — and
+the probe demands the CORRELATED RECEIPT: the ingest state for that exact
+{topicId, msgId, incarnation, op}, or an explicit statement of inability.
+Transport reachability, a generic routing reply, or any answer that does not
+bind those four fields is NOT exculpatory — the captured flapper was alive
+and answering; a liveness probe would have acquitted it forever (Aster seq
+427). No receipt → it writes an **eviction record** — a tombstone for that incarnation, which
 is an authoritative, reconcilable root-state mutation, not a private note —
 and promotes the closest LIVE holder by the same closest-live rule used
 everywhere else. The promoted root mints the next incarnation. History is
@@ -177,12 +194,13 @@ Race tests beyond the basic SIGKILL smoke, each PUB and KILL separately:
 Plus the full standing gates: kernel suite, axonSpec, churn and interloper
 smokes, soak A/B against 4.61.2.
 
-**The specimen is the prod gate.** The `axona.bot` topic stays broken on
-purpose. When this ships to prod, the first write must land, the dead
-incarnation must be tombstoned, and — per Aster — the eviction must be
-visible ACROSS the cohort: an independent fresh peer, not the recovering
-writer, must read the new message as latest and observe the promoted root. A
-fix that passes every smoke and does not heal the specimen does not ship.
+**The prod gate.** The original specimen healed on tape during the capture,
+so the gate becomes: the SIGKILL smoke and the responsive-no-mutation smoke
+green, plus a FRESHLY MINTED specimen at prod deploy time — kill a root
+ungracefully, write, and the write must land within the caller's deadline
+with the eviction visible ACROSS the cohort: an independent fresh peer, not
+the recovering writer, reads the new message as latest and observes the
+promoted incarnation.
 
 ## Register
 
