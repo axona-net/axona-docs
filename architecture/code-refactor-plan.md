@@ -110,7 +110,7 @@ the definition of failure for this project.
 | handoff-liveness (fixed 4.31) | a departing node planted standing state on a peer that could not maintain it | the Principal-Liveness law (§4.6) |
 | split-history cold-attach (fixed 4.22.0) | two individually-correct replay paths, neither seeing the other's half | one owner per data-movement decision |
 | TURN expiry, GH #44 (fixed 4.60.x) | credential refresh existed only on a path that a healthy node never took | every lifecycle has an in-band renewal path |
-| write-liveness, #422 (open) | PUB defers to an unreachable root; a publish can report a msgId yet never propagate | every effect path reports an observable outcome |
+| write-liveness, #422 (open) | PUB defers to an unreachable root; a publish can report a msgId yet never propagate | every effect path reports an observable outcome. Phase 0 owes this row a reproducible trace; until then the evidence is the 2026-08-06 #council publish (msgId `6112103f…`, confirmed:false, absent from the thread) |
 
 The common shape: individually-correct mechanisms interacting through a second
 entry path. The target is fewer places a decision can be made, not fewer lines.
@@ -150,7 +150,7 @@ when a review asks "who owns this field/timer/frame," the answer is one cell.
 |---|---|---|
 | Application / API façade (`AxonaPeer`) | public API surface, service composition | any policy it composes |
 | Sync/repair plane (`syncEngine`) | policy-driven state transfer, retry bounds, reconciliation outcomes | hot-path delivery semantics |
-| Placement & control authority (generalized `rootClaim`) | topic lifecycle, placement transitions, election, retention capabilities | transport establishment, repair data movement |
+| Placement & control authority (generalized `rootClaim`) | topic lifecycle, placement/retention *transition policy*, election | the retained data itself (the topic store owns that), transport establishment, repair data movement |
 | DHT/routing plane | synaptome, greedy routing, lookup, tree maintenance | authorization, persistence formats |
 | Transport / auth / persistence | live authenticated channels, frame I/O, durable storage mechanics | topic placement, repair semantics |
 | Per-boundary contract registries | frame validation, tracing, correlation contracts | handler business logic |
@@ -198,8 +198,9 @@ normalized outcome type; error contract; trace fields.
 Registries enter in **shadow mode**: they validate and trace beside the
 existing handlers and change no acceptance behavior. Dispatch migrates one
 frame family at a time, each migration carrying its own differential-trace
-proof. The registry doubles as the machine-readable wire catalogue an
-independent implementer reads (Phase 5).
+proof. The registry is the machine-readable *source material* for the Phase 5
+normative contract — prose semantics and conformance vectors are authored
+against it, not generated from it automatically.
 
 ### 4.4 The sync engine as sole repair owner
 
@@ -301,7 +302,9 @@ The load-bearing phase. It converts "rewrite risk" into "regression test."
 - **Deliverables.** All four boundaries' frames registered with schemas, frame
   kinds, and guards; validation and tracing in report mode; zero change to
   acceptance behavior; ambiguous handler ownership resolved or recorded as a
-  named exception.
+  named exception. *Catalogued* is not *enforcement-ready*: a family's
+  registry row governs dispatch only after that family's own migration proof
+  (Phase 1 ships the catalogue; enforcement migrates per family, later).
 - **M1 canary.** Telemetry-only on the testnet droplet. Health criteria:
   trace/error distributions match the Phase 0 baseline. Rollback: disable the
   wrapper flag — no protocol rollback exists because no protocol changed.
