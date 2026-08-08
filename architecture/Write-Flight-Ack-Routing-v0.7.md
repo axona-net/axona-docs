@@ -1,6 +1,6 @@
 # Write-Flight Ack Routing and Chain Budget — remediation design
 
-**Status:** design proposal v0.6 — Aster R1–R10 (seq 481/494/499/502) plus R11–R12 (seq 507) incorporated; R7/R8/R10 retired by Aster; for council clearance before any code
+**Status:** design proposal v0.7 — Aster R1–R12 incorporated (R7/R8/R10 retired; R11/R12 retire once R13/R14 close, per Aster's v0.6 review); R13 (authenticated capability oracle) and R14 (mixed-version rollout safety) added this revision; for council clearance before any code
 **Baseline:** `@axona/protocol` 4.62.1 testnet at `8f34759`; incident GH #51
 **Author:** axona.bot · **Reviewers:** Aster, Orion · **Decider:** David
 **Scope:** the write flight's evidence return path and its termination. No
@@ -198,18 +198,21 @@ single number can be a hard aggregate. v0.5 removes the propagated count
 entirely and bounds the attempt two ways that each use only LOCAL state:
 
 **1. Publisher pins ONE capable adjacent delegate per attempt (D0).** The
-delegate is a 4.62.2-capable adjacent peer that claims the flight directly, so
-a pinned attempt has exactly one delegate no matter how the route past it
-varies (R11). Pin creation is **atomic at the API boundary**, before any retry
-timer can fire, so concurrent early retries cannot establish two initial
-delegates:
+delegate is a capability-attested adjacent peer (see R13 for how capability is
+established — NOT read from the base auth transcript, which carries no version)
+that claims the flight directly, so a pinned attempt has exactly one delegate no
+matter how the route past it varies (R11). Pin creation is **atomic at the API
+boundary**, before any retry timer can fire, so concurrent early retries cannot
+establish two initial delegates:
 
 ```
 peer.pub(...):                       # runs once, synchronously, per API call
     attemptId = random16()
-    delegate  = pickCapableAdjacent()        # 4.62.2 peer, or null
+    delegate  = pickCapableAdjacent()        # R13-attested peer, or null; fail-closed
     if delegate == null:
-        return legacyObservationOnlyPublish()   # R11 fallback: no flight, no ackTo
+        return fallbackPublish(...)          # R14: bounded ONLY under a rollout-safe
+                                             # topology — see R14 for what the caller
+                                             # cannot certify about downstream old nodes
     pin = { attemptId, delegate, assignments: 1 }   # established BEFORE first dispatch
     dispatchTo(delegate, attemptId)
     # every automatic retry reads `pin` and via-pins to pin.delegate — it never
@@ -280,6 +283,106 @@ death (K=3 cohort); `DELEGATE_MAX = 2` allows the initial delegate plus one
 replacement. Both are constants the `write-flight-exhausted` metric will tune;
 changing them is not a design change.
 
+## R13 — The capability oracle must be an authenticated contract, not the auth transcript
+
+v0.6's `pickCapableAdjacent()` assumed the publisher could read a bound peer's
+`KERNEL_VERSION` from the handshake and decide it implements 4.62.2. Aster is
+right that no such fact exists today. The peer authentication proof signs only
+`{proto, nodeId, pubkey, cbv}`; the mesh/node auth path neither exposes nor
+retains a per-peer remote kernel version. The version-bearing hello is
+**bridge-facing** (client↔bridge), not peer↔peer, and the transport's
+capability helpers describe LOCAL features. So there is nothing authenticated
+to read, and reading an unauthenticated self-report would let any peer claim
+capability to be handed a flight.
+
+**The contract.** Define an explicit capability token — `write-flight-ack-v1`
+— established as a **separately domain-separated, channel-bound signed
+attestation exchanged AFTER base authentication completes**, and stored per
+bound peer. It is treated **fail-closed**: absent, malformed, or
+signature-invalid ⇒ the peer is NOT capable ⇒ `pickCapableAdjacent()` returns
+null ⇒ the R14 fallback path. `pickCapableAdjacent()` reads only this stored,
+verified flag; it never re-derives capability from a version string.
+
+- **Transcript, downgrade resistance.** The attestation is its own signed
+  object with its own `DOMAIN` (e.g. ASCII `AXONA_WRITE_FLIGHT_CAP_V1`), and it
+  is **channel-bound** — it covers the same `cbv` the base auth bound, so a
+  valid attestation captured on one channel cannot be replayed onto another.
+  Because it is a NEW object exchanged after base auth, the existing auth
+  transcript is byte-unchanged: **old verifiers still accept new peers' base
+  proofs** (no forced flag-day), and new verifiers simply see no capability
+  attestation from an old peer and fail closed. Domain separation prevents an
+  INGEST_ACK proof or any other signed frame from being replayed as a
+  capability claim, and vice-versa.
+- **Never persisted.** Capability is a property of a live authenticated
+  channel, re-attested on every (re)connection — consistent with the
+  never-persist-a-transport-id rule. A reconnect re-runs the exchange; a peer
+  that changed capability across a reconnect is re-evaluated from the fresh
+  attestation, never from a cached one.
+- **Bridge handling.** A bridge relaying peers attests its OWN
+  `write-flight-ack-v1` capability on the channel it terminates; it does not
+  forward another node's attestation as its own. A publisher adjacent to a
+  bridge therefore treats the bridge as a candidate delegate only if the bridge
+  itself attested — and a bridge that is a capable delegate is a known-capable
+  ingress, which is exactly the safe fallback target R14 wants.
+- **Selection API.** `pickCapableAdjacent()` iterates the bound-peer table,
+  filters to peers whose stored `write-flight-ack-v1` attestation verified on
+  the current channel, and returns the closest such peer to the topic (or null).
+
+**Tests (R13).** An old peer with no claim → not selected, fail-closed. A valid
+capable peer → selected. A tampered or forged capability claim (wrong domain,
+wrong `cbv`, bad signature, or a re-labelled INGEST_ACK proof) → rejected,
+fail-closed. A reconnect that changes capability → re-evaluated from the fresh
+attestation, not a cached flag. No-capable-peer → null → R14 fallback.
+
+## R14 — The fallback bounds our publisher, not an old relay's machinery
+
+v0.6 claimed the no-capable-delegate fallback was "bounded by the publisher
+retry loop." Aster is right that this bounds only OUR publisher's own
+dispatches. A plain PUB that reaches a **4.62.1 waypoint** carrying a stale
+closer-root hint still executes THAT node's old `_forwardToRoot`, opens the
+deaf flight there, and enters the unbounded #51 promotion loop — machinery we
+do not control and cannot remotely fix. The honest statement: **a publisher can
+authenticate only its adjacent hop (R13); it cannot certify a whole multi-hop
+route, so it cannot guarantee a mixed network spawns no problematic flight.**
+
+The storm is therefore a property of the deployed VERSION topology, and the
+rollout rule is scoped to it. Grounding fact, verified against the kernel tree
+(v4.61.2 vs v4.62.1 at `8f34759`): the write-flight machinery
+(`src/pubsub/writeFlight.js`, `_writeFlights`, ingest-ack, evict-and-promote)
+**does not exist before 4.62.0.** At 4.61.2, `_forwardToRoot` sends the write
+and, on a failed verdict, only invalidates the beacon pointer — no flight, no
+conviction, no eviction. **Only 4.62.0 and 4.62.1 are storm-capable.**
+
+- **Production (4.61.2 → 4.62.2), clean by construction.** Prod runs 4.61.2,
+  which has no flight machinery, and rolls directly to 4.62.2, which has the
+  fixed machinery. **No storm-capable version is ever in the prod write path**,
+  so the mixed-version fallback on prod can reach only a 4.61.2 old node, whose
+  worst case is a dropped beacon pointer and a lost write (#422) — never a
+  storm.
+- **Testnet (the only 4.62.1) — fenced roll, Aster's option 3 made concrete.**
+  A mixed 4.62.1 + 4.62.2 network under sustained write load **IS storm-capable
+  and is an operational deployment blocker for any un-fenced roll.** The M4 (26)
+  and M1 (12) fleets are the only 4.62.1 population and are entirely
+  operator-controlled. The roll is fenced: (1) quiesce sustained writes for the
+  roll window; (2) `roll-fleet.sh` starts every 4.62.2 unit and stops every
+  4.62.1 unit within the window (start-then-stop, EXPECT-verified), so no old
+  unit lingers; (3) the eviction-rate watch is armed (>20 evictions/10 min ⇒
+  abort and revert to 4.61.2); (4) prefer routing any necessary write through a
+  known-capable ingress (a 4.62.2 relay or an attested bridge, per R13) rather
+  than a bare PUB into the mixed fleet.
+- **The distinction Aster requires.** A signed proof handled by a NEW delegate
+  exhausts under the D2 chain budget. A flight OWNED by an OLD 4.62.1 relay does
+  NOT — only removing that relay ends it. The new chain budget bounds the new
+  machinery; it has no reach into the old.
+
+**Tests (R14).** A mixed-version test places a new publisher with no capable
+adjacent peer and routes its PUB through an old 4.62.1 waypoint holding a stale
+closer-root hint. The gate does not assert false safety; it **detects the
+unbounded old flight and classifies that topology as a deployment blocker** —
+encoding the operational rule as an assertion. A companion case proves the
+prod-shaped topology (old node = 4.61.2, no flight machinery) opens no flight
+and loses at most the single write.
+
 ## D3 — The test class that let this ship cannot exist
 
 Every path that passed a gate was 1-hop: MockNet dispatches direct; the live
@@ -310,11 +413,11 @@ gates ran on a dense settled mesh; the one live promotion went to self.
 - **Mixed-version delegate selection (Aster R11):** pin one OLD (pre-4.62.2)
   peer as the publisher's adjacent hop and vary its downstream next hop across
   retries, with isolated delegate stores — assert the documented bound holds.
-  Two sub-cases: (a) a 4.62.2-capable adjacent peer exists → it is chosen and
-  claims directly, one delegate; (b) no capable adjacent peer → delegation is
-  disabled, the publisher falls back to observation-only publish, NO flight and
-  NO `ackTo` is ever emitted, and the old marker-passed-deeper path does not
-  execute.
+  Two sub-cases: (a) a capability-attested adjacent peer exists (R13) → it is
+  chosen and claims directly, one delegate; (b) no capable adjacent peer → the
+  NEW publisher opens NO flight and emits NO `ackTo`, and the old
+  marker-passed-deeper path does not execute. Sub-case (b) is completed by the
+  R14 tests below, which cover what the OLD downstream machinery can still do.
 - **Re-pin arithmetic + terminal surface (Aster R12):** the initial delegate
   plus exactly ONE permitted replacement reaches the six-promotion maximum;
   a SECOND delegate loss stops with no third budget; concurrent early retry
@@ -322,6 +425,21 @@ gates ran on a dense settled mesh; the one live promotion went to self.
   terminal is observable through the named surface — a `write-attempt-exhausted`
   event on the peer event surface AND the metrics counter — while `peer.pub()`
   keeps returning the msgId unchanged.
+- **Capability oracle (Aster R13):** old peer with no attestation → not
+  selected, fail-closed; valid `write-flight-ack-v1` attestation → selected;
+  forged/tampered claim (wrong domain, wrong `cbv`, bad signature, or a
+  re-labelled INGEST_ACK proof) → rejected, fail-closed; reconnect with changed
+  capability → re-evaluated from the fresh attestation, never a cached flag; a
+  base-auth proof from a new peer still verifies under an OLD verifier
+  (transcript byte-unchanged, no forced flag-day).
+- **Mixed-version rollout safety (Aster R14):** new publisher, no capable
+  adjacent peer, PUB routed through an OLD **4.62.1** waypoint holding a stale
+  closer-root hint → the gate DETECTS the unbounded old flight and asserts that
+  topology is a **deployment blocker** (it does not assert false safety). The
+  companion case with the OLD node at **4.61.2** (no flight machinery) asserts
+  no flight opens and at most the single write is lost. A signed proof handled
+  by a NEW delegate exhausts under the D2 budget; a flight OWNED by an OLD
+  4.62.1 relay is shown NOT to, ending only when that relay is removed.
 - **Per-entry batching (R10):** multiple PUB/KILL entries with DISTINCT
   attemptIds join one suspect flight (keyed by incarnation) and then complete
   or exhaust independently; an ACK bound to one entry's attemptId settles
