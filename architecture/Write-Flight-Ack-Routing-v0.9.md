@@ -1,6 +1,6 @@
 # Write-Flight Ack Routing and Chain Budget — remediation design
 
-**Status:** design proposal v0.8 — Aster R1–R14 incorporated (R7/R8/R10 retired; R14 closed in substance, retires with the R16 cleanup below); R15 (byte-exact capability transcript with base-auth key binding) and R16 (removal of three stale contradictions) added this revision per Aster's v0.7 review (seq 517); R11/R12 retire once the byte-exact R13/R15 oracle clears; for council clearance before any code
+**Status:** design proposal v0.9 — Aster R1–R16 incorporated (R7/R8/R10/R14/R16 retired; R15 closed the key-substitution gap per Aster's v0.8 review, seq 517→file); R17 (locally-derived `cbvDigest` — freshness bound to the verifier's own channel, not the wire) added this revision; R13/R15 retire once R17 clears, and R11/R12 retire with them; for council clearance before any code
 **Baseline:** `@axona/protocol` 4.62.1 testnet at `8f34759`; incident GH #51
 **Author:** axona.bot · **Reviewers:** Aster, Orion · **Decider:** David
 **Scope:** the write flight's evidence return path and its termination. No
@@ -288,7 +288,7 @@ death (K=3 cohort); `DELEGATE_MAX = 2` allows the initial delegate plus one
 replacement. Both are constants the `write-flight-exhausted` metric will tune;
 changing them is not a design change.
 
-## R13 / R15 — The capability oracle: a byte-exact authenticated contract, not the auth transcript
+## R13 / R15 / R17 — The capability oracle: a byte-exact authenticated contract, not the auth transcript
 
 v0.6's `pickCapableAdjacent()` assumed the publisher could read a bound peer's
 `KERNEL_VERSION` from the handshake and decide it implements 4.62.2. Aster is
@@ -309,23 +309,26 @@ hex/key fields signed as DECODED BYTES at fixed width — the same discipline as
 the D1 INGEST_ACK transcript:
 
 ```
-DOMAIN   = ASCII "AXONA_CAP_ATTEST_V1"   (19 bytes, no NUL)   — FIXED, not "e.g."
-capId    : the ASCII bytes "write-flight-ack-v1" (19 bytes, fixed) — the one
-           capability this frame attests; a different capId is a different token
+DOMAIN    = ASCII "AXONA_CAP_ATTEST_V1"   (19 bytes, no NUL)   — FIXED, not "e.g."
+capId     : the ASCII bytes "write-flight-ack-v1" (19 bytes, fixed) — the one
+            capability this frame attests; a different capId is a different token
+cbvDigest : SHA-256( UTF-8( currentTransportCbvString ) )  — 32 bytes, FIXED width,
+            DERIVED LOCALLY by each side from its own live channel (see R17)
 transcript =
   DOMAIN            (19 bytes, fixed)
   u8(capIdLen=19)
   capId             (19 bytes, fixed)
   nodeId            (NODE_ID_BYTES, fixed width, decoded) — the ATTESTER's id
-  cbv               (CBV_BYTES, fixed width, decoded) — the CURRENT channel binding
+  cbvDigest         (32 bytes, fixed) — the SHA-256 digest of THIS side's current CBV
 sig = Ed25519(attesterIdentityKey, transcript)
 ```
 
-The wire frame carries `{capId, nodeId, cbv, sig}` — and **no public key.** The
-verifier rebuilds the transcript from a fixed-width decode of each field and,
-before any signature check, rejects: a `capId` ≠ the 19 expected bytes, a
-`nodeId`/`cbv` whose decoded width is wrong, or a frame over the inbound size
-cap.
+The wire frame carries `{capId, nodeId, sig}` — and **no public key and no CBV
+material** (see R17: freshness is derived locally, never taken from the frame).
+The verifier rebuilds the transcript from a fixed-width decode of `capId` and
+`nodeId` plus its OWN locally derived `cbvDigest`, and before any signature check
+rejects: a `capId` ≠ the 19 expected bytes, a `nodeId` whose decoded width is
+wrong, or a frame over the inbound size cap.
 
 **Key binding is the crux (R15).** The signature is verified with the **public
 key already established for this peer by base authentication** — the key stored
@@ -337,13 +340,20 @@ checked against the stored key of the peer on the channel it arrived on, and the
 `nodeId` in the transcript must equal that peer's authenticated id. There is no
 wire field a forger can populate to substitute a key.
 
-- **Channel binding + verified-flag lifecycle.** The transcript covers the
-  current `cbv`, so an attestation captured on one channel cannot replay onto
-  another (different `cbv` ⇒ different transcript ⇒ signature fails). On success
-  the verifier sets a boolean `capable[write-flight-ack-v1] = true` **keyed to
-  that exact live channel object**; the flag is CLEARED on channel loss and is
-  never persisted or carried across a reconnect. A reconnect re-runs
-  `CAP_ATTEST` from scratch — consistent with never-persist-a-transport-id.
+- **Channel-freshness binding, derived locally (Aster R17).** The signed
+  transcript covers `cbvDigest`, and both signer and verifier compute that digest
+  from THEIR OWN current live channel — it is never read from the wire. So an
+  attestation captured on one channel and replayed on another (or on the same
+  peer's channel after a reconnect) fails: the verifier derives a different
+  current `cbvDigest`, rebuilds a different transcript, and the old signature no
+  longer matches. This is the same discipline as R15's key binding — freshness
+  material, like the verification key, comes from the verifier's own
+  authenticated state, not from the frame. See the R17 subsection for the exact
+  digest definition and per-transport fixtures. On success the verifier sets a
+  boolean `capable[write-flight-ack-v1] = true` **keyed to that exact live
+  channel object**; the flag is CLEARED on channel loss and is never persisted or
+  carried across a reconnect. A reconnect re-runs `CAP_ATTEST` from scratch —
+  consistent with never-persist-a-transport-id.
 - **Downgrade resistance / no flag-day.** `CAP_ATTEST` is a NEW application
   frame; the base auth transcript is byte-unchanged, so **old verifiers still
   accept new peers' base proofs.** An old transport that does not know
@@ -364,17 +374,54 @@ wire field a forger can populate to substitute a key.
   `topicId`, or null. It reads only that per-channel flag — never a version
   string, never a frame-supplied key.
 
-**Tests (R13/R15).** Golden vector: one checked-in `(fixed key, fixed nodeId,
-fixed cbv)` → expected transcript bytes + expected signature; an independent
-implementation reproduces it or is non-conformant. Rejection vectors, each
-fail-closed: (a) a claim validly signed by a DIFFERENT authenticated identity;
-(b) a frame attempting to supply a replacement/verification key (there is no
-such field — a frame with an extra key field is refused by the fixed decode);
-(c) wrong `capId`; (d) wrong `cbv`; (e) wrong DOMAIN; (f) a re-labelled
-INGEST_ACK proof; (g) replay of a prior-channel attestation after reconnect
-(stale `cbv`). Behavioural: an old transport receives `CAP_ATTEST` and stays
-connected, ignoring it; a valid capable peer is selected; a reconnect that drops
-the attestation clears the flag and moves the peer to the R14 fallback;
+### The CBV digest, defined exactly and derived locally (Aster R17)
+
+v0.8's first draft signed `cbv (CBV_BYTES, fixed width, decoded)` and carried
+`cbv` on the wire — both wrong. The base-auth CBV is **not** a fixed-width value:
+`cbvFromNonces` returns a structured UTF-8 string (`n:<nonce>:<nonce>:<tag>`),
+the bridge appends a connection id, and the mesh concatenates
+`fp:<fingerprint>:<fingerprint>`. These are transport-specific and
+variable-length; there is no `CBV_BYTES` in the tree. And carrying `cbv` on the
+wire reopens replay: a prior-channel `CAP_ATTEST` replayed after reconnect keeps
+its old `cbv` and signature, which still match each other. Both are fixed the
+same way R15 fixed key binding — the freshness value comes from the verifier's
+own state, never the frame:
+
+```
+cbvDigest = SHA-256( UTF-8( currentTransportCbvString ) )     — exactly 32 bytes
+```
+
+- **Locally derived, both sides.** Signer and verifier each compute `cbvDigest`
+  from THEIR OWN live channel's current CBV string. The signer signs the
+  transcript containing its digest; the verifier rebuilds the transcript with
+  ITS digest and checks the signature. On the same live channel the two strings
+  are identical, so an honest attestation verifies; across a reconnect (or a
+  different channel) the strings differ, the digests differ, and the old
+  signature fails. Replay is dead without any nonce table.
+- **Not on the wire.** `cbvDigest` is **omitted from `CAP_ATTEST` entirely.**
+  (If a future build keeps it for diagnostics, the verifier MUST reject unless
+  the wire value byte-equals the locally derived digest, and MUST still rebuild
+  the signed transcript from the local digest — never from the wire value.)
+- **Exact primitives.** The hash is SHA-256; the pre-image is the UTF-8 encoding
+  of the transport's current CBV string, verbatim as that transport already
+  builds it for base auth (node-WS `n:…`, bridge `n:…` + connection id, mesh
+  `n:…` + `fp:…`). No re-canonicalization — the transport's existing string is
+  the pre-image, so the digest tracks exactly what base auth already bound.
+
+**Tests (R13 / R15 / R17).** Golden vector: one checked-in `(fixed identity key,
+fixed nodeId, fixed cbvDigest)` → expected transcript bytes + expected signature;
+an independent implementation reproduces it or is non-conformant. Per-transport
+digest fixtures: a node-WS, a bridge, and a mesh CBV string, each with its
+expected `SHA-256(UTF-8(string))` — proving the structured strings produce the
+documented 32-byte digest. Rejection vectors, each fail-closed: (a) a claim
+validly signed by a DIFFERENT authenticated identity; (b) a frame supplying a
+replacement/verification key (no such field survives the fixed decode); (c) wrong
+`capId`; (d) wrong DOMAIN; (e) a re-labelled INGEST_ACK proof; (f) **the R17
+reconnect test — a valid prior-channel `CAP_ATTEST` replayed byte-for-byte after
+reconnect FAILS, because the verifier derives a different current `cbvDigest`.**
+Behavioural: an old transport receives `CAP_ATTEST` and stays connected, ignoring
+it; a valid capable peer is selected; a reconnect that drops the attestation
+clears the per-channel flag and moves the peer to the R14 fallback;
 no-capable-peer → null → R14 fallback.
 
 ## R14 — The fallback bounds our publisher, not an old relay's machinery
@@ -468,18 +515,21 @@ gates ran on a dense settled mesh; the one live promotion went to self.
   terminal is observable through the named surface — a `write-attempt-exhausted`
   event on the peer event surface AND the metrics counter — while `peer.pub()`
   keeps returning the msgId unchanged.
-- **Capability oracle, byte-exact (Aster R13/R15):** a checked-in golden
-  transcript+signature vector reproduces, and rejection vectors all fail closed
-  — a claim signed by a DIFFERENT authenticated identity, a frame carrying a
-  replacement key (no such field survives the fixed decode), wrong `capId`,
-  wrong `cbv`, wrong DOMAIN, a re-labelled INGEST_ACK proof, and a prior-channel
-  attestation replayed after reconnect (stale `cbv`). The signature is verified
-  ONLY with the stored base-authenticated peer key. Behavioural: an OLD
-  transport receives `CAP_ATTEST` and stays connected (ignores the unknown
-  frame); a valid capable peer is selected; a reconnect that drops the
-  attestation clears the per-channel flag → R14 fallback; a new peer's base-auth
-  proof still verifies under an OLD verifier (base transcript byte-unchanged, no
-  flag-day).
+- **Capability oracle, byte-exact (Aster R13/R15/R17):** a checked-in golden
+  transcript+signature vector reproduces; per-transport `SHA-256(UTF-8(cbv))`
+  digest fixtures (node-WS, bridge, mesh) reproduce; and rejection vectors all
+  fail closed — a claim signed by a DIFFERENT authenticated identity, a frame
+  carrying a replacement key (no such field survives the fixed decode), wrong
+  `capId`, wrong DOMAIN, a re-labelled INGEST_ACK proof, and **the R17 reconnect
+  test: a prior-channel `CAP_ATTEST` replayed byte-for-byte fails because the
+  verifier derives a different current `cbvDigest`.** The signature is verified
+  ONLY with the stored base-authenticated peer key, and the `cbvDigest` is
+  derived ONLY from the verifier's own live channel — neither is ever taken from
+  the frame. Behavioural: an OLD transport receives `CAP_ATTEST` and stays
+  connected (ignores the unknown frame); a valid capable peer is selected; a
+  reconnect that drops the attestation clears the per-channel flag → R14
+  fallback; a new peer's base-auth proof still verifies under an OLD verifier
+  (base transcript byte-unchanged, no flag-day).
 - **Mixed-version rollout safety (Aster R14):** new publisher, no capable
   adjacent peer, PUB routed through an OLD **4.62.1** waypoint holding a stale
   closer-root hint → the gate DETECTS the unbounded old flight and asserts that
