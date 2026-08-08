@@ -1,7 +1,7 @@
 # Axona Kernel Refactor — Master Plan
 
 **File:** `axona-docs/architecture/code-refactor-plan.md`
-**Version:** v2.0 — 2026-08-08, triumvirate-readiness amendments incorporated
+**Version:** v2.1 — 2026-08-08, triumvirate-readiness amendments incorporated; Aster final-review corrections E1/E2 applied
 **Collator:** axona.bot (chief programmer), by unanimous council vote, David's designation (#council, 2026-08-07)
 **Sources:** `axona.bot-Redesign-Plan.md`, `Aster-Protocol-Refactor-Plan.md`, `Orion-Redesign-Plan.md`, `code-refactor-plan-draft-orion.md`, the council cross-review thread (#council seq 381–392), `axona-refactor-triumvirate-readiness-review-v0.1.md` (Aster, 2026-08-08), and the readiness Q&A record (#council seq 458–462: Q1/Q2 confirmed, A1 accepted)
 **Status:** FINAL DRAFT v2 — shared with the council and David for final agreement before Phase 0 begins
@@ -282,14 +282,19 @@ normalized outcome type; error contract; trace fields.
 ROUTED        a transport or routing hop accepted/forwarded the frame
 INGESTED      the intended write authority accepted the operation
 RETAINED      an authenticated named holder confirms it stores the exact entry
-COMMITTED_R2  two named cohort holders retain the entry     (RESERVED)
-COMMITTED_R3  all three cohort holders retain the entry     (RESERVED)
+COMMITTED_R2  two distinct named retention-capable holders
+              prove exact retention                          (RESERVED)
+COMMITTED_R3  three distinct named retention-capable holders
+              prove exact retention                          (RESERVED)
 ```
 
 A `consumed` routing verdict is not retention; successful dispatch is not
 ingestion; self-delivery is not cohort durability. The 4.62.1 write-flight
 acknowledgment is the shipped precedent: success is correlated to the message
-and bound to the expected sender plus authority incarnation. The two
+and bound to the expected sender plus authority incarnation. Commitment
+counts *retention-capable holders*, never raw cohort size: the design permits
+a configured member that cannot hold cache state (`FORWARD_ONLY`, `BRIDGE`),
+and such a member can satisfy neither proof (Aster final review, E1). The two
 `COMMITTED` levels are registry vocabulary only — nothing produces them in the
 current profile, and the RESERVED rule below governs them.
 
@@ -319,10 +324,16 @@ across authorities or terms. New code uses VERSIONED whenever an epoch is
 known. Current wire adapters keep encoding and decoding the existing fields.
 
 Consumers of "where is this topic served" query a `TopicLocator` returning a
-`TopicServiceView { servingNodes, writeAuthority, configuration, observedAt,
-evidence }`. The current locator returns one serving root and its known
-backups. Routing, write flights, delivery, and sync consume the view rather
-than each reading raw beacon maps.
+`TopicServiceView { servingNodes, retentionNodes, writeAuthority,
+configuration, observedAt, evidence }`. Serving and retention are distinct
+facts and the view keeps them distinct (Aster final review, E2): in the
+current profile `servingNodes` contains the active root; `retentionNodes`
+contains only named nodes actually known to retain state; `configuration` may
+describe backups and candidates without claiming either. A backup is never
+represented as a current serving node, and a future `FORWARD_ONLY` member can
+appear in `configuration` while appearing in neither list. Routing, write
+flights, delivery, and sync consume the view rather than each reading raw
+beacon maps.
 
 Registries enter in **shadow mode**: they validate and trace beside the
 existing handlers and change no acceptance behavior. Dispatch migrates one
@@ -508,7 +519,7 @@ answer is one row:
 | Subscriber forest | `TopicDeliveryTree` | subscribers/children/upstream | SUB/DELIVER/replay/rehome |
 | Repair/state transfer | `SyncEngine` | policy/flight ledger | router plus `TopicStore` import/export |
 | Durability | `DurabilityLedger` | evidence state per message | no delivery mutation |
-| Authority discovery | `TopicLocator` | observed service view | lookup/beacon adapters |
+| Authority discovery | `TopicLocator` | observed service view (serving ≠ retention, per §4.3 E2) | lookup/beacon adapters |
 | Wire validation/correlation | per-boundary registry | contract metadata | invokes owning service |
 
 ---
@@ -652,7 +663,8 @@ at Phase 5; none of them requires triumvirate behavior to exist:
 5. Write-flight and receipt correlation use the versioned `AuthorityRef`
    internally, with algebraic UNVERSIONED semantics preserved.
 6. Registry outcomes distinguish routed, ingested, retained, and committed
-   evidence.
+   evidence; committed levels count retention-capable holders, and the
+   service view keeps serving and retention distinct (E1/E2).
 7. Sync summaries are policy-selected; no heuristic is labeled universal
    equality proof; RESERVED strategies are unselectable.
 8. Lookup returns bounded candidate sets and supports eligibility/admission
