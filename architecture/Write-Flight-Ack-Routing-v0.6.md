@@ -1,6 +1,6 @@
 # Write-Flight Ack Routing and Chain Budget — remediation design
 
-**Status:** design proposal v0.5 — Aster R1–R4 (seq 481), R5–R6 (seq 494), R7–R9 (seq 499), R9-redo + R10 (seq 502) incorporated; for council clearance before any code
+**Status:** design proposal v0.6 — Aster R1–R10 (seq 481/494/499/502) plus R11–R12 (seq 507) incorporated; R7/R8/R10 retired by Aster; for council clearance before any code
 **Baseline:** `@axona/protocol` 4.62.1 testnet at `8f34759`; incident GH #51
 **Author:** axona.bot · **Reviewers:** Aster, Orion · **Decider:** David
 **Scope:** the write flight's evidence return path and its termination. No
@@ -39,23 +39,31 @@ correlator, which I-9 forbids a PUB to carry.
 The resolution is structural (Aster's path *a*): **an API-origin node never
 owns a carried flight.**
 
-- An API-origin PUB/KILL is dispatched with a `flightDelegate` marker and NO
-  `ackTo`. The publisher's node opens no flight for it.
-- The FIRST RELAY HOP that forwards the marked frame strips the marker, opens
-  the flight, and stamps its OWN transport id as `ackTo`. The `ackTo` on the
-  wire always names the authenticated claiming relay, never the API origin.
-- The publisher **pins** this first hop for the attempt (D2): from local
-  knowledge of which adjacent peer it routed to, it via-pins every automatic
-  retry of the same attemptId to that peer, so an honest attempt keeps ONE
-  delegate. No signal returns to the publisher — pinning is its own routing
-  choice, so D0's no-ack-channel property holds.
+- The publisher selects a **4.62.2-capable adjacent peer** as its delegate
+  (capability is known from that peer's handshake `KERNEL_VERSION`), dispatches
+  the PUB/KILL to it with a `flightDelegate` marker and NO `ackTo`, and pins
+  the attempt to that exact adjacent peer. The publisher's own node opens no
+  flight.
+- That adjacent delegate **claims the flight itself** — strips the marker,
+  opens the flight, stamps its OWN transport id as `ackTo`. It does NOT pass
+  the marker deeper. Because the delegate is adjacent and claims directly, a
+  pinned attempt has exactly ONE delegate regardless of how the route past it
+  varies (Aster R11). The `ackTo` on the wire always names that authenticated
+  claiming relay, never the API origin.
+- **No capable adjacent peer (mixed-version rollout, R11):** delegation is
+  disabled for this attempt. The publisher falls back to pre-4.62.2 behavior —
+  an ordinary routed publish with observation-only confirmation, NO `ackTo`,
+  no flight, bounded by the publisher's own retry loop. It forgoes the new
+  write-liveness guarantee but adds no `ackTo` exposure (I-9 unchanged) and
+  cannot spawn multiple delegates because it spawns none. The
+  marker-passed-one-hop-deeper mechanism of v0.5 is REMOVED — it was the
+  multi-delegate hole R11 identified.
 - Degenerate cases: publisher adjacent to root (1-hop) → root's one-hop ack
   reaches it as the authenticated channel peer, today's behavior; publisher
-  IS the terminus → local ingest, no flight; bridge as sole first hop → the
-  bridge owns the flight as a bounded control record (the capability-aware
-  terminal proxying the triumvirate direction already assigns to
-  forward-only ingress); old first hop → marker passes one hop deeper, never
-  into the publisher's id.
+  IS the terminus → local ingest, no flight; bridge as the chosen capable
+  adjacent delegate → the bridge owns the flight as a bounded control record
+  (the capability-aware terminal proxying the triumvirate direction already
+  assigns to forward-only ingress).
 - Relay-origin writes (promotion re-sends, relay ingress forwards) own their
   flights directly: a relay's id next to a client's envelope links the author
   to the RELAY, not the publisher, and relay ids are public routing material.
@@ -189,15 +197,24 @@ opens a fresh budget. There is no authority that sees all delegates, so no
 single number can be a hard aggregate. v0.5 removes the propagated count
 entirely and bounds the attempt two ways that each use only LOCAL state:
 
-**1. Publisher pins its delegate (keeps the honest fan-out at one delegate).**
-The publisher already knows, from purely local state, which adjacent peer it
-routed the first dispatch to — that peer IS the first hop / delegate. The
-publisher records `attemptId → firstHopPeer` and **via-pins every automatic
-retry of that attemptId to the same peer.** No signal back from the delegate
-is needed (so D0's no-ack-channel property is untouched — a pin is the
-publisher's own routing choice, not received evidence). An honest attempt
-therefore lands on ONE delegate across all its retries; the alternating-first-
-hop case arises only when that delegate DIES.
+**1. Publisher pins ONE capable adjacent delegate per attempt (D0).** The
+delegate is a 4.62.2-capable adjacent peer that claims the flight directly, so
+a pinned attempt has exactly one delegate no matter how the route past it
+varies (R11). Pin creation is **atomic at the API boundary**, before any retry
+timer can fire, so concurrent early retries cannot establish two initial
+delegates:
+
+```
+peer.pub(...):                       # runs once, synchronously, per API call
+    attemptId = random16()
+    delegate  = pickCapableAdjacent()        # 4.62.2 peer, or null
+    if delegate == null:
+        return legacyObservationOnlyPublish()   # R11 fallback: no flight, no ackTo
+    pin = { attemptId, delegate, assignments: 1 }   # established BEFORE first dispatch
+    dispatchTo(delegate, attemptId)
+    # every automatic retry reads `pin` and via-pins to pin.delegate — it never
+    # re-derives a delegate, so no timer race can mint a second initial pin.
+```
 
 **2. Each delegate is the sole authority for its own per-delegate cap.** A
 delegate caps promotions for a `(topicId, msgId, op, attemptId)` at
@@ -206,14 +223,28 @@ and tombstones that attemptId locally for `EXHAUSTED_RECORD_TTL`. No frame,
 stale or replayed, can make a delegate exceed its own local cap — the cap
 lives at the delegate, never in the marker, so there is no count to replay.
 
-**Delegate death → counted re-pin.** When the pinned delegate's channel drops
-(locally observable) or a via-pinned retry fails, the publisher re-pins to a
-new first hop and increments a publisher-local `DELEGATE_REPIN_MAX = 2`. Past
-that, the publisher's automatic retry stops and the failure surfaces to the
-application. So the honest composite worst case is
-`DELEGATE_REPIN_MAX × CHAIN_MAX_PROMOTIONS = 6` promotions for one API call —
-the same number, now an HONEST derived ceiling from two independently
-enforced local bounds, not a fictional shared register.
+**Delegate death → at most one replacement (Aster R12).** The bound is
+`DELEGATE_MAX = 2` **total delegate assignments** for one attempt — the initial
+delegate plus at most one replacement (there is no separate "re-pin count"; the
+v0.5 `DELEGATE_REPIN_MAX` name is removed as ambiguous). When the pinned
+delegate's channel drops (locally observable) or a via-pinned retry fails, the
+publisher re-pins to one new capable adjacent delegate and sets `assignments =
+2`. A second death stops the automatic path — no third delegate. The honest
+composite ceiling is therefore literal and exact:
+
+```
+DELEGATE_MAX (2)  ×  CHAIN_MAX_PROMOTIONS (3)  =  6 promotions, worst case
+```
+
+**Terminal failure has a named, observable surface (Aster R12).** `peer.pub()`
+keeps its current contract — it returns the `msgId` and confirmation stays
+observation-only (I-9); it does NOT block on the flight. When the second
+delegate is exhausted or unavailable, the terminal is surfaced two ways the
+application can consume without changing that contract: (a) a
+`write-attempt-exhausted { attemptId, topicId, msgId, op, lastReason }` event
+on the peer's existing `onError`-class event surface, and (b) a monotonic
+counter on the metrics surface. Applications needing delivery certainty listen
+to (a) or watch (b); the return value of `pub()` is unchanged.
 
 **The adversarial tail, stated plainly.** A party replaying the count-free
 first frame to arbitrary delegates gets at most `CHAIN_MAX_PROMOTIONS` per
@@ -245,8 +276,8 @@ is safe because the only openers are `api` (a fresh attemptId) and
 `promotion` (which carries the exhausted attemptId and is dropped).
 
 `CHAIN_MAX_PROMOTIONS = 3` exceeds the plausible stale-candidate run after one
-death (K=3 cohort); `DELEGATE_REPIN_MAX = 2` allows one delegate death and
-recovery. Both are constants the `write-flight-exhausted` metric will tune;
+death (K=3 cohort); `DELEGATE_MAX = 2` allows the initial delegate plus one
+replacement. Both are constants the `write-flight-exhausted` metric will tune;
 changing them is not a design change.
 
 ## D3 — The test class that let this ship cannot exist
@@ -269,16 +300,28 @@ gates ran on a dense settled mesh; the one live promotion went to self.
   the API origin; no ACK proof is addressed to or routed toward the
   publishing transport. It does NOT assert the withdrawn no-correlation
   claim.
-- **Attempt / bound (R9), with genuinely independent delegate state:** the
-  test harness gives each delegate its own isolated chain/exhaustion store
-  (no shared map). It asserts: an honest pinned attempt keeps one delegate;
-  on delegate death the publisher re-pins and stops at `DELEGATE_REPIN_MAX`;
-  a same-attempt retry cannot reset an exhausted chain; a fresh `peer.pub()`
-  can; and — the case v0.4 missed — **replaying the original count-free first
-  frame at a SECOND delegate after the first has exhausted the attempt opens
-  at most `CHAIN_MAX_PROMOTIONS` there and no more**, confirming the bound is
-  per-delegate-local, not a spoofable shared counter. A promotion never mints
-  a new attemptId.
+- **Attempt / bound (R9), genuinely independent delegate state:** each delegate
+  gets its own isolated chain/exhaustion store (no shared map). Asserts: an
+  honest pinned attempt keeps one delegate; a same-attempt retry cannot reset
+  an exhausted chain; a fresh `peer.pub()` can; replaying the count-free first
+  frame at a SECOND delegate after the first exhausted opens at most
+  `CHAIN_MAX_PROMOTIONS` there and no more (per-delegate-local, not a spoofable
+  shared counter); a promotion never mints a new attemptId.
+- **Mixed-version delegate selection (Aster R11):** pin one OLD (pre-4.62.2)
+  peer as the publisher's adjacent hop and vary its downstream next hop across
+  retries, with isolated delegate stores — assert the documented bound holds.
+  Two sub-cases: (a) a 4.62.2-capable adjacent peer exists → it is chosen and
+  claims directly, one delegate; (b) no capable adjacent peer → delegation is
+  disabled, the publisher falls back to observation-only publish, NO flight and
+  NO `ackTo` is ever emitted, and the old marker-passed-deeper path does not
+  execute.
+- **Re-pin arithmetic + terminal surface (Aster R12):** the initial delegate
+  plus exactly ONE permitted replacement reaches the six-promotion maximum;
+  a SECOND delegate loss stops with no third budget; concurrent early retry
+  timers establish exactly ONE initial pin (atomic-pin assertion); and the
+  terminal is observable through the named surface — a `write-attempt-exhausted`
+  event on the peer event surface AND the metrics counter — while `peer.pub()`
+  keeps returning the msgId unchanged.
 - **Per-entry batching (R10):** multiple PUB/KILL entries with DISTINCT
   attemptIds join one suspect flight (keyed by incarnation) and then complete
   or exhaust independently; an ACK bound to one entry's attemptId settles
