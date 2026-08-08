@@ -16,6 +16,29 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel 4.62.0 — 2026-08-08 — a write completes on proof of ingestion, and a dead root's seat is reclaimable (testnet)
+
+What happens to a topic whose root dies without saying goodbye? Before this
+release: its writes were dead until chance intervened — measured live on prod
+as a 2-hour strand behind a half-alive node that accepted every write and
+ingested none (GH #28). Now the write path carries its own liveness law.
+Every root claim bears an incarnation (nodeId, epoch). A forwarded write
+completes ONLY on a correlated INGEST-ack emitted after topic-store ingest —
+routing verdicts, including consumed-at-the-named-root, are hop-local
+evidence and never terminal. No ack within the flight budget: one serialized
+recovery flight per seat probes for the receipt itself (a live answer that
+binds nothing proves nothing), convicts on silence or a receipt-less retry,
+tombstones the incarnation, and promotes the write to the closest live
+holder — roughly fifteen seconds by contract where the field showed two
+hours by accident. A convicted incarnation cannot retake its seat from any
+distance; a returning root adopts under the higher epoch. Unversioned
+(pre-epoch) nodes keep exact 4.61.x behavior in mixed meshes. What this does
+not do: it does not ack publishers (location privacy holds — the flight
+lives at the mesh's deferral sites), and it does not evict on epoch lag
+alone — only a tombstone rejects, which is what keeps ordinary succession
+intact. Council-ratified design (Dead-Root-Eviction-v0.3); phases E1–E5 at
+kernel 12dc201, 609c81a, 83b2916, d2c9eb8, and the release commit.
+
 ## Kernel 4.60.0 – 4.61.2 — 2026-08-07 — connectivity failures surface instead of degrading silently (production-deployed at 4.61.2)
 
 **What is protected:** a user's knowledge of their own connectivity.
