@@ -1,7 +1,7 @@
 # Testnet Test Protocol
 
 **File:** `axona-docs/TESTNET-PROTOCOL.md`
-**Kernel version on testnet:** 4.61.2 (re-version this header whenever the
+**Kernel version on testnet:** 4.62.1 (re-version this header whenever the
 deployed testnet kernel changes — held or undeployed releases do not count)
 **Standing decision (David, 2026-08-07):** the M4 relay fleet is the designated
 test fleet for testnet verification, at a standing size of **26 relays**. Three

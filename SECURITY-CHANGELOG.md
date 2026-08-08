@@ -16,6 +16,22 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel 4.62.1 — 2026-08-08 — an INGEST-ack settles a flight only from the root it was addressed to (testnet)
+
+Which ack may complete a write flight? In 4.62.0: any holder's valid-looking
+ack for the right (topic, msgId, op) — so a backup's ack, or an ack from a
+stale incarnation, could settle a flight opened against a suspect root that
+never ingested anything (Aster, council seq 439). Now completion is BOUND:
+the ack must come from the flight's root and carry the flight's epoch.
+Unversioned (epoch-0) flights accept the addressed node's first ack, so mixed
+meshes keep exactly the 4.61.x behavior. What this protects: the eviction
+verdict — a dead root can no longer be exonerated by its neighbors' honesty.
+Verified live 2026-08-08: SIGKILL'd root, write published 6ms later, successor
+convicted and write promoted in 29s (bound = flight budget + refresh sweep
+cadence; the same phenotype stranded 2h06m on 4.61.x).
+
+---
+
 ## Kernel 4.62.0 — 2026-08-08 — a write completes on proof of ingestion, and a dead root's seat is reclaimable (testnet)
 
 What happens to a topic whose root dies without saying goodbye? Before this
