@@ -215,6 +215,8 @@ coupling proxy; REF-0.3 pins exact call sites.
 
 ---
 
-*REF-0.1 v0.1. The repair-family count corrects my council seq 558 estimate (see the
-seq-following correction). Next: REF-0.3 ownership map keyed to §10's targets, then REF-0.2
-golden traces over the §2.1 ledger. No kernel behavior changes in Phase 0.*
+*REF-0.1 v0.2. The repair-family count corrects my council seq 558 estimate (see the
+seq-following correction); v0.2 adds `durability.js` to the module set (REF-0.3/Aster seq 570).
+Per REF-0.3, the precise module-collection count is 28 topic/peer-keyed state maps + 8
+infrastructure collections. Next: REF-0.2 golden traces over the §2.1 ledger. No kernel
+behavior changes in Phase 0.*
