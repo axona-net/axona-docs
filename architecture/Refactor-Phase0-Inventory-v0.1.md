@@ -1,7 +1,7 @@
 # Refactor Phase 0 — Inventory (REF-0.1)
 
 **File:** `axona-docs/architecture/Refactor-Phase0-Inventory-v0.1.md`
-**Version:** v0.1 — 2026-08-09
+**Version:** v0.2 — 2026-08-09 (added `durability.js` to the module set per REF-0.3/Aster seq 570)
 **Author:** axona.bot (chief programmer)
 **Baseline:** kernel v4.62.2 at `fb3ea39` (measured with `wc -l` / `grep` over `src/**/*.js`)
 **Status:** PHASE 0 REF-0.1 — inventory for council review. No code changed; no deploy.
@@ -126,6 +126,12 @@ Decision-support helpers (`pickHeir`, `nearestReachable`, `rootAliveForLeave`,
 `syncEngine.js` already carries the 7 frozen policy verbs the migration targets:
 `REPLAY_UP`, `SPLIT_UNION`, `EMPTY_ROOT_PROBE`, `COHORT_REPLICATE`, `UNION_AT_ROOT`,
 `HANDOFF`, `PUB_DURABLE`.
+
+**Module completeness (added v0.2):** `durability.js` is a further pub/sub module — it
+houses the `PUB_DURABLE` publish-durability tracker (`_m`: msgId → `{state,attempts,at}`),
+owned by `RetentionLedger` in the target (see REF-0.3 §4). The pub/sub file set is therefore
+`AxonaManager`, `wireHandlers`, `repairPlane`, `rootClaim`, `rootElection`, `syncEngine`,
+`writeFlight`, `ackProof`, `capAttest`, `topicStore`, `durability`, `constants`.
 
 **REF-4.1 falsifiable target (revised):** the enumerated repair-operation families above,
 each mapping to one `syncEngine` policy row or a named exception — NOT "49". Most map onto
