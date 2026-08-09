@@ -1,8 +1,8 @@
 # Refactor Phase 0 — Static Ownership Map (REF-0.3)
 
 **File:** `axona-docs/architecture/Refactor-Phase0-OwnershipMap-v0.1.md`
-**Version:** v0.3 — 2026-08-09 (Aster seq-575 semantic corrections: authority-state placement,
-delivery/handoff ownership, consumer-free cells, per-site timer semantics, category counts)
+**Version:** v0.4 — 2026-08-09 (Aster seq-580: name data owners not state types; consumers out
+of effect cells; sole legacy-placement policy owner; rootElection→TopicLocator; TOUCH owned)
 **Author:** axona.bot (chief programmer)
 **Baseline:** kernel v4.62.2 at `fb3ea39`
 **Targets:** `code-refactor-plan.md` **v3.2** (sha256 `51ce07f6…`) §4.9 owner roster
@@ -38,13 +38,19 @@ down the outward action. One name per column; consumers are named in prose, neve
 | `INGESTACK` (signed D1) | `WriteIngress` | `ackProof.js` builds → routing adapter sends |
 | `INGESTACK` (legacy 1-hop) | `writeFlight` (compat) | `writeFlight` |
 | `RECEIPTPROBE`,`RECEIPTNACK` | `writeFlight` | `ackProof.js` + routing adapter |
-| `PULL`,`PULLRESP` | `TopicDeliveryPlane` | `TopicStore` supplies bytes (consumer) |
+| `PULL`,`PULLRESP` | `TopicDeliveryPlane` | `TopicDeliveryPlane` (response via routing/messaging adapter) |
 | `PULLUP`,`REPLAYUP`,`REPLICATE` | `SyncEngine` | `SyncEngine` |
 | `HANDOFF`,`HANDOFFACK` | `TopicRoleLifecycle` (transition) | `SyncEngine` (movement + ack ledger) |
 | `ROOTBEACON` | `TopicLocator` | `TopicLocator` |
 | `METRICSON` | `TopicRoleLifecycle` (demand) | metrics loop |
-| `TOUCH` | deprecate-track | — |
+| `TOUCH` (registered, deprecated) | `TopicRoleLifecycle` (renewal compat) | `wireHandlers` compat no-op — **governed deprecation exception**, retirement tracked |
 | `UNPUB` | **RETIRE** (unregistered) | — |
+
+`PULL`/`PULLRESP`: `TopicStore` supplies the event bytes as a data source (prose), but the
+outward response effect is `TopicDeliveryPlane`'s — `TopicStore` has no outward effect beyond
+local mutation. `TOUCH` is a *registered* frame, so it carries a sole compatibility owner and
+a named no-op effect under a governed deprecation exception (retire in a later phase); it is
+not left ownerless.
 
 ## 3. `role.*` state fields → policy / data / effect owner
 
@@ -52,7 +58,7 @@ down the outward action. One name per column; consumers are named in prose, neve
 |---|---|---|---|
 | `cache`,`cacheIds`,`cacheBytes`,`tombstones`,`publishes` | **`WriteIngress`** | `TopicStore` | `TopicStore.apply` |
 | `seq`,`lastTs` | `LegacyStampAuthority` | `OrderingIndex` (legacy) | returns stamped entry |
-| `isRoot`,`epoch`,`backupOf` | `LegacyPlacementControl`/rootClaim | rootClaim record | rootClaim `_set` |
+| `isRoot`,`epoch`,`backupOf` | `LegacyPlacementControl` | `LegacyPlacementControl` (placement record) | `_set` transition |
 | `subscribers`,`children`,`readHolder` | `TopicDeliveryPlane` | `TopicDeliveryPlane` leases | SUB/DELIVER/renew |
 | `replicas`,`lastReplicaAt` | `RetentionLedger` | `RetentionLedger` | cohort via `SyncEngine` |
 | `sync`,`attempted`,`lastVerify` | `SyncEngine` | `SyncEngine` flight ledger | reconcile |
@@ -61,6 +67,8 @@ down the outward action. One name per column; consumers are named in prose, neve
 
 `role.cache` policy is `WriteIngress` alone; reads served through `TopicDeliveryPlane` are a
 **consumer** of the one `TopicStore` data owner, not a co-owner (Aster seq-575 #4).
+`LegacyPlacementControl` is the sole owner of placement fields; `rootClaim` is its **legacy
+implementation adapter** (named in prose, not a co-owner cell — Aster seq-580 #4).
 
 ## 4. Module-level `this._*` collections → policy / data / effect owner
 
@@ -81,15 +89,15 @@ registries + 3 listener sets + 1 persistence-dirty set + 1 timer set (§4b). Com
 | `_rootBeacons` | `TopicLocator` | beacon map | `TopicLocator` |
 | `_beaconSeen` | `TopicLocator` | dedup set | `TopicLocator` |
 | `_lastAnnounce` | `TopicLocator` | announce-time map | `TopicLocator` |
-| `_rootHint` | `TopicLocator` | candidate cache | `LookupService` (consumer) |
-| `_rootTombstones` | **`LegacyPlacementControl`** | **legacy authority-flight state** (convicted root id/epoch) | writeFlight eviction path |
+| `_rootHint` | `TopicLocator` | candidate cache | `TopicLocator` (cache update/teardown) |
+| `_rootTombstones` | `LegacyPlacementControl` | `LegacyPlacementControl` (convicted-root id/epoch record) | writeFlight eviction path |
 | `_upstream` | `TopicDeliveryPlane` | upstream lease | attach/rehome |
 | `_subscriptions` | `TopicDeliveryPlane` | downstream leases | `TopicDeliveryPlane` |
 | `mySubscriptions` | `TopicRoleLifecycle` (own APP_SUBSCRIBE) | obligation record | `PeerMessaging` bridge |
 | `_backupTopics` | `TopicRoleLifecycle` | obligation set | rootClaim (BACKUP) |
 | `_hostedTopics` | `TopicRoleLifecycle` | obligation set | `TopicRoleLifecycle` |
 | `_publishedTopics` | `TopicRoleLifecycle` | obligation set | `TopicRoleLifecycle` |
-| `axonRoles` | `LegacyPlacementControl`/rootClaim | placement record | rootClaim `_set` |
+| `axonRoles` | `LegacyPlacementControl` | placement record | `_set` (rootClaim adapter) |
 | `_appDelivered` | **`TopicDeliveryPlane`** | **`TopicDeliveryPlane`** (dup-suppression) | `PeerMessaging` callback bridge |
 | `_metricsWanted` | `TopicRoleLifecycle` (demand) | demand set | metrics loop |
 | `_metricsFwdAt` | `TopicRoleLifecycle` | fwd-time map | metrics loop |
@@ -130,7 +138,7 @@ for standing timers; transient yields need no scheduler slot.
 | `AxonaPeer.js:1276` `setTimeout` `_persistTimer` | STANDING | `PeerPersistence` (checkpoint debounce) |
 | `AxonaManager.js:1086` `setTimeout` (`_pending` corr) | STANDING | contract registry (request-response timeout) |
 | `AxonaManager.js:221` `_burstTimers` first/burst publish | STANDING | `WriteIngress` (cold-publish burst) |
-| `rootElection.js:298` `setTimeout(...unref)` | STANDING | `rootClaim`/election (lookup/verify timeout) |
+| `rootElection.js:298` `setTimeout(...unref)` (warmRootHint findKClosest) | STANDING | `TopicLocator` (candidate-lookup timeout) |
 | `repairPlane.js:436` `setTimeout` handle | STANDING | `SyncEngine` (repair deferral) |
 | `repairPlane.js:853` `setTimeout` handle | STANDING | `SyncEngine` (repair deferral) |
 | `AxonaPeer.js:1005` `setTimeout` handle | STANDING | `PeerLifecycle` (deferred lifecycle op) |
@@ -179,9 +187,19 @@ delegation → Phase 4 is from-scratch.
 - **Double policy/data ownership:** none, re-checked after the three reassignments and the
   §3 consumer removal. Signed vs legacy `INGESTACK` are two frames by design.
 - **Timers:** all 17 have a single deadline-semantics owner (§5); no grouped cells.
+- **Frame coverage (seq-580 #5):** all 19 *registered* frames now carry an owner + effect —
+  `TOUCH` is assigned `TopicRoleLifecycle` (renewal compat) with a named `wireHandlers` no-op
+  effect under a governed deprecation exception; `UNPUB` alone is RETIRE (unregistered, so no
+  ownership claim). The "all registered frames owned / no orphans" statement is now true.
+- **seq-580 cell fixes re-proven:** `_rootTombstones` data owner is `LegacyPlacementControl`
+  (a service, not a state-type label); `PULL/PULLRESP` effect is `TopicDeliveryPlane`
+  (`TopicStore` is a data source in prose, no outward effect); `_rootHint` effect is
+  `TopicLocator` (not the `LookupService` consumer); `role.isRoot/epoch/backupOf` and
+  `axonRoles` name the sole policy owner `LegacyPlacementControl` (rootClaim = adapter in
+  prose); `rootElection.js:298` deadline semantics belong to `TopicLocator`.
 
-**No open cells, no slash cells, no consumers in owner cells, no double ownership.** §4, §9,
-§10, and the footer agree.
+**No open cells, no slash cells, no consumers in owner cells, no double ownership; all 19
+registered frames owned.** §2, §3, §4, §5, §9, §10, and the footer agree.
 
 ## 10. Conclusion
 
@@ -196,8 +214,11 @@ current fact; the singleton-root-coupled maps sit behind the `TopicLocator`/
 
 ---
 
-*REF-0.3 v0.3. All seven Aster seq-575 corrections applied: `_rootTombstones`/`_appDelivered`/
-`_handoffAcked` reassigned; `role.cache` consumer removed from the owner cell; all 17 timers
-named per-site with STANDING/TRANSIENT kind; 36 collections categorized (28 state + 8
-infra) as the falsifiable denominator; REF-0.1 footer reconciled to v0.2. Next: REF-0.2
-golden traces over the §2.1 ledger. No kernel behavior changed in Phase 0.*
+*REF-0.3 v0.4. All five Aster seq-580 corrections applied on top of the seq-575 round:
+`_rootTombstones` data owner named as the `LegacyPlacementControl` service (not a state-type
+label); `PULL/PULLRESP` effect → `TopicDeliveryPlane` (consumer out of the effect cell);
+`_rootHint` effect → `TopicLocator`; `role.isRoot/epoch/backupOf` + `axonRoles` sole policy
+owner `LegacyPlacementControl` (rootClaim = adapter in prose); `rootElection.js:298` →
+`TopicLocator`; `TOUCH` owned as a governed deprecation exception so all 19 registered frames
+carry an owner. §2/§3/§4/§5/§9/§10/footer reconciled. Next: REF-0.2 golden traces over the
+§2.1 ledger. No kernel behavior changed in Phase 0.*
