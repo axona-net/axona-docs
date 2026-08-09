@@ -586,3 +586,34 @@ Acceptance (blockers named):
 
 The 4.62.1 gate numbers taught what a settled-mesh pass is worth; the soak
 decides.
+
+## Implementation contract (4.62.2 as shipped)
+
+The ratified design above fixes the wire format at the type level. Two field
+contracts are pinned by the 4.62.2 implementation and were not spelled out in
+the transcript's symbolic widths (`TOPIC_ID_BYTES`/`NODE_ID_BYTES`, `u64(epoch)`).
+Recording them so an independent reader reproduces the exact bytes (Aster
+re-review of candidate `fb3ea39`).
+
+**D1 ids decode to a fixed 33 bytes, in every keyspace profile.** `topicId`,
+`ackTo`, and the CAP_ATTEST `nodeId` are exactly 33 bytes — the width the wire
+serializer `idHex()` emits, which pads to 66 hex unconditionally regardless of
+profile (a shrunk sim id is the same 33 bytes, zero-extended). The transcript
+builder enforces 33 (`ID_BYTES`), NOT a profile-derived `HEX_CHARS/2`; a raw
+shrunk-width id that never passed through `idHex` is refused before signing.
+`smoke_ack_proof_profile` proves the signed path through the real `idHex` under
+an even shrunk profile (hashBits 64, HEX_CHARS 18) and an odd one (hashBits 66,
+HEX_CHARS 19). The other widths stay fixed: `msgId` 32 (SHA-256),
+`attemptId`/`flightNonce` 16, `rootPub` 32.
+
+**Epoch is a u64 wire field carrying the JavaScript safe-integer subset.** The
+transcript's `u64(epoch)` is the full 64-bit wire type. This implementation
+accepts only non-negative `Number.isSafeInteger` epochs (≤ 2^53−1) and refuses
+anything larger, because a larger value cannot be an exact JavaScript number and
+`u64be` would truncate two distinct epochs to identical bytes. Epochs are
+incarnation counters, far below that ceiling; an implementation that must span
+the full u64 range has to carry a lossless 64-bit representation, not a Number.
+
+Both contracts live in `src/pubsub/ackProof.js` (`ID_BYTES`, the epoch guard)
+and `src/pubsub/capAttest.js`, shipped in kernel 4.62.2 at protocol commit
+`fb3ea39`.

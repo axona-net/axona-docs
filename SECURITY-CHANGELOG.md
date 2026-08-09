@@ -16,6 +16,68 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel 4.62.2 — 2026-08-09 — a multi-hop ingest-ack routes home to the flight owner (PROD)
+
+When a write travels several hops to the root, where does the root's ingest-ack
+go? In 4.62.0/4.62.1 it went ONE hop back — to the last forwarder — so on any
+route longer than a single hop the ack never reached the node holding the
+flight. The honest root was convicted for an ack it had in fact produced, and
+the eviction verdict fed the next promotion, which fed the next conviction: a
+self-sustaining storm. This is not hypothetical — it ran live on prod
+2026-08-09, mass peer-died-eviction of the relay fleet wedging the council
+topic until a rolling fleet roll cleared it (GH #51/#446).
+
+Now the root signs an INGEST-ACK PROOF and routes it to the flight owner
+(`ackTo`) across any number of hops. Completion binds on
+attemptId + ackTo + flightNonce + the root's hash-bound authority + epoch —
+never the last hop — so a signed proof delivered from a NON-root relay still
+completes the flight, the exact case #51 dropped. What this protects: the
+eviction verdict stops firing on an ack that was merely lost in transit.
+
+First 4.62.x promotion to PROD (4.62.0/4.62.1 were testnet-only). Scoped to the
+ack-routing fix (D1). The delegation and promotion-chain-budget remainder of
+the deaf-flight remediation (D0/D2/D3) is deferred to a post-refactor release —
+the promotion-chain budget that bounds the residual storm is NOT in this ship,
+so a flight whose evidence can never return can still churn; the operational
+mitigation remains a rolling fleet roll until that lands.
+
+KNOWN INTERIM EXPOSURE (tracked, closed by D0). A flight owner stamps its
+transport id (`ackTo`) on the carried write. For a node that BOTH authors a
+publish AND owns the flight for that topic — our own axona.bot and the
+civildefense host fleets, not pure browser clients — this places the author
+envelope beside the owner transport id on the wire: an author↔transport
+correlator (Aster R6, invariant I-9). Prod 4.61.2 carried no `ackTo`, so this
+is a new disclosure for that narrow class. D0's delegation — an API-origin node
+never owns its own carried flight — closes it, and is deferred with the rest of
+the delegation work. This I-9 disclosure and the unbounded-promotion-chain gap
+above are both **David-accepted governed exceptions** for the interim, recorded
+here and stated to council before the deploy — not properties covered by any
+reviewer clearance.
+
+Conformance hardening (Aster council review, closed before ship). Aster's review
+raised a conformance blocker on the D1 transcript: `ackProof.buildTranscript`
+accepted `topicId`/`ackTo` at any hex width and any `Number.isInteger` epoch
+while `u64be` truncates, and CAP_ATTEST's `buildCapTranscript` lacked its fixed
+nodeId-width check. All are now enforced. `topicId`/`ackTo`/nodeId must be
+EXACTLY 33 bytes — the fixed canonical width the D1 serializer `idHex()` emits in
+EVERY keyspace profile (it pads to 66 hex unconditionally); an earlier
+`HEX_CHARS/2` profile-derived check was wrong and rejected the real signed path
+under a shrunk profile (Aster fixed-slice review) — now covered by a signed
+shrunk-profile + odd-width test through the real `idHex` path. Epoch is bounded
+to `Number.isSafeInteger` — the JavaScript safe-integer SUBSET of u64 (≤ 2^53−1),
+not the full u64 range; this is truncation-free and sufficient because epochs are
+small incarnation counters, and the wire remains u64. Wrong-width and epoch-
+overflow rejection vectors are in the golden suites. Gate evidence is the full
+serial suite (jobs=1) run to a deterministic green. The blocker is closed by fix,
+not waived.
+
+Also present but INERT on this release: the CAP_ATTEST capability oracle
+(authenticated `write-flight-ack-v1` attestation, R13/R15/R17) — verified per
+channel and surfaced at `dht.isCapable`, fail-closed. Nothing consumes it until
+D0, so it changes no behavior on this ship.
+
+---
+
 ## Kernel 4.62.1 — 2026-08-08 — an INGEST-ack settles a flight only from the root it was addressed to (testnet)
 
 Which ack may complete a write flight? In 4.62.0: any holder's valid-looking
