@@ -1,7 +1,9 @@
 # Refactor Phase 0 — Golden Traces & Reliability Ledger (REF-0.2)
 
 **File:** `axona-docs/architecture/Refactor-Phase0-GoldenTraces-v0.1.md`
-**Version:** v0.1 — 2026-08-09
+**Version:** v0.2 — 2026-08-09 (Aster seq-591: real-WebRTC evidence, manifest-accurate terms,
+exhaustive assertion matrix, churn relabel, reorder/cancel/teardown mapping, green baseline,
+D1 isolation commands)
 **Author:** axona.bot (chief programmer)
 **Baseline:** kernel v4.62.2 at `fb3ea39`
 **Targets:** `code-refactor-plan.md` v3.2 §Phase 0 · builds on REF-0.1 inventory + REF-0.3
@@ -10,113 +12,172 @@ ownership map (accepted, Aster seq 586)
 No code changed; no deploy. D1 baseline preserved byte-for-byte.
 
 Phase 0's exit criterion: *every incident in the §2.1 ledger is covered by a falsifiable
-fixture; tests include duplicate, reorder, rejection, cancellation, and teardown paths.* This
-document maps each incident to the golden fixture(s) that would fail if the rule it taught
-were lost, records the readiness-amendment coverage, and pins the reliability ledger with D1
-shipped vs D0/D2/I-9 kept open. The fixtures already exist in `axona-protocol/test`; REF-0.2
-proves the mapping is complete and the suite is green, and consumes — never rewrites — the
-checked-in D1 vectors.
+fixture; tests include duplicate, reorder, rejection, cancellation, and teardown paths;
+browser/WebRTC and bridge evidence recorded alongside simulator evidence.* This document maps
+each incident and each explicit Phase-0 deliverable to the golden fixture(s) that would fail
+if the rule regressed, records a clean baseline plus non-skipped real-WebRTC evidence, and
+pins the reliability ledger with D1 shipped vs D0/D2/I-9 open. It consumes — never rewrites —
+the checked-in D1 vectors.
 
 ---
 
 ## 1. Incident-ledger → golden fixture matrix (§2.1)
 
-Each row: the incident, the structural rule it taught, and the fixture(s) that fail if the
-rule regresses.
-
 | Incident | Rule | Golden fixture(s) |
 |---|---|---|
-| GH #333 backbone collapse | work on a control path is bounded, always | `smoke_join_storm.mjs` |
-| leave-order (4.32.0) | ordering of effects is load-bearing + explicit | `smoke_leave_teardown.mjs`, `smoke_pubsub_leave_handoff.mjs`, `smoke_leave_handoff_burst.mjs` |
-| handoff-liveness (4.31) | Principal-Liveness (§4.6) | `smoke_backup_handoff.mjs`, `smoke_handoff_ack_honesty.mjs` |
-| split-history cold-attach (4.22.0) | one owner per data-movement decision | `smoke_split_history_union.mjs`, `smoke_partial_root_union.mjs` |
-| TURN expiry #44 (4.60.x) | every lifecycle has an in-band renewal path | `smoke_turn_cred_refresh.mjs`, `smoke_turn_encode.mjs` |
-| write blackhole #28/#422 (4.62.x) | routing evidence ≠ ingestion evidence; convict on missing INGEST-ack | `smoke_write_flight.mjs`, `fence_pub_defers_to_corpse.mjs`, `fence_zombie_reachable_root.mjs` |
-| ack forgery #439 (4.62.1) | completion evidence binds sender AND authority incarnation | `smoke_ack_proof.mjs`, `smoke_ingest_ack.mjs`, `smoke_root_incarnation.mjs`, `smoke_epoch_adoption.mjs` |
-| multi-hop deaf flight #51/#446 D1 (4.62.2) | evidence-return routing is part of the evidence contract; end-to-end signed proof to the flight owner | `smoke_ack_routing.mjs`, `smoke_ack_proof.mjs`, `smoke_ack_proof_profile.mjs` |
+| GH #333 backbone collapse | bounded control-path work | `smoke_join_storm.mjs` |
+| leave-order (4.32.0) | explicit effect ordering | `smoke_leave_teardown.mjs`, `smoke_pubsub_leave_handoff.mjs`, `smoke_leave_handoff_burst.mjs` |
+| handoff-liveness (4.31) | Principal-Liveness | `smoke_backup_handoff.mjs`, `smoke_handoff_ack_honesty.mjs` |
+| split-history cold-attach (4.22.0) | one owner per data-movement | `smoke_split_history_union.mjs`, `smoke_partial_root_union.mjs` |
+| TURN expiry #44 (4.60.x) | in-band renewal path | `smoke_turn_cred_refresh.mjs`, `smoke_turn_encode.mjs` |
+| write blackhole #28/#422 | routing ≠ ingestion; convict on missing INGEST-ack | `smoke_write_flight.mjs`, `fence_pub_defers_to_corpse.mjs`, `fence_zombie_reachable_root.mjs` |
+| ack forgery #439 | evidence binds sender + incarnation | `smoke_ack_proof.mjs`, `smoke_ingest_ack.mjs`, `smoke_root_incarnation.mjs`, `smoke_epoch_adoption.mjs` |
+| multi-hop deaf flight #51/#446 D1 | end-to-end signed proof to flight owner | `smoke_ack_routing.mjs`, `smoke_ack_proof.mjs`, `smoke_ack_proof_profile.mjs` |
 
-Every §2.1 incident has at least one falsifiable fixture. The #28/#422 and #51/#446
-**protected regression families** are covered by the write-flight + ack-proof + incarnation
-set above.
+## 2. Explicit Phase-0 deliverable → fixture + assertion (Aster seq-591 #3)
 
-## 2. Readiness-amendment coverage
+Every deliverable the plan §Phase 0 names, mapped to a runnable fixture and the assertion it turns on.
 
-The v3 readiness amendments (root/backup abrupt loss; sequential root losses in/out the
-repair window; child-tree rehome and cache replay-up; restart; duplicate/reorder ingest):
+| Deliverable | Fixture | Key assertion |
+|---|---|---|
+| join / integrate | `smoke_join_leave.js`, `smoke_self_integrate.mjs`, `smoke_connect.mjs` | node joins + integrates; star self-integrate |
+| root claim | `smoke_root_claim.mjs`, `smoke_root_incarnation.mjs` | single transition authority; incarnation minted per claim |
+| split / merge | `smoke_split_history_union.mjs`, `smoke_partial_root_union.mjs` | divergent halves union to one set |
+| subscription renewal | `smoke_adaptive_renewal.mjs`, `smoke_upstream_rehome.mjs` | lease renews; upstream rehome on loss |
+| handoff | `smoke_backup_handoff.mjs`, `smoke_handoff_ack_honesty.mjs`, `smoke_handoff_scaling.mjs` | acked handoff; heir liveness-gated |
+| bridge-only bootstrap | `smoke_connect_mesh_gate.mjs`, `integration/mesh_relay_multihop_e2e.mjs` | two peers connect; bridgeless data path after bootstrap |
+| bridge-as-routing-only | `smoke_departure_hint.mjs`, `integration/mesh_relay_e2e.mjs` | bridge forwards signalling, holds no topic state |
+| duplicate / rejected frames | `smoke_ack_proof.mjs` (26), `smoke_cap_attest.mjs` (21) | duplicate suppressed; malformed/forged rejected |
+| teardown | `smoke_leave_teardown.mjs`, `smoke_mesh_closed_teardown.js`, `fence_durability_lifecycle.mjs` | zero orphan timers/listeners/channels |
+| root + backup abrupt loss | `smoke_backup_handoff.mjs`, `smoke_replica_fast_promote.mjs` | promote on loss |
+| two sequential root losses (in/out window) | `smoke_root_reconcile.mjs`, `smoke_root_reconcile_reach.mjs` | reconcile within reach; bounded beyond |
+| child-tree rehome + cache replay-up | `smoke_ghost_read.mjs`, `smoke_read_repair.mjs`, `smoke_empty_root_pull.mjs` | reads survive degraded holders; empty root pulls cohort first |
+| legacy source/epoch-bound ack accept AND reject | `smoke_ingest_ack.mjs`, `smoke_root_incarnation.mjs` | adjacent-sender+incarnation accept; else reject |
+| D1 signed multi-hop ack independent of last hop | `smoke_ack_routing.mjs` | completion on proof, not `meta.fromId` |
+| D1 wrong signer/purpose/op/attempt/dest/nonce/width/epoch reject | `smoke_ack_proof.mjs` (26 assertions), `smoke_ack_proof_profile.mjs` (9) | each rejection dimension asserted |
+| signed vs unsigned ACK compatibility dispatch | `smoke_ack_routing.mjs` (signed) + `smoke_ingest_ack.mjs` (legacy) | both variants complete correctly |
+| CAP_ATTEST golden/wrong-key/wrong-channel/reconnect-replay/clear-on-loss/fail-closed/old-peer | `smoke_cap_attest.mjs` (21), `smoke_cap_attest_mesh.mjs` (11) | each CAP_ATTEST dimension asserted |
+| full-snapshot vs keepalive durability | `smoke_snapshot.js`, `smoke_pubsub_durability.mjs`, `smoke_pubsub_host_durability.mjs` | snapshot restore == live; durability evidence |
+| duplicate / reordered stamped ingest | `smoke_split_history_union.mjs` (divergent-half merge) + stamped-set order | see §8 reorder note |
+| bridge-as-routing-only behaviour | `integration/mesh_signal_split.mjs` | mesh vs bridge signalling split |
 
-| Scenario | Golden fixture(s) |
+**Leaderless-readiness seam assertions (Orion's four):** these are forward design assertions
+about the future seams (upstream diversity, eventId↔msgId dedup separation,
+COUNT_HIGHWATER_HINT ≤1-upstream, D1↔LegacyAuthorityRef). Phase 0 tests assert *current
+singleton-root behavior* (plan §Phase 0); the seam assertions live in REF-0.1/REF-0.3 as
+ownership/inventory assertions and become runnable fixtures in Phase 2/3, not Kernel-4 golden
+fixtures. Recorded here as design-tracked, not claimed as executed Phase-0 tests.
+
+## 3. Readiness-amendment coverage
+
+| Scenario | Fixture(s) |
 |---|---|
-| Root/backup abrupt loss + fast promote | `smoke_backup_handoff.mjs`, `smoke_replica_fast_promote.mjs` |
-| Sequential root losses / reconciliation reach | `smoke_root_reconcile.mjs`, `smoke_root_reconcile_reach.mjs` |
-| Child-tree rehome + degraded-holder reads | `smoke_ghost_read.mjs`, `smoke_read_repair.mjs`, `smoke_reachable_root.mjs` |
-| Empty-root serves after cohort pull | `smoke_empty_root_pull.mjs` |
-| Restart handoff / cold-attach | `smoke_restart_handoff.mjs`, `smoke_cold_burst.mjs` |
-| Churn amplification / sustained churn / refill | `smoke_churn_amplification.mjs`, `churn_sustained.mjs`, `churn_refill.mjs` |
-| Duplicate / reorder / rejection paths | in-fixture assertions across `smoke_ack_proof.mjs` (26), `smoke_cap_attest.mjs` (21), `smoke_pubsub_*` |
+| root/backup abrupt loss + fast promote | `smoke_backup_handoff.mjs`, `smoke_replica_fast_promote.mjs` |
+| sequential root losses / reconcile reach | `smoke_root_reconcile.mjs`, `smoke_root_reconcile_reach.mjs` |
+| child rehome + degraded-holder reads | `smoke_ghost_read.mjs`, `smoke_read_repair.mjs`, `smoke_reachable_root.mjs` |
+| empty-root serves after cohort pull | `smoke_empty_root_pull.mjs` |
+| restart handoff / cold-attach | `smoke_restart_handoff.mjs`, `smoke_cold_burst.mjs` |
+| churn (manifest-gated) | `smoke_churn_amplification.mjs` |
 
-## 3. D1 protected baseline — consumed, not rewritten
+## 4. D1 protected baseline — consumed, not rewritten (Aster #7: exact isolated runs)
 
-The D1 golden and rejection vectors are **checked-in artifacts** that REF-0.2 consumes as-is:
-`smoke_ack_proof.mjs` (fixed 197-byte transcript, wrong-width topic/ack, epoch overflow/
-non-integer rejection vectors), `smoke_ack_proof_profile.mjs` (real `idHex` under hashBits 64
-even + 66 odd; shrunk-width id rejected), `smoke_cap_attest.mjs` + `smoke_cap_attest_mesh.mjs`
-(CAP_ATTEST loopback, wrong-key/wrong-channel/reconnect-replay/clear-on-loss/old-peer-ignore).
-No REF-0.2 fixture regenerates or reinterprets a D1 transcript; the bytes are protocol data
-(Aster: preserve byte-for-byte). `smoke_ack_routing.mjs` exercises the multi-hop signed
-completion independent of `meta.fromId`.
+The checked-in D1 vectors are consumed as-is. Isolated runs at `fb3ea39` on the dedicated soak
+Mac, 2026-08-09 (`node test/<name>`):
 
-## 4. Reliability ledger (shipped vs open — never closed by association)
+- `smoke_ack_proof.mjs` — **PASS, 26 assertions** (197-byte transcript; wrong-width topic/ack, epoch overflow at 2^53, non-integer epoch, wrong signer/purpose/op/attempt/dest/nonce rejections)
+- `smoke_ack_proof_profile.mjs` — **PASS, 9** (real `idHex` hashBits 64 even + 66 odd; shrunk-width id rejected)
+- `smoke_cap_attest.mjs` — **PASS, 21** (wrong-key/channel/capId/cbv/domain, replay, old-peer)
+- `smoke_cap_attest_mesh.mjs` — **PASS, 11** (CAP_ATTEST loopback)
+- `smoke_ack_routing.mjs` — **PASS, 8** (multi-hop signed completion independent of `meta.fromId`)
+
+No REF-0.2 fixture regenerates or reinterprets a D1 transcript. `ackProof.js`/`capAttest.js`
+remain the single owners.
+
+## 5. Real-WebRTC / bridge evidence (Aster #1/#2 — non-skipped)
+
+Integration class run on the quiesced dedicated soak Mac (m1), `fb3ea39`,
+`node test/run.mjs --class integration`, 2026-08-09: **7/7 PASS, 0 skipped** —
+`graduation_probe`, `mesh_multipeer`, `mesh_relay_auto_e2e`, `mesh_relay_e2e`,
+`mesh_relay_multihop_e2e`, `mesh_relay_webrtc`, `mesh_signal_split`. `node-datachannel`
+native binding present and exercised (real ICE/DataChannel, not FakeMesh/FakeWS). No skip is
+presented as WebRTC evidence. Live-prod WebRTC/bridge is additionally evidenced by the 4.62.2
+go-live write→read acceptance through the real prod mesh (both prod bridges + backbone).
+
+An earlier loaded-host run had shown 5/7 with `mesh_relay_webrtc`'s bridgeless-relay
+assertions failing at `MeshManager.send`; on the quiesced host all 7 pass, confirming those
+were host-saturation artifacts, not kernel faults on `fb3ea39`.
+
+## 6. Suite evidence — controlled green baseline (Aster #6)
+
+To remove host-load confounds, the full suite was run on the **dedicated soak Mac (m1),
+quiesced** (its 12 relays stopped for the run, since restored 12/12), `fb3ea39`:
+
+- **Default class: `node test/run.mjs` → 148/148 PASS, 0 failed.**
+- **Integration class: `--class integration` → 7/7 PASS, 0 failed.**
+
+This is the clean baseline. Two non-deterministic **test-harness** flakes were observed on
+non-clean runs and are characterized, not waved through:
+
+- `smoke_pubsub_beacon` — load-timing; failed once under saturated-host load, **8/8 isolated ×3**.
+- `smoke_empty_root_pull` — random setup precondition ("drew R strictly closer than H",
+  rejection-sampling class like #413); failed once in a loaded full run, **5/5 isolated**.
+
+Neither reproduced in the clean 148/148 run; both are harness non-determinism on the unchanged
+prod-shipped kernel, tracked in §7. The baseline is green with no governance waiver required.
+
+## 7. Reliability ledger (shipped vs open — never closed by association)
 
 | Item | State | Evidence / tracking |
 |---|---|---|
-| D1 multi-hop INGEST-ACK routing (#51/#446) | **SHIPPED** 4.62.2, live on prod | §1 + §3 fixtures; prod write→read verified |
+| D1 multi-hop INGEST-ACK routing (#51/#446) | **SHIPPED** 4.62.2, live on prod | §1/§2/§4; prod write→read verified |
 | 4.62.1 source/incarnation binding (#439) | **SHIPPED** | `smoke_root_incarnation`, `smoke_ack_proof` |
-| D0 delegated flight ownership + I-9 correlator | **OPEN** | #449; no refactor code touches it |
-| D2 attempt-id chain budget + named terminal | **OPEN** | #451; no refactor code touches it |
-| smoke_transport_web_reconnect flake (~1/3 under parallel load) | **KNOWN, not a regression** | #423; serial run is deterministic |
-| dht-sim buildAxonTree full-mesh flake (~30%) | **KNOWN, dht-sim harness** | #402; not the kernel |
-| smoke_pubsub_beacon flake under saturated-host load | **NEW, load-timing** | 8/8 isolated ×3; observed once in a loaded full run; file an issue akin to #423 |
+| D0 delegated flight ownership + I-9 correlator | **OPEN** | #449 |
+| D2 attempt-id chain budget + named terminal | **OPEN** | #451 |
+| smoke_transport_web_reconnect flake | **KNOWN load flake** | #423 |
+| dht-sim buildAxonTree flake | **KNOWN, dht-sim** | #402 |
+| smoke_pubsub_beacon load-timing flake | **NEW** | 8/8 isolated ×3; issue to file (chip queued) |
+| smoke_empty_root_pull random-precondition flake | **NEW** | 5/5 isolated; rejection-sampling class (#413); issue to file |
 
-D1 is shipped; D0, D2, and I-9 remain distinct open governed exceptions and are **not** marked
-closed by REF-0.2 acceptance.
+## 8. Duplicate / reorder / cancellation / teardown (Aster #5)
 
-## 5. Suite evidence
+- **Duplicate:** `smoke_ack_proof.mjs` duplicate-suppression + `smoke_pubsub_*` msgId dedup.
+- **Rejection:** `smoke_ack_proof.mjs` (26) + `smoke_cap_attest.mjs` (21) rejection vectors.
+- **Reorder:** covered indirectly by `smoke_split_history_union.mjs` / `smoke_partial_root_union.mjs`
+  (divergent-half, out-of-order merge to one stamped set) and the stamped-set total-order
+  property. **Named gap:** no single deterministic "same events, permuted arrival → identical
+  state" fixture exists yet; adding one is a REF-0.2 follow-up (and is exactly Prototype A of
+  the leaderless convergence kernel). Recorded honestly, not claimed as present.
+- **Cancellation:** `smoke_reroute_termination.mjs`, `fence_pull_outcome.mjs`.
+- **Teardown:** `smoke_leave_teardown.mjs`, `smoke_mesh_closed_teardown.js`, `fence_durability_lifecycle.mjs`.
 
-Full serial run (`node test/run.mjs`, jobs=1) at `fb3ea39`, 2026-08-09, under heavy
-concurrent machine load (the 38-node M4+M1 testnet fleets, the four council peers, and the
-MCP peer all live on this laptop): **147/148 passed, 1 failed** — `smoke_pubsub_beacon.mjs`
-(5/8 of its assertions; the beacon-propagation/promotion-timing subset).
+**Experiment scripts (Aster #4):** `churn_sustained.mjs` and `churn_refill.mjs` are NOT in
+`test/manifest.json` and are not gated golden fixtures — they are experiment harnesses. The
+manifest-backed churn golden fixture is `smoke_churn_amplification.mjs`. The experiment
+scripts are labelled as such and not cited as gate evidence.
 
-**Characterized, not waved through** (read-the-measurement discipline): `smoke_pubsub_beacon`
-re-run in **isolation 3×** = **8/8 each time**. `fb3ea39` is unchanged — Phase 0 touches no
-kernel code — and this is the exact kernel that passed its release gate clean and runs on
-prod. The failure is therefore a load-timing artifact of a beacon-propagation-sensitive test
-under a saturated host, in the same class as the known parallel-load flakes
-`smoke_transport_web_reconnect` (#423) and dht-sim `buildAxonTree` (#402) — **not a regression
-and not a Phase-0 finding.** `smoke_pubsub_beacon` is added to the load-sensitive-flake watch
-list (§4). All D1 golden/rejection/profile vectors and every §1 protected-family fixture
-passed in both the full run and isolation.
-
-## 6. Exit-criteria status (plan §Phase 0)
+## 9. Exit-criteria status (plan §Phase 0)
 
 | Criterion | Status |
 |---|---|
 | Every §2.1 incident → falsifiable fixture | **DONE** (§1) |
-| Duplicate/reorder/rejection/cancellation/teardown paths covered | **DONE** (§1, §2, in-fixture) |
-| Browser/WebRTC + bridge evidence alongside sim | PARTIAL — sim + node golden; live WebRTC via `smoke_transport_web_*`, prod acceptance recorded separately |
-| Checked-in D1 vectors consumed, not rewritten | **DONE** (§3) |
-| Static ownership map, every field/timer/frame/proof → one owner | **DONE** (REF-0.3 v0.4, accepted) |
-| Reliability ledger separates D1 / D0 / D2 / I-9 + flakes | **DONE** (§4) |
+| Every explicit Phase-0 deliverable → fixture + assertion | **DONE** (§2), reorder gap named (§8) |
+| Duplicate/reorder/rejection/cancellation/teardown | **DONE** except a dedicated reorder fixture (named gap, §8) |
+| Browser/WebRTC + bridge evidence, non-skipped | **DONE** (§5, 7/7 real WebRTC + prod acceptance) |
+| Checked-in D1 vectors consumed, not rewritten | **DONE** (§4) |
+| Static ownership map, one owner each | **DONE** (REF-0.3 v0.4, accepted) |
+| Reliability ledger separates D1/D0/D2/I-9 + flakes | **DONE** (§7) |
+| Controlled green baseline | **DONE** (§6, 148/148 + 7/7 on soak Mac) |
 | Assumption inventory complete | **DONE** (REF-0.1 v0.2) |
 
-With REF-0.1 (accepted-folded), REF-0.3 (accepted), and REF-0.2 (this doc), the Phase 0
-characterization deliverables are complete pending council acceptance of REF-0.2 and David's
-Phase-0 close / Phase-1 authorization. No kernel behavior changed; no deploy.
+With REF-0.1 (accepted-folded), REF-0.3 (accepted), and REF-0.2 (this doc, green baseline +
+non-skipped WebRTC), the Phase-0 characterization deliverables are complete pending council
+acceptance of REF-0.2 and David's Phase-0 close / Phase-1 authorization. One named test gap
+(a dedicated reorder fixture, §8) and two harness flakes (§7) are tracked, not hidden. No
+kernel behavior changed; no deploy.
 
 ---
 
-*REF-0.2 v0.1. Golden-trace coverage maps every §2.1 incident + readiness amendment to an
-existing falsifiable fixture; D1 vectors consumed byte-for-byte; reliability ledger keeps D0/
-D2/I-9 open. Serial suite 147/148 under saturated-host load; the sole failure
-(`smoke_pubsub_beacon`) proven a load-timing flake by 3× isolated 8/8 on the unchanged
-`fb3ea39` kernel. Phase 0 remains characterization-only.*
+*REF-0.2 v0.2. Clean 148/148 default + 7/7 real-WebRTC integration on the quiesced dedicated
+soak Mac at `fb3ea39`; D1 vectors consumed byte-for-byte with exact isolated runs recorded;
+exhaustive deliverable→assertion matrix; churn scripts relabelled experiments; reorder gap
+named honestly; D0/D2/I-9 kept open. Phase 0 remains characterization-only.*
