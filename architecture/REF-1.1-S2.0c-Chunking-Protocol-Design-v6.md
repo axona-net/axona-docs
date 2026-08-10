@@ -9,9 +9,13 @@
   transfer-tree, exact-partition, and fragmentation mechanics as directionally sound;
   the blocker was tombstone **authorization**. v6 removes the broken receipt and defers
   authorization to a separate, gated prerequisite.
-- **Depends on:** `REF-1.1-S2.0c-AUTH-Admission-Attestation-Design.md`. v6's frame
+- **Depends on:** `REF-1.1-S2.0c-AUTH-Admission-Attestation-Design-v2.md`. v6's frame
   mechanics *carry* the admission proof defined there; they do not define the trust
-  model. **S2.0c cannot clear until both this design and S2.0c-AUTH clear.**
+  model. **S2.0c cannot clear until both this design and S2.0c-AUTH v2 clear.**
+- **F6 patch (Aster seq 755):** the completion rule below is corrected — closing the
+  legacy retention window is **not** authorization; clearance depends on the proofless
+  tombstone's **absence**, never a timer. The del-record `admissionProof` shape tracks
+  S2.0c-AUTH **v2** (`cohortVersion`, carried `cohortDescriptor`/cert chain, `signerNodeId`).
 
 ## What changed from v5
 
@@ -48,27 +52,32 @@ half. Four things change; everything else in v5 stands.
 
     delRecord = {
       signedKill:     { d: KILL_DOMAIN, topicId, msgId, ts, seq, signerPubkey, signature },
-      admissionProof: { version, topicId, msgId, authorPubkey,
-                        epoch, rootNodeHash, cohortDigest,
-                        attestations: [ { signerPub, signerNodeHash, sig }, … ] }  // ≥2 distinct
+      admissionProof: { authorPubkey, rootNodeId, rootEpoch, cohortVersion,
+                        cohortDescriptor,          // opens cohortDigest (AUTH v2 F1)
+                        cohortCertChainSuffix,      // to a trusted anchor/checkpoint (F3)
+                        attestations: [ { signerNodeId, signerPub, sig }, … ] }  // ≥ threshold, distinct
     }
 
-`admissionProof` is exactly the object S2.0c-AUTH defines — a cohort quorum (≥2 of the 3
-`{root, replica, replica}` members) of `AXONA_ADMISSION_ATTEST_V1` signatures, carrying no
-body and no preimage. There is **no `rootStamp`**. The del leaf binds the whole canonical
-`delRecord`, so the kill and its authorization proof are committed together and cannot be
-recombined across transfers.
+`admissionProof` is exactly the object S2.0c-AUTH **v2** defines — a cohort quorum (≥ 2 of
+the 3 `{root, replica, replica}` members) of `AXONA_ADMISSION_ATTEST_V1` signatures, plus
+the carried `cohortDescriptor` that opens `cohortDigest` and the certificate-chain suffix
+that proves *which* cohort admitted the record. It carries no body and no preimage, and no
+`rootStamp`. The del leaf binds the whole canonical `delRecord`, so the kill and its
+authorization proof are committed together and cannot be recombined across transfers.
 
 ## Verification before any effect
 
 Before any durable effect (delete, suppress-then-release, fan-out, ack, high-water
-advance), the receiver runs the S2.0c-AUTH verification in full: `verifyKill` valid;
-quorum of distinct, same-epoch, same-transcript cohort attestations, each self-certifying
-(`signerNodeHash == H(signerPub)`) and keyspace-proximate; `signedKill.signerPubkey ==
+advance), the receiver runs the S2.0c-AUTH **v2** verification in full: `verifyKill` valid;
+≥ threshold distinct, same-`cohortVersion`, same-transcript attestations, each self-certifying
+(`hashComponent(signerNodeId) == SHA-256(signerPub) & HASH_MASK`, AUTH v2 F4); the
+`cohortDescriptor` opens `cohortDigest` and its cohort certificate **chains to a trusted
+anchor** (AUTH v2 F3 — never live-routing reconstruction); `signedKill.signerPubkey ==
 admissionProof.authorPubkey`; topic agreement with the authenticated `signedKill.topicId`;
-incarnation not superseded (E4) or convicted (E3). Any failure **rejects the record and
-fails the batch.** Below quorum, the record may be held locally but creates **no
-transferable authorization**, and no handoff discards the only safe copy (#402 holds).
+the `(rootEpoch, cohortVersion)` not superseded by a certified higher version (E4) and the
+incarnation not convicted (E3). Any failure **rejects the record and fails the batch.**
+Below quorum, the record may be held locally but creates **no transferable authorization**,
+and no handoff discards the only safe copy (#402 holds).
 
 ## Local ordering (no trusted migrated stamp)
 
@@ -123,11 +132,18 @@ waits for complete reassembly **and** a valid admission proof for every del reco
 
 Completion is transfer-global (F2): every leaf HELD or validly SUPPRESSED, zero unexplained
 rejects, the whole-partition proof holds, **and every tombstone carries a valid quorum
-admission proof (or is a retained legacy tombstone inside its window, which blocks handoff
-clearance rather than completing it).** High-water advancement and
-`HANDOFFACK{transferId, complete}` occur only at verified transfer-level completion with
-authorization satisfied. A short or unauthorized transfer can never ack; the leaver
-retries and finally cohort-sprays; the last-copy-drop guard holds.
+admission proof.** High-water advancement and `HANDOFFACK{transferId, complete}` occur only
+at verified transfer-level completion with authorization satisfied. A short or unauthorized
+transfer can never ack; the leaver retries and finally cohort-sprays; the last-copy-drop
+guard holds.
+
+**Legacy tombstones are not an authorization branch (AUTH v2 F6).** A proofless legacy
+tombstone never *completes* a transfer and its retention window closing never *authorizes*
+it. It pins its role (above): handoff clearance for that role is permitted only after the
+proofless tombstone has **actually expired and been removed** from live and outgoing state —
+clearance depends on its **absence**, never on a timer. A proofless tombstone arriving after
+the cutoff is **rejected**; it cannot reopen, extend, or pass through the closed window, and
+it never selects an authorized branch.
 
 ## Test matrix — v5 mechanics plus the authorization split
 
@@ -139,23 +155,25 @@ cases to match the split:
 1. A del record with a **valid quorum admission proof** completes and applies with **no
    body present**.
 2. A del record whose admission proof is **below quorum, off-cohort, duplicate-signer,
-   mixed-epoch, or stale-incarnation** fails the batch (delegated to the S2.0c-AUTH
-   checks; v6 asserts the batch fails and nothing releases).
+   mixed-`cohortVersion`, stale-incarnation, or whose cohort certificate does not chain to
+   a trusted anchor** fails the batch (delegated to the S2.0c-AUTH v2 checks; v6 asserts the
+   batch fails and nothing releases).
 3. **Proof stripping / omission fails closed** — the tombstone is rejected, the batch
    fails, and no legacy branch is selected.
 4. A **proofless legacy tombstone** pins its role: the handoff does not clear, the leaver
-   retains state, and the pin releases only when the locally derived retention window
-   closes — never on arriving peer metadata.
+   retains state, and the pin releases only once that tombstone has **expired and been
+   removed** (absence) — never on a closing timer alone and never on arriving peer metadata.
 5. A migrated `killTs`/`rootSeq` has **no effect** on `role.seq`, replay/high-water floors,
    TTL origin, cache ordering, or app-delivery ordering.
 6. `HANDOFFACK` / high-water **remain blocked** until transfer-level completion *and*
-   authorization (quorum proof or closed retention window) both hold.
+   authorization hold; a **closed retention window is never an authorization branch**, and a
+   post-cutoff proofless tombstone is rejected (AUTH v2 F6).
 7. A pre-existing record larger than the chunk budget — including one enlarged by its
    admission proof — is fragmented and reassembled with no state loss, or blocks rollout.
 
 ## Status
 
-Design v6. No chunk-size constant, no S2.0c clearance, no S2.1 authorization, no canary or
-deploy is implied. S2.0c clears only when **both** this design and
-`REF-1.1-S2.0c-AUTH-Admission-Attestation-Design.md` clear. Submitted for review before
-any sync-engine code.
+Design v6 (F6-patched; proof shape retargeted to S2.0c-AUTH v2). No chunk-size constant, no
+S2.0c clearance, no S2.1 authorization, no canary or deploy is implied. S2.0c clears only
+when **both** this design and `REF-1.1-S2.0c-AUTH-Admission-Attestation-Design-v2.md` clear.
+Submitted for review before any sync-engine code.
