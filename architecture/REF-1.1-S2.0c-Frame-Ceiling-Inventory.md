@@ -9,6 +9,33 @@
   (`ASTER-COUNCIL-REF11-S20C-REREVIEW-20260810-02`), which reproduced a
   legitimate 1,076,365-byte REPLICATE frame that a 1 MiB certifier ceiling
   rejects.
+- **Status:** Option A CHOSEN (Aster seq 714), design-direction authorization
+  only — not code clearance. This v1 inventory had two producer errors, corrected
+  below; the tranche's complete, code-grounded inventory supersedes this file.
+
+## Corrections (Aster seq 714, verified in code)
+
+Two rows in the v1 table below are WRONG and one class was missing:
+
+- **DELIVER (subscriber replay) is ALREADY chunked**, not a full-cache producer.
+  `_replayTo` (`wireHandlers.js:747`) flushes a batch once it would exceed
+  `REPLAY_CHUNK_BYTES` = 96 KiB. It is bounded already.
+- **PULLRESP carries ONE cached `json` value or null** (`wireHandlers.js:947`),
+  not history. It is a single-message producer, not full-state.
+- **UNCAPPED producers were omitted.** Tombstone `dels` arrays ride inside
+  REPLICATE/HANDOFF and can also be sent as a DELIVER tombstone array; the
+  tombstone map has TTL expiry but NO `CACHE_MAX`/`CACHE_BYTES`-equivalent count
+  or byte ceiling. `replayCacheSize`/`replayCacheBytes` are configurable and NOT
+  clamped to the `CACHE_MAX`/`CACHE_BYTES` defaults, so those defaults alone do
+  not prove a global maximum. Direct/RPC and `notify` payloads are arbitrary
+  application JSON with no demonstrated producer-side frame cap. Lookup,
+  handshake, and signaling maxima need explicit production-path evidence, not
+  omission.
+
+So the ~48 MiB "honest ceiling" (Option C) is NOT honest: it is both too weak a
+pre-parse bound AND unproven to admit every legitimate frame (unbounded
+tombstones, configurable caches, uncapped direct/notify). The demonstrated
+unchunked full-state producers are exactly **REPLICATE, HANDOFF, REPLAYUP**.
 
 ## What value may the pre-parse frame ceiling take?
 
@@ -81,15 +108,35 @@ from `CACHE_BYTES` plus UTF-8 expansion plus the routed envelope, measured throu
 `_syncSnapshot` + `wire.encode`. Keeps S2.0c to the certifier. Never rejects a
 legitimate frame. Leaves the pre-parse allocation bound at tens of MiB.
 
-## Recommendation
+## Decision (Aster seq 714): Option A, as the next reviewable tranche
 
-Chunk the full-state producers (A), as a dedicated tranche gated before S2.0c's
-ceiling drops. It is the only path to a pre-parse ceiling small enough to bound
-the parse to a useful degree, and it retires an event-loop cost that has already
-caused a production collapse. If a ceiling value must ship before that tranche
-lands, set it by measurement to the full-state maximum (C) so nothing legitimate
-is rejected, and record that the value is provisional until chunking lands. B is
-not available without a transport rewrite.
+Chunk the full-state producers. Option C rejected. The tranche must:
+
+- Complete the decode-site producer inventory from actual send/encode paths —
+  correcting DELIVER and PULLRESP, and including tombstones, direct/notify,
+  lookup, handshake, and signaling.
+- Establish ONE transport hard cap only after every producer sharing that decode
+  site is either bounded below it or moved to a separately bounded decode seam.
+- Chunk REPLICATE, HANDOFF, REPLAYUP by measured UTF-8 serialized bytes,
+  including routed/RPC wrapper overhead — not inner `json.length` alone.
+- Bound or chunk tombstone transfer, preserving the invariant that a tombstone
+  suppresses its body even under chunk loss, duplication, and reordering.
+- Define batch identity, chunk index/count or finality, retry/dedup semantics,
+  and completeness evidence. Idempotent union makes duplicate data safe; it does
+  not by itself prove complete transfer under loss.
+- Emit `HANDOFF_ACK` and any durability/receipt evidence only after all required
+  chunks for a transfer are accepted. Partial transfer must never masquerade as
+  completion.
+- Specify how chunk count interacts with `REPLICATE_FULL_BUDGET`, ingest queue
+  limits, leave/handoff deadlines, anti-entropy retries, and event-loop bounds.
+- Add production-path tests: exact byte boundaries and multibyte expansion;
+  maximum single-message frames; maximum/bounded tombstone frames; multi-chunk
+  success; loss, duplication, reordering; partial-transfer no-ack;
+  tombstone-before-body safety; and every chunk at or below the final
+  `MAX_FRAME_BYTES`.
+
+The provisional 1 MiB constant stays UNWIRED until the tranche shows every
+legitimate producer conforms. S2.0c held, S2.1 blocked, no canary or deploy.
 
 ## Settled regardless of the fork
 
@@ -101,10 +148,10 @@ only to a genuinely omitted argument (Finding 3). Both hold in kernel testnet
 tripwire that reproduces Aster's REPLICATE measurement and fails the day a value
 change makes it stale.
 
-## The ask
+## Next deliverable
 
-The ceiling value is a protocol-design decision with a denial-of-service tradeoff,
-not a constant to tune. Council and David: chunk the full-state producers now
-(larger, tighter), or ship the honest full-state ceiling and chunk later
-(smaller, looser)? S2.0c's `MAX_FRAME_BYTES` and its production-path fixtures
-follow that call.
+The chunking-protocol design (batch/chunk/finality/ack semantics, tombstone
+bounding, budget interactions) plus the corrected code-grounded producer
+inventory, submitted for review before any sync-engine code. This file records
+the decision and the corrections; the tranche's inventory supersedes the v1 table
+above.
