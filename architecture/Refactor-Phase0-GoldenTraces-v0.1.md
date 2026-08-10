@@ -1,7 +1,13 @@
 # Refactor Phase 0 — Golden Traces & Reliability Ledger (REF-0.2)
 
 **File:** `axona-docs/architecture/Refactor-Phase0-GoldenTraces-v0.1.md`
-**Version:** v0.3 — 2026-08-09 (Aster seq-598: dedicated reorder fixture
+**Version:** v0.4 — 2026-08-09 (Aster REF-0.2-v0.3 disposition: the one remaining blocker —
+the §8 signed-ACK-frame duplicate claim mis-cited `smoke_ack_proof.mjs`, which never re-delivers
+a frame — is resolved. Added `smoke_ack_routing.mjs` case 7 (16 assertions), a real duplicate
+signed-ACK ingest at the manager seam: settles once, idempotent redelivery, bounded correlation
+store. §8 + assertion matrix re-cited; reorder note now states it is NOT complete deterministic
+convergence. Re-run clean baseline.
+v0.3 — 2026-08-09 (Aster seq-598: dedicated reorder fixture
 `smoke_reorder_convergence.mjs` closes the named gap; D1 wrong-destination case added to
 `smoke_ack_routing.mjs`; dedup citation corrected to `smoke_pubsub_fundamental.mjs`; flake
 issues filed #52/#53; clean baseline re-established at 149/149 + 7/7 with the two new fixtures.
@@ -51,13 +57,14 @@ Every deliverable the plan §Phase 0 names, mapped to a runnable fixture and the
 | handoff | `smoke_backup_handoff.mjs`, `smoke_handoff_ack_honesty.mjs`, `smoke_handoff_scaling.mjs` | acked handoff; heir liveness-gated |
 | bridge-only bootstrap | `smoke_connect_mesh_gate.mjs`, `integration/mesh_relay_multihop_e2e.mjs` | two peers connect; bridgeless data path after bootstrap |
 | bridge-as-routing-only | `smoke_departure_hint.mjs`, `integration/mesh_relay_e2e.mjs` | bridge forwards signalling, holds no topic state |
-| duplicate / rejected frames | `smoke_ack_proof.mjs` (26), `smoke_cap_attest.mjs` (21) | duplicate suppressed; malformed/forged rejected |
+| duplicate signed ACK frame (idempotent ingest) | `smoke_ack_routing.mjs` case 7 (16 total) | same proof redelivered → flight settles once, no-op after, correlation store bounded |
+| rejected / malformed / forged frames | `smoke_ack_proof.mjs` (26), `smoke_cap_attest.mjs` (21) | malformed/forged/wrong-field rejected (NOT a duplicate test) |
 | teardown | `smoke_leave_teardown.mjs`, `smoke_mesh_closed_teardown.js`, `fence_durability_lifecycle.mjs` | zero orphan timers/listeners/channels |
 | root + backup abrupt loss | `smoke_backup_handoff.mjs`, `smoke_replica_fast_promote.mjs` | promote on loss |
 | two sequential root losses (in/out window) | `smoke_root_reconcile.mjs`, `smoke_root_reconcile_reach.mjs` | reconcile within reach; bounded beyond |
 | child-tree rehome + cache replay-up | `smoke_ghost_read.mjs`, `smoke_read_repair.mjs`, `smoke_empty_root_pull.mjs` | reads survive degraded holders; empty root pulls cohort first |
 | legacy source/epoch-bound ack accept AND reject | `smoke_ingest_ack.mjs`, `smoke_root_incarnation.mjs` | adjacent-sender+incarnation accept; else reject |
-| D1 signed multi-hop ack independent of last hop | `smoke_ack_routing.mjs` (12) | completion on proof, not `meta.fromId` |
+| D1 signed multi-hop ack independent of last hop | `smoke_ack_routing.mjs` (16) | completion on proof, not `meta.fromId` |
 | D1 wrong signer/purpose/op/attempt/nonce/width/epoch reject | `smoke_ack_proof.mjs` (26 assertions), `smoke_ack_proof_profile.mjs` (9) | each rejection dimension asserted |
 | D1 wrong-DESTINATION reject (valid proof, different same-width ackTo) | `smoke_ack_routing.mjs` (case 6) | flight-owner binding: a validly-signed proof addressed elsewhere leaves the flight open |
 | signed vs unsigned ACK compatibility dispatch | `smoke_ack_routing.mjs` (signed) + `smoke_ingest_ack.mjs` (legacy) | both variants complete correctly |
@@ -120,9 +127,11 @@ quiesced** (its 12 relays stopped for the run, since restored 12/12), `fb3ea39`:
 - **Default class: `node test/run.mjs` → 149/149 PASS, 0 failed.**
 - **Integration class: `--class integration` → 7/7 PASS, 0 failed.**
 
-The 149 default includes the two v0.3 fixtures (`smoke_reorder_convergence.mjs`, and
-`smoke_ack_routing.mjs` grown to 12 assertions). Re-run clean on the quiesced dedicated soak
-Mac at `fb3ea39`; the local M4 dev machine returned the same 149/149 the same day.
+The 149 default includes `smoke_reorder_convergence.mjs` and `smoke_ack_routing.mjs` grown to
+16 assertions (v0.4 added case 7, the duplicate signed-ACK ingest). The file count is unchanged
+at 149 — v0.4 grows assertions within an existing fixture, not the fixture roster. Re-run clean
+on the quiesced dedicated soak Mac at `fb3ea39`; the local M4 dev machine returned the same
+149/149 the same day.
 
 This is the clean baseline. Two non-deterministic **test-harness** flakes were observed on
 non-clean runs and are characterized, not waved through:
@@ -152,8 +161,14 @@ prod-shipped kernel, tracked in §7. The baseline is green with no governance wa
 - **Duplicate:** msgId body dedup is asserted directly in `smoke_pubsub_fundamental.mjs`
   (lines 134–136 "exactly-once: nobody got duplicates"; line 181 "no duplicates after renewal")
   and again in `smoke_reorder_convergence.mjs` (re-ingest of the full set is a no-op). Signed
-  ACK-frame duplicate suppression is separately covered by `smoke_ack_proof.mjs`. (Broad
-  `smoke_pubsub_*` globs are deliberately NOT cited — they name fixtures that may be retired.)
+  ACK-frame duplicate handling is covered by `smoke_ack_routing.mjs` case 7 (v0.4): the SAME
+  valid signed proof delivered repeatedly settles the flight EXACTLY once, every redelivery is
+  an idempotent no-op, and `_writeFlights` (the only correlation store) resurrects no flight and
+  does not grow. (`smoke_ack_proof.mjs` is deliberately NOT cited for duplicate coverage — it
+  re-signs the same transcript to prove signature determinism but never re-DELIVERS a frame, so
+  it asserts nothing about duplicate ingest; correcting that mis-citation was the v0.3→v0.4
+  blocker, Aster REF-0.2-v0.3 disposition. Broad `smoke_pubsub_*` globs are also not cited —
+  they name fixtures that may be retired.)
 - **Rejection:** `smoke_ack_proof.mjs` (26) + `smoke_cap_attest.mjs` (21) rejection vectors.
 - **Reorder:** `smoke_reorder_convergence.mjs` (14 assertions) — the same signed, already-stamped
   event set ingested in four arrival orders (in-order, reversed, kill-before-target, shuffled)
@@ -164,7 +179,11 @@ prod-shipped kernel, tracked in §7. The baseline is green with no governance wa
   in arrival order, and the killed body's app-delivery timeline (delivered-then-retracted vs
   suppressed) depends on arrival order while durable state still converges. `smoke_split_history_union.mjs`
   / `smoke_partial_root_union.mjs` cover the divergent-half out-of-order merge end-to-end. The
-  deterministic permuted-arrival fixture Aster named is now present, not deferred.
+  deterministic permuted-arrival fixture Aster named is now present, not deferred. **This is NOT
+  a proof of complete deterministic convergence:** durable state (held set / hw / seq /
+  tombstone / survivor set) converges, but low-water and the subscriber-visible deletion history
+  remain arrival-ordered (above), and Phase 1 must treat stamp-ordering of `TopicStore` as an
+  expected behavior change rather than requiring blind differential parity at that seam.
 - **Cancellation:** `smoke_reroute_termination.mjs`, `fence_pull_outcome.mjs`.
 - **Teardown:** `smoke_leave_teardown.mjs`, `smoke_mesh_closed_teardown.js`, `fence_durability_lifecycle.mjs`.
 
@@ -196,10 +215,13 @@ characterization-only (they drive shipped code paths and assert current behavior
 
 ---
 
-*REF-0.2 v0.3. Clean 149/149 default + 7/7 real-WebRTC integration on the quiesced dedicated
+*REF-0.2 v0.4. Clean 149/149 default + 7/7 real-WebRTC integration on the quiesced dedicated
 soak Mac at `fb3ea39` (same 149/149 on the M4 dev machine); D1 vectors consumed byte-for-byte
 with exact isolated runs recorded; exhaustive deliverable→assertion matrix; churn scripts
 relabelled experiments; the reorder gap closed by `smoke_reorder_convergence.mjs` (with two
-TopicStore seam findings characterized); dedup citation corrected; flakes filed #52/#53;
-D0/D2/I-9 kept open. Phase 0 remains characterization-only — the two new fixtures drive shipped
-code and assert current behavior; no kernel change, no deploy.*
+TopicStore seam findings characterized, and stated explicitly NOT to be complete deterministic
+convergence); the v0.3 signed-ACK-duplicate mis-citation corrected by a real duplicate-ingest
+case (`smoke_ack_routing.mjs` case 7, Aster REF-0.2-v0.3 disposition); msgId dedup cited to
+`smoke_pubsub_fundamental.mjs`; flakes filed #52/#53; D0/D2/I-9 kept open. Phase 0 remains
+characterization-only — the fixtures drive shipped code and assert current behavior; no kernel
+change, no deploy.*
