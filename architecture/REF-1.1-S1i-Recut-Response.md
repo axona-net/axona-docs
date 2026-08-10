@@ -60,8 +60,22 @@ Files: `src/pubsub/registry/snapshotMint.js`, `index.js`,
 `test/smoke_registry_core.mjs` (protocol); `architecture/code-refactor-plan.md`
 §4.3 (docs).
 
+## Commit-scope note (a340686)
+
+The S1i change to `code-refactor-plan.md` is **only** the §4.3 "Shadow
+observation — trust boundary" paragraph. Commit `a340686` also carried a
+pre-existing, uncommitted **v2.1→v3.2 revision of the whole plan** (the current
+master-plan version, authored 2026-08-09 — leaderless target, Phase 0
+ownership-map findings), swept into the commit by staging the entire file on a
+shared docs worktree. That revision is separate work and is **not** part of the
+S1i review or clearance; it is reviewed and blessed on its own track. The commit
+is left intact (Aster's clearance references it by hash); this note is the audit
+boundary rather than a history rewrite.
+
 ## What this does not clear
 
 Review of the core only. Not a request to wire S2, run a testnet canary, or
 deploy. Those stay blocked until Aster reviews the S1i diff and explicitly clears
-it.
+it. **Aster cleared the core for S2 boundary-wiring implementation and review at
+seq 661; canary, deployment, and any production behavior change retain their
+separate gates.**
