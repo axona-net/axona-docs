@@ -148,6 +148,37 @@ only to a genuinely omitted argument (Finding 3). Both hold in kernel testnet
 tripwire that reproduces Aster's REPLICATE measurement and fails the day a value
 change makes it stale.
 
+## Complete producer inventory (code-grounded, 2026-08-10)
+
+Every frame reaching the node/bridge/mesh decode sites, from its actual
+send/encode path. **Routed** frames cross a multi-hop chain, so the binding
+budget is 15 KiB (`MAX_RELIABLE_PUBLISH_BYTES`) − wrapper − metadata (David's
+ruling). **Single-hop** frames are not routed and answer to the 64 KiB standard,
+not the 15 KiB multi-hop budget.
+
+| Frame | Path | Producer / size today | Verdict vs 15 KiB multi-hop |
+|-------|------|-----------------------|------------------------------|
+| PUB | routed | `_maxPublishBytes = min(override ?? MAX_RELIABLE_PUBLISH_BYTES, 256 KiB)` (AxonaPeer:132) | CONFORMS by default (15 KiB); the documented override to 256 KiB VIOLATES — flag as multi-hop-unsafe |
+| DELIVER (live) | routed | one stamped envelope (≤ PUB size) | conforms if PUB conforms |
+| DELIVER (replay) | routed | `_replayTo` chunks at REPLAY_CHUNK_BYTES = 96 KiB (wireHandlers:747) | VIOLATES — 96 KiB, re-chunk to 15 KiB budget |
+| DELIVER (tombstones) | routed | `msgs: dels` (wireHandlers:777) | VIOLATES — unbounded `dels` array, bound/chunk |
+| PULLRESP | routed | single `json` value or null (wireHandlers:947) | conforms if PUB conforms |
+| REPLICATE / HANDOFF | routed | `_syncSnapshot`: whole cache + `_activeDels` (syncEngine:104) | VIOLATES — unchunked, chunk to 15 KiB |
+| REPLAYUP | routed | `_syncDelta`: cache filtered by `sinceHw` + `_activeDels`; worst case whole cache | VIOLATES — unchunked, chunk to 15 KiB |
+| direct / notify | routed | `axona:direct` carries arbitrary app `message`, NO cap (AxonaPeer:2531/2548) | VIOLATES if oversized — cap or chunk |
+| mesh:signal | routed | SDP + ICE via `routeMessage` (AxonaPeer:4061) | usually small; VERIFY worst-case SDP ≤ budget |
+| find_closest_set | routed | K-bounded peer sample; K not clamped (#433, Aster seq 268) | VERIFY bounded ≤ budget; ties to the open #433 clamp |
+| SUB/UNSUB/KILL/TOUCH/PULL/PULLUP/METRICSON/ROOTBEACON/RECEIPT*/INGESTACK/HANDOFFACK | routed | ids + scalars | conform (small) |
+| ADOPT | routed | subscriber handoff ≤ MAX_DIRECT = 20 | conforms (small) |
+| handshake hello | single-hop | point-to-point auth (not routed) | 64 KiB standard applies, not 15 KiB |
+
+**Frames the tranche must fix to the 15 KiB budget:** REPLICATE, HANDOFF, REPLAYUP
+(chunk the msgs array); the tombstone `dels` arrays they and DELIVER carry
+(bound/chunk, tombstone-before-body preserved); the 96 KiB DELIVER replay chunk
+(re-chunk); direct/notify (cap or chunk arbitrary payloads). PUB's 256 KiB
+override is flagged multi-hop-unsafe. mesh:signal and find_closest_set need
+worst-case verification, the latter tied to the open #433 K-clamp.
+
 ## Next deliverable
 
 The chunking-protocol design (batch/chunk/finality/ack semantics, tombstone
