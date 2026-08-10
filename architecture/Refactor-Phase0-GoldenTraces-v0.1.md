@@ -1,7 +1,13 @@
 # Refactor Phase 0 — Golden Traces & Reliability Ledger (REF-0.2)
 
 **File:** `axona-docs/architecture/Refactor-Phase0-GoldenTraces-v0.1.md`
-**Version:** v0.5 — 2026-08-09 (Aster REF-0.2-v0.4 baseline-flake clarification: the v0.4
+**Version:** v0.6 — 2026-08-09 (Aster REF-0.2-v0.5 disposition, three docs-only consistency
+corrections, no protocol change and no rerun: §4 `smoke_ack_routing.mjs` count 8→16; §6 + §9
+stale "148/148" → 149/149; and the v0.4-flake paragraph no longer claims the uncaptured failure
+is bounded to #52/#53/#423 or that "no new class appeared across 13 runs" — an uncaptured
+failure's class is unknowable, so it is now stated as unclassifiable, unlinked to any issue, with
+no failure in the 12 captured follow-ups and a forward capture rule.
+v0.5 — 2026-08-09 (Aster REF-0.2-v0.4 baseline-flake clarification: the v0.4
 first-run flake is dispositioned honestly in §6 — unattributable due to a `tail -9` capture
 error of mine, NOT a runner/kernel gap; 12 further quiesced-m1 runs all 149/149 with no new
 failure class; explicitly NOT attributed to #52 or any id that was not measured.
@@ -104,7 +110,9 @@ Mac, 2026-08-09 (`node test/<name>`):
 - `smoke_ack_proof_profile.mjs` — **PASS, 9** (real `idHex` hashBits 64 even + 66 odd; shrunk-width id rejected)
 - `smoke_cap_attest.mjs` — **PASS, 21** (wrong-key/channel/capId/cbv/domain, replay, old-peer)
 - `smoke_cap_attest_mesh.mjs` — **PASS, 11** (CAP_ATTEST loopback)
-- `smoke_ack_routing.mjs` — **PASS, 8** (multi-hop signed completion independent of `meta.fromId`)
+- `smoke_ack_routing.mjs` — **PASS, 16** (multi-hop signed completion independent of `meta.fromId`;
+  wrong signer/nonce/attempt negatives; case 6 same-width wrong-destination reject; case 7 duplicate
+  signed-ACK idempotent ingest)
 
 No REF-0.2 fixture regenerates or reinterprets a D1 transcript. `ackProof.js`/`capAttest.js`
 remain the single owners.
@@ -142,15 +150,21 @@ delivery reported "one first-run load flake, non-reproducing on re-run." That sp
 fixture is **unattributable**, and the reason is a capture error of mine, not a runner or kernel
 gap: `test/run.mjs` already names every failure (inline `✗ <file>` plus a `failures` section),
 but the first v0.4 baseline command piped through `tail -9`, discarding both and keeping only the
-summary; the runner persists no results artifact, so the instance cannot be recovered. What the
-evidence does establish: **12 further full default runs on the quiesced m1 — 10 (catcher) + 1
-archived full-output + 1 — all 149/149, zero `✗`, no `failures` section.** The flake did not
-recur, and **no new or untracked failure class appeared across the 13 total runs.** It is
-therefore not a new acceptance blocker (Aster's own criterion); it sits within the tracked
-intermittent set (#52 / #53 / #423) but is **not pinned to a specific issue** — this document
-does not claim it was #52 or any particular id, because that was never measured. Forward fix:
-baseline runs now capture full runner output (which already names failures), so any future flake
-is identified rather than truncated.
+summary; the runner persists no results artifact, so the instance cannot be recovered. The honest
+bounds on that one event, and nothing more:
+
+- **the original run is unclassifiable** — its failure output was truncated, so its fixture,
+  assertion, and class are unknown and cannot be recovered;
+- **no failure appeared in the twelve captured follow-up runs** on the quiesced m1 (10 catcher
+  + 1 archived full-output + 1 — all 149/149, zero `✗`, no `failures` section);
+- **the original event is not linked to any existing issue** — it is neither attributed to
+  #52 / #53 / #423 nor to a new class, because an uncaptured failure's class cannot be bounded
+  either way;
+- **the forward full-output capture rule** (baseline runs now retain the complete runner output,
+  which already names every failure) prevents this evidence loss from recurring.
+
+This is a disclosed measurement limitation, not a new acceptance blocker; the duplicate signed-ACK
+correction and the twelve clean captured runs stand on their own evidence.
 
 This is the clean baseline. Two non-deterministic **test-harness** flakes were observed on
 non-clean runs and are characterized, not waved through:
@@ -159,7 +173,7 @@ non-clean runs and are characterized, not waved through:
 - `smoke_empty_root_pull` — random setup precondition ("drew R strictly closer than H",
   rejection-sampling class like #413); failed once in a loaded full run, **5/5 isolated**.
 
-Neither reproduced in the clean 148/148 run; both are harness non-determinism on the unchanged
+Neither reproduced in the clean 149/149 run; both are harness non-determinism on the unchanged
 prod-shipped kernel, tracked in §7. The baseline is green with no governance waiver required.
 
 ## 7. Reliability ledger (shipped vs open — never closed by association)
@@ -222,7 +236,7 @@ scripts are labelled as such and not cited as gate evidence.
 | Checked-in D1 vectors consumed, not rewritten | **DONE** (§4) |
 | Static ownership map, one owner each | **DONE** (REF-0.3 v0.4, accepted) |
 | Reliability ledger separates D1/D0/D2/I-9 + flakes | **DONE** (§7) |
-| Controlled green baseline | **DONE** (§6, 148/148 + 7/7 on soak Mac) |
+| Controlled green baseline | **DONE** (§6, 149/149 + 7/7 on soak Mac) |
 | Assumption inventory complete | **DONE** (REF-0.1 v0.2) |
 
 With REF-0.1 (accepted-folded), REF-0.3 (accepted), and REF-0.2 (this doc, green baseline +
@@ -234,10 +248,11 @@ characterization-only (they drive shipped code paths and assert current behavior
 
 ---
 
-*REF-0.2 v0.5. Clean 149/149 default + 7/7 real-WebRTC integration on the quiesced dedicated
-soak Mac at `fb3ea39`, and the v0.4 first-run flake dispositioned honestly (§6): unattributable
-via a capture error of mine, 12 further clean quiesced runs, no new failure class, not pinned to
-any unmeasured issue id (same 149/149 on the M4 dev machine); D1 vectors consumed byte-for-byte
+*REF-0.2 v0.6. Clean 149/149 default + 7/7 real-WebRTC integration on the quiesced dedicated
+soak Mac at `fb3ea39`; the v0.4 first-run flake dispositioned honestly (§6) as unclassifiable
+(output truncated), unlinked to any issue, with no failure in the 12 captured follow-ups and a
+forward full-output capture rule — NOT bounded to or attributed to any unmeasured issue set; the
+three v0.5 stale-count / over-claim consistency corrections applied per Aster's disposition (same 149/149 on the M4 dev machine); D1 vectors consumed byte-for-byte
 with exact isolated runs recorded; exhaustive deliverable→assertion matrix; churn scripts
 relabelled experiments; the reorder gap closed by `smoke_reorder_convergence.mjs` (with two
 TopicStore seam findings characterized, and stated explicitly NOT to be complete deterministic
