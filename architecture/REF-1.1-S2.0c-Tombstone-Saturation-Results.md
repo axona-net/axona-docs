@@ -1,4 +1,18 @@
-# REF-1.1 S2.0c — Tombstone-saturation results v6 (AUTH-B Gate A)
+# REF-1.1 S2.0c — Tombstone-saturation results v7 (AUTH-B Gate A)
+
+**v7 delta (Aster review msgId c8e7cc4a — Gate A v6 CHANGES REQUIRED, one guard):** the v6 harness
+made `run` mandatory but left `mode` optional, so `?run=<id>` with no mode stored a campaign whose
+fingerprint carried `mode=null` — defeating the requirement that every campaign identify its
+measurement mode / browser flag profile. Fixed: **both `run` and `mode` are now mandatory** (each
+trimmed, nonempty) before any sample is stored or counted; a missing mode emits `MODE REQUIRED`
+exactly as a missing run emits `RUN ID REQUIRED`, and both appear in the result and fingerprint.
+Verified across the empty/partial/whitespace cases: only `?run=X&mode=Y` with both nonempty stores.
+Aster's disposition: with this guard the Gate A harness is **acceptable for target-host execution**;
+Gate A itself stays open until ≥6 valid fresh-process trials on the deployed **Windows and Linux**
+Node/V8 profiles and ≥6 valid fresh-context trials on the **target browser** are reviewed
+(worst-observed max governs sizing; browser profile stays disabled; no relay limit is normative
+until those pass). Gate B v4 was ACCEPTED in the same disposition as an implementation test plan
+(test plan only — not code/canary/deploy/S2.1/chunking authorization).
 
 **v6 delta (Aster review msgId dd81651c):** closed the last Gate A isolation gap. The browser
 harness now requires an operator-supplied **run ID** (`?run=<campaign-id>`) *and* a **measurement

@@ -87,10 +87,12 @@ async function run() {
   // run ID + fingerprint. Bump HARNESS_VERSION whenever the representation changes.
   const HARNESS_VERSION = 'v4';
   const q = new URLSearchParams(location.search);
-  const runId = q.get('run'), mode = q.get('mode');
+  const runId = (q.get('run') || '').trim(), mode = (q.get('mode') || '').trim();
   const fp = `${HARNESS_VERSION}|run=${runId}|mode=${mode}|${navigator.userAgent}|tomb=${TOMB_N}|cand=${CAND_N}|rec=${RECORD_MAX}`;
   const isValid = perEntry > 0 && !pinned;
-  const store = runId ? `ref11_ctx_samples__${runId}` : null;   // run ID is part of the storage key
+  // BOTH run and mode are mandatory: no campaign may be stored or counted without identifying its
+  // measurement mode / browser flag profile (the UA does not reveal --enable-precise-memory-info).
+  const store = (runId && mode) ? `ref11_ctx_samples__${runId}` : null;   // run ID keys the bag; mode is required too
   let bag = { fp, samples: [] }, storeError = null;
   if (store) {
     try { const raw = JSON.parse(localStorage.getItem(store) || 'null'); if (raw && raw.fp === fp) bag = raw; } catch {}
@@ -112,6 +114,7 @@ async function run() {
     validSamplesThisRun: bag.samples.length, need: NEED, storeError,
     aggregate: enough ? { mean: Math.round(mean), sd: Math.round(sd), max: Math.round(max), sizeBy: 'worst-case max' } : null,
     status: !runId ? 'RUN ID REQUIRED — append ?run=<campaign-id>&mode=<flag-profile> to the URL; nothing is stored without it'
+      : !mode ? 'MODE REQUIRED — append &mode=<flag-profile> (e.g. precise-memory / coi / default) identifying the measurement mode or browser flag set; nothing is stored without it'
       : storeError ? `STORAGE FAILURE — sample NOT persisted (${storeError}); progress cannot be trusted`
       : pinned ? 'UNAVAILABLE — performance.memory pinned/quantized (zero delta); this sample is invalid and NOT stored. Run on a browser with --enable-precise-memory-info, or measureUserAgentSpecificMemory() under cross-origin isolation.'
       : enough ? 'ok — 6 valid fresh-context samples under this run ID; worst-case max governs sizing'
