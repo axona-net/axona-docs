@@ -79,33 +79,45 @@ async function run() {
   const perEntry = (after - before) / COMBINED;
   const pinned = perEntry === 0 && performance.memory.usedJSHeapSize === after;
   // Accumulate fresh-context samples.
-  // Fingerprint the run so samples from a different browser build, flag set, cap profile, or
-  // harness version never silently mix. Bump HARNESS_VERSION whenever the representation changes.
-  const HARNESS_VERSION = 'v3';
-  const fp = `${HARNESS_VERSION}|${navigator.userAgent}|tomb=${TOMB_N}|cand=${CAND_N}|rec=${RECORD_MAX}`;
-  // A sample is VALID only if it is a real positive measurement (not pinned/zero/negative).
+  // Isolation: every measurement campaign needs an explicit unique RUN ID plus an operator-supplied
+  // measurement MODE (flag profile — e.g. precise-memory / coi / default), because the UA does not
+  // change when --enable-precise-memory-info is set. Supply both on the URL:
+  //     ...Heap-Browser.html?run=<campaign-id>&mode=<flag-profile>
+  // A different run= starts a fresh bag at zero; six VALID samples must accrue under that exact
+  // run ID + fingerprint. Bump HARNESS_VERSION whenever the representation changes.
+  const HARNESS_VERSION = 'v4';
+  const q = new URLSearchParams(location.search);
+  const runId = q.get('run'), mode = q.get('mode');
+  const fp = `${HARNESS_VERSION}|run=${runId}|mode=${mode}|${navigator.userAgent}|tomb=${TOMB_N}|cand=${CAND_N}|rec=${RECORD_MAX}`;
   const isValid = perEntry > 0 && !pinned;
-  const store = 'ref11_ctx_samples';
-  let bag = { fp: null, samples: [] };
-  try { const raw = JSON.parse(localStorage.getItem(store) || 'null'); if (raw && raw.fp) bag = raw; } catch {}
-  if (bag.fp !== fp) bag = { fp, samples: [] };   // isolate: mismatched fingerprint starts fresh
-  if (isValid) { bag.samples.push({ perEntry: Math.round(perEntry), before, after, usedJSHeapSize: performance.memory.usedJSHeapSize }); try { localStorage.setItem(store, JSON.stringify(bag)); } catch {} }
+  const store = runId ? `ref11_ctx_samples__${runId}` : null;   // run ID is part of the storage key
+  let bag = { fp, samples: [] }, storeError = null;
+  if (store) {
+    try { const raw = JSON.parse(localStorage.getItem(store) || 'null'); if (raw && raw.fp === fp) bag = raw; } catch {}
+    if (isValid) {
+      bag.samples.push({ perEntry: Math.round(perEntry), before, after, usedJSHeapSize: performance.memory.usedJSHeapSize });
+      try { localStorage.setItem(store, JSON.stringify(bag)); const chk = localStorage.getItem(store); if (chk !== JSON.stringify(bag)) storeError = 'readback mismatch'; }
+      catch (e) { storeError = String(e && e.message || e); bag.samples.pop(); }   // don't claim a sample we couldn't persist
+    }
+  }
   const vals = bag.samples.map(s => s.perEntry);
   const mean = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
   const max = vals.length ? Math.max(...vals) : 0;
   const sd = vals.length ? Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length) : 0;
-  const enough = bag.samples.length >= NEED;
+  const enough = store && bag.samples.length >= NEED;
   window.__result = {
-    engine: 'chromium', ua: navigator.userAgent, harness: HARNESS_VERSION, fingerprint: fp,
+    engine: 'chromium', ua: navigator.userAgent, harness: HARNESS_VERSION, runId, mode, fingerprint: fp,
     tombN: TOMB_N, candN: CAND_N, combined: COMBINED,
     thisContext: { perEntry: Math.round(perEntry), before, after, usedJSHeapSize: performance.memory.usedJSHeapSize, valid: isValid },
-    validFreshContexts: bag.samples.length, need: NEED,
+    validSamplesThisRun: bag.samples.length, need: NEED, storeError,
     aggregate: enough ? { mean: Math.round(mean), sd: Math.round(sd), max: Math.round(max), sizeBy: 'worst-case max' } : null,
-    status: pinned
-      ? 'UNAVAILABLE — performance.memory pinned/quantized (zero delta); this sample is invalid and NOT stored. Run on a browser with --enable-precise-memory-info, or measureUserAgentSpecificMemory() under cross-origin isolation.'
-      : (enough ? 'ok — 6 valid fresh-context samples; worst-case max governs sizing' : `collecting: ${NEED - bag.samples.length} more valid fresh-context sample(s) needed — reload this page (localStorage.removeItem('${store}') to reset)`),
-    completed: true,     // clean, exception-free completion
-    note: 'one measured fill per fresh context (page load); invalid (pinned/zero/negative) samples excluded; fingerprint-scoped; raw before/after retained; references held on window.__state',
+    status: !runId ? 'RUN ID REQUIRED — append ?run=<campaign-id>&mode=<flag-profile> to the URL; nothing is stored without it'
+      : storeError ? `STORAGE FAILURE — sample NOT persisted (${storeError}); progress cannot be trusted`
+      : pinned ? 'UNAVAILABLE — performance.memory pinned/quantized (zero delta); this sample is invalid and NOT stored. Run on a browser with --enable-precise-memory-info, or measureUserAgentSpecificMemory() under cross-origin isolation.'
+      : enough ? 'ok — 6 valid fresh-context samples under this run ID; worst-case max governs sizing'
+      : `collecting: ${NEED - bag.samples.length} more valid fresh-context sample(s) needed under run=${runId} — reload this page (localStorage.removeItem('${store}') to reset this run)`,
+    completed: true,
+    note: 'one measured fill per fresh context (page load); invalid (pinned/zero/negative) excluded; run-ID + fingerprint scoped; raw before/after retained; storage failures surfaced; references on window.__state',
   };
   out.textContent = 'DONE\n' + JSON.stringify(window.__result, null, 2);
 }

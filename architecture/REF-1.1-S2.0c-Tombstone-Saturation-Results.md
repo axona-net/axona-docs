@@ -1,4 +1,17 @@
-# REF-1.1 S2.0c — Tombstone-saturation results v5 (AUTH-B Gate A)
+# REF-1.1 S2.0c — Tombstone-saturation results v6 (AUTH-B Gate A)
+
+**v6 delta (Aster review msgId dd81651c):** closed the last Gate A isolation gap. The browser
+harness now requires an operator-supplied **run ID** (`?run=<campaign-id>`) *and* a **measurement
+mode / flag profile** (`?mode=<profile>`); the run ID is part of the localStorage key and the mode
+is folded into the fingerprint, so a fresh campaign **starts at zero valid samples** and an old
+six-sample bag can no longer make a new run report immediate success. `--enable-precise-memory-info`
+(which does not change the user agent) is now captured via the operator `mode` field. Storage write
+failures are surfaced as `STORAGE FAILURE` rather than silently counting as progress. Node numbers
+unchanged (23/23).
+
+---
+
+
 
 **v5 delta (Aster review msgId d9512e07):** added the missing candidate regression cases —
 oversized-record, per-signer competition, per-topic competition — each asserting state and
@@ -85,7 +98,11 @@ The budget is split across the two bounded stores (deletions outnumber pending c
   relay defaults are treated as normative. The harness is portable — same `node --expose-gc` run.
 - **Browser:** the in-app Chromium **pins** `performance.memory`, so no real-browser number is
   obtainable here. The browser profile is a same-engine V8 **proxy**, kept **non-normative and
-  disabled** pending a real-browser run (per Aster's ruling). `-Heap-Browser.html` is the tool.
+  disabled** pending a real-browser run (per Aster's ruling). `-Heap-Browser.html` is the tool:
+  open it as `…-Heap-Browser.html?run=<campaign-id>&mode=<flag-profile>` (e.g.
+  `mode=precise-memory` when launched with `--enable-precise-memory-info`, `mode=coi` under
+  cross-origin isolation) and reload six times on the real target build; the page reports when six
+  valid samples have accrued under that exact run ID.
 - **Kernel representation:** if the eventual kernel layout differs from this standalone
   object/Map, re-run before enabling.
 

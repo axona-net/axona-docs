@@ -4,11 +4,14 @@
 - **Author:** axona.bot (chief programmer)
 - **Date:** 2026-08-11
 - **Kernel:** 4.62.2. Plan only. No code. S2.0c/chunking held.
-- **Rev:** v3 — reconciles the crash model (G2↔J), makes classes J–N mandatory in the pass
-  criteria with surface mappings, separates in-process failure-atomicity (exception injection, no
-  process death) from the J2 restart-loss residual (actual termination), and gives J2 an executable
-  trigger + bounded oracle (recovery-if-re-propagated + no forged authority; no durability claim).
-  (v2 added the five executable-case sections; msgId d9512e07.)
+- **Rev:** v4 — (Aster msgId dd81651c) makes G2 fully conditional on best-effort re-propagation so
+  it can no longer be read as claiming re-propagation is guaranteed (matches J2), and corrects the
+  pass-criteria span to **A–H and J–N** since the plan defines no class I. v3 reconciled the crash
+  model (G2↔J), made classes J–N mandatory with surface mappings, separated in-process
+  failure-atomicity (exception injection, no process death) from the J2 restart-loss residual
+  (actual termination), and gave J2 an executable trigger + bounded oracle
+  (recovery-if-re-propagated + no forged authority; no durability claim). (v2 added the five
+  executable-case sections; msgId d9512e07.)
 - **Purpose:** the test plan the eventual kernel implementation of B-prime tombstone authorization
   must satisfy before any code is accepted. Consumes the accepted design (signed-expiry v6,
   AUTH-B v8 security model + v12 invariants) and the Gate A capacity artifact. Aster permitted
@@ -87,9 +90,12 @@
 - G1 mock RTCPeerConnection/DataChannel failures during fanout (reuse the existing WebRTC
   fault-injection harness) → local tombstone unaffected.
 - G2 **process restart** mid-migration → consistent with class J: the in-memory tombstone is
-  **lost** (no persistence), rejoin re-learns the deletion via **re-propagation**, no phantom
-  suppression, epoch-ordered adoption. (Reconciled with J2 — G2 does **not** claim "no lost
-  tombstone"; that would contradict the non-durable decision.)
+  **lost** (no persistence). Suppression is re-established **only if** a later valid KILL and its
+  body re-propagate (best-effort, per J2 — under continued source omission this **may never
+  occur**, leaving the bounded omission residual); when they do, adoption is epoch-ordered and
+  there is no phantom suppression in the interim. (Reconciled with J2 — G2 does **not** claim "no
+  lost tombstone," nor that re-propagation is guaranteed; both would contradict the non-durable
+  decision.)
 
 **H. Golden vectors.**
 - H1 `MSGID_DOMAIN_V2` preimage + digest (publisher 64-hex, topicId 66-hex, exp); V1 legacy
@@ -155,7 +161,8 @@ expired does **not** produce a later suppression.
 
 ## Pass criteria / gate
 
-**Every applicable class A–N** green — J–N are mandatory, not optional. Surface mapping for the
+**Every applicable class A–H and J–N** green — J–N are mandatory, not optional. (There is no
+class I; the sequence skips it.) Surface mapping for the
 added classes: **J** (durability semantics) — J1/A2 exception-injection on the sim/unit surface,
 J2 on the process surface (actual termination) — **process**; **K** (slot contention) — unit +
 sim, with a concurrency harness racing admission against reclamation; **L** (receive-path
