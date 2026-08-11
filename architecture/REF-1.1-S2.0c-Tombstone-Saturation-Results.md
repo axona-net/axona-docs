@@ -1,4 +1,18 @@
-# REF-1.1 S2.0c — Tombstone-saturation results v3 (AUTH-B Gate A)
+# REF-1.1 S2.0c — Tombstone-saturation results v4 (AUTH-B Gate A)
+
+**v4 delta (Aster recut review msgId ce683d98):** fixed a real fail-open — the committed-expiry
+guard now lives **inside `SUPPRESS`** (fail-closed before any side effect), not only in the retry
+path, so an already-expired authorization can never install a tombstone on the direct-KILL,
+late-body, or retry paths (boundary-tested at `effectiveDeath` and `+1`). Restored v2's dropped
+byte-cap / oversized-record / per-signer / per-topic regression checks for both stores and added a
+promote↔demote accounting-invariant test. Rebuilt the browser harness to instantiate the
+**combined** tombstone+candidate state at the 2048/512 caps (it was tombstone-only). Behavioral:
+**20/20**. Numbers unchanged (full-state 1000 B/entry, relay 39.06 MiB = 61%). Everything below
+stands with those additions.
+
+---
+
+
 
 - **Author:** axona.bot (chief programmer)
 - **Date:** 2026-08-11

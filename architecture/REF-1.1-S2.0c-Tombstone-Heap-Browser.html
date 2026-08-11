@@ -26,31 +26,44 @@ function canonical(v) {
 }
 function killBytes(t, m, s, now) { return canonical({ d: KILL_DOMAIN, topicId: t, msgId: m, ts: now - 1000, seq: 1, signature: newSig(), signerPubkey: s }); }
 
-function fillTrial(count) {
-  const store = new Map();
+// Build the COMPLETE deletion state at v11's proposed browser caps: a tombstone Map AND a
+// candidate store with the same representation the Node model uses (candidate metadata: tag,
+// bodyArrivedAt, claimRet; plus perSigner/perTopic accounting maps). Mirrors -Sim.mjs so the
+// heap number covers tombstones + candidates, not tombstones alone.
+const TOMB_N = 2048, CAND_N = 512;
+const TTL_CEILING = 86400000, CLOCK_SKEW = 5000, FUTURE_TOLERANCE_MS = 30000;
+function fillTrial() {
   const now = 3e12;
-  for (let i = 0; i < count; i++) {
+  const tomb = new Map(), cand = new Map(), perSignerT = new Map(), perTopicT = new Map(), perSignerC = new Map(), perTopicC = new Map();
+  const inc = (m, k) => m.set(k, (m.get(k) || 0) + 1);
+  for (let i = 0; i < TOMB_N; i++) {
     const t = newTopicId(), m = newMsgId(), s = newSigner();
-    store.set(t + '|' + m, { signerPubkey: s, effectiveDeath: now + 86400000, killBytes: killBytes(t, m, s, now) });
+    tomb.set(t + '|' + m, { signerPubkey: s, effectiveDeath: now + TTL_CEILING, killBytes: killBytes(t, m, s, now) });
+    inc(perSignerT, s); inc(perTopicT, t);
   }
-  return store;
+  for (let i = 0; i < CAND_N; i++) {
+    const t = newTopicId(), m = newMsgId(), s = newSigner(), k = t + '|' + m;
+    cand.set(k, [{ signer: s, killBytes: killBytes(t, m, s, now), tag: 'pending', bodyArrivedAt: now, claimRet: now + FUTURE_TOLERANCE_MS + TTL_CEILING + CLOCK_SKEW }]);
+    inc(perSignerC, s); inc(perTopicC, t);
+  }
+  return { tomb, cand, perSignerT, perTopicT, perSignerC, perTopicC };   // retain the whole state
 }
 
 async function run() {
   const out = document.getElementById('out');
   if (!performance.memory) { out.textContent = 'performance.memory unavailable (non-Chromium). Cannot measure heap here.'; window.__result = { error: 'no performance.memory', ua: navigator.userAgent }; return; }
-  const COUNT = 32768;                 // large N so the delta dominates GC noise
-  const TRIALS = 4;
+  const COMBINED = TOMB_N + CAND_N;    // the complete deletion state at v11 browser caps (2048 + 512)
+  const TRIALS = 6;                    // Aster: >= 6 fresh contexts on the real target build
   const per = [];
   const keep = [];                     // hold references so nothing is collected mid-run
   for (let t = 0; t < TRIALS; t++) {
     await new Promise(r => setTimeout(r, 300));   // let the allocator settle
     const before = performance.memory.usedJSHeapSize;
-    const store = fillTrial(COUNT);
-    keep.push(store);
+    const state = fillTrial();                    // combined tombstone + candidate state
+    keep.push(state);
     await new Promise(r => setTimeout(r, 300));
     const after = performance.memory.usedJSHeapSize;
-    per.push((after - before) / COUNT);
+    per.push((after - before) / COMBINED);
   }
   const mean = per.reduce((a, b) => a + b, 0) / per.length;
   const max = Math.max(...per);
@@ -60,7 +73,7 @@ async function run() {
   // how much is allocated. Detect and report that honestly rather than emit a fake 0.
   const pinned = per.every(x => x === 0);
   window.__result = {
-    engine: 'chromium', ua: navigator.userAgent, count: COUNT, trials: TRIALS,
+    engine: 'chromium', ua: navigator.userAgent, tombN: TOMB_N, candN: CAND_N, combined: COMBINED, trials: TRIALS,
     usedJSHeapSize: performance.memory.usedJSHeapSize,
     perEntry: per.map(x => Math.round(x)), mean: Math.round(mean), sd: Math.round(sd), max: Math.round(max),
     status: pinned ? 'UNAVAILABLE — performance.memory appears pinned/quantized (zero delta at large N); run in a browser with --enable-precise-memory-info, or use measureUserAgentSpecificMemory() under cross-origin isolation' : 'ok',

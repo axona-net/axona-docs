@@ -151,7 +151,11 @@ class Node2 {
     this.fx = { cacheRemovals: 0, fanouts: 0, candidatePurges: 0, liveEvictions: 0, suppressions: 0, demotions: 0 };
   }
   // SUPPRESS is atomic and uses the body's COMMITTED effectiveDeath (never recomputed).
+  // FAIL-CLOSED deadline check FIRST — before any capacity check or side effect — so an
+  // already-expired authorization can never suppress a body or install an expired tombstone,
+  // on ANY path (direct body-present KILL, late matching body, or retry).
   suppress(topicId, msgId, signer, killBytes, effectiveDeath, now) {
+    if (now > effectiveDeath) return 'REFUSED_EXPIRED';
     const k = key(topicId, msgId);
     this.tomb.reclaimExpired(now);
     const rec = { signerPubkey: signer, effectiveDeath, killBytes };
@@ -175,6 +179,7 @@ class Node2 {
       if (body.publisher === signer) {
         const r = this.suppress(topicId, msgId, signer, kb, body.effectiveDeath, now);
         if (r === 'SUPPRESSED') return 'SUPPRESSED';
+        if (r === 'REFUSED_EXPIRED') return 'DROP_EXPIRED';                          // committed death passed: no pending
         const a = this.cand.admit(k, signer, kb, now, 'pending', body.arrivedAt);   // retain matching kill, bounded
         return 'PENDING_CAPACITY:' + r + '/' + a;
       }
@@ -189,6 +194,7 @@ class Node2 {
     if (match) {
       const r = this.suppress(topicId, msgId, publisher, match.killBytes, effectiveDeath, now);
       if (r === 'SUPPRESSED') return 'SUPPRESSED';
+      if (r === 'REFUSED_EXPIRED') return 'DROP_EXPIRED';                              // committed death passed
       this.cand.setTag(k, publisher, 'pending', now);                                 // stays bounded in cand store
       return 'PENDING_CAPACITY:' + r;
     }
@@ -283,6 +289,42 @@ console.log('1. Behavioral coverage');
   nx.onBody(ty, my, sy, deathY, now); nx.onKill(ty, my, sy, now);            // Y pending, committed death now+500
   nx.reclaimAndRetry(now + 1001);                                            // slot frees at 1001 > Y's death 500
   check('retry after committed effectiveDeath is rejected', nx.tomb.map.has(key(ty, my)) === false, `suppressed=${nx.fx.suppressions}`);
+
+  // FIX-1: the committed-expiry guard lives in SUPPRESS itself — fail-closed on EVERY path.
+  const ng = () => new Node2({ tomb: { maxCount: 10, maxBytes: 1 << 20, perSignerMax: 10, perTopicMax: 10 }, cand: { max: 10, maxBytes: 1 << 20, perSignerMax: 10, perTopicMax: 10 }, bodyMax: 10 });
+  { const g = ng(), t = newTopicId(), m = newMsgId(), s = newSigner(), d = now + 1000; g.onBody(t, m, s, d, now);
+    check('direct KILL at effectiveDeath suppresses (boundary)', g.onKill(t, m, s, d) === 'SUPPRESSED'); }
+  { const g = ng(), t = newTopicId(), m = newMsgId(), s = newSigner(), d = now + 1000; g.onBody(t, m, s, d, now);
+    check('direct KILL at effectiveDeath+1 dropped, no tombstone', g.onKill(t, m, s, d + 1) === 'DROP_EXPIRED' && !g.tomb.map.has(key(t, m))); }
+  { const g = ng(), t = newTopicId(), m = newMsgId(), s = newSigner(), d = now + 1000; g.onKill(t, m, s, now);
+    check('late matching body past committed death does not suppress', g.onBody(t, m, s, d, d + 1) === 'DROP_EXPIRED' && !g.tomb.map.has(key(t, m))); }
+  { const g = ng(), t = newTopicId(), m = newMsgId(), s = newSigner();
+    check('suppress() directly rejects already-expired', g.suppress(t, m, s, killBytesFor(t, m, s, now), now - 1, now) === 'REFUSED_EXPIRED' && !g.tomb.map.has(key(t, m))); }
+
+  // FIX-3 restored regression coverage: byte-cap, oversized-record, per-signer, per-topic (both stores)
+  { const g = new Node2({ tomb: { maxCount: 100, maxBytes: 900, perSignerMax: 100, perTopicMax: 100 }, cand: { max: 10, maxBytes: 1 << 20, perSignerMax: 10, perTopicMax: 10 }, bodyMax: 10 });
+    const t1 = newTopicId(), m1 = newMsgId(), s1 = newSigner(); g.onBody(t1, m1, s1, ed(), now); const a = g.onKill(t1, m1, s1, now);
+    const t2 = newTopicId(), m2 = newMsgId(), s2 = newSigner(); g.onBody(t2, m2, s2, ed(), now); const b = g.onKill(t2, m2, s2, now);
+    check('tombstone byte-cap refuses 2nd', a === 'SUPPRESSED' && b.includes('REFUSED_GLOBAL_BYTES'), `${a}/${b}`); }
+  { const g = new Node2({ tomb: { maxCount: 100, maxBytes: 1 << 20, perSignerMax: 100, perTopicMax: 100 }, cand: { max: 10, maxBytes: 1 << 20, perSignerMax: 10, perTopicMax: 10 }, bodyMax: 10 });
+    const t = newTopicId(), m = newMsgId(), s = newSigner();
+    check('tombstone oversized-record refused', g.suppress(t, m, s, 'x'.repeat(2000), ed(), now) === 'REFUSED_RECORD_TOO_LARGE'); }
+  { const g = new Node2({ tomb: { maxCount: 100, maxBytes: 1 << 20, perSignerMax: 2, perTopicMax: 100 }, cand: { max: 20, maxBytes: 1 << 20, perSignerMax: 20, perTopicMax: 20 }, bodyMax: 20 });
+    const s = newSigner(); let ok = 0; for (let i = 0; i < 3; i++) { const t = newTopicId(), m = newMsgId(); g.onBody(t, m, s, ed(), now); if (g.onKill(t, m, s, now) === 'SUPPRESSED') ok++; }
+    check('tombstone per-signer sublimit binds (2 of 3)', ok === 2, `ok=${ok}`); }
+  { const g = new Node2({ tomb: { maxCount: 100, maxBytes: 1 << 20, perSignerMax: 100, perTopicMax: 2 }, cand: { max: 20, maxBytes: 1 << 20, perSignerMax: 20, perTopicMax: 20 }, bodyMax: 20 });
+    const tp = newTopicId(); let ok = 0; for (let i = 0; i < 3; i++) { const m = newMsgId(), s = newSigner(); g.onBody(tp, m, s, ed(), now); if (g.onKill(tp, m, s, now) === 'SUPPRESSED') ok++; }
+    check('tombstone per-topic sublimit binds (2 of 3)', ok === 2, `ok=${ok}`); }
+  { const g = new Node2({ tomb: { maxCount: 0, maxBytes: 1 << 20, perSignerMax: 5, perTopicMax: 5 }, cand: { max: 100, maxBytes: 900, perSignerMax: 100, perTopicMax: 100 }, bodyMax: 10 });
+    const c1 = g.onKill(newTopicId(), newMsgId(), newSigner(), now); const c2 = g.onKill(newTopicId(), newMsgId(), newSigner(), now);
+    check('candidate byte-cap refuses when full', c1 === 'ADMITTED' && c2 === 'REFUSED_CAND_BYTES', `${c1}/${c2}`); }
+
+  // FIX-3: promote(plain->pending) and demote preserve count/bytes/sublimit/dedup/ClaimRetention
+  { const g = new Node2({ tomb: { maxCount: 0, maxBytes: 1 << 20, perSignerMax: 5, perTopicMax: 5 }, cand: { max: 10, maxBytes: 1 << 20, perSignerMax: 10, perTopicMax: 10 }, bodyMax: 10 });
+    const t = newTopicId(), m = newMsgId(), s = newSigner(); g.onKill(t, m, s, now);
+    const snap = () => JSON.stringify({ total: g.cand.total, bytes: g.cand.bytes, sig: g.cand.perSigner.get(s), top: g.cand.perTopic.get(t), cr: g.cand.find(key(t, m), s).claimRet });
+    const b0 = snap(); g.cand.setTag(key(t, m), s, 'pending', now + 5); g.cand.demoteKey(key(t, m)); const a0 = snap();
+    check('promote/demote preserve count/bytes/sublimit/claimRet', b0 === a0, a0); }
   console.log('');
 }
 
