@@ -12,15 +12,16 @@ confirm).
 Harness: `REF-1.1-S2.0c-Tombstone-Saturation-Sim.mjs`, run as `node --expose-gc <file>`.
 `RECORD_MAX=768`, `INTEGRATION_HEADROOM=0.30`, relay budget 64 MiB.
 
-Status: **GATE A OPEN — Aster HOLD (disposition `c079c3f`, 2026-08-11).** The deployed-Node evidence
-is accepted for its measurement sub-gate; the browser measurement was NOT accepted and is being
-corrected (see the browser section). NON-NORMATIVE throughout; the browser profile stays disabled;
-no relay or browser cap is normative. **The campaign is NOT complete.** Aster's three HOLD items:
-(1) retain **all six** raw browser `{perEntry,before,after,usedJSHeapSize}` records (the harness now
-emits `samples`), not just the aggregate + two contexts; (2) an MB/MiB arithmetic error in the
-browser budget (corrected below); (3) the browser caps 2048/512 fail budget + headroom, so pick
-smaller final caps from the worst observed max and **rerun ≥6 fresh contexts at those exact caps**,
-retaining every raw sample.
+Status: **GATE A OPEN — Aster HOLD (`c079c3f`) items ADDRESSED; corrected evidence awaiting Aster's
+review.** The deployed-Node evidence was accepted for its measurement sub-gate; the first browser
+pass was rejected and has been corrected. All three HOLD items resolved: (1) the harness now emits
+the full `samples` array — the corrected rerun retains **all six** raw
+`{perEntry,before,after,usedJSHeapSize}` records; (2) the MB/MiB arithmetic error is fixed (browser
+mean 2021 × 2560 = 4.93 MiB = 123.35%, not 5.17/129%); (3) the browser caps 2048/512 (over budget)
+are abandoned for **tomb 512 + cand 128**, sized from the worst observed max, and the rerun AT those
+caps **fits** (worst-max 2918 B × 640 = 1.78 MiB = 44.5% of 4 MiB, 30% headroom preserved).
+NON-NORMATIVE throughout; the browser profile stays disabled; no relay or browser cap is normative
+until Aster accepts. Gate A does not close on my say-so.
 
 | Profile | Node / V8 | OS / arch | per-entry (mean=max, sd) | full-state @ 32768+8192 | % of 64 MiB |
 |---|---|---|---|---|---|
@@ -159,13 +160,44 @@ context as reported:
 }
 ```
 
-## Real browser — corrected rerun, PENDING (caps 512/128, harness v5)
+## Real browser — corrected rerun, raw output (2026-08-11, operator: David, Windows/Chrome)
 
-To run: launch the isolated flagged Chrome at
-`…-Heap-Browser.html?run=<fresh-id>&mode=precise-memory` (harness `v5` now carries caps
-**tomb 512 + cand 128** and emits the full `samples` array), reload six times, and paste the whole
-`window.__result` — it now contains every raw `{perEntry,before,after,usedJSHeapSize}` record.
-Acceptance: six valid contexts at 512/128, all raw retained, and the re-measured worst observed
-maximum × 640 ≤ 4 MiB with 30% headroom. **Until this rerun is accepted, Gate A stays OPEN, the
-browser profile stays disabled, and no browser cap is normative. The relay caps are independent and
-within budget (Node worst-max 1011 B = 62% of 64 MiB). The campaign is NOT complete.**
+Chrome 151.0.0.0 (Win64 x64), `--enable-precise-memory-info` in a fresh isolated profile, harness
+**v5** at caps **tomb 512 + cand 128** (combined 640), `run=cary-win-2026-08-11-b`,
+`mode=precise-memory`, six fresh contexts, all valid (none pinned). **All six raw records retained**
+(Aster HOLD item 1 satisfied):
+
+| # | perEntry (B) | before | after | usedJSHeapSize |
+|---|---|---|---|---|
+| 1 | 2918 | 621040 | 2488647 | 2588670 |
+| 2 | 2840 | 621040 | 2438523 | 2539324 |
+| 3 | 2687 | 2816263 | 4536259 | 4554691 |
+| 4 | 2683 | 4831702 | 6549002 | 6567450 |
+| 5 | 2354 | 6844881 | 8351553 | 8370033 |
+| 6 | 2580 | 8648004 | 10299128 | 10317640 |
+
+Aggregate: **mean 2677, sd 182, max 2918 B/entry** (`sizeBy: worst-case max`). Variance is far
+tighter than the first pass (sd 182 = 6.8% of mean, vs 39%); the worst observed maximum still
+governs sizing.
+
+**Budget check at the final caps (worst-max 2918 B × 640):**
+
+| Case | bytes | MiB | % of 4 MiB |
+|---|---|---|---|
+| worst-max | 2918 × 640 = 1,867,520 | **1.78 MiB** | **44.5%** |
+| mean | 2677 × 640 = 1,713,280 | 1.63 MiB | 40.8% |
+
+**PASS:** 44.5% is well under the 70% ceiling, so the full 30% integration headroom is preserved
+(~55% budget remaining at the worst case). The corrected browser caps **tomb 512 + cand 128** fit
+the 4 MiB budget with margin under the measured worst-case per-entry cost.
+
+Standing caveat (unchanged): `performance.memory` under `--enable-precise-memory-info` is still
+GC-timing-sensitive, so this worst-max is conservative. A tighter cross-origin-isolated
+`measureUserAgentSpecificMemory()` figure remains the path before proposing any *less*-conservative
+(larger) browser caps; 512/128 is the conservative interim. **The browser profile stays DISABLED and
+NON-NORMATIVE regardless** — this rerun establishes only that the sizing fits its budget.
+
+**Campaign evidence is now complete and awaiting Aster's review** (all three classes: Windows Node,
+Linux Node, corrected real-browser rerun with full raw retention). Gate A stays OPEN until Aster
+accepts this corrected evidence; kernel code / canary / deploy / S2.1 / chunking remain gated. The
+relay caps (tomb 32768 + cand 8192, Node worst-max 1011 B = 62% of 64 MiB) are unaffected.
