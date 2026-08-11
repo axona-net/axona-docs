@@ -1,68 +1,75 @@
-# REF-1.1 S2.0c — Tombstone-saturation results (AUTH-B Gate A)
+# REF-1.1 S2.0c — Tombstone-saturation results v2 (AUTH-B Gate A)
 
 - **Author:** axona.bot (chief programmer)
 - **Date:** 2026-08-11
-- **Artifact:** `REF-1.1-S2.0c-Tombstone-Saturation-Sim.mjs` (run: `node --expose-gc …`)
-- **Gate:** Aster pre-code Gate A (disposition msgId bbdf622e). Design only; S2.0c held.
+- **Artifacts:** `REF-1.1-S2.0c-Tombstone-Saturation-Sim.mjs` (Node, `node --expose-gc`),
+  `REF-1.1-S2.0c-Tombstone-Heap-Browser.html` (real-browser probe)
+- **Gate:** Aster Gate A recut (msgId e4b908b9, CHANGES REQUIRED). Design only; S2.0c held.
 
-## What was asked
+Recut of the Gate A artifact after Aster's two findings: the first sim modelled only the
+tombstone store (faking retry and body-eviction), and sized limits with ~5% headroom off a
+single Node reading. Both are addressed.
 
-Before any kernel code, prove the AUTH-B v8 capacity model under simultaneous count / byte /
-signer / topic limits, pending-capacity candidate pressure, reclamation + retry, and
-body-eviction-before-retry — measuring **both** canonical retained bytes **and** actual runtime
-heap, and adjusting the defaults if measurement disagrees. It did.
+## 1. Integrated behavioral coverage — 15/15
 
-## Behavioral result — 11/11
+The sim now runs a full node model — `BodyCache` + `CandidateStore` + `TombstoneStore` +
+pending-capacity queue + oldest-body-first scheduler + an atomic `SUPPRESS` — and passes:
 
-The standalone v8 tombstone store (admission-refusal at capacity, never live-eviction; per-signer
-and per-topic sublimits; reclaim only expired) passes every required scenario:
+- 4 co-located kills suppressed; **N+1 refused on count → retained pending**; refusal **removed no
+  body** and caused **no fanout / cache-removal / candidate-purge / live-tombstone eviction**
+  (side-effect counters asserted unchanged);
+- **real reclamation → retry**: a short-lived tombstone expires, a genuinely pending candidate
+  (body still present) is admitted on the next `reclaimAndRetry`;
+- **real body eviction → demotion**: a pending candidate whose body is evicted is not admitted on
+  reclaim and reverts to a body-absent candidate;
+- **byte-cap refusal** (`REFUSED_GLOBAL_BYTES`) and **oversized-record refusal**
+  (`REFUSED_RECORD_TOO_LARGE`);
+- candidate global + per-signer caps; tombstone per-signer and per-topic sublimits under
+  competition.
 
-- fills to N live tombstones; **N+1 genuine kill refused** (global count) with **no live eviction**;
-- one signer fills its per-signer sublimit, its next kill refused, a **different signer still admits**;
-- one topic fills its per-topic sublimit, its next kill refused;
-- at capacity a matching kill is **refused (pending-capacity)**, then **slot reclamation lets the
-  retry succeed**;
-- a **body evicted before retry** is not admitted on reclamation (lost co-location basis).
+## 2. Measurement — repeated, environment-recorded, honest
 
-## Measurement — the defaults were wrong, and are corrected
+Each trial is a **fresh Node process** (`--measure-once`) so a prior fill's heap high-water mark
+cannot make a later fill read ~0 B/entry (the flaw in the first version's single-process loop).
 
-Deterministic per-record structure (topicId 66-hex, msgId 64-hex, signerPubkey 64-hex,
-effectiveDeath, retained signed kill):
+- Environment: `node v24.14.1, V8 13.6.233.17-node.44, darwin/arm64 25.5.0`. Trials: 6.
+- **Relay @ 65536 — measured in the actual supported relay runtime (Node):** per-entry
+  mean **979 B**, sd **1 B**, max **980 B** (978/979/979/980/979/980). Tight variance.
+- **Browser @ 4096 — Node V8 proxy:** mean **1005 B**, sd **1 B**, max **1006 B**.
 
-| Quantity | Assumed (v8) | **Measured** |
-|---|---|---|
-| canonical bytes / record | ≤ 512 (`TOMBSTONE_RECORD_MAX`) | **726 B** (max 725) |
-| runtime heap / entry (relay) | — | **974 B** |
-| runtime heap / entry (browser) | — | **985 B** |
-| relay heap at assumed 131072 | ≤ 64 MiB | **121.8 MiB — EXCEEDS ~1.9×** |
-| browser heap at assumed 8192 | ≤ 4 MiB | **7.69 MiB — EXCEEDS ~1.9×** |
+**Real-browser probe — could not measure here (reported, not faked).** The companion HTML reads
+`performance.memory.usedJSHeapSize`, but the in-app Electron/Chromium pane **pins** that value to a
+constant `10,000,000` for anti-fingerprinting — a 300k-entry fill still shows a **0-byte delta**. A
+precise browser number needs a browser launched with `--enable-precise-memory-info`, or
+`measureUserAgentSpecificMemory()` under cross-origin isolation; neither is available in this
+environment. The browser profile below therefore rests on the **same-engine (V8) Node proxy** and
+is **explicitly non-normative** until a real-browser run confirms it — the HTML is the tool to do
+that on a proper browser build.
 
-Runtime heap per entry (~974 B) is materially larger than canonical bytes (~726 B) — JS string
-(2 B/char + header), object, and Map-entry overhead. `TOMBSTONE_RECORD_MAX` is an accounting
-proxy; the **runtime-heap-per-entry × count** is what actually spends the memory budget, and it
-is the binding constraint.
+## 3. Conservative sizing — worst-case + 30% integration headroom
 
-## Corrected normative defaults (measurement-driven)
+Sized from the **worst-case** per-entry (not the mean), reserving **30%** of the budget for the
+eventual kernel representation, allocator variance, and surrounding store metadata (the previous
+~5% was too thin):
 
-Sized so the full live set fits the stated **runtime** budget with margin (heap ≈ 974 B/entry):
-
-| Parameter | v8 assumed | **v9 (measured)** | Fit |
+| Parameter | measured basis | **v10 default** | budget use |
 |---|---|---|---|
-| `TOMBSTONE_RECORD_MAX` | 512 B | **768 B** | measured max 725 B + margin |
-| relay `TOMBSTONE_MAX_COUNT` | 131072 | **65536** | 65536 × 974 B ≈ 60.9 MiB < 64 MiB |
-| relay per-signer / per-topic | 8192 | **4096** | count / 16 |
-| browser `TOMBSTONE_MAX_COUNT` | 8192 | **4096** | 4096 × 985 B ≈ 3.85 MiB < 4 MiB |
-| browser per-signer / per-topic | 512 | **256** | count / 16 |
+| `TOMBSTONE_RECORD_MAX` | 725 B canonical max | **768 B** | — |
+| relay `TOMBSTONE_MAX_COUNT` | 980 B/entry worst-case (Node, supported runtime) | **32768** | 30.6 MiB = **48%** of 64 MiB |
+| relay per-signer / per-topic | count / 16 | **2048** | — |
+| relay `TOMBSTONE_MAX_BYTES` | count × record cap | **24 MiB** | — |
+| browser `TOMBSTONE_MAX_COUNT` | 1006 B/entry (V8 proxy — **confirm in real browser**) | **2048** | ~2.0 MiB = **49%** of 4 MiB |
+| browser per-signer / per-topic | count / 16 | **128** | — |
+| browser `TOMBSTONE_MAX_BYTES` | count × record cap | **1.5 MiB** | — |
 
-(The measurement-safe ceilings were 68889 relay / 4259 browser; rounded down to the nearest power
-of two for a clean margin against GC and allocator variance.) The byte cap stays as a cheap
-in-process guard, but the **count** cap is what enforces the memory budget and should be treated
-as primary. `TOMBSTONE_MAX_BYTES` follows as `MAX_COUNT × TOMBSTONE_RECORD_MAX`
-(relay 48 MiB, browser 3 MiB) so the two caps bind at roughly the same point.
+The relay figure is measured in its real runtime and is proposed as normative. The browser figure
+is a conservative proxy pending a real-browser confirmation (and, per Aster, a re-run if the
+eventual kernel representation differs from this standalone object/Map layout).
 
 ## Disposition
 
-Gate A is satisfied by this artifact, subject to Aster's review of the numbers. `AUTH-B v9`
-folds the corrected defaults into the design (measurement-driven values only; no logic change from
-the accepted v8 model). Next pre-code deliverable: the implementation test plan (Gate B). No
-kernel code, canary, deploy, S2.1 wiring, or chunking until both are reviewed.
+Gate A recut delivered: integrated behavioral coverage + repeated, environment-recorded,
+conservatively-headroomed measurement, with the real-browser limitation reported honestly rather
+than papered over. `AUTH-B v10` carries the conservative defaults (browser marked non-normative
+pending a real-browser run). Gate B (implementation test plan) next. No kernel code, canary,
+deploy, S2.1 wiring, or chunking until Aster reviews this and the Gate B plan.

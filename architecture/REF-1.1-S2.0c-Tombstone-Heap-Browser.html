@@ -1,0 +1,74 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>REF-1.1 S2.0c — tombstone heap (real browser)</title>
+<body style="font:14px ui-monospace,monospace;padding:1rem;white-space:pre-wrap">
+<div id="out">measuring…</div>
+<script>
+// REF-1.1 S2.0c Gate A — real in-browser tombstone-store heap measurement.
+// Companion to REF-1.1-S2.0c-Tombstone-Saturation-Sim.mjs (which measures in Node).
+// Aster Gate A: the browser figure must come from a real browser runtime, not a Node
+// process. This builds the same retained tombstone record + Map and reads
+// performance.memory.usedJSHeapSize (Chromium). No --expose-gc in the pane, so we build
+// a large N (delta dominates noise), settle briefly, and report per-entry + variance.
+
+const enc = new TextEncoder();
+function hex(nBytes) {
+  const b = new Uint8Array(nBytes); crypto.getRandomValues(b);
+  let s = ''; for (const x of b) s += x.toString(16).padStart(2, '0'); return s;
+}
+const newTopicId = () => hex(33), newMsgId = () => hex(32), newSigner = () => hex(32);
+const newSig = () => 'ed25519:' + hex(64);
+const KILL_DOMAIN = 'axona:pubsub-kill:v1';
+function canonical(v) {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return '[' + v.map(canonical).join(',') + ']';
+  return '{' + Object.keys(v).sort().map(k => JSON.stringify(k) + ':' + canonical(v[k])).join(',') + '}';
+}
+function killBytes(t, m, s, now) { return canonical({ d: KILL_DOMAIN, topicId: t, msgId: m, ts: now - 1000, seq: 1, signature: newSig(), signerPubkey: s }); }
+
+function fillTrial(count) {
+  const store = new Map();
+  const now = 3e12;
+  for (let i = 0; i < count; i++) {
+    const t = newTopicId(), m = newMsgId(), s = newSigner();
+    store.set(t + '|' + m, { signerPubkey: s, effectiveDeath: now + 86400000, killBytes: killBytes(t, m, s, now) });
+  }
+  return store;
+}
+
+async function run() {
+  const out = document.getElementById('out');
+  if (!performance.memory) { out.textContent = 'performance.memory unavailable (non-Chromium). Cannot measure heap here.'; window.__result = { error: 'no performance.memory', ua: navigator.userAgent }; return; }
+  const COUNT = 32768;                 // large N so the delta dominates GC noise
+  const TRIALS = 4;
+  const per = [];
+  const keep = [];                     // hold references so nothing is collected mid-run
+  for (let t = 0; t < TRIALS; t++) {
+    await new Promise(r => setTimeout(r, 300));   // let the allocator settle
+    const before = performance.memory.usedJSHeapSize;
+    const store = fillTrial(COUNT);
+    keep.push(store);
+    await new Promise(r => setTimeout(r, 300));
+    const after = performance.memory.usedJSHeapSize;
+    per.push((after - before) / COUNT);
+  }
+  const mean = per.reduce((a, b) => a + b, 0) / per.length;
+  const max = Math.max(...per);
+  const sd = Math.sqrt(per.reduce((a, b) => a + (b - mean) ** 2, 0) / per.length);
+  // Anti-fingerprinting: some Chromium builds (notably the Electron app pane) PIN
+  // performance.memory.usedJSHeapSize to a constant, so every delta is 0 regardless of
+  // how much is allocated. Detect and report that honestly rather than emit a fake 0.
+  const pinned = per.every(x => x === 0);
+  window.__result = {
+    engine: 'chromium', ua: navigator.userAgent, count: COUNT, trials: TRIALS,
+    usedJSHeapSize: performance.memory.usedJSHeapSize,
+    perEntry: per.map(x => Math.round(x)), mean: Math.round(mean), sd: Math.round(sd), max: Math.round(max),
+    status: pinned ? 'UNAVAILABLE — performance.memory appears pinned/quantized (zero delta at large N); run in a browser with --enable-precise-memory-info, or use measureUserAgentSpecificMemory() under cross-origin isolation' : 'ok',
+    note: 'no --expose-gc in pane; delta over large N, references retained',
+  };
+  out.textContent = 'DONE\n' + JSON.stringify(window.__result, null, 2);
+  keep.length;                         // reference keep so it is not optimised away
+}
+run();
+</script>
+</body>
