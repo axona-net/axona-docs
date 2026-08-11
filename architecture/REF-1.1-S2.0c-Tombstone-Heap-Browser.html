@@ -26,12 +26,17 @@ function canonical(v) {
 }
 function killBytes(t, m, s, now) { return canonical({ d: KILL_DOMAIN, topicId: t, msgId: m, ts: now - 1000, seq: 1, signature: newSig(), signerPubkey: s }); }
 
-// Build the COMPLETE deletion state at v11's proposed browser caps, REPRESENTATION-EQUIVALENT
-// to -Sim.mjs: every retained record carries `_bytes`; each store carries its total bytes +
-// count; the tombstone store carries its `minDeath` reclaim-guard field; both carry perSigner +
-// perTopic accounting Maps. This is what the kernel structures actually hold, so the heap number
-// is faithful — not an under-count.
-const TOMB_N = 2048, CAND_N = 512;
+// Build the COMPLETE deletion state at the CORRECTED conservative browser caps, REPRESENTATION-
+// EQUIVALENT to -Sim.mjs: every retained record carries `_bytes`; each store carries its total
+// bytes + count; the tombstone store carries its `minDeath` reclaim-guard field; both carry
+// perSigner + perTopic accounting Maps. This is what the kernel structures actually hold, so the
+// heap number is faithful — not an under-count.
+// Caps derived from the first real-browser run's worst observed maximum (2972 B/entry) via the
+// same proposeCounts logic as the relay: 4 MiB budget × 0.70 (30% integration headroom) = 2.80 MiB
+// usable ÷ 2972 ≈ 987 entries → power-of-2, ~4:1 → tomb 512 + cand 128 (combined 640 = 1.81 MiB at
+// worst-max = 45% of 4 MiB). The prior 2048/512 overran the budget (per Aster HOLD, c079c3f) and is
+// abandoned. These caps remain NON-NORMATIVE; this rerun measures the full state AT these caps.
+const TOMB_N = 512, CAND_N = 128;
 const TTL_CEILING = 86400000, CLOCK_SKEW = 5000, FUTURE_TOLERANCE_MS = 30000;
 function canonicalBytes(s) { return enc.encode(s).length; }
 function recBytes(k, rec) { return canonicalBytes(k) + canonicalBytes(canonical(rec)); }
@@ -85,7 +90,7 @@ async function run() {
   //     ...Heap-Browser.html?run=<campaign-id>&mode=<flag-profile>
   // A different run= starts a fresh bag at zero; six VALID samples must accrue under that exact
   // run ID + fingerprint. Bump HARNESS_VERSION whenever the representation changes.
-  const HARNESS_VERSION = 'v4';
+  const HARNESS_VERSION = 'v5';
   const q = new URLSearchParams(location.search);
   const runId = (q.get('run') || '').trim(), mode = (q.get('mode') || '').trim();
   const fp = `${HARNESS_VERSION}|run=${runId}|mode=${mode}|${navigator.userAgent}|tomb=${TOMB_N}|cand=${CAND_N}|rec=${RECORD_MAX}`;
@@ -112,6 +117,7 @@ async function run() {
     tombN: TOMB_N, candN: CAND_N, combined: COMBINED,
     thisContext: { perEntry: Math.round(perEntry), before, after, usedJSHeapSize: performance.memory.usedJSHeapSize, valid: isValid },
     validSamplesThisRun: bag.samples.length, need: NEED, storeError,
+    samples: bag.samples,   // ALL raw {perEntry,before,after,usedJSHeapSize} records — retain every one (Aster HOLD item 1)
     aggregate: enough ? { mean: Math.round(mean), sd: Math.round(sd), max: Math.round(max), sizeBy: 'worst-case max' } : null,
     status: !runId ? 'RUN ID REQUIRED — append ?run=<campaign-id>&mode=<flag-profile> to the URL; nothing is stored without it'
       : !mode ? 'MODE REQUIRED — append &mode=<flag-profile> (e.g. precise-memory / coi / default) identifying the measurement mode or browser flag set; nothing is stored without it'

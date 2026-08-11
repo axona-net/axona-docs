@@ -12,8 +12,15 @@ confirm).
 Harness: `REF-1.1-S2.0c-Tombstone-Saturation-Sim.mjs`, run as `node --expose-gc <file>`.
 `RECORD_MAX=768`, `INTEGRATION_HEADROOM=0.30`, relay budget 64 MiB.
 
-Status: **NON-NORMATIVE until Aster reviews the full campaign** (Windows + Linux Node + a real
-browser). The browser profile stays disabled; no relay cap is normative until then.
+Status: **GATE A OPEN — Aster HOLD (disposition `c079c3f`, 2026-08-11).** The deployed-Node evidence
+is accepted for its measurement sub-gate; the browser measurement was NOT accepted and is being
+corrected (see the browser section). NON-NORMATIVE throughout; the browser profile stays disabled;
+no relay or browser cap is normative. **The campaign is NOT complete.** Aster's three HOLD items:
+(1) retain **all six** raw browser `{perEntry,before,after,usedJSHeapSize}` records (the harness now
+emits `samples`), not just the aggregate + two contexts; (2) an MB/MiB arithmetic error in the
+browser budget (corrected below); (3) the browser caps 2048/512 fail budget + headroom, so pick
+smaller final caps from the worst observed max and **rerun ≥6 fresh contexts at those exact caps**,
+retaining every raw sample.
 
 | Profile | Node / V8 | OS / arch | per-entry (mean=max, sd) | full-state @ 32768+8192 | % of 64 MiB |
 |---|---|---|---|---|---|
@@ -28,24 +35,38 @@ headroom preserved. Per-entry cost is stable across **three** V8 majors (12.4 / 
 processes). **The relay caps (tomb 32768 + cand 8192) are governed entirely by these Node runs and
 are within budget.**
 
-### Real browser (separate, NON-NORMATIVE / DISABLED profile — combined caps tomb 2048 + cand 512)
+### Real browser (separate, NON-NORMATIVE / DISABLED profile)
 
-| Browser | UA | per-entry (6 valid contexts) | combined-state @ 2560 | vs 4 MiB browser budget |
+**First pass — REJECTED (Aster HOLD `c079c3f`); caps 2048/512 abandoned.** Chrome 151 (Windows,
+`--enable-precise-memory-info`), 6 valid precise-memory contexts (none pinned): mean **2021 B**,
+sd **790**, max **2972 B**, range 772–2972. Corrected budget arithmetic (bytes, then MiB = /1048576):
+
+| Case | per-entry × 2560 | bytes | MiB | % of 4 MiB |
 |---|---|---|---|---|
-| Chrome 151 (Windows, `--enable-precise-memory-info`) | Win64 x64 | mean **2021 B**, sd **790**, max **2972 B**, range 772–2972 | worst 7.26 MiB / mean 5.17 MiB | worst **181%** / mean **129%** |
+| worst-max | 2972 × 2560 | 7,608,320 | **7.26 MiB** | **181.4%** |
+| mean | 2021 × 2560 | 5,173,760 | **4.93 MiB** | **123.35%** |
 
-**The browser number is high-variance and does NOT gate the relay.** A plain browser tab cannot force
-GC (no `--expose-gc` equivalent), so each fresh-context before/after delta captures a different
-amount of uncollected garbage — hence sd 790 (~39% of mean) and the 772–2972 range. All six samples
-are valid precise-memory readings (none pinned). Consequences: (1) the browser per-entry runs
-~2–3× the Node per-entry, confirming the Node figure was never a safe browser proxy — exactly why
-this real run was required; (2) at the measured cost the current NON-NORMATIVE browser caps
-(2048/512) **overrun the 4 MiB browser budget** (181% worst / 129% mean), so the browser profile
-**stays disabled** and its caps must be sized down before it is ever enabled. Before that sizing is
-treated as final, a **GC-settled** browser figure via `measureUserAgentSpecificMemory()` under
-cross-origin isolation is worth taking — it returns a settled per-isolate breakdown rather than a
-timing-contaminated `performance.memory` delta, and would replace the noisy worst-max with a tight
-one. Relay sizing does not wait on that; only the (disabled) browser profile does.
+(The earlier "mean 5.17 MiB / 129%" was an MB↔MiB error — 5,173,760 B is 4.93 **MiB**, not 5.17 MiB.
+The worst-case 7.26 MiB / 181% was correct.) So the 2048/512 caps **overrun the 4 MiB budget and
+the 30% headroom** and cannot be final — hence the HOLD.
+
+**Why the browser number is noisy:** a plain browser tab cannot force GC (no `--expose-gc`
+equivalent), so each before/after delta carries a different amount of uncollected garbage — hence
+sd 790 (~39% of mean) and the wide 772–2972 range. All samples are valid readings; the *dispersion*
+is measurement noise, not per-entry cost. Because of that variance the worst observed maximum
+(2972 B) governs sizing conservatively, and a tighter number is required before any less-conservative
+sizing: `measureUserAgentSpecificMemory()` under cross-origin isolation returns a settled
+per-isolate breakdown instead of a timing-contaminated `performance.memory` delta.
+
+**Corrected final browser caps + rerun (PENDING).** Sizing from the worst observed max (2972 B) via
+the same `proposeCounts` logic as the relay (4 MiB × 0.70 = 2.80 MiB usable ÷ 2972 ≈ 987 entries →
+power-of-2, ~4:1): **tomb 512 + cand 128** (combined 640 = 1.81 MiB at worst-max = **45% of 4 MiB**,
+large headroom to absorb the GC variance). The harness (`-Heap-Browser.html`, now HARNESS_VERSION
+`v5`) is set to these caps and emits every raw `samples` record. **Pending: rerun ≥6 fresh contexts
+at 512/128 (fresh run ID), retain all six raw records, and confirm the re-measured worst-max still
+fits budget + headroom.** Until that rerun is accepted, the browser profile stays disabled and no
+browser cap is normative. **None of this affects the relay caps** — those are governed by the Node
+runs (worst-max 1011 B = 62% of the 64 MiB relay budget) and are within budget.
 
 ---
 
@@ -119,30 +140,32 @@ RESULT: 23 behavioral checks passed, 0 failed.
 
 (All 23 behavioral checks passed identically to the Windows run.)
 
-## Real browser — raw output (2026-08-11, operator: David, Windows/Chrome)
+## Real browser — first pass, SUPERSEDED (2026-08-11, operator: David, Windows/Chrome)
 
-Chrome 151.0.0.0 (Win64 x64), launched with `--enable-precise-memory-info` in an isolated profile,
-`REF-1.1-S2.0c-Tombstone-Heap-Browser.html?run=cary-win-2026-08-11&mode=precise-memory`, six fresh
-page-load contexts. All six samples valid (real precise-memory readings, none pinned). Final
-aggregate context (`window.__result`):
+Chrome 151.0.0.0 (Win64 x64), `--enable-precise-memory-info` in an isolated profile,
+`…-Heap-Browser.html?run=cary-win-2026-08-11&mode=precise-memory` (harness v4, caps 2048/512), six
+fresh contexts. All six valid (none pinned). **This pass was REJECTED under Aster HOLD `c079c3f`:**
+its caps overrun the 4 MiB budget, and the displayed `window.__result` omitted the per-context
+`samples` array, so only two of the six raw records were captured (5th = 1598 B, 6th below). Final
+context as reported:
 
 ```json
 {
-  "engine": "chromium",
-  "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) ... Chrome/151.0.0.0 Safari/537.36",
   "harness": "v4", "runId": "cary-win-2026-08-11", "mode": "precise-memory",
   "tombN": 2048, "candN": 512, "combined": 2560,
   "thisContext": { "perEntry": 772, "before": 3145428, "after": 5122373, "usedJSHeapSize": 5149992, "valid": true },
   "validSamplesThisRun": 6, "need": 6, "storeError": null,
-  "aggregate": { "mean": 2021, "sd": 790, "max": 2972, "sizeBy": "worst-case max" },
-  "status": "ok — 6 valid fresh-context samples under this run ID; worst-case max governs sizing",
-  "completed": true
+  "aggregate": { "mean": 2021, "sd": 790, "max": 2972, "sizeBy": "worst-case max" }
 }
 ```
 
-Per-context per-entry samples spanned 772–2972 B (two individually recorded here: the 5th context
-1598 B, the 6th 772 B); aggregate mean 2021, sd 790, max 2972. See the browser-measurement caveat
-above — the variance is GC-timing, not per-entry cost, and a `measureUserAgentSpecificMemory()` /
-COI run is the way to a tight number before the browser profile is sized. **Campaign status: all
-three required measurement classes (Windows Node, Linux Node, real browser) are now measured and
-retained; relay caps are within budget on the Node worst-max; the browser profile remains disabled.**
+## Real browser — corrected rerun, PENDING (caps 512/128, harness v5)
+
+To run: launch the isolated flagged Chrome at
+`…-Heap-Browser.html?run=<fresh-id>&mode=precise-memory` (harness `v5` now carries caps
+**tomb 512 + cand 128** and emits the full `samples` array), reload six times, and paste the whole
+`window.__result` — it now contains every raw `{perEntry,before,after,usedJSHeapSize}` record.
+Acceptance: six valid contexts at 512/128, all raw retained, and the re-measured worst observed
+maximum × 640 ≤ 4 MiB with 30% headroom. **Until this rerun is accepted, Gate A stays OPEN, the
+browser profile stays disabled, and no browser cap is normative. The relay caps are independent and
+within budget (Node worst-max 1011 B = 62% of 64 MiB). The campaign is NOT complete.**
