@@ -35,12 +35,16 @@ const TOMB_N = 2048, CAND_N = 512;
 const TTL_CEILING = 86400000, CLOCK_SKEW = 5000, FUTURE_TOLERANCE_MS = 30000;
 function canonicalBytes(s) { return enc.encode(s).length; }
 function recBytes(k, rec) { return canonicalBytes(k) + canonicalBytes(canonical(rec)); }
+const RECORD_MAX = 768, SUBLIMIT = 16;
 function fillTrial() {
   const now = 3e12;
-  // Tombstone store: same fields as TombstoneStore (map, bytes, perSigner, perTopic, minDeath).
-  const tomb = { map: new Map(), bytes: 0, perSigner: new Map(), perTopic: new Map(), minDeath: Infinity };
-  // Candidate store: same fields as CandidateStore (map of lists, total, bytes, perSigner, perTopic).
-  const cand = { map: new Map(), total: 0, bytes: 0, perSigner: new Map(), perTopic: new Map() };
+  // Tombstone store: EXACT field parity with Node TombstoneStore, incl. the retained cap/config
+  // fields (maxCount, maxBytes, perSignerMax, perTopicMax) and the minDeath reclaim guard.
+  const tomb = { maxCount: TOMB_N, maxBytes: TOMB_N * RECORD_MAX, perSignerMax: TOMB_N / SUBLIMIT, perTopicMax: TOMB_N / SUBLIMIT,
+    map: new Map(), bytes: 0, perSigner: new Map(), perTopic: new Map(), minDeath: Infinity };
+  // Candidate store: EXACT field parity with Node CandidateStore (max, maxBytes, perSignerMax, perTopicMax).
+  const cand = { max: CAND_N, maxBytes: CAND_N * RECORD_MAX, perSignerMax: CAND_N / SUBLIMIT, perTopicMax: CAND_N / SUBLIMIT,
+    map: new Map(), total: 0, bytes: 0, perSigner: new Map(), perTopic: new Map() };
   const inc = (m, k) => m.set(k, (m.get(k) || 0) + 1);
   for (let i = 0; i < TOMB_N; i++) {
     const t = newTopicId(), m = newMsgId(), s = newSigner(), k = t + '|' + m;
@@ -75,26 +79,40 @@ async function run() {
   const perEntry = (after - before) / COMBINED;
   const pinned = perEntry === 0 && performance.memory.usedJSHeapSize === after;
   // Accumulate fresh-context samples.
-  let samples = [];
-  try { samples = JSON.parse(localStorage.getItem('ref11_ctx_samples') || '[]'); } catch {}
-  samples.push({ perEntry: Math.round(perEntry), usedJSHeapSize: performance.memory.usedJSHeapSize, at: Date.now() });
-  try { localStorage.setItem('ref11_ctx_samples', JSON.stringify(samples)); } catch {}
-  const vals = samples.map(s => s.perEntry);
-  const mean = vals.reduce((a, b) => a + b, 0) / vals.length, max = Math.max(...vals);
-  const sd = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length);
+  // Fingerprint the run so samples from a different browser build, flag set, cap profile, or
+  // harness version never silently mix. Bump HARNESS_VERSION whenever the representation changes.
+  const HARNESS_VERSION = 'v3';
+  const fp = `${HARNESS_VERSION}|${navigator.userAgent}|tomb=${TOMB_N}|cand=${CAND_N}|rec=${RECORD_MAX}`;
+  // A sample is VALID only if it is a real positive measurement (not pinned/zero/negative).
+  const isValid = perEntry > 0 && !pinned;
+  const store = 'ref11_ctx_samples';
+  let bag = { fp: null, samples: [] };
+  try { const raw = JSON.parse(localStorage.getItem(store) || 'null'); if (raw && raw.fp) bag = raw; } catch {}
+  if (bag.fp !== fp) bag = { fp, samples: [] };   // isolate: mismatched fingerprint starts fresh
+  if (isValid) { bag.samples.push({ perEntry: Math.round(perEntry), before, after, usedJSHeapSize: performance.memory.usedJSHeapSize }); try { localStorage.setItem(store, JSON.stringify(bag)); } catch {} }
+  const vals = bag.samples.map(s => s.perEntry);
+  const mean = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  const max = vals.length ? Math.max(...vals) : 0;
+  const sd = vals.length ? Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length) : 0;
+  const enough = bag.samples.length >= NEED;
   window.__result = {
-    engine: 'chromium', ua: navigator.userAgent, tombN: TOMB_N, candN: CAND_N, combined: COMBINED,
-    thisContextPerEntry: Math.round(perEntry), usedJSHeapSize: performance.memory.usedJSHeapSize,
-    freshContexts: samples.length, need: NEED,
-    aggregate: samples.length >= NEED ? { mean: Math.round(mean), sd: Math.round(sd), max: Math.round(max) } : null,
+    engine: 'chromium', ua: navigator.userAgent, harness: HARNESS_VERSION, fingerprint: fp,
+    tombN: TOMB_N, candN: CAND_N, combined: COMBINED,
+    thisContext: { perEntry: Math.round(perEntry), before, after, usedJSHeapSize: performance.memory.usedJSHeapSize, valid: isValid },
+    validFreshContexts: bag.samples.length, need: NEED,
+    aggregate: enough ? { mean: Math.round(mean), sd: Math.round(sd), max: Math.round(max), sizeBy: 'worst-case max' } : null,
     status: pinned
-      ? 'UNAVAILABLE — performance.memory appears pinned/quantized (zero delta); run on a browser build with --enable-precise-memory-info, or use measureUserAgentSpecificMemory() under cross-origin isolation'
-      : (samples.length >= NEED ? 'ok — worst-case max governs sizing' : `collecting: reload this page ${NEED - samples.length} more time(s) for fresh contexts (localStorage.removeItem('ref11_ctx_samples') to reset)`),
-    note: 'one measured fill per fresh context (page load); no --expose-gc in pane; references retained on window.__state',
+      ? 'UNAVAILABLE — performance.memory pinned/quantized (zero delta); this sample is invalid and NOT stored. Run on a browser with --enable-precise-memory-info, or measureUserAgentSpecificMemory() under cross-origin isolation.'
+      : (enough ? 'ok — 6 valid fresh-context samples; worst-case max governs sizing' : `collecting: ${NEED - bag.samples.length} more valid fresh-context sample(s) needed — reload this page (localStorage.removeItem('${store}') to reset)`),
+    completed: true,     // clean, exception-free completion
+    note: 'one measured fill per fresh context (page load); invalid (pinned/zero/negative) samples excluded; fingerprint-scoped; raw before/after retained; references held on window.__state',
   };
   out.textContent = 'DONE\n' + JSON.stringify(window.__result, null, 2);
-  keep.length;                         // reference keep so it is not optimised away
 }
-run();
+run().catch(e => {   // require a clean, exception-free completion; surface any error instead of throwing
+  const out = document.getElementById('out');
+  window.__result = { completed: false, error: String(e && e.stack || e), ua: navigator.userAgent };
+  if (out) out.textContent = 'ERROR\n' + JSON.stringify(window.__result, null, 2);
+});
 </script>
 </body>

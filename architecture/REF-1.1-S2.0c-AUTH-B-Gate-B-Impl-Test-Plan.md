@@ -4,8 +4,11 @@
 - **Author:** axona.bot (chief programmer)
 - **Date:** 2026-08-11
 - **Kernel:** 4.62.2. Plan only. No code. S2.0c/chunking held.
-- **Rev:** v2 — adds the executable cases + oracles Aster required (msgId d9512e07) and states the
-  crash-durability decision.
+- **Rev:** v3 — reconciles the crash model (G2↔J), makes classes J–N mandatory in the pass
+  criteria with surface mappings, separates in-process failure-atomicity (exception injection, no
+  process death) from the J2 restart-loss residual (actual termination), and gives J2 an executable
+  trigger + bounded oracle (recovery-if-re-propagated + no forged authority; no durability claim).
+  (v2 added the five executable-case sections; msgId d9512e07.)
 - **Purpose:** the test plan the eventual kernel implementation of B-prime tombstone authorization
   must satisfy before any code is accepted. Consumes the accepted design (signed-expiry v6,
   AUTH-B v8 security model + v12 invariants) and the Gate A capacity artifact. Aster permitted
@@ -34,9 +37,12 @@
 **A. Commit-order / atomicity.**
 - A1 body-present author KILL: local tombstone + body-removal + candidate-purge all present, or all
   absent — never a subset.
-- A2 injected crash (fault clock + kill switch) at each point between deadline check, tombstone
-  insert, body remove, candidate purge, and fanout emit → recovery leaves a consistent state; no
-  expired or half-installed tombstone.
+- A2 **in-process failure-atomicity** — inject a **synchronous exception / abort after each local
+  mutation** (deadline check, tombstone insert, body remove, candidate purge) **without process
+  death** → the operation rolls back or completes; never a half-installed subset (tombstone without
+  body removed, or body removed without tombstone), never an expired tombstone. A live process is
+  required to observe atomicity; **actual process termination is NOT used here** — it clears all
+  in-memory state and is reserved for the J2 restart-loss residual.
 - A3 concurrent body-arrival and KILL for the same `(topicId, msgId)`: exactly one `SUPPRESS`
   commits; no double-remove, no lost tombstone.
 
@@ -80,8 +86,10 @@
 **G. Fault injection.**
 - G1 mock RTCPeerConnection/DataChannel failures during fanout (reuse the existing WebRTC
   fault-injection harness) → local tombstone unaffected.
-- G2 process restart mid-migration → rejoin adopts consistently (epoch-ordered), no phantom
-  suppression, no lost live tombstone.
+- G2 **process restart** mid-migration → consistent with class J: the in-memory tombstone is
+  **lost** (no persistence), rejoin re-learns the deletion via **re-propagation**, no phantom
+  suppression, epoch-ordered adoption. (Reconciled with J2 — G2 does **not** claim "no lost
+  tombstone"; that would contradict the non-durable decision.)
 
 **H. Golden vectors.**
 - H1 `MSGID_DOMAIN_V2` preimage + digest (publisher 64-hex, topicId 66-hex, exp); V1 legacy
@@ -101,9 +109,14 @@ re-established by **re-propagation** (eventual under an honest path). No durable
 recovery is claimed or built.
 - J1 (within-process) send failure after commit → tombstone stays live, fanout retried, no
   rollback. Oracle: tombstone present; fanout attempts ≥ 2; no accounting change.
-- J2 (crash) kill the process between commit and fanout → on restart the tombstone is absent (no
-  persistence); a re-propagated kill co-locates and re-suppresses. Oracle: post-restart tombstone
-  absent; after re-propagation, suppressed again; no false durability.
+- J2 (**actual process termination**) between commit and fanout → on restart the tombstone is
+  absent (no persistence). Re-propagation is **best-effort, not guaranteed** (under continued
+  source omission it may never re-arrive — the accepted omission residual). **Executable trigger:**
+  after restart, deliver a **later valid re-propagated KILL** plus its body; **bounded oracle:**
+  co-located authorization re-establishes suppression, **and** a **fabricated "authoritative"
+  marker** presented at the same time gains **no** authority (the receiver still requires its own
+  body co-location). No durability is asserted; the test proves recovery-if-re-propagated and
+  no-forged-authority, nothing stronger.
 - J3 the class-B "no-lost-tombstone" claim is scoped to J1 only; J2 is the documented accepted
   residual. (Corrects the earlier over-strong recovery claim.)
 
@@ -142,7 +155,14 @@ expired does **not** produce a later suppression.
 
 ## Pass criteria / gate
 
-Every class A–H green on sim + WebRTC surfaces; the Gate A saturation numbers confirmed on the
+**Every applicable class A–N** green — J–N are mandatory, not optional. Surface mapping for the
+added classes: **J** (durability semantics) — J1/A2 exception-injection on the sim/unit surface,
+J2 on the process surface (actual termination) — **process**; **K** (slot contention) — unit +
+sim, with a concurrency harness racing admission against reclamation; **L** (receive-path
+dominance + replay) — sim + **WebRTC** (reconnect replay, duplicate fanout); **M** (crypto
+prefilter + local-receipt retention) — **unit** (signature verification, ClaimRetention
+derivation) + golden vectors; **N** (retry scheduling/expiry) — unit + **saturation** (starvation
+under load). Then: the Gate A saturation numbers confirmed on the
 production relay OS/runtimes (Windows fleet + Linux droplet) and, before enabling the browser
 profile, on a real browser. Only then does S2.0c code become eligible for canary — still David-gated
 and Aster-reviewed. This plan gates **the tests**, not the code; no kernel implementation, canary,
