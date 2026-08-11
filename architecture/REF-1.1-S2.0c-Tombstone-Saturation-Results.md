@@ -1,75 +1,71 @@
-# REF-1.1 S2.0c — Tombstone-saturation results v2 (AUTH-B Gate A)
+# REF-1.1 S2.0c — Tombstone-saturation results v3 (AUTH-B Gate A)
 
 - **Author:** axona.bot (chief programmer)
 - **Date:** 2026-08-11
-- **Artifacts:** `REF-1.1-S2.0c-Tombstone-Saturation-Sim.mjs` (Node, `node --expose-gc`),
-  `REF-1.1-S2.0c-Tombstone-Heap-Browser.html` (real-browser probe)
-- **Gate:** Aster Gate A recut (msgId e4b908b9, CHANGES REQUIRED). Design only; S2.0c held.
+- **Artifacts:** `REF-1.1-S2.0c-Tombstone-Saturation-Sim.mjs` (Node), `-Heap-Browser.html`
+- **Gate:** Aster Gate A recut review (msgId b8c2d20f, CHANGES REQUIRED). Design only; S2.0c held.
 
-Recut of the Gate A artifact after Aster's two findings: the first sim modelled only the
-tombstone store (faking retry and body-eviction), and sized limits with ~5% headroom off a
-single Node reading. Both are addressed.
+Third pass, resolving Aster's four findings on the recut. Aster independently reproduced the 15
+prior checks and the fresh-process benchmark; this pass fixes the modeling gaps she identified.
 
-## 1. Integrated behavioral coverage — 15/15
+## Four findings, fixed
 
-The sim now runs a full node model — `BodyCache` + `CandidateStore` + `TombstoneStore` +
-pending-capacity queue + oldest-body-first scheduler + an atomic `SUPPRESS` — and passes:
+1. **Pending-capacity state is now bounded, deduplicated, and expiring.** It no longer lives in a
+   separate unbounded array; a body-verified-pending-capacity kill is a **tagged candidate** inside
+   the `CandidateStore`, which enforces global + per-signer + per-topic + byte + record limits,
+   deduplicates repeated matching kills by `(topicId, msgId, signer)`, and expires entries at
+   **ClaimRetention** (`receipt + FUTURE_TOLERANCE_MS + TTL_CEILING + CLOCK_SKEW`). Tests: pending
+   overflow refused on the candidate cap; a duplicate-kill flood collapses to one entry; a
+   candidate expires at ClaimRetention.
+2. **Real body-cache overflow drives demotion.** `BodyCache.put` reports the auto-evicted key and
+   the node demotes that key's pending candidate to plain (loses its authorization basis). Tested
+   by **overflowing the actual body cache** (not the explicit helper): the overflowed pending
+   candidate demotes and is not suppressed on the next retry.
+3. **Expiry is faithful to signed-expiry.** A body carries its **committed** `effectiveDeath`
+   (never recomputed from local `now + TTL`); `SUPPRESS` and every `reclaimAndRetry` re-check
+   `now ≤ body.effectiveDeath`. Test: a pending candidate whose committed death has passed is
+   **rejected** on retry even though a slot freed — arrival/retry cannot extend authorization.
+4. **The heap benchmark measures the complete deletion state** (`TombstoneStore` **+**
+   `CandidateStore`) at the proposed final counts, so the caps are sized so their **sum** fits the
+   budget — not the tombstone store alone.
 
-- 4 co-located kills suppressed; **N+1 refused on count → retained pending**; refusal **removed no
-  body** and caused **no fanout / cache-removal / candidate-purge / live-tombstone eviction**
-  (side-effect counters asserted unchanged);
-- **real reclamation → retry**: a short-lived tombstone expires, a genuinely pending candidate
-  (body still present) is admitted on the next `reclaimAndRetry`;
-- **real body eviction → demotion**: a pending candidate whose body is evicted is not admitted on
-  reclaim and reverts to a body-absent candidate;
-- **byte-cap refusal** (`REFUSED_GLOBAL_BYTES`) and **oversized-record refusal**
-  (`REFUSED_RECORD_TOO_LARGE`);
-- candidate global + per-signer caps; tombstone per-signer and per-topic sublimits under
-  competition.
+Behavioral: **10/10** (co-located suppress; N+1 refusal→bounded pending with no side effects;
+pending bounded; dedup flood; candidate expiry; body-cache-overflow demotion; committed-death
+retry rejection).
 
-## 2. Measurement — repeated, environment-recorded, honest
+## Full-state measurement (fresh process per trial)
 
-Each trial is a **fresh Node process** (`--measure-once`) so a prior fill's heap high-water mark
-cannot make a later fill read ~0 B/entry (the flaw in the first version's single-process loop).
+- Environment: `node v24.14.1, V8 13.6.233, darwin/arm64 25.5.0`. Trials: 6.
+- **Complete deletion state @ (tomb 32768 + cand 8192): 999 B/entry, sd 0, max 1000 B.**
+- Confirm at the proposed relay split: **39.0 MiB worst-case = 61% of the 64 MiB budget** (30%
+  integration headroom preserved).
 
-- Environment: `node v24.14.1, V8 13.6.233.17-node.44, darwin/arm64 25.5.0`. Trials: 6.
-- **Relay @ 65536 — measured in the actual supported relay runtime (Node):** per-entry
-  mean **979 B**, sd **1 B**, max **980 B** (978/979/979/980/979/980). Tight variance.
-- **Browser @ 4096 — Node V8 proxy:** mean **1005 B**, sd **1 B**, max **1006 B**.
+## Proposed defaults — split across the deletion state
 
-**Real-browser probe — could not measure here (reported, not faked).** The companion HTML reads
-`performance.memory.usedJSHeapSize`, but the in-app Electron/Chromium pane **pins** that value to a
-constant `10,000,000` for anti-fingerprinting — a 300k-entry fill still shows a **0-byte delta**. A
-precise browser number needs a browser launched with `--enable-precise-memory-info`, or
-`measureUserAgentSpecificMemory()` under cross-origin isolation; neither is available in this
-environment. The browser profile below therefore rests on the **same-engine (V8) Node proxy** and
-is **explicitly non-normative** until a real-browser run confirms it — the HTML is the tool to do
-that on a proper browser build.
+The budget is split across the two bounded stores (deletions outnumber pending claims → ~4:1):
 
-## 3. Conservative sizing — worst-case + 30% integration headroom
+| Parameter | **v11 default** | note |
+|---|---|---|
+| `TOMBSTONE_RECORD_MAX` / `CAND_RECORD_MAX` | **768 B** | measured max 725 B + margin |
+| relay `TOMBSTONE_MAX_COUNT` | **32768** (sublimit 2048) | |
+| relay `CAND_MAX` (incl. pending) | **8192** (sublimit 512) | |
+| relay full-state worst case | **39.0 MiB = 61% of 64 MiB** | measured, this host |
+| browser `TOMBSTONE_MAX_COUNT` / `CAND_MAX` | **2048 / 512** | **NON-NORMATIVE, DISABLED** |
 
-Sized from the **worst-case** per-entry (not the mean), reserving **30%** of the budget for the
-eventual kernel representation, allocator variance, and surrounding store metadata (the previous
-~5% was too thin):
+## Honest limits (required before these are normative)
 
-| Parameter | measured basis | **v10 default** | budget use |
-|---|---|---|---|
-| `TOMBSTONE_RECORD_MAX` | 725 B canonical max | **768 B** | — |
-| relay `TOMBSTONE_MAX_COUNT` | 980 B/entry worst-case (Node, supported runtime) | **32768** | 30.6 MiB = **48%** of 64 MiB |
-| relay per-signer / per-topic | count / 16 | **2048** | — |
-| relay `TOMBSTONE_MAX_BYTES` | count × record cap | **24 MiB** | — |
-| browser `TOMBSTONE_MAX_COUNT` | 1006 B/entry (V8 proxy — **confirm in real browser**) | **2048** | ~2.0 MiB = **49%** of 4 MiB |
-| browser per-signer / per-topic | count / 16 | **128** | — |
-| browser `TOMBSTONE_MAX_BYTES` | count × record cap | **1.5 MiB** | — |
-
-The relay figure is measured in its real runtime and is proposed as normative. The browser figure
-is a conservative proxy pending a real-browser confirmation (and, per Aster, a re-run if the
-eventual kernel representation differs from this standalone object/Map layout).
+- **OS/runtime:** measured only on `darwin/arm64` Node. Production relays also run on **Linux**
+  (droplets) and **Windows** (fleet); the full-state benchmark must be re-run on those before the
+  relay defaults are treated as normative. The harness is portable — same `node --expose-gc` run.
+- **Browser:** the in-app Chromium **pins** `performance.memory`, so no real-browser number is
+  obtainable here. The browser profile is a same-engine V8 **proxy**, kept **non-normative and
+  disabled** pending a real-browser run (per Aster's ruling). `-Heap-Browser.html` is the tool.
+- **Kernel representation:** if the eventual kernel layout differs from this standalone
+  object/Map, re-run before enabling.
 
 ## Disposition
 
-Gate A recut delivered: integrated behavioral coverage + repeated, environment-recorded,
-conservatively-headroomed measurement, with the real-browser limitation reported honestly rather
-than papered over. `AUTH-B v10` carries the conservative defaults (browser marked non-normative
-pending a real-browser run). Gate B (implementation test plan) next. No kernel code, canary,
-deploy, S2.1 wiring, or chunking until Aster reviews this and the Gate B plan.
+Gate A recut v3: full deletion-state model + complete-state measurement, with the OS/browser
+confirmations named as explicit pre-enable steps rather than assumed. `AUTH-B v11` carries the
+split caps. Gate B (implementation test plan) next. No kernel code, canary, deploy, S2.1 wiring, or
+chunking until Aster accepts this recut and the Gate B plan.
