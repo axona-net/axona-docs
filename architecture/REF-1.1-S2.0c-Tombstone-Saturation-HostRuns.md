@@ -191,6 +191,40 @@ governs sizing.
 (~55% budget remaining at the worst case). The corrected browser caps **tomb 512 + cand 128** fit
 the 4 MiB budget with margin under the measured worst-case per-entry cost.
 
+**Exact final `window.__result` (retained verbatim, run `cary-win-2026-08-11-b`)** — full UA,
+fingerprint, mode, and complete `samples` array preserved so the six records provably belong to the
+exact v5 fingerprint, with the final validity/storage status intact:
+
+```json
+{
+  "engine": "chromium",
+  "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36",
+  "harness": "v5",
+  "runId": "cary-win-2026-08-11-b",
+  "mode": "precise-memory",
+  "fingerprint": "v5|run=cary-win-2026-08-11-b|mode=precise-memory|Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36|tomb=512|cand=128|rec=768",
+  "tombN": 512,
+  "candN": 128,
+  "combined": 640,
+  "thisContext": { "perEntry": 2580, "before": 8648004, "after": 10299128, "usedJSHeapSize": 10322823, "valid": true },
+  "validSamplesThisRun": 6,
+  "need": 6,
+  "storeError": null,
+  "samples": [
+    { "perEntry": 2918, "before": 621040, "after": 2488647, "usedJSHeapSize": 2588670 },
+    { "perEntry": 2840, "before": 621040, "after": 2438523, "usedJSHeapSize": 2539324 },
+    { "perEntry": 2687, "before": 2816263, "after": 4536259, "usedJSHeapSize": 4554691 },
+    { "perEntry": 2683, "before": 4831702, "after": 6549002, "usedJSHeapSize": 6567450 },
+    { "perEntry": 2354, "before": 6844881, "after": 8351553, "usedJSHeapSize": 8370033 },
+    { "perEntry": 2580, "before": 8648004, "after": 10299128, "usedJSHeapSize": 10317640 }
+  ],
+  "aggregate": { "mean": 2677, "sd": 182, "max": 2918, "sizeBy": "worst-case max" },
+  "status": "ok — 6 valid fresh-context samples under this run ID; worst-case max governs sizing",
+  "completed": true,
+  "note": "one measured fill per fresh context (page load); invalid (pinned/zero/negative) excluded; run-ID + fingerprint scoped; raw before/after retained; storage failures surfaced; references on window.__state"
+}
+```
+
 Standing caveat (unchanged): `performance.memory` under `--enable-precise-memory-info` is still
 GC-timing-sensitive, so this worst-max is conservative. A tighter cross-origin-isolated
 `measureUserAgentSpecificMemory()` figure remains the path before proposing any *less*-conservative
