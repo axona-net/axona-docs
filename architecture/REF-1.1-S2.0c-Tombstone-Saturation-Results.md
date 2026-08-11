@@ -1,4 +1,16 @@
-# REF-1.1 S2.0c — Tombstone-saturation results v4 (AUTH-B Gate A)
+# REF-1.1 S2.0c — Tombstone-saturation results v5 (AUTH-B Gate A)
+
+**v5 delta (Aster review msgId d9512e07):** added the missing candidate regression cases —
+oversized-record, per-signer competition, per-topic competition — each asserting state and
+accounting are **unchanged on refusal** (behavioral now **23/23**). Rebuilt the browser harness to
+be **representation-equivalent** to the Node stores (every retained record carries `_bytes`; each
+store carries its total bytes/count; the tombstone store carries `minDeath`; both carry
+perSigner/perTopic maps) and to measure **one fill per fresh context**, aggregating ≥6 contexts
+across page loads (localStorage) with the worst-case max governing sizing. Numbers unchanged.
+
+---
+
+
 
 **v4 delta (Aster recut review msgId ce683d98):** fixed a real fail-open — the committed-expiry
 guard now lives **inside `SUPPRESS`** (fail-closed before any side effect), not only in the retry

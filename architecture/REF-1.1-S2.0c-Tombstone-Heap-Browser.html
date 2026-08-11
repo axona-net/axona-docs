@@ -26,58 +26,71 @@ function canonical(v) {
 }
 function killBytes(t, m, s, now) { return canonical({ d: KILL_DOMAIN, topicId: t, msgId: m, ts: now - 1000, seq: 1, signature: newSig(), signerPubkey: s }); }
 
-// Build the COMPLETE deletion state at v11's proposed browser caps: a tombstone Map AND a
-// candidate store with the same representation the Node model uses (candidate metadata: tag,
-// bodyArrivedAt, claimRet; plus perSigner/perTopic accounting maps). Mirrors -Sim.mjs so the
-// heap number covers tombstones + candidates, not tombstones alone.
+// Build the COMPLETE deletion state at v11's proposed browser caps, REPRESENTATION-EQUIVALENT
+// to -Sim.mjs: every retained record carries `_bytes`; each store carries its total bytes +
+// count; the tombstone store carries its `minDeath` reclaim-guard field; both carry perSigner +
+// perTopic accounting Maps. This is what the kernel structures actually hold, so the heap number
+// is faithful — not an under-count.
 const TOMB_N = 2048, CAND_N = 512;
 const TTL_CEILING = 86400000, CLOCK_SKEW = 5000, FUTURE_TOLERANCE_MS = 30000;
+function canonicalBytes(s) { return enc.encode(s).length; }
+function recBytes(k, rec) { return canonicalBytes(k) + canonicalBytes(canonical(rec)); }
 function fillTrial() {
   const now = 3e12;
-  const tomb = new Map(), cand = new Map(), perSignerT = new Map(), perTopicT = new Map(), perSignerC = new Map(), perTopicC = new Map();
+  // Tombstone store: same fields as TombstoneStore (map, bytes, perSigner, perTopic, minDeath).
+  const tomb = { map: new Map(), bytes: 0, perSigner: new Map(), perTopic: new Map(), minDeath: Infinity };
+  // Candidate store: same fields as CandidateStore (map of lists, total, bytes, perSigner, perTopic).
+  const cand = { map: new Map(), total: 0, bytes: 0, perSigner: new Map(), perTopic: new Map() };
   const inc = (m, k) => m.set(k, (m.get(k) || 0) + 1);
   for (let i = 0; i < TOMB_N; i++) {
-    const t = newTopicId(), m = newMsgId(), s = newSigner();
-    tomb.set(t + '|' + m, { signerPubkey: s, effectiveDeath: now + TTL_CEILING, killBytes: killBytes(t, m, s, now) });
-    inc(perSignerT, s); inc(perTopicT, t);
+    const t = newTopicId(), m = newMsgId(), s = newSigner(), k = t + '|' + m;
+    const ed = now + TTL_CEILING;
+    const rec = { signerPubkey: s, effectiveDeath: ed, killBytes: killBytes(t, m, s, now) };
+    rec._bytes = recBytes(k, { signerPubkey: rec.signerPubkey, effectiveDeath: rec.effectiveDeath, killBytes: rec.killBytes });
+    tomb.map.set(k, rec); tomb.bytes += rec._bytes; if (ed < tomb.minDeath) tomb.minDeath = ed; inc(tomb.perSigner, s); inc(tomb.perTopic, t);
   }
   for (let i = 0; i < CAND_N; i++) {
     const t = newTopicId(), m = newMsgId(), s = newSigner(), k = t + '|' + m;
-    cand.set(k, [{ signer: s, killBytes: killBytes(t, m, s, now), tag: 'pending', bodyArrivedAt: now, claimRet: now + FUTURE_TOLERANCE_MS + TTL_CEILING + CLOCK_SKEW }]);
-    inc(perSignerC, s); inc(perTopicC, t);
+    const c = { signer: s, killBytes: killBytes(t, m, s, now), tag: 'pending', bodyArrivedAt: now, claimRet: now + FUTURE_TOLERANCE_MS + TTL_CEILING + CLOCK_SKEW };
+    c._bytes = recBytes(k, { signer: c.signer, killBytes: c.killBytes });
+    cand.map.set(k, [c]); cand.total++; cand.bytes += c._bytes; inc(cand.perSigner, s); inc(cand.perTopic, t);
   }
-  return { tomb, cand, perSignerT, perTopicT, perSignerC, perTopicC };   // retain the whole state
+  return { tomb, cand };   // retain the whole representation-equivalent state
 }
 
 async function run() {
   const out = document.getElementById('out');
   if (!performance.memory) { out.textContent = 'performance.memory unavailable (non-Chromium). Cannot measure heap here.'; window.__result = { error: 'no performance.memory', ua: navigator.userAgent }; return; }
   const COMBINED = TOMB_N + CAND_N;    // the complete deletion state at v11 browser caps (2048 + 512)
-  const TRIALS = 6;                    // Aster: >= 6 fresh contexts on the real target build
-  const per = [];
-  const keep = [];                     // hold references so nothing is collected mid-run
-  for (let t = 0; t < TRIALS; t++) {
-    await new Promise(r => setTimeout(r, 300));   // let the allocator settle
-    const before = performance.memory.usedJSHeapSize;
-    const state = fillTrial();                    // combined tombstone + candidate state
-    keep.push(state);
-    await new Promise(r => setTimeout(r, 300));
-    const after = performance.memory.usedJSHeapSize;
-    per.push((after - before) / COMBINED);
-  }
-  const mean = per.reduce((a, b) => a + b, 0) / per.length;
-  const max = Math.max(...per);
-  const sd = Math.sqrt(per.reduce((a, b) => a + (b - mean) ** 2, 0) / per.length);
-  // Anti-fingerprinting: some Chromium builds (notably the Electron app pane) PIN
-  // performance.memory.usedJSHeapSize to a constant, so every delta is 0 regardless of
-  // how much is allocated. Detect and report that honestly rather than emit a fake 0.
-  const pinned = per.every(x => x === 0);
+  const NEED = 6;                      // Aster: >= 6 FRESH contexts, one measured fill each
+  // ONE measured fill in THIS fresh context. Each page load is a fresh context; samples are
+  // aggregated across loads via localStorage. Operator procedure: reload this page (or open a
+  // new tab) NEED times on the real target browser build; the aggregate reports when NEED is
+  // reached. (An external runner — e.g. puppeteer launching NEED fresh pages — is equivalent.)
+  await new Promise(r => setTimeout(r, 300));
+  const before = performance.memory.usedJSHeapSize;
+  window.__state = fillTrial();        // retained on window for this context's lifetime
+  await new Promise(r => setTimeout(r, 300));
+  const after = performance.memory.usedJSHeapSize;
+  const perEntry = (after - before) / COMBINED;
+  const pinned = perEntry === 0 && performance.memory.usedJSHeapSize === after;
+  // Accumulate fresh-context samples.
+  let samples = [];
+  try { samples = JSON.parse(localStorage.getItem('ref11_ctx_samples') || '[]'); } catch {}
+  samples.push({ perEntry: Math.round(perEntry), usedJSHeapSize: performance.memory.usedJSHeapSize, at: Date.now() });
+  try { localStorage.setItem('ref11_ctx_samples', JSON.stringify(samples)); } catch {}
+  const vals = samples.map(s => s.perEntry);
+  const mean = vals.reduce((a, b) => a + b, 0) / vals.length, max = Math.max(...vals);
+  const sd = Math.sqrt(vals.reduce((a, b) => a + (b - mean) ** 2, 0) / vals.length);
   window.__result = {
-    engine: 'chromium', ua: navigator.userAgent, tombN: TOMB_N, candN: CAND_N, combined: COMBINED, trials: TRIALS,
-    usedJSHeapSize: performance.memory.usedJSHeapSize,
-    perEntry: per.map(x => Math.round(x)), mean: Math.round(mean), sd: Math.round(sd), max: Math.round(max),
-    status: pinned ? 'UNAVAILABLE — performance.memory appears pinned/quantized (zero delta at large N); run in a browser with --enable-precise-memory-info, or use measureUserAgentSpecificMemory() under cross-origin isolation' : 'ok',
-    note: 'no --expose-gc in pane; delta over large N, references retained',
+    engine: 'chromium', ua: navigator.userAgent, tombN: TOMB_N, candN: CAND_N, combined: COMBINED,
+    thisContextPerEntry: Math.round(perEntry), usedJSHeapSize: performance.memory.usedJSHeapSize,
+    freshContexts: samples.length, need: NEED,
+    aggregate: samples.length >= NEED ? { mean: Math.round(mean), sd: Math.round(sd), max: Math.round(max) } : null,
+    status: pinned
+      ? 'UNAVAILABLE — performance.memory appears pinned/quantized (zero delta); run on a browser build with --enable-precise-memory-info, or use measureUserAgentSpecificMemory() under cross-origin isolation'
+      : (samples.length >= NEED ? 'ok — worst-case max governs sizing' : `collecting: reload this page ${NEED - samples.length} more time(s) for fresh contexts (localStorage.removeItem('ref11_ctx_samples') to reset)`),
+    note: 'one measured fill per fresh context (page load); no --expose-gc in pane; references retained on window.__state',
   };
   out.textContent = 'DONE\n' + JSON.stringify(window.__result, null, 2);
   keep.length;                         // reference keep so it is not optimised away

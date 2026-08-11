@@ -318,6 +318,24 @@ console.log('1. Behavioral coverage');
   { const g = new Node2({ tomb: { maxCount: 0, maxBytes: 1 << 20, perSignerMax: 5, perTopicMax: 5 }, cand: { max: 100, maxBytes: 900, perSignerMax: 100, perTopicMax: 100 }, bodyMax: 10 });
     const c1 = g.onKill(newTopicId(), newMsgId(), newSigner(), now); const c2 = g.onKill(newTopicId(), newMsgId(), newSigner(), now);
     check('candidate byte-cap refuses when full', c1 === 'ADMITTED' && c2 === 'REFUSED_CAND_BYTES', `${c1}/${c2}`); }
+  // candidate oversized-record refusal — with state/accounting unchanged on refusal
+  { const c = new CandidateStore({ max: 10, maxBytes: 1 << 20, perSignerMax: 10, perTopicMax: 10 });
+    const t = newTopicId(), m = newMsgId(), s = newSigner();
+    const snap = () => JSON.stringify({ total: c.total, bytes: c.bytes, ps: [...c.perSigner], pt: [...c.perTopic] });
+    const b = snap(); const r = c.admit(key(t, m), s, 'x'.repeat(2000), now);
+    check('candidate oversized-record refused, accounting unchanged', r === 'REFUSED_RECORD_TOO_LARGE' && snap() === b, r); }
+  // candidate per-signer competition — with accounting unchanged on refusal
+  { const c = new CandidateStore({ max: 100, maxBytes: 1 << 20, perSignerMax: 2, perTopicMax: 100 });
+    const s = newSigner(); let ok = 0; for (let i = 0; i < 2; i++) { const t = newTopicId(), m = newMsgId(); if (c.admit(key(t, m), s, killBytesFor(t, m, s, now), now) === 'ADMITTED') ok++; }
+    const snap = () => JSON.stringify({ total: c.total, bytes: c.bytes, sig: c.perSigner.get(s) });
+    const b = snap(); const t = newTopicId(), m = newMsgId(); const r = c.admit(key(t, m), s, killBytesFor(t, m, s, now), now);
+    check('candidate per-signer competition refuses 3rd, accounting unchanged', ok === 2 && r === 'REFUSED_CAND_SIGNER' && snap() === b, r); }
+  // candidate per-topic competition — with accounting unchanged on refusal
+  { const c = new CandidateStore({ max: 100, maxBytes: 1 << 20, perSignerMax: 100, perTopicMax: 2 });
+    const t = newTopicId(); let ok = 0; for (let i = 0; i < 2; i++) { const m = newMsgId(), s = newSigner(); if (c.admit(key(t, m), s, killBytesFor(t, m, s, now), now) === 'ADMITTED') ok++; }
+    const snap = () => JSON.stringify({ total: c.total, bytes: c.bytes, top: c.perTopic.get(t) });
+    const b = snap(); const m = newMsgId(), s = newSigner(); const r = c.admit(key(t, m), s, killBytesFor(t, m, s, now), now);
+    check('candidate per-topic competition refuses 3rd, accounting unchanged', ok === 2 && r === 'REFUSED_CAND_TOPIC' && snap() === b, r); }
 
   // FIX-3: promote(plain->pending) and demote preserve count/bytes/sublimit/dedup/ClaimRetention
   { const g = new Node2({ tomb: { maxCount: 0, maxBytes: 1 << 20, perSignerMax: 5, perTopicMax: 5 }, cand: { max: 10, maxBytes: 1 << 20, perSignerMax: 10, perTopicMax: 10 }, bodyMax: 10 });
