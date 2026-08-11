@@ -19,11 +19,13 @@ browser). The browser profile stays disabled; no relay cap is normative until th
 |---|---|---|---|---|---|
 | darwin laptop (reference, non-target) | v24.14.1 / V8 13.6.233 | darwin/arm64 25.5.0 | 1000 B, sd 0 | 39.16 MiB | 61% |
 | **Windows fleet host** | **v26.5.0 / V8 14.6.202.34-node.24** | **win32/x64 10.0.26200** | **1011 B, sd 0** | **39.52 MiB** | **62%** |
-| Linux droplet | _pending_ | | | | |
+| **Linux relay droplet (sfo3)** | **v22.23.1 / V8 12.4.254.21-node.56** | **linux/x64 6.8.0-124-generic** | **1002 B, sd 1** | **39.11 MiB** | **61%** |
 
-Worst observed maximum so far: **1011 B/entry** (Windows). Budget check: 39.52 MiB with the 30%
-integration headroom preserved. Per-entry cost is stable across two V8 majors (13.6 → 14.6:
-1000 → 1011 B, +1.1%), and deterministic within each host (sd 0 across six fresh processes).
+Worst observed maximum across the two deployed Node profiles: **1011 B/entry** (Windows). Budget
+check at that worst case: 39.52 MiB = 62% of 64 MiB, the 30% integration headroom preserved. Per-
+entry cost is stable across **three** V8 majors (12.4 / 13.6 / 14.6 → 1002 / 1000 / 1011 B, a 1.1%
+spread) and deterministic within each host (sd 0–1 across six fresh processes). Both deployed Node
+profiles are now measured; only the real-browser run remains before the campaign is reviewable.
 
 ---
 
@@ -72,14 +74,30 @@ REF-1.1 S2.0c — Tombstone-saturation sim v3 (full deletion state). gc: true
 RESULT: 23 behavioral checks passed, 0 failed.
 ```
 
-## Linux droplet — pending
+## Linux relay droplet (sfo3) — raw output (2026-08-11)
 
-To run (same harness, prod relay OS/runtime):
+Prod relay backbone droplet `143.110.224.247` (sfo3), the deployed relay OS/runtime (bare-metal
+checkout, systemd `axona-relay@grizzly{1,2,3}`). Node v22.23.1, V8 12.4.254.21-node.56,
+linux/x64 6.8.0-124-generic, 1 vCPU / 961 MB. Harness downloaded to `/tmp`, run with
+`oom_score_adj=900` so the harness (not any relay) would be the OOM victim under pressure; the file
+was removed afterward. Host memory came back healthy (avail 276→287 MB, swap −15 MB), relays
+untouched.
 
 ```
-curl -fsSL -o ref11-sat.mjs https://raw.githubusercontent.com/axona-net/axona-docs/main/architecture/REF-1.1-S2.0c-Tombstone-Saturation-Sim.mjs
-node --expose-gc ref11-sat.mjs
+2. Full-state heap measurement (tombstones + candidates), multi-trial
+   node=v22.23.1 v8=12.4.254.21-node.56 os=linux/x64 6.8.0-124-generic
+   full-state @ (tomb 32768 + cand 8192): per-entry mean=1001B sd=1 max=1002  (1001,1000,1000,1000,1001,1002)
+   relay proposed (tomb 32768 + cand 8192): confirm total 39.11 MiB worst-case = 61% of 64 MiB
+
+3. Proposed defaults (relay measured on THIS host only; Linux/Windows + real browser required before normative)
+   TOMBSTONE_RECORD_MAX=768
+   relay:   TOMBSTONE_MAX_COUNT=32768 sublimit=2048  CAND_MAX=8192 sublimit=512
+   browser: TOMBSTONE_MAX_COUNT=2048 CAND_MAX=512  (NON-NORMATIVE, DISABLED — pane pins performance.memory; real-browser run required)
+
+RESULT: 23 behavioral checks passed, 0 failed.
 ```
+
+(All 23 behavioral checks passed identically to the Windows run.)
 
 ## Real browser — pending (separate, browser profile)
 
