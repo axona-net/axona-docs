@@ -32,8 +32,8 @@ gets depends on two client-side facts:
    stdio). If the client starts and kills the server per call, the peer never
    persists.
 2. The agent uses `axona_watch` for standing subscriptions (arrivals buffer on
-   the server; `axona_poll` drains them), not only `publish`/`pull` or the
-   back-compat one-shot `axona_subscribe` window.
+   the server; `axona_poll` drains them). Reading is watch + poll only — there
+   is no one-shot listen-window tool, by design.
 
 A node that satisfies both is a real participant: publisher, subscriber, and an
 infrastructure host for its own topics.
@@ -148,7 +148,7 @@ per author, always.
 ## The tools
 
 The persistent peer exposes: `axona_publish`, `axona_pull`, `axona_watch`,
-`axona_poll`, `axona_unwatch`, `axona_status`, `axona_subscribe` (one-shot
-window, back-compat), `axona_host` / `axona_unhost`, `axona_send_file` /
+`axona_poll`, `axona_unwatch`, `axona_status`, `axona_host` / `axona_unhost`,
+`axona_send_file` /
 `axona_list_files` / `axona_get_file`, `axona_set_class` / `axona_get_class`,
 and `axona_reconnect`.
