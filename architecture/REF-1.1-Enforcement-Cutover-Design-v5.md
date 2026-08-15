@@ -30,6 +30,17 @@ closed are retained below as [R1]–[R4].
 - [R4] The runtime proof must quantify all roots, not one receiver. v4 defines the
   root set as the E0 consumer inventory and the production import graph, including
   dynamic and module-loader entry points.
+- [E0] The raw dispatch surface is **four** primitives, not two. This document
+  names `onRoutedMessage` and `onNotification` in its examples; an E0 read-only
+  scan of the kernel at 1edb1fd found the sealed-capability set is
+  `{onRequest, onNotification, onRoutedMessage, onMessage}` — 32 call sites in
+  `src/`, ~60% of them in `AxonaPeer.js`. The mechanism is unchanged: the
+  closure-captured capability [A1], the module-identity allowlist and gate [A3],
+  and the runtime reachability proof [A4] each cover all four names, not a special
+  pair. The examples stay two-named for readability; the implementation binds the
+  set of four. (A related E0 finding: a few of the 32 sites — the
+  `CompositeTransport` fan-out — are mechanism, not frame registrations, and land
+  on the shim allowlist rather than the migration worklist.)
 
 ## The question
 
