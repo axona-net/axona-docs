@@ -16,6 +16,33 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel 4.63.0 — 2026-08-15 — the wire surface gets a map (shadow; enforces nothing yet)
+
+Which of the four boundaries owns each frame on the wire? Until now the answer
+lived in scattered `on(...)` registrations and `switch` cases across the source,
+provable only by reading every file. 4.63.0 lands four per-boundary
+frame-contract registries — pub/sub and DHT, transport and auth, WebRTC
+signalling and mesh-auth, bridge administration — that name every in-scope wire
+and the boundary that owns it. Alongside them ships a test fence that parses all
+73 `src/` files and fails closed if a registration is added, moved, or reassigned
+without updating the owning registry.
+
+The registries are default-off. They observe; they gate nothing. A frame that
+violated ownership today would still flow — the fence catches drift in CI, not on
+the wire. This ships the scaffold, not the guarantee.
+
+The sound guarantee — one canonical registration path, with raw
+`onRoutedMessage`/`onNotification` access prohibited outside it, checked across
+all of `src/` in CI — is scheduled for the enforcement flag day, where a
+violating registration fails the build instead of merely being recorded. The
+fence proves the map is complete within what a static scan can decide; the forms
+a scan cannot decide — a registration reached only through a runtime-computed
+method name threaded across object or array indirection — are named in the test,
+measured to occur zero times in `src/` today, and closed by the canonical path
+when it lands.
+
+Nothing on prod changes. Prod and testnet stay on the prior wire.
+
 ## Kernel 4.62.2 — 2026-08-09 — a multi-hop ingest-ack routes home to the flight owner (PROD)
 
 When a write travels several hops to the root, where does the root's ingest-ack
