@@ -30,17 +30,27 @@ closed are retained below as [R1]–[R4].
 - [R4] The runtime proof must quantify all roots, not one receiver. v4 defines the
   root set as the E0 consumer inventory and the production import graph, including
   dynamic and module-loader entry points.
-- [E0] The raw dispatch surface is **four** primitives, not two. This document
-  names `onRoutedMessage` and `onNotification` in its examples; an E0 read-only
-  scan of the kernel at 1edb1fd found the sealed-capability set is
-  `{onRequest, onNotification, onRoutedMessage, onMessage}` — 32 call sites in
-  `src/`, ~60% of them in `AxonaPeer.js`. The mechanism is unchanged: the
-  closure-captured capability [A1], the module-identity allowlist and gate [A3],
-  and the runtime reachability proof [A4] each cover all four names, not a special
-  pair. The examples stay two-named for readability; the implementation binds the
-  set of four. (A related E0 finding: a few of the 32 sites — the
-  `CompositeTransport` fan-out — are mechanism, not frame registrations, and land
-  on the shim allowlist rather than the migration worklist.)
+- [E0] The raw dispatch surface — corrected after council review (Aster f7c6b99b,
+  Vega 07f383ab / bf6a4a2d). The examples name `onRoutedMessage` and
+  `onNotification`; an E0 read-only scan of the kernel at 1edb1fd found the raw
+  **registration** set is three primitives: `onRequest`, `onNotification`,
+  `onRoutedMessage`. [A1] closure-captured capability, [A3] module-identity
+  allowlist and gate, and [A4] runtime reachability proof bind exactly these
+  three. `onRequest` is the transport twin of the `onNotification` the body
+  already names; adding it is a real expansion of the sealed set, stated here, not
+  a second door.
+- [E0] `onMessage` is **NOT** a raw registration primitive and is **NOT** sealed.
+  It is a public application/subscribe API — `peer.onMessage(handler)` installs the
+  direct-message handler (at most one); the mesh `onMessage(cb)` subscribes to
+  delivered messages. Sealing it would change application compatibility, which is
+  outside registration discipline. It is out of this cutover; corralling it, if it
+  ever comes, is a separate compatibility migration. The four-name reading in an
+  earlier draft of this footnote was a category error.
+- [E0] The exact per-site classification — every call site labelled
+  migration-target or named mechanism shim, with counts — is the E0 deliverable,
+  not asserted here. The `CompositeTransport` fan-out is the archetype of the shim
+  class. This footnote states no approximate worklist: [R2] withdrew "exceeds by
+  nothing," and an approximate count is the same withdrawal.
 
 ## The question
 
