@@ -140,18 +140,33 @@ Do NOT weaken `[V2]` (the wire-literal rule) to admit a computed
 `direct_${type}` — that would be a new primitive. `onDirectMessage` stays the
 single parameterized registrar for the family; the manifest tracks it as one site.
 
-**STATUS — UNMET E1 EXIT-CONDITION, BLOCKS E2 (David's steer, 2026-08-16).** The
-E1 door + gates landed and cleared their review; the `mintLive` hardening landed
-(Aster F1 — the observation certifier is registry-owned, no public caller path).
-This fence did NOT land in the E1 gate slice — allowlisting `onDirectMessage` is
-not the fence (Aster F2 = Vega V3). Per both seats' offered alternative and
-David's steer, the fence is recorded here as an explicit **unmet E1 exit-condition
-that blocks E2**: it must be delivered as its own dedicated, reviewed slice —
-design the admissible-type source (the open question: a static manifest of
-approved `direct_*` types vs a registration-time allowlist), then the four
-requirements above with tests for an approved type, a rejected unapproved type,
-and the no-raw-`onNotification` proof — **before any E2 boundary migration
-begins**. E2/E3/E4 and deploy remain held for David.
+**STATUS — E1 EXIT-CONDITION MET (axona-protocol testnet `502ae75`, 2026-08-16;
+all three seats code-cleared: Aster `e5be5324`, Orion `fdabfc90`, Vega
+`09cd5558`).** David chose the admissible-type source: a **registration-time
+allowlist** (`directMessageTypes` on `AxonaPeer`), so the fence is a RUNTIME
+capability check — the `[Q1]` side of the two-gate partition — not a static gate;
+the computed `direct_${type}` wire cannot be decided at build time and `[V2]` is
+left unchanged. `_gateDirectType(type, op)` gates BOTH `sendDirect` and
+`onDirectMessage`: malformed types (non-string / empty / already `direct_`-prefixed)
+fail closed in every phase; an omitted allowlist is dormant; an explicit Set
+(including empty = admit zero) is copied at construction. Phased like the cutover:
+OBSERVE at E1 (records `direct-fence-would-refuse`, installs — byte-identical for
+well-formed types), ENFORCE at E4 (throws `ERR_DIRECT_TYPE_INADMISSIBLE`, installs
+nothing). `onDirectMessage` remains the single parameterized registrar; no new raw
+site. Tests: `test/smoke_direct_fence.mjs` (22/22) + `fence_e0_manifest` +
+`fence_raw_dispatch_gate`.
+
+**This closes E1's last exit-condition — E1 is CLOSED.** E2/E3/E4 and deploy
+remain held for David.
+
+**E4-arming exit-criterion (Vega `09cd5558`):** arming enforcement must not be
+fail-open. `omitted list + enforceDirectMessageTypes:true` is still dormant
+(DISTINCT2), so a forgotten allowlist at the flag day would admit everything.
+Arming E4 REQUIRES an explicit allowlist (empty = admit zero) — either throw at
+construction when enforce-true and the list is omitted, or gate it on the E4
+checklist. Do not ship enforce-true with no list. This arms alongside the other
+E4 steps: seal the three registration primitives, arm the baseline-diff to fail
+the build, flip `direct_*` to throw.
 
 ## Definitions to seal at E3 (13)
 
