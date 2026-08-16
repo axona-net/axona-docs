@@ -18,25 +18,38 @@ site can migrate only if some registry already owns its wire. Not every site doe
 
 The four registries built in S2–S4 cover pub/sub (Boundary-1), transport/auth
 (Boundary-2), WebRTC + mesh-auth (Boundary-3), and bridge administration
-(Boundary-4). Matching the 38 migration-target wires against every declared row:
+(Boundary-4). Matching the 38 migration-target sites against every declared row —
+by the key `registerFrame` actually uses, `registry.wiring.get(wire)`, not by the
+E0 group label — gives:
 
 | E0 group | sites | declaring registry | migratable today |
 |---|---|---|---|
 | A4 pub/sub wire handlers | 19 | Boundary-1 | yes |
 | A5 bridge base-auth (`hello`, `hello-ack`, `cap-attest`) | 3 | Boundary-2 | yes |
 | A5 mesh base-auth (`hello`, `hello-sig`) | 2 | Boundary-3 | yes |
-| A1 `mesh:signal` | 1 | Boundary-3 | yes |
-| **A1 DHT-core routing** | **10** | **none** | **no** |
-| **A2 `axona:direct` (request + notify)** | **2** | **none** | **no** |
-| **A3 `__tunneled_direct__`** | **1** | **none** | **no** |
+| **A1 `mesh:signal`** | **1** | **B3 declares it under the wrong wire (`'signal'`, not `'mesh:signal'`)** | **no — B3 wire-label fix** |
+| **A1 DHT-core routing** | **10** | **none** | **no — Boundary-5** |
+| **A2 `axona:direct` (request + notify)** | **2** | **none** | **no — Boundary-6** |
+| **A3 `__tunneled_direct__`** | **1** | **none** | **no — Boundary-6** |
 
-25 of 38 have a home. 13 do not: the routing plane
-(`lookup_step, lookahead_probe, local_probe, find_closest_set, route_msg,
-reinforce, triadic_introduce, hop_cache, lateral_spread, peer-leaving`) and the
-direct-message plane (`axona:direct` two legs, `__tunneled_direct__`). This is not
-an E0 defect — E0 enumerated the worklist exactly, which is how the gap is visible
-now instead of at the flag day. It is a precondition: **E2 opens by giving the 13
-a boundary, or it cannot migrate them at all.**
+24 of 38 are homed under the door's key. 14 are not, and they split into two kinds
+(council review, Vega `4b66abe0`; both verified against the tree):
+
+- **Thirteen have no registry at all** — the routing plane (`lookup_step,
+  lookahead_probe, local_probe, find_closest_set, route_msg, reinforce,
+  triadic_introduce, hop_cache, lateral_spread, peer-leaving`) and the
+  direct-message plane (`axona:direct` two legs, `__tunneled_direct__`). These get
+  the two new registries.
+- **One is homed under the wrong wire.** The E0 site is
+  `this.onRoutedMessage('mesh:signal')` (AxonaPeer.js:729). B3 declares its
+  `mesh:signal` rows under wire `'signal'` (the SDP offer/answer/candidate variant
+  label), so `registry.wiring.get('mesh:signal')` on B3 is empty. `signal` is not
+  `mesh:signal`. E2.0 corrects the B3 row wire to `'mesh:signal'` before E2.3 — an
+  in-place fix, not a new registry.
+
+This is not an E0 defect — E0 enumerated the worklist exactly, which is how both
+gaps are visible now instead of at the flag day. It is a precondition: **E2 opens
+by homing all fourteen under the key the door uses, or it cannot migrate them.**
 
 ## E2.0 — home the 13 orphan sites (precondition)
 
@@ -114,11 +127,36 @@ byte-identical to today. No deploy. The `direct_*` E4-arming criterion (an
 explicit allowlist required before enforce-true) is untouched by E2 and still
 waits at E4.
 
-## The one decision for David
+## E2.0 preconditions (council review, 2026-08-16)
 
-E2.0 needs a ruling before it starts: **two new registries (Boundary-5 routing,
-Boundary-6 direct), or fold the direct/tunneled plane into an existing boundary.**
-Two registries keep the "one boundary owns exactly its frames" invariant clean and
-mirror the existing four; folding is fewer files but mixes planes. Recommended:
-two new registries. Everything downstream (the E2.1–E2.5 order) is unaffected by
-the choice except whether step 4 reads "Boundary-6" or a folded name.
+David ruled two new registries (Boundary-5 routing, Boundary-6 direct). All three
+seats accepted the plan; the changes below are required before E2.1 begins (Aster
+`ASTER-E2-SITE-IDENTITY` CHANGES-REQUIRED, Orion `d8be77be`, Vega `4b66abe0`):
+
+1. **Machine-checked coverage, keyed by site — not by wire.** Every E0 migration
+   target appears exactly once across the B1–B6 wiring; the count is 38; the check
+   fails for an unowned or a multiply-owned target. It cannot key on the wire
+   string: `hello` is two sites (B2 bridge + B3 mesh), and `axona:direct` is two
+   sites under one wire. A wire-keyed map of 38 would lie. Key by stable site
+   identity — call-site / source primitive plus wire. Recompute the 24/14 counts
+   from that gate, not by assertion.
+2. **The wiring lookup must carry `transportKind`.** `axona:direct` is one wire on
+   two primitives — `onRequest` (AxonaPeer.js:2599) and `onNotification` (:2615).
+   Today `frameWiring` maps one wire to one row, and `registerFrame` reads a single
+   `transportKind`. One row cannot select both, and the B1/B3 variant split shares
+   a wire *and* a kind so it does not cover this. Fix the lookup to
+   `(wire, transportKind)` (or distinct equivalent keys) in E2.0, before any
+   migration reads a B6 row.
+3. **Home `mesh:signal` under its real wire.** Add/correct a B3 row keyed
+   `{ wire: 'mesh:signal', transportKind: 'routed' }` (the `onRoutedMessage` label
+   at AxonaPeer.js:729) before E2.3. B3's `signal` rows are not that key.
+4. **B5/B6 fully specified and smoke-tested** — `type, wire, transportKind, kind,
+   owningService` — before migrations consume their rows.
+5. **Audit the B1–B3 differentials for a hidden B5 dependency.** Identify whether
+   any B1–B3 differential exercises a raw B5 routing path; if it does, migrate that
+   dependency first or state it explicitly outside the differential claim, so the
+   "B5 last" ordering is auditable rather than assumed.
+
+E2.0 stays contract declaration and proof only — no handler moves. The `direct_*`
+E4 explicit-allowlist arming rule is untouched. E2.1+ and every deploy stay HELD
+for David.
