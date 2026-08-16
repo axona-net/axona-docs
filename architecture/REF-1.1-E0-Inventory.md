@@ -104,6 +104,19 @@ Do NOT weaken `[V2]` (the wire-literal rule) to admit a computed
 `direct_${type}` — that would be a new primitive. `onDirectMessage` stays the
 single parameterized registrar for the family; the manifest tracks it as one site.
 
+**STATUS — UNMET E1 EXIT-CONDITION, BLOCKS E2 (David's steer, 2026-08-16).** The
+E1 door + gates landed and cleared their review; the `mintLive` hardening landed
+(Aster F1 — the observation certifier is registry-owned, no public caller path).
+This fence did NOT land in the E1 gate slice — allowlisting `onDirectMessage` is
+not the fence (Aster F2 = Vega V3). Per both seats' offered alternative and
+David's steer, the fence is recorded here as an explicit **unmet E1 exit-condition
+that blocks E2**: it must be delivered as its own dedicated, reviewed slice —
+design the admissible-type source (the open question: a static manifest of
+approved `direct_*` types vs a registration-time allowlist), then the four
+requirements above with tests for an approved type, a rejected unapproved type,
+and the no-raw-`onNotification` proof — **before any E2 boundary migration
+begins**. E2/E3/E4 and deploy remain held for David.
+
 ## Definitions to seal at E3 (13)
 
 `onRequest` (6): webrtc.js:400, bridge.js:286, composite.js:222, wstransport.js:371,
