@@ -1,142 +1,126 @@
 # REF-1.1 E0 — Frame-registration site inventory
 
-Companion to `REF-1.1-Enforcement-Cutover-Design-v5.md`. This is the deliverable
-the v5 `[E0]` footnote deferred: every call site that touches a raw registration
-primitive, classified as a migration-target, a named mechanism shim, a primitive
-definition, or out of scope — with exact counts, not an approximation.
+Companion to `REF-1.1-Enforcement-Cutover-Design-v5.md`. The deliverable the v5
+`[E0]` footnote deferred: every call site that touches a raw registration
+primitive, classified, with exact counts.
 
-Scanned against `axona-protocol/src` at the 4.63.0 tree (shadow registry present,
-default-off). Line numbers are that tree; treat them as anchors, re-resolve
-before editing.
+**The source of truth is a generated manifest, not this prose.** The first cut of
+this table was hand-counted and diverged from the tree in three places (council
+review, 2026-08-16): A4 was 16 where the tree has 19, `cap-attest` was omitted
+from A5, and the `onDirectMessage` passthrough was omitted from the shim list. A
+narrative count cannot prove a bounded set when line anchors must be re-resolved.
+So the inventory now lives in:
 
-## What "sealed set" means here
+- `axona-protocol/test/REF-1.1-E0-manifest.json` — one row per site
+  (`file, line, callee, receiver, wire, classification`), pinned to the tree hash
+  it was generated from (`1edb1fd`).
+- `axona-protocol/test/fence_e0_manifest.mjs` — the generator and the CI gate. Its
+  default run fails if any registration site is added, removed, or reclassified
+  versus the committed manifest, and fails closed on any unresolved (aliased /
+  computed / loose-literal) registration or a parse-coverage loss.
+- `axona-protocol/test/lib/registrationScan.mjs` — the discovery, the same sound
+  acorn walk the S5 ownership fence uses (`smoke_boundary_ownership.mjs`),
+  extended to the third primitive. A raw registration cannot silently escape it.
+
+This document is the human-readable projection of that manifest. The counts below
+are the generator's, not a re-count.
+
+## The sealed set
 
 The cutover makes one canonical `registerFrame(recv, wire, handler)` the sole
-door for frame registration. The raw primitives it replaces as a registration
-surface are three:
+door for frame registration. It seals three registration primitives:
 
 - `onRequest(type, handler)` — request/response leg
 - `onNotification(type, handler)` — fire-and-forget leg
 - `onRoutedMessage(type, handler)` — routed (multi-hop) leg
 
-`onMessage` is NOT in this set. `peer.onMessage(handler)` (AxonaPeer.js:2574,
-at most one handler) and mesh `onMessage(cb)` (mesh.js:249) are the public
-application delivery API. Sealing them would break application compatibility,
-which is outside registration discipline. They are listed under §E and stay.
+`onMessage` is NOT in this set. `peer.onMessage(handler)` (AxonaPeer.js:2574, at
+most one) and mesh `onMessage(cb)` (mesh.js:249) are the public application
+delivery API; sealing them would change application compatibility. They are
+enumerated below as out-of-scope and stay regression-tested through the cutover.
 
-## §A — Migration-targets
+## Generator summary (tree 1edb1fd)
 
-Genuine frame registrations. Each routes through `registerFrame` at the cutover.
-34 named frames across five groups.
-
-### A1 — DHT core (AxonaPeer, `start`/`_wireDht`) — 11 frames
-
-| wire type | primitive | site |
+| class | count | meaning |
 |---|---|---|
-| `lookup_step` | onRequest | AxonaPeer.js:453 |
-| `lookahead_probe` | onRequest | AxonaPeer.js:471 |
-| `local_probe` | onRequest | AxonaPeer.js:586 |
-| `find_closest_set` | onRequest | AxonaPeer.js:610 |
-| `route_msg` | onRequest | AxonaPeer.js:636 |
-| `reinforce` | onNotification | AxonaPeer.js:486 |
-| `triadic_introduce` | onNotification | AxonaPeer.js:514 |
-| `hop_cache` | onNotification | AxonaPeer.js:523 |
-| `lateral_spread` | onNotification | AxonaPeer.js:524 |
-| `peer-leaving` | onNotification | AxonaPeer.js:551 |
-| `mesh:signal` | onRoutedMessage | AxonaPeer.js:717 |
+| migration-target | **38** | genuine sealed-primitive registrations → route through `registerFrame` at E1 |
+| primitive-definition | **13** | where a sealed primitive is defined → sealed at E3 |
+| mechanism-shim | **5** | CompositeTransport fan-out (4) + DHT-adapter `onRoutedMessage` passthrough (AxonaPeer.js:3089) |
+| registration-helper | **1** | `wireHandlers.js:57` `dht.onRoutedMessage(type)` — the `on()` door whose 19 concrete wires resolve from `on(T.X)` |
+| parameterized-registrar | **1** | `onDirectMessage` → `onNotification('direct_${type}')`; the open `direct_*` family (see §direct-fence) |
+| wrapper-passthrough | **2** | `onDirectMessage` definition + its adapter passthrough (AxonaPeer.js:3090) — forwards to the wrapper, not a sealed primitive |
+| public-api-out-of-scope | **3** | `onMessage` sites (never sealed) |
+| bridge-ws-dispatch | **8** | the bridge WS `dispatch` switch — a separate registration style, not one of the three sealed primitives |
 
-### A2 — Direct-message transport legs (AxonaPeer) — 2 frames
+71 rows total. 24 of the 38 migration-targets are already shadow/observe-wrapped
+today (A4's 19 through the S2 `reg.wrap`; A5's 5 through B2/B3 observers), so E1
+moves them from wrapped-in-place to registered-through-the-door.
 
-| wire type | primitive | site |
-|---|---|---|
-| `axona:direct` (request) | onRequest | AxonaPeer.js:2587 |
-| `axona:direct` (notify) | onNotification | AxonaPeer.js:2603 |
+## Migration-targets (38)
 
-### A3 — Tunneled direct — 1 frame
+### A1 — DHT core (AxonaPeer) — 11
+`lookup_step` (onRequest, :453), `lookahead_probe` (:471), `local_probe` (:586),
+`find_closest_set` (:610), `route_msg` (:636); `reinforce` (onNotification, :486),
+`triadic_introduce` (:514), `hop_cache` (:523), `lateral_spread` (:524),
+`peer-leaving` (:551); `mesh:signal` (onRoutedMessage, :717).
 
-| wire type | primitive | site |
-|---|---|---|
-| `__tunneled_direct__` | onRoutedMessage | AxonaPeer.js:3119 |
+### A2 — Direct-message transport legs (AxonaPeer) — 2
+`axona:direct` request (onRequest, :2587) and notify (onNotification, :2603).
 
-### A4 — Pub/sub wire handlers (`wireHandlers.js`, the `on()` loop) — 16 frames
+### A3 — Tunneled direct — 1
+`__tunneled_direct__` (onRoutedMessage, :3119).
 
-Registered through `this.dht.onRoutedMessage(type, h)` at wireHandlers.js:57.
-These are ALREADY shadow-wrapped: the `on()` helper consults `reg.wiring` and
-calls `reg.wrap(...)` (wireHandlers.js:50-56). S2 threaded the Boundary-1
-registry through this loop; the cutover moves them from "wrapped-in-place" to
-"registered through the canonical door."
-
+### A4 — Pub/sub wire handlers (wireHandlers.js `on()` loop) — 19
+Registered through `dht.onRoutedMessage(type, h)` (:57), already S2 `reg.wrap`
+shadow-wrapped. The `on(T.*)` calls at wireHandlers.js:59-77:
 `SUB, UNSUB, PUB, DELIVER, ADOPT, PULLUP, HANDOFFACK, REPLAYUP, HANDOFF,
-REPLICATE, KILL, INGESTACK, RECEIPTPROBE, RECEIPTNACK, TOUCH, PULL`
-(wireHandlers.js:59-74; `TOUCH` is a retained no-op kept for wire compat.)
+REPLICATE, KILL, INGESTACK, RECEIPTPROBE, RECEIPTNACK, TOUCH, PULL, PULLRESP,
+ROOTBEACON, METRICSON`. (The first cut stopped at PULL — the missing three,
+PULLRESP/ROOTBEACON/METRICSON, are the correction.)
 
-### A5 — Mesh/bridge base-auth notifications (`transport/web/index.js`) — 4 frames
+### A5 — Mesh/bridge base-auth notifications (transport/web/index.js) — 5
+All already observe-wrapped: bridge `hello` (:939, b2observe), `hello-ack` (:940,
+b2observe), webrtc `hello` (:982, b3observe), `hello-sig` (:983, b3observe), and
+`cap-attest` (:987, b2observe — carries the write-flight-ack-v1 capability codec;
+omitted from the first cut).
 
-Already observe-wrapped (B2/B3 shadow observers).
+## The `direct_*` fence (parameterized registrar)
 
-| wire type | primitive | site | observer |
-|---|---|---|---|
-| bridge `hello` | onNotification | index.js:939 | b2observe |
-| bridge `hello-ack` | onNotification | index.js:940 | b2observe |
-| webrtc `hello` | onNotification | index.js:982 | b3observe |
-| webrtc `hello-sig` | onNotification | index.js:983 | b3observe |
+`onDirectMessage(type, handler)` (AxonaPeer.js:4231) lazily installs one
+`transport.onNotification('direct_${type}')` per app-supplied `type`
+(AxonaPeer.js:4235). The wire is computed.
 
-## §B — Parameterized registrar (dynamic-type family)
+Council decision (Aster + Vega, 2026-08-16): `[Q2]`'s dynamic-import/loader
+manifest closes the module graph; it does NOT close an application-supplied
+runtime registration-name family. So this is not merely a `[Q2]` manifest case.
+E1 must give it its own fence:
 
-One registrar, an open set of wire types. Not a fixed enumeration.
+1. route it through the canonical registration gateway;
+2. define the admissible type source, validation, and lifecycle;
+3. fail closed for an unapproved dynamic type past the migration boundary;
+4. show no raw `transport.onNotification` remains in this path.
 
-`onDirectMessage(type, handler)` (AxonaPeer.js:4231) lazily installs ONE
-`transport.onNotification('direct_${type}')` per distinct app-supplied `type`
-(AxonaPeer.js:4235), storing handlers in a Map keyed by `type`. The registrar
-migrates; the wire types it produces are app-supplied, so the closed-world set
-of `direct_*` frames is a manifest deliverable, not a line in this table. This
-is the concrete case the design's `[Q2]` dynamic-import manifest exists for.
+Do NOT weaken `[V2]` (the wire-literal rule) to admit a computed
+`direct_${type}` — that would be a new primitive. `onDirectMessage` stays the
+single parameterized registrar for the family; the manifest tracks it as one site.
 
-## §C — Named mechanism shims (stay as-is)
+## Definitions to seal at E3 (13)
 
-Re-dispatch of an already-registered handler. Not distinct registrations, so not
-migration-targets. The CompositeTransport fan-out is the archetype the v5
-footnote named.
+`onRequest` (6): webrtc.js:400, bridge.js:286, composite.js:222, wstransport.js:371,
+sim/transport.js:380, contracts/Transport.js:189 (abstract).
+`onNotification` (6): webrtc.js:407, bridge.js:291, composite.js:227, wstransport.js:378,
+sim/transport.js:387, contracts/Transport.js:202 (abstract).
+`onRoutedMessage` (1): AxonaPeer.js:4223.
 
-| shim | site | what it does |
-|---|---|---|
-| Composite replay (req) | composite.js:70 | replays stored `_reqHandlers` onto a newly-added sub-transport |
-| Composite replay (ntf) | composite.js:71 | same for `_ntfHandlers` |
-| Composite fan-out (req) | composite.js:224 | fans `onRequest` across `_subs` |
-| Composite fan-out (ntf) | composite.js:229 | fans `onNotification` across `_subs` |
-| DHT-adapter passthrough | AxonaPeer.js:3089 | `onRoutedMessage: (t,h)=>peer.onRoutedMessage(t,h)` on the default-dht adapter object |
+## Out of scope
 
-## §D — Primitive definitions (sealed at E3; not migration-targets)
+`onMessage` — the public delivery API (AxonaPeer.js:2574, mesh.js:249, plus
+webrtc plumbing). Never sealed; stays regression-tested. `bridge-ws-dispatch` —
+the WS message switch, a separate registration style outside the three sealed
+primitives.
 
-The method definitions themselves. E3 seals these behind closure-captured
-capabilities. 13 sites.
+## Line anchors
 
-- onRequest defs (6): webrtc.js:400, bridge.js:286, composite.js:222,
-  wstransport.js:371, sim/transport.js:380, contracts/Transport.js:189 (abstract)
-- onNotification defs (6): webrtc.js:407, bridge.js:291, composite.js:227,
-  wstransport.js:378, sim/transport.js:387, contracts/Transport.js:202 (abstract)
-- onRoutedMessage def (1): AxonaPeer.js:4223 (`_routedHandlers.set`)
-
-## §E — Out of scope (public API)
-
-`onMessage` — the public application delivery surface. Not sealed by this
-cutover; a compatibility migration if it is ever touched, tracked separately.
-
-- `peer.onMessage(handler)` — AxonaPeer.js:2574 (at most one)
-- mesh `onMessage(cb)` — mesh.js:249; webrtc.js:145/465 internal plumbing
-
-## Count reconciliation
-
-The v5 dry-run gave an approximate ~24-28 and `[R2]` withdrew it. The exact
-figures:
-
-- Migration-targets: **34 named frames** (A1 11 + A2 2 + A3 1 + A4 16 + A5 4)
-  plus **1 parameterized registrar** over an open `direct_*` family (B).
-- Already shadow/observe-wrapped today: 20 of the 34 (A4 16 + A5 4).
-- Named mechanism shims: **5** (C).
-- Primitive definitions to seal: **13** (D).
-- Out of scope: `onMessage` (E).
-
-The 34 named frames are the finite, enumerable set the AST gate and the runtime
-capability boundary must jointly cover; the `direct_*` family is the finite-but-
-open case the manifest closes.
+All line numbers are the `1edb1fd` tree and are re-derived by the generator, not
+maintained by hand. Regenerate (`node test/fence_e0_manifest.mjs --write`) after
+any tree change; the CI gate fails on drift.
