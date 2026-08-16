@@ -39,6 +39,42 @@ most one) and mesh `onMessage(cb)` (mesh.js:249) are the public application
 delivery API; sealing them would change application compatibility. They are
 enumerated below as out-of-scope and stay regression-tested through the cutover.
 
+## The `[V2]` wire-literal gate — normative scope
+
+Enshrined after council review (Aster, Vega, Orion; axona-protocol testnet
+`9859fff`). The E1 wire-literal gate (`test/fence_raw_dispatch_gate.mjs`) requires
+every `registerFrame(recv, wire, handler)` call to pass a string-literal or
+`T.<name>` wire. To find those calls it resolves which callee names are the door.
+
+**`[V2]` is intentionally a DIRECT name-binding resolver.** It answers one
+decidable question: does a callee name resolve, through direct binding
+introductions, to `registerFrame`? It binds the door across the finite set of
+name-introducer AST node types, each handled wherever it occurs:
+
+1. import specifiers — named (`ImportSpecifier` `imported.name === 'registerFrame'`,
+   any source, *not* a resolved re-export graph) / default (`registerFrame.js`) /
+   namespace (`registerFrame.js` or the barrel `registry/index.js`);
+2. `VariableDeclarator`;
+3. `AssignmentExpression '='`;
+4. `AssignmentPattern` — parameter default AND destructuring default, any nesting.
+
+Targets are `Identifier` and `ObjectPattern`; the RHS resolves only when it is
+directly an already-bound name or a recognized door-namespace member. Alias chains
+close under fixpoint; plain and optional call forms are matched. Flow-insensitive,
+once-bound-stays-bound — the correct fail-closed over-approximation for a gate.
+Teeth NEG-B1…B19 pin every case.
+
+**This is a scoped claim, not "no further syntax exists."** Anything that needs
+VALUE-FLOW analysis rather than direct name resolution is OUTSIDE `[V2]` by design
+— the E3 runtime capability boundary's job, structurally closed there: a
+value-preserving RHS expression (`cond ? registerFrame : g`, `registerFrame ||
+fallback`, a sequence, a call/IIFE return); value flow through a container
+(`const [f] = [registerFrame]`); computed member `ns['registerFrame']` (`[Q1]`); a
+dynamic-import handle `(await import(...)).registerFrame` (`[Q2]`); a third-party
+re-exporter's namespace that is neither the definition module nor the barrel.
+`[V2]` is the build-time direct-name-binding gate for the E1–E3 window; soundness
+is the E3 closure-captured capability, not this gate.
+
 ## Generator summary (tree 1edb1fd)
 
 | class | count | meaning |
