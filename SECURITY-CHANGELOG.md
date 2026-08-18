@@ -43,6 +43,33 @@ when it lands.
 
 Nothing on prod changes. Prod and testnet stay on the prior wire.
 
+### Update — 2026-08-18 — the enforcement lands, on testnet
+
+What stops a new `onRoutedMessage` from being wired up somewhere the map does not
+know about? A month ago, only review. Now the map is the only road.
+
+The three raw dispatch primitives are gone from every public receiver:
+`onRequest`, `onNotification`, `onRoutedMessage`. On a built node no transport and
+no peer carries them as a method. They survive as a closure held in a
+module-private table, which the one canonical registration door alone can read. A
+property lookup for the old names returns `undefined` under any string or symbol
+key, and through a prototype walk or `Reflect.get` the same. A runtime test checks
+this over every sealed receiver — the five transports, the peer, and the default
+routing adapter — not one sample.
+
+The CI gate is armed against an empty baseline. A raw dispatch reference anywhere
+in `src/` now fails the build, where in the shadow cut it was counted and allowed.
+Named access the AST gate catches; unnamed access has nothing left to resolve to.
+
+This is deployed to the testnet relay fleet: 38 relays, 26 on one host and 12 on
+the other, restarted onto the sealed build one slot at a time, each verified live
+on its version banner and open mesh before its predecessor left, so the fleet
+never dropped below full count. The sealed build puts the same bytes on the wire
+as the build before it, which is why a fleet caught half-rolled stays connected.
+
+Prod and mainnet are unchanged. The seal reaches them only on a separate roll, on
+David's word.
+
 ## Kernel 4.62.2 — 2026-08-09 — a multi-hop ingest-ack routes home to the flight owner (PROD)
 
 When a write travels several hops to the root, where does the root's ingest-ack
