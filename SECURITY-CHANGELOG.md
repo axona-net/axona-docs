@@ -16,6 +16,33 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel 4.66.0 — 2026-08-24 — a node can say it's back, and prove it (opt-in sending; receivers verify)
+
+How does a peer that gave up on a candidate learn the candidate came back?
+Until now it couldn't: an exhausted retry budget was forever, and the only
+"he's back" signals on the wire were third-party nominations — exactly the
+message an attacker would forge to make a neighbourhood re-dial a victim.
+4.66.0 lands the `dht:presence` frame from the council-closed reset-record
+definition: a record only the returning node itself can mint, signed with the
+same key its handshake proves, carrying a per-identity generation counter.
+Receivers verify the pubkey-to-nodeId binding and the signature, then enforce
+a monotonic watermark keyed by the 256-bit identity suffix — a replayed or
+stale record does nothing, and a record for a stranger updates a watermark
+and nothing else. A presence record never inserts a table entry, never
+carries an address, and never bypasses admission; the next contact still
+goes through the dial, the handshake, and the gate.
+
+Receiving is always on and inert — verify, watermark, notify local hooks.
+Sending and one-hop relay are opt-in and default off; no deployment emits
+the frame yet. CAVEAT: the record RESETS retry state at receivers that hold
+it (the machinery arrives in the next slice); until the receiver-side refill
+pacing from the definition ships with it, presence stays a verified no-op
+beyond the watermark. Generation counters are never persisted — a node that
+abandons its key is a new identity with a fresh watermark everywhere, by
+design.
+
+---
+
 ## Kernel 4.65.0 — 2026-08-24 — the table gets a door (opt-in; default off, enforces nothing yet)
 
 Who may enter a full routing table? Until now, nobody asked: on every binding
