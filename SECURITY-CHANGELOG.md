@@ -16,6 +16,40 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel 4.67.0 — 2026-08-24 — the dial gets a budget, the door gets a lane (opt-in; default off)
+
+What stops a node from dialing a dead candidate forever? Until now, nothing:
+the maintenance loop re-probed a never-binding near-successor on every
+nomination — the connection-count storm measured at kernel test `c16d12b`,
+3.0 probes per tick, sustained, the failure that got synaptome maintenance
+reverted in June. 4.67.0 lands the guard the council-closed definition
+specifies: per-candidate in-flight dedup, bounded retry with exponential
+backoff, expiry on bind or exhaustion — keyed by the 256-bit identity
+suffix, so a prefix change buys nothing. The 4.66.0 presence record becomes
+what it was built to be: the release valve. A verified fresh record refills
+exactly one attempt budget, paced to one refill per identity per window no
+matter how many valid generations arrive, and resets the search backoff. A
+maintenance pass that finds nothing to attempt backs its next search off
+exponentially — an empty band is usually an unpopulated band, and searching
+cannot fill it.
+
+The admission gate from 4.65.0 gains its join lane: `kJoin` reserves the
+table's last slots for qualified newcomers — one admission per identity per
+window, a per-lane cooldown, and the lane lives INSIDE the cap, so a mature
+mesh admits joiners without ever exceeding its budget and a Sybil burst
+buys at most the lane, never the table.
+
+Everything is opt-in and default off; un-armed peers behave exactly as
+before, storm included — arming is a deployment decision. CAVEAT: the
+degree-floor emergency refill from the definition is not in this slice (it
+needs a remembered-peers cache), and the sponsor-attested lane
+qualification stays spec-defined, unimplemented. The eclipse story is now
+admission bounds plus attempt bounds together, as the 4.66.0 entry said it
+must be; what remains before any arming is constants via the matrix and
+live correlation of the original storm.
+
+---
+
 ## Kernel 4.66.0 — 2026-08-24 — a node can say it's back, and prove it (opt-in sending; receivers verify)
 
 How does a peer that gave up on a candidate learn the candidate came back?
