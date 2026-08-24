@@ -16,7 +16,30 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
-## Kernel 4.63.0 — 2026-08-15 — the wire surface gets a map (shadow; enforces nothing yet)
+## Kernel 4.65.0 — 2026-08-24 — the table gets a door (opt-in; default off, enforces nothing yet)
+
+Who may enter a full routing table? Until now, nobody asked: on every binding
+transport, a peer that completed the handshake was inserted into the synaptome
+directly — no cap check, no comparison, no eviction. A node's table could grow
+past its budget, and the entries it held were whoever bound first, not whoever
+the mesh needed. 4.65.0 lands the hold-or-improve admission gate at that
+entrypoint (`_seedSynaptomeWithSponsor`), implementing the council-closed
+Connection-Quality definition v0.6: below the cap every distinct live peer is
+admitted; at the cap a candidate enters only by structural improvement the
+candidate's id alone can prove, paired with the eviction of the weakest edge
+in the most over-represented band. The k nearest successors and the last two
+members of any sparse band cannot be evicted — protection is re-checked at
+each decision, never granted. A refused candidate's channel is closed: a
+connection outside the budget defeats the budget.
+
+The gate is opt-in and default off. Flag-off behavior is byte-identical,
+including the historical over-cap insert. No deployment arms it yet; arming
+is a separate, gated decision. CAVEAT: the gate bounds table membership, not
+dial traffic — the candidate attempt guard, join lane, and presence pacing
+from the same definition are later slices, and the eclipse-resistance story
+is complete only when admission and attempt bounds ship together.
+
+
 
 Which of the four boundaries owns each frame on the wire? Until now the answer
 lived in scattered `on(...)` registrations and `switch` cases across the source,
