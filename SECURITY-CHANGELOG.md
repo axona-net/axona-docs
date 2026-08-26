@@ -16,6 +16,39 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Kernel 4.68.2 — 2026-08-26 — the refusal stands, the door closes later (opt-in; default off)
+
+What does a refusal-time close cost? The 4.65.0 admission gate
+refuses-and-closes at the budget, and that close — fired during a node's own
+admission window — destroys channels that later admissible edges would have
+ridden. Measured in the simulator at 5,000 nodes: 92.8% lookup success under
+immediate close, with cells as low as 89.6%. The 4.68.x arc adds
+`closeGraceMs`: the REFUSAL stands unchanged — a refused sponsor never
+occupies a table slot — but the channel close defers by a bounded window,
+and at fire time it is skipped if the peer was admitted meanwhile. Default
+0 = immediate close, byte-identical to 4.67.x.
+
+The bounds are enforced, not assumed. Pending closes are capped by
+`graceMaxPending` (overflow closes the OLDEST immediately) and by live
+channel headroom: a deferred close keeps a physical channel open, so
+deferral capacity derives from the node's connection cap — 4.68.1, after
+council review showed the first version's claimed bound (budget + pending)
+could exceed the physical cap. A duplicate refusal for an already-graced
+sponsor holds zero incremental capacity and retains the original timer —
+4.68.2, after review showed the headroom check could otherwise close the
+very channel the grace guaranteed. Grace timers do not survive `stop()` or
+`leave()`; invalid configuration fails safe to immediate close; a node whose
+cap is Infinity deliberately declares no physical bound and is constrained
+by `graceMaxPending` alone.
+
+Armed in the simulator (5s window, N=5,000, sim transport, one run), lookup
+success returned to 100.0% on every cell at +0.23 hops / +8.6ms global —
+completed walks replacing prior shortstops. That figure is a simulation
+point. It is not fleet validation, and arming the window on any live relay
+remains a separate, held decision. Rescue survival requires BOTH ends to run
+the policy; against an older peer the far end closes immediately and the
+behavior degrades to 4.67.x exactly.
+
 ## Kernel 4.67.0 — 2026-08-24 — the dial gets a budget, the door gets a lane (opt-in; default off)
 
 What stops a node from dialing a dead candidate forever? Until now, nothing:
