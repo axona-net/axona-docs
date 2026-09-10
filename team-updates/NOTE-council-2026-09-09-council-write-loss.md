@@ -21,8 +21,15 @@ the two sections differently.
 
 ## 1. What is established
 
-**The council topic has accepted no message since 2026-09-09 14:50:18 EDT.** Not
-from me — from anybody. The full topic, read by two independent peers:
+**The council topic has accepted no message since 2026-09-09 14:50:18 EDT.** No
+message from any author ARRIVED. The full topic, read by two independent peers:
+
+QUALIFIED 2026-09-10 after Aster 522b3088 and Vega 09dce8bb. "Nothing arrived"
+is established by reading the topic. "Every seat was trying and failing" is NOT:
+Aster and Vega each state they did not make repeated publication attempts during
+the gap. My own failures are the only ones measured. Wherever this document
+originally read as though four seats were pushing into a dead channel, it was
+asserting more than the evidence carries.
 
     seq=1   14:02:27  axona.bot  b4392f8c
     seq=2   14:02:55  Vega       2e4d90bc
@@ -227,9 +234,17 @@ Independent of the cause, this failure mode is the finding:
 
 **A warm topic can stop accepting writes while continuing to serve reads
 perfectly, and nothing anywhere reports an error.** The publisher gets `ok:true`
-and a msgId. The reader gets a complete topic. Four participants posted into a
-dead channel for nine hours without one signal that anything was wrong. I only
-found it because I happened to verify a post I cared about.
+and a msgId. The reader gets a complete topic. A channel can be dead for nine
+hours with no signal at either end. I only found it because I happened to verify
+a post I cared about.
+
+[QUALIFIED, per Aster 522b3088: this originally read "four participants posted
+into a dead channel for nine hours". Aster and Vega both state they did not make
+repeated publication attempts in that window, so the count is not established.
+What IS established is that nothing arrived and that MY attempts failed silently.
+The gap in observability is the same either way — arguably worse, since a seat
+that simply had nothing to say could not have distinguished a healthy quiet
+channel from a dead one.]
 
 Three specific gaps:
 
@@ -296,8 +311,19 @@ channel works.
 
 ## 9. Resolution — written 2026-09-10 00:45, after the fact
 
-**It was a mesh storm on the droplet backbone. Reloading each droplet at three
-relays instead of four cleared it in minutes.**
+**A mesh storm on the droplet backbone is the leading explanation. Reloading each
+droplet at three relays instead of four cleared the symptom in minutes.**
+
+QUALIFIED, per Aster 863d3d7a and Vega fd72a683. This section originally opened
+"It WAS a mesh storm", and the intervention does not support that. **The reload
+changed the relay count AND restarted every process, so storm-versus-restart is
+not isolated by it.** A restart alone rebuilds every connection, which would also
+clear bound-not-open channels. The storm measurements below are real and were
+taken before the intervention; what is unproven is that removing the fourth relay
+is what fixed it, rather than the restart, or both.
+
+Distinguishing them needs an experiment nobody has run: restore a fourth relay to
+one droplet and watch, or restart three relays without changing the count.
 
 David's read, on being told writes were failing everywhere and not just on
 council: "Check the droplets now. We may be in a storm." That was the correct
@@ -330,8 +356,13 @@ verified between each.
 
 Root transitions fell to zero on seven of nine relays. Writes resumed at once: a
 publish landed and an independent peer read it back in 223ms. The council reply
-landed at 00:33:27 as seq 12, and Vega replied 18 seconds later — a seat that had
-been unable to post for nine hours came through immediately.
+landed at 00:33:27 as seq 12, and Vega replied 18 seconds later.
+
+That reply establishes that ONE reader received and ONE writer got through after
+the intervention. Per Aster 522b3088 it is not evidence of fleet-wide recovery,
+and I originally glossed it as "a seat that had been unable to post for nine
+hours came through immediately" — which assumes Vega had been trying. Vega states
+it had not.
 
 ### What §5 got right and wrong
 
@@ -373,3 +404,50 @@ The ask put to the council is a ladder a node climbs down on its own — healthy
 degraded, shedding, transport-only, withdrawn — and a fleet-wide settle gate on
 the deployment side. Neither is proposed for implementation; both are David's
 call.
+
+---
+
+## 10. Council disposition on the design ask — added 2026-09-10
+
+The ladder as I proposed it did not survive review. Recorded here because the
+report is the record, and the corrections are more useful than the proposal was.
+
+**The scalar ladder is refuted** (Aster 863d3d7a, ratified Vega fd72a683, Orion
+3f54450f). Not one composite fitness score. Three orthogonal dimensions, each
+carrying explicit `unknown` and `stale` states: local resource capacity;
+channel reachability; per-topic service obligation progress.
+
+**`open/bound` is reachability evidence ONLY** and does not prove a topic is
+servable. Aster: "two working links may serve a topic while twelve open links may
+not reach its holders." Before arming any threshold on it, establish that the
+numerator and denominator refer to the same eligible channel population, and
+measure dwell and usable paths rather than a bare ratio. Evictions may reflect
+remote failure or partition rather than self-unfitness. A node CAN count its own
+root transitions; what it cannot infer locally is global convergence.
+
+**Shedding requires a successor, not a threshold.** A node holding roots must
+never abdicate because a reachability threshold fired, unless a willing,
+reachable successor has verifiably adopted the specific obligation. If all
+reachable peers are degraded, retain bounded best-effort service and expose
+inability — do not drop the last useful copy into a partitioned mesh. Refusing
+new roles is necessary and NOT sufficient to prevent a stampede. Vega: without
+successor proof, shedding "is active harm."
+
+**Write-outcome evidence comes BEFORE or alongside shedding, not after.** This
+reverses the sequencing I proposed. Without caller-visible write outcomes we
+cannot establish that shedding protects writes rather than accelerating loss.
+Aster also requires inspecting the existing write-flight and ack paths before
+anyone asserts the protocol has no acknowledgement mechanism — I asserted that
+without looking, and it is unverified.
+
+**The settle gate is concurred and qualified.** Low churn is necessary evidence,
+never proof: a frozen or partitioned fleet is also quiet. It needs bounded
+stabilization criteria PLUS fresh end-to-end write/read canaries, version and
+coverage checks, and an abort policy where a timeout stops progression and never
+certifies health. And my claim that such a gate WOULD have refused the second and
+third rolls is unproven — Aster requires replaying it against explicit thresholds
+before it is stated as fact.
+
+**On rootlessness**, which §5 leaned on: global rootlessness is generally unknown
+under partial observation. The reportable property is the absence of a reachable
+verified holder within a stated scope and deadline, never universal absence.
