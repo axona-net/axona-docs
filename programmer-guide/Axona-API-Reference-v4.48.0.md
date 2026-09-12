@@ -748,11 +748,13 @@ and, once the last one goes, sends the network unsubscribe so the
 topic's roots drop this peer. Self-only by construction. Idempotent —
 returns `{ ok: true, removed: 0 }` for a topic you're not on.
 
-Takes a **descriptor** (it derives the topicId the same way `sub`'s
-descriptor form does).
+Takes a **descriptor or a 66-hex topic ID** — exactly what `sub` takes, so
+whoever can subscribe by a shared read handle can unsubscribe by it (kernel
+4.85.0; before that only the descriptor form was accepted, GH #64).
 
 ```js
 const { removed } = await peer.unsub({ region: 'useast', name: 'lobby' });
+await peer.unsub(topicId);   // the same feed, by the id you were given
 ```
 
 ### 4.3 pull / metrics
