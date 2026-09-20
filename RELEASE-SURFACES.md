@@ -9,6 +9,8 @@ Baseline recorded 2026-07-27 at kernel **4.48.0**.
 
 ---
 
+> **The order of a promotion** — every action from kernel bump to MCP-server restart, with the gates — is in [`RELEASE-PROCEDURE.md`](RELEASE-PROCEDURE.md). This file is the map of surfaces; that file is the sequence.
+
 ## 0. The rule that orders everything
 
 > **Documents are versioned to the kernel version DEPLOYED ON TESTNET.**
