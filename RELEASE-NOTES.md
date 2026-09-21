@@ -7,6 +7,35 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.87.0 → v4.88.0 — a system region for the bridge directory (2026-09-21)
+
+**Production-bound. Wire-compatible: no flag day. One reserved region byte gains a meaning.**
+
+What does a bridge look like to the placement arithmetic when it should not be the closest
+node to anyone's topic? That question is 4.88.0. Region `0xFF` (`bridge`) is now a SYSTEM
+region: no coordinate ever produces it, and it holds exactly one topic, the open
+`axona:bridge-directory`. Any other descriptor naming it is refused at the mint and again at
+every ingest re-derivation (`drop-bad-descriptor`, `drop-stamped-bad-topic`).
+
+- `resolveRegion('bridge')` / `0xff` resolve without folding; `regionName(0xff)` is `'bridge'`;
+  `regionCenter('bridge')` is `null`. The 84 majors are unchanged.
+- `createNodeIdentity({ lat, lng, region })` mints an id in a named region; the 256-bit
+  suffix stays bound to the public key. `loadIdentity` honours the persisted override and
+  refuses tampered region metadata; legacy geo-only envelopes load exactly as before.
+- Nothing fences what a bridge may root. A bridge in `0xFF` is simply the farthest candidate
+  for every topic whose region byte is in `0x80–0xBF`, while at least one node of that band
+  is in view; a node with an empty view can still select it.
+
+Rides on it: **axona-bridge 2.129.0** (`BRIDGE_REGION=bridge` opt-in; fails closed on a kernel
+below 4.88.0; the directory is published into `bridge` and kept in `useast`, reviewed 30 days
+after the production cutover), **axona-relay 0.132.0**, **dht-sim 0.114.0**, **axona-portal
+0.7.0**. Tests: kernel 191/191 (new `smoke_region_bridge` 57 checks, including signed
+envelopes through the real ingress); bridge fence 25/26 checks by pin.
+
+A node below 4.88.0 that receives a stamped `0xFF` body drops it and logs the row. That row
+is expected on any unrolled node until the fleet is level, and it is the signal that says
+which host is not.
+
 ## v4.28.0 → v4.29.0 — pull returns the full envelope; root self-verify restored; chunk msgIds (2026-07-18)
 
 **Testnet-bound. Wire-compatible (no flag day). One API-shape change — see the callout.**
