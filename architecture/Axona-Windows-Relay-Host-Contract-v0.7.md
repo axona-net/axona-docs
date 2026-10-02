@@ -1,10 +1,11 @@
-# Windows relay host contract — v0.6, a candidate for council review
+# Windows relay host contract — v0.7, a candidate for council review
 
 *axona.bot, 2026-10-02. v0.1 (ed2ece8) was the consolidation Aster asked for in council 709, on
 David's 708. v0.2 (5b88197, 85f4e12) answered Aster's `4d410f51`. v0.3 (2c6f5e1, amended 36ceef7)
 answered Aster's `f5442247` and Vega's `037d75df`. v0.4 (d05746b) answered Aster's `ee657b8c`. v0.5
 (ce79f6b) answered Aster's `fc7d5766` and was accepted for design freeze by Vega (`eb9d7f3e`). v0.6
-answers Aster's `18ecc644`: what the two fences actually prove.*
+(8ae6297) answered Aster's `18ecc644`, with Orion concurring on v0.5 (`7dad1f2c`). v0.7 answers
+Aster's `d92e793f`: containment, and three places the text contradicted itself.*
 
 How should twenty relays live on a Windows host so that the count is a declaration, a reboot is a
 non-event, and the operator always knows what happened? That is the question.
@@ -14,7 +15,23 @@ nothing has been run, and no live process is touched by it. Its scope is one hos
 is not a bridge change, not a kernel change, and it does not decide `SUB_TERMINAL_VERIFY` policy.
 Stage A (design) is under David's 708; stages B, C and D each need their own word (§3).
 
-**What v0.6 changes.** v0.5 claimed more than its fences prove (Aster, `18ecc644`).
+**What v0.7 changes.**
+
+1. **Kill-on-close happens when the LAST handle to the job closes**, not the wrapper's handle
+   (Microsoft, *Job Objects*). Fence 1b now requires the wrapper to own the job's only handle,
+   non-inheritable; no breakaway for any descendant; and the relay assigned to the job before it
+   executes a single instruction. The marker scan is demoted to a diagnostic.
+2. **C5's `resolved` row still accepted a changed boot time**, the escape path C4 had already
+   closed. It now requires the full Fence 2 predicate.
+3. **C11 contradicted itself twice.** It made every row inherit C6.0, which refuses any pending
+   slot, while its purpose is to settle that very slot; and it said recovery never stops a slot
+   beside a row that retries a drain. Recovery is now three distinct steps: reconcile without
+   mutating, restore by starting only, then resume the authorised swap, which alone may stop a
+   slot and only after C6.0 passes again.
+4. **"Safety, unconditional" overstated the count.** The count guarantee is now explicitly
+   conditional on the containment contract.
+
+**What v0.6 changed.** v0.5 claimed more than its fences prove (Aster, `18ecc644`).
 
 1. **Fence 1 proved one WRAPPER per slot, not one RELAY.** A wrapper can die while its `node.exe`
    child lives on, and the next start would add a second relay to that slot. Fence 1 is now two
@@ -190,16 +207,29 @@ acquires the abandoned mutex. So:
   - **Fence 1b, relays.** A wrapper can terminate while its `node.exe` child, or that child's
     descendants, survive (Aster, `18ecc644`). So one wrapper does not mean one relay. Fence 1b is the
     obligation that closes the gap:
-    - **Containment.** The wrapper places the relay in a Windows Job Object created with
-      kill-on-job-close. When the wrapper's handle to the job closes, for whatever reason including
-      the wrapper's own death, the operating system terminates every process in the job.
+    - **Containment, by the last handle.** The wrapper creates an unnamed Windows Job Object with
+      kill-on-job-close. Windows terminates the job's processes when the LAST handle to the job
+      closes, not any particular one (Aster, `d92e793f`; Microsoft, *Job Objects*). So:
+      - the wrapper holds the job's ONLY handle, created non-inheritable; no child inherits it, and
+        an unnamed job cannot be opened by name;
+      - no process in the job may break away: neither breakaway-allowed nor silent-breakaway is set,
+        so every descendant stays in the job;
+      - the relay is in the job BEFORE it executes anything: created suspended, assigned to the job,
+        then resumed, or assigned at creation through the process attribute list. There is no window
+        in which the relay runs outside the job.
+      When the wrapper dies for any reason, its handle closes; it was the last, so every process in
+      the job is terminated by the operating system.
     - **One child, launched once.** The wrapper starts exactly one relay and never restarts it. When
       the relay exits, the wrapper exits. Any restart is the controller's, through C8, never the
       wrapper's own.
-    - **No orphan before any launch.** Before EVERY start of a slot, including recovered and delayed
-      ones, the controller proves no process carrying that slot's marker exists. Each relay is
-      launched with the argument `--axona-slot=<slot>`, visible in its command line; a match blocks
-      the start and makes the slot UNKNOWN.
+    - **The guard is in the launch, not only before the request.** A start the controller requests
+      may be carried out later, so a check by the controller before the request is not enough
+      (Aster, `d92e793f`). The containment above is established inside the wrapper at the moment it
+      launches the relay, every time, which is what bounds a late or delayed start.
+    - **The marker is a diagnostic.** Each relay carries `--axona-slot=<slot>` in its command line,
+      and the controller scans for it before a start; a match blocks the start and makes the slot
+      UNKNOWN. A scan cannot prove ownership of descendants, which need not carry the marker. The
+      containment, not the scan, is the guarantee.
     The claim that no late effect can take the RELAY count above twenty is made only under Fence 1b,
     and stays an obligation until V12 and V13 show it on this build.
   - **Fence 2, a fresh SCM execution epoch.** A changed last-boot time is not enough (Aster,
@@ -280,7 +310,7 @@ acquires the abandoned mutex. So:
 | `halted` record, every intent has a result | stopped cleanly part-way | closed; read-only history |
 | `halted` record, some intent has NO result | **still open** | its slots stay pending and the global stop halt stays in force until each is reconciled to a result, or an operator writes a `resolved` record naming it |
 | `complete` record | done | read-only history |
-| `resolved` record | an operator settled an open slot | closed for that slot, ONLY if the record carries one of: (a) evidence the old effect can no longer arrive, which today means a `bootId` change since the intent (Fence 2); or (b) a separately authorised override, naming who authorised it and stating the guarantee it gives up. A label alone settles nothing (Aster, `fc7d5766`) |
+| `resolved` record | an operator settled an open slot | closed for that slot, ONLY if the record carries one of: (a) evidence the old effect can no longer arrive: the FULL Fence 2 predicate (a new `services.exe` start time, the issuing controller incarnation gone, and no replay source), never a changed boot time alone, and anything uncertain leaves the slot UNKNOWN; or (b) a separately authorised override, naming who authorised it and stating the guarantee it gives up. A label alone settles nothing (Aster, `fc7d5766`) |
 
 - **One open operation at a time.** A new operation may become active only when every earlier
   operation is `complete`, or `halted` with every intent resolved. A HALTED operation with an
@@ -316,9 +346,15 @@ acquires the abandoned mutex. So:
    deadline: **not-ready-by-deadline**, HALT. CPU time and log silence are evidence only.
 
 **The invariants.**
-- *Safety, unconditional:* steady state never manages more than twenty instances. At any moment at
-  most ONE slot is down BECAUSE OF AN OPERATION, in addition to slots whose desired state is
-  `stopped`. No slot is stopped while any slot is UNKNOWN or pending.
+- *The count, conditional on containment:* steady state never runs more than twenty RELAYS, given
+  Fence 1b. Without Fence 1b the contract claims only twenty WRAPPERS (Fence 1a). V12 and V13 are the
+  refinement obligations, and finite tests support the claim without proving it.
+- *The controller's own stops, from C4 and C5 rather than from timing:* at any moment at most ONE
+  slot is down because a controller stopped it, in addition to slots whose desired state is
+  `stopped`, and no controller issues a stop while any slot is UNKNOWN or has an unresolved effect.
+  This rests on two things: every stop's intent is flushed before the stop is issued (C5), so even a
+  dead controller's late stop has a durable record; and only one controller can hold the mutex (C4),
+  so the next holder sees that record and refuses to stop anything else.
 - *Liveness, conditional:* if the other desired-running slots are ready at step 0 and stay ready,
   each of them is ready throughout. A crash, a reboot or a degraded start voids that, and step 0
   reports it.
@@ -376,14 +412,21 @@ neither `not-started` nor `done` is an obligation, and operations move one slot 
 at most one. If the journal is damaged so that phases cannot be read, every slot in that scope is an
 obligation and stays UNKNOWN.
 
-**Order.**
-1. Classify every slot: phase, unresolved effect, epoch.
-2. Restore every desired-running slot that is NOT an obligation, by STARTING only, and only if it is
-   not UNKNOWN or quarantined, is proven `Stopped`, and passes Fence 1b's no-orphan check. A slot found
-   `Running` is inspected, never started again. Each is brought to readiness before the next. Starting
-   cannot reduce the number of ready relays, so this respects the global stop halt.
-3. Then the obligation slot, by the table below. Every row inherits every C4, C6.0 and C8 guard, and a
-   historical record is never permission on its own.
+**Order: reconcile, restore, then resume.** Three distinct steps, and only the third can stop a slot.
+
+1. **Reconcile, without mutating anything.** Classify every slot: phase, unresolved effect, epoch.
+   For the obligation slot, settle its EARLIER-epoch outcome by the phase table below, which reads
+   live state and writes only the journal. This is how the obligation stops being pending. It issues
+   no SCM action. C6.0 does not apply here, because its job is to stop a swap from starting while
+   something is unresolved, and this step is what resolves it (Aster, `d92e793f`).
+2. **Restore, by starting only.** Every desired-running slot that is not an obligation, is not UNKNOWN
+   or quarantined, is proven `Stopped`, and passes the no-orphan diagnostic is started, each to
+   readiness before the next. A slot found `Running` is inspected, never started again. Starting
+   cannot reduce the number of ready relays.
+3. **Resume the authorised swap, only after C6.0 passes again.** With the obligation slot now in a
+   settled phase, re-evaluate C6.0 against every other slot. Only if it passes may the operation
+   continue from the phase the table assigned, and only this step may issue a stop, for example to
+   retry a drain that never landed. If C6.0 fails, the operation HALTS as DEGRADED.
 4. Report through `status`.
 
 **The phase table for the obligation slot.**
@@ -409,7 +452,8 @@ recovers automatically only in the rows above that name a recovery, and only if 
 the other desired-running slots are ready (C6.0). Every other case waits for an operator. A slot that
 is not an obligation recovers by step 2 under the same budget and containment conditions.
 
-Recovery never starts every slot blindly, never stops any slot, and obeys C8.
+Reconciliation never mutates a slot. Restoration only starts slots, never all of them blindly. Only
+the resumption of an authorised swap may stop a slot, and only after C6.0 passes. All three obey C8.
 
 ## 6. Obligations, by stage
 
@@ -428,8 +472,10 @@ native ABI; and the controller's state machine run against a fake SCM.
   treated as the same epoch; a request from a client killed mid-call has no effect once `services.exe`
   has restarted. Finite observation can falsify these and cannot prove them. No outcome of V11
   converts `ESCALATE_MS` into permission.
-- **V12** — Fence 1b containment: with the chosen wrapper, killing the wrapper process terminates the
-  relay and every descendant, by the Job Object's kill-on-close, with no survivor.
+- **V12** — Fence 1b containment, with the chosen wrapper: the job handle is the wrapper's only one and
+  is not inherited; breakaway is impossible for every descendant; the relay is in the job before it
+  runs; and killing the wrapper terminates the relay and every descendant with no survivor. If the
+  candidate wrapper cannot meet these, it is not the wrapper.
 - **V13** — Fence 1b launch: the wrapper starts one relay, never restarts it, and exits when it exits;
   the `--axona-slot` marker is visible in the relay's command line for the no-orphan check.
 - **V10** — `Global\axona-relayctl` is visible to the controller (session 0) and the CLI (an ssh
@@ -501,10 +547,17 @@ native ABI; and the controller's state machine run against a fake SCM.
 | Aster `18ecc644` #2 | a changed boot time is not a fresh SCM | C4 Fence 2: `services.exe` epoch, issuer gone, no replay source; V11 |
 | Aster `18ecc644` #3 | the liveness promise contradicted step 4; action vs migration completion | C11 phase table; promise narrowed to its rows |
 | Aster `18ecc644` | residual quiescence wording | removed; the timer renamed `ESCALATE_MS` |
+| Aster `d92e793f` | kill-on-close is at the LAST handle; launch-before-assignment; marker is not ownership | C4 Fence 1b: sole non-inherited handle, no breakaway, assigned before execution, guard in the launch; V12 |
+| Aster `d92e793f` | `resolved` still accepted a changed boot time | C5: full Fence 2 predicate |
+| Aster `d92e793f` | C11 inherited C6.0 while settling the pending slot; "never stops" beside a retried drain | C11: reconcile, restore, resume |
+| Aster `d92e793f` | "Safety, unconditional" overstated the count | C6: count conditional on Fence 1b |
 
 **Dispositions on v0.3:** Vega **ACCEPT as the stage-A candidate** (`037d75df`), conditional on
-the two rows above, which this amendment answers. Aster: CHANGES REQUIRED on v0.3 (`ee657b8c`), v0.4 (`fc7d5766`) and v0.5 (`18ecc644`), answered in
-v0.4, v0.5 and v0.6. Vega: ACCEPT v0.5 for design freeze (`eb9d7f3e`); v0.6 disposition pending.
+the two rows above, which this amendment answers. Aster: CHANGES REQUIRED on v0.3 to v0.6 (`ee657b8c`, `fc7d5766`, `18ecc644`, `d92e793f`), each
+answered in the next version. Vega: ACCEPT v0.5 for design freeze (`eb9d7f3e`); v0.7 disposition
+asked. Orion: concurred with Aster's v0.5 review (`7dad1f2c`); v0.7 disposition asked, with one open
+point: whether an interrupted drain or switch should ever recover automatically after a verified fresh
+epoch (axona.bot `047ceaa3`).
 Orion: no disposition on any version.
 
 ## 9. Open decisions, all David's
