@@ -1,9 +1,10 @@
-# Windows relay host contract — v0.5, a candidate for council review
+# Windows relay host contract — v0.6, a candidate for council review
 
 *axona.bot, 2026-10-02. v0.1 (ed2ece8) was the consolidation Aster asked for in council 709, on
 David's 708. v0.2 (5b88197, 85f4e12) answered Aster's `4d410f51`. v0.3 (2c6f5e1, amended 36ceef7)
 answered Aster's `f5442247` and Vega's `037d75df`. v0.4 (d05746b) answered Aster's `ee657b8c`. v0.5
-answers Aster's `fc7d5766`: a timing bound is not a fence.*
+(ce79f6b) answered Aster's `fc7d5766` and was accepted for design freeze by Vega (`eb9d7f3e`). v0.6
+answers Aster's `18ecc644`: what the two fences actually prove.*
 
 How should twenty relays live on a Windows host so that the count is a declaration, a reboot is a
 non-event, and the operator always knows what happened? That is the question.
@@ -13,7 +14,22 @@ nothing has been run, and no live process is touched by it. Its scope is one hos
 is not a bridge change, not a kernel change, and it does not decide `SUB_TERMINAL_VERIFY` policy.
 Stage A (design) is under David's 708; stages B, C and D each need their own word (§3).
 
-**What v0.5 changes.** v0.4 let a 150-second quiescence wait and two stable readings act as
+**What v0.6 changes.** v0.5 claimed more than its fences prove (Aster, `18ecc644`).
+
+1. **Fence 1 proved one WRAPPER per slot, not one RELAY.** A wrapper can die while its `node.exe`
+   child lives on, and the next start would add a second relay to that slot. Fence 1 is now two
+   levels: SCM bounds wrappers; a Windows Job Object with kill-on-close, a one-child launch, and a
+   no-orphan check before every launch bound relays. The relay-count claim is made only under
+   those obligations.
+2. **A changed boot time is not a fresh SCM.** Windows 11 Fast Startup hibernates session 0, where
+   the services run, rather than restarting it; sleep and hibernate resume it too. Fence 2 now
+   requires `services.exe` itself to have a new start time AND the issuing controller to be gone,
+   and anything short of that is the same epoch.
+3. **v0.5's liveness paragraph contradicted its own step 4.** C11 is now a per-slot phase table
+   with the recoverable rows named, and the promise covers those rows only. A slot's phase is kept
+   separate from whether it has an unresolved effect.
+
+**What v0.5 changed.** v0.4 let a 150-second quiescence wait and two stable readings act as
 permission to recover a slot after a controller died mid-action. That is a timing heuristic, not a
 fence: no finite set of tests can show a delayed SCM request will never land (Aster, `fc7d5766`).
 v0.5 withdraws it. Recovery now rests on two fences the operating system actually provides, and
@@ -32,8 +48,8 @@ where neither applies, it gives up automatic recovery for that slot and says so.
 **What v0.4 changed.** Three recovery contracts are made explicit (§8 has the full record).
 
 1. A previous controller's request to SCM can still take effect after that controller has died,
-   and SCM offers no way to cancel it. C4 now waits out a bounded quiescence fence before any
-   action, distinguishes the wrapper's process from the relay's, and leaves any slot it cannot
+   and SCM offers no way to cancel it. C4 waited out a bounded quiescence period before any
+   action (that permission was WITHDRAWN in v0.5), distinguishes the wrapper's process from the relay's, and leaves any slot it cannot
    prove settled UNKNOWN.
 2. A HALTED operation is not history while any of its actions is unresolved. C5 now has an
    ordering and recovery table, and every operation declares its scope durably BEFORE its first
@@ -136,7 +152,7 @@ or practice, and the one that is not yet measured on this host says so.
 | `POLL_MS` | 3 000 | `fleet-cadence.sh` `POLL=3` |
 | `LEAVE_TIMEOUT_MS` | 30 000 | `fleet-cadence.sh` `LEAVE_TIMEOUT=30` |
 | `PENDING_MAX_MS` | 120 000 | four times `LEAVE_TIMEOUT_MS`: a stop that has not settled by then is UNKNOWN |
-| `QUIESCE_MS` | 150 000 | how long after a same-boot controller death the controller re-reads an unresolved slot and raises it to the operator. **It schedules observation and escalation. It confers NO permission to act** (Aster, `fc7d5766`) |
+| `ESCALATE_MS` | 150 000 | how long after a same-epoch controller death the controller re-reads an unresolved slot and raises it to the operator. Named `QUIESCE_MS` in v0.4 and v0.5; renamed so the name cannot suggest permission. **It schedules observation and escalation. It confers NO permission to act** (Aster, `fc7d5766`) |
 | `READY_DEADLINE_MS` | 270 000 | the Windows roll's current `READY_TIMEOUT` (`fleet.sh` passes 3 × `WIN_ADVANCE_CAP`=90) |
 | `FRESH_MS` | 15 000 | a relay writes a state line every 1 000 ms (`src/index.js:322`); fifteen missed lines tolerate an event-loop stall. **Provisional until V9** measures the cadence under a service on this host |
 | `BOOT_GRACE_MS` | 600 000 | a slot failing within ten minutes of its boot start counts as a crash restart; more than twice `READY_DEADLINE_MS` |
@@ -169,19 +185,41 @@ acquires the abandoned mutex. So:
   from a client that has died may still be delivered and executed, and SCM has no cancellation for
   it. A snapshot cannot rule that out, so the contract does not pretend it does.
 - **What actually fences a late effect.** Two things, and only two.
-  - **Fence 1, the count.** SCM runs at most one instance of a service, and each slot is one
-    service. A late START can only make its own slot `Running`, on whatever release that slot is
-    configured with at that moment. No late effect of any kind can bring the managed count above
-    twenty. The count invariant holds with no timing assumption.
-  - **Fence 2, the boot.** Every intent carries its `bootId`. SCM is a process of the operating
-    system and restarts with it, so a request issued under one `bootId` cannot take effect under a
-    later one. For an unresolved intent from an EARLIER boot, the slot's live state is therefore the
-    final outcome of that intent, and recovery may act on it after a stability read (two readings
-    `POLL_MS` apart that agree on a terminal SCM state and a consistent process table). V11 confirms
-    this on the host; it is a property of the operating system, not of a timer.
-- **Neither fence: an unresolved intent from THIS boot.** A controller that died mid-action without
+  - **Fence 1a, wrappers.** SCM runs at most one instance of a service, and each slot is one
+    service, so a slot has at most one WRAPPER however late a start lands. That is all SCM proves.
+  - **Fence 1b, relays.** A wrapper can terminate while its `node.exe` child, or that child's
+    descendants, survive (Aster, `18ecc644`). So one wrapper does not mean one relay. Fence 1b is the
+    obligation that closes the gap:
+    - **Containment.** The wrapper places the relay in a Windows Job Object created with
+      kill-on-job-close. When the wrapper's handle to the job closes, for whatever reason including
+      the wrapper's own death, the operating system terminates every process in the job.
+    - **One child, launched once.** The wrapper starts exactly one relay and never restarts it. When
+      the relay exits, the wrapper exits. Any restart is the controller's, through C8, never the
+      wrapper's own.
+    - **No orphan before any launch.** Before EVERY start of a slot, including recovered and delayed
+      ones, the controller proves no process carrying that slot's marker exists. Each relay is
+      launched with the argument `--axona-slot=<slot>`, visible in its command line; a match blocks
+      the start and makes the slot UNKNOWN.
+    The claim that no late effect can take the RELAY count above twenty is made only under Fence 1b,
+    and stays an obligation until V12 and V13 show it on this build.
+  - **Fence 2, a fresh SCM execution epoch.** A changed last-boot time is not enough (Aster,
+    `18ecc644`). Windows 11 Fast Startup hibernates session 0, where the services run, instead of
+    restarting it, and sleep and hibernate resume it. Every intent therefore records the **SCM
+    epoch** (`services.exe` pid and process start time) and the **issuing controller incarnation**.
+    Fence 2 applies to an unresolved intent only when ALL of these hold:
+    - `services.exe` now has a DIFFERENT start time from the one recorded with the intent;
+    - the issuing controller incarnation no longer exists;
+    - no durable source can replay the request. SCM keeps no queue of control requests across its
+      own restart; the only durable request source in this design is the spool, which acts only
+      through the journal rules.
+    If any of these cannot be read or is uncertain, the intent is treated as SAME-epoch. Under Fence
+    2, the slot's live state is the final outcome of that intent, and recovery may act on it after a
+    stability read (two readings `POLL_MS` apart that agree on a terminal SCM state and a consistent
+    process table). V11 can challenge these assumptions; it cannot prove them by finite observation,
+    and the contract does not claim it does.
+- **Neither fence: an unresolved intent from the SAME epoch.** A controller that died mid-action without
   a reboot may have issued a stop that has not landed yet, and nothing bounds when it will. That slot
-  is **UNKNOWN by default**. The global stop halt applies. The controller re-reads it at `QUIESCE_MS`
+  is **UNKNOWN by default**. The global stop halt applies. The controller re-reads it at `ESCALATE_MS`
   and escalates to the operator, and that is all the timer does. **Automatic recovery is lost for
   that slot until an operator settles it** (C5 `resolved`), and the contract accepts that loss
   rather than calling a timing assumption safe.
@@ -238,7 +276,7 @@ acquires the abandoned mutex. So:
 |---|---|---|
 | request in `spool\pending\`, no journal | submitted, not accepted | may be accepted, once no other operation is open |
 | `accepted` record, pointer not yet naming it | accepted, not active | write the pointer, then proceed; the scope is known |
-| last record an `intent` with no `result` | its effect may or may not have happened | that slot is pending: C4 quiescence fence |
+| last record an `intent` with no `result` | its effect may or may not have happened | that slot has an unresolved effect: C4 epoch rules, C11 phase table |
 | `halted` record, every intent has a result | stopped cleanly part-way | closed; read-only history |
 | `halted` record, some intent has NO result | **still open** | its slots stay pending and the global stop halt stays in force until each is reconciled to a result, or an operator writes a `resolved` record naming it |
 | `complete` record | done | read-only history |
@@ -324,41 +362,52 @@ a state-format boundary is unresolved until V7.
 - Ceilings: managed plus legacy never exceeds **21** during migration; steady state is **20**.
 - The 351 debris tasks are a separate cleanup on David's word.
 
-**C11 — Boot recovery, in order.** On every controller start, after acquiring the mutex:
+**C11 — Boot recovery, by phase.** On every controller start, after acquiring the mutex.
 
-1. **Pass the quiescence fence**, per C4, for every slot. Slots that cannot be proven settled are
-   UNKNOWN. Every operation that is open per C5's table keeps its fence.
-2. **Separate the operation's authorised SCOPE from its actual OBLIGATIONS.** An all-slot roll has
-   all twenty slots in scope, and v0.4 excluded every slot in scope from restoration, which would
-   have restored nothing (Aster, `fc7d5766`). Operations move one slot at a time, so within a readable
-   journal each slot in scope is exactly one of: **finished** (its last intent has a result), **not
-   started** (no intent), or **open** (an intent with no result, at most one slot). Only an OPEN slot
-   is an obligation. If the journal is damaged so that this cannot be told apart, every slot in scope
-   is treated as open.
-3. **Restore every desired-running slot that is not an obligation, by STARTING only.** A slot is
-   started only if it is desired `running`, is not an obligation, is not UNKNOWN, is not quarantined,
-   AND is proven `Stopped` with no process of any recorded incarnation and no descendant of one. A
-   slot found `Running` is inspected, never started again. Each is brought to readiness before the
-   next. Starting cannot reduce the number of ready relays,
-   so this does not bypass the global swap halt (C4). An incomplete swap after a reboot may face
-   nineteen slots that are not yet ready. This step is what brings them back before the swap is
-   touched again.
-4. **Then the open slot, if any, under every C4 and C8 guard.** A historical `switch` record is not
-   permission to start (Aster, `fc7d5766`).
-   - If its intent is from an EARLIER boot (Fence 2), take the stability read. Found `Running`:
-     inspect it, and if it is a single incarnation on the switched, verified release, record `ready`
-     or not per C7; never start it again. Found `Stopped` with no incarnation or descendant, and the
-     durable records show a completed `switch` to a verified release: start it once, subject to C8,
-     and resume from C6 step 8. Anything else: UNKNOWN.
-   - If its intent is from THIS boot: UNKNOWN, per C4. No automatic action.
-   - **There is NO automatic return to the predecessor release while V7 is unresolved.**
-5. Report the result through `status`.
+**Two separate facts per slot** (Aster, `18ecc644`: "the last intent has a result" describes one
+action, not the slot's migration):
+- its **phase** in the open operation: `not-started`, `draining`, `stopped`, `switched`, `started`,
+  `done`, or `halted`;
+- whether it has an **unresolved effect**: an intent with no result, and if so whether that intent is
+  from the SAME SCM epoch or an EARLIER one (C4 Fence 2).
 
-**The liveness this buys, stated conditionally.** After a REBOOT, every slot that is not
-quarantined and whose journal is readable is restored automatically, including the one a swap was
-interrupted on. After a controller crash WITHOUT a reboot, every slot except the open one is
-restored automatically; the open one waits for an operator. After journal damage, every slot in that
-operation's scope waits for an operator.
+**Scope is not obligation.** An all-slot roll has twenty slots in scope; only the slot whose phase is
+neither `not-started` nor `done` is an obligation, and operations move one slot at a time, so there is
+at most one. If the journal is damaged so that phases cannot be read, every slot in that scope is an
+obligation and stays UNKNOWN.
+
+**Order.**
+1. Classify every slot: phase, unresolved effect, epoch.
+2. Restore every desired-running slot that is NOT an obligation, by STARTING only, and only if it is
+   not UNKNOWN or quarantined, is proven `Stopped`, and passes Fence 1b's no-orphan check. A slot found
+   `Running` is inspected, never started again. Each is brought to readiness before the next. Starting
+   cannot reduce the number of ready relays, so this respects the global stop halt.
+3. Then the obligation slot, by the table below. Every row inherits every C4, C6.0 and C8 guard, and a
+   historical record is never permission on its own.
+4. Report through `status`.
+
+**The phase table for the obligation slot.**
+
+| phase, last intent | epoch of that intent | live state found | recovery |
+|---|---|---|---|
+| any | SAME | any | **UNKNOWN**. Escalate at `ESCALATE_MS`. Operator settles it (C5 `resolved`) |
+| any | cannot be determined | any | **UNKNOWN**, as SAME |
+| journal damaged | unreadable | not consulted | **UNKNOWN**, whole scope |
+| `draining`, `drain` unresolved | EARLIER | `Running`, the predecessor incarnation | the stop never landed: phase back to `not-started`; the operation may retry the drain under C6 |
+| `draining`, `drain` unresolved | EARLIER | `Stopped`, no orphan, configured on the predecessor release | the stop landed: phase `stopped`; resume at C6 step 6 under C6.0 |
+| `stopped` or `switch` unresolved | EARLIER | `Stopped`, no orphan; live configuration names the TARGET release, verified | the switch landed: phase `switched`; resume at C6 step 7 |
+| `stopped` or `switch` unresolved | EARLIER | `Stopped`, no orphan; live configuration names the PREDECESSOR release | the switch did not land: phase `stopped`; redo C6 step 6 |
+| `start` unresolved | EARLIER | `Running`, one incarnation on the target release | phase `started`; continue at C6 step 8 (readiness) |
+| `start` unresolved | EARLIER | `Stopped`, no orphan, configured on the target | start once under C8; continue at C6 step 8 |
+| any other combination | EARLIER | anything not in a row above | **UNKNOWN** |
+
+There is NO row that returns a slot to its predecessor release while V7 is unresolved.
+
+**The liveness promise, narrowed to the table.** After a verified fresh SCM epoch, an obligation slot
+recovers automatically only in the rows above that name a recovery, and only if that slot is desired
+`running`, its restart budget is not exhausted, Fence 1b holds, and, for any row that resumes a swap,
+the other desired-running slots are ready (C6.0). Every other case waits for an operator. A slot that
+is not an obligation recovers by step 2 under the same budget and containment conditions.
 
 Recovery never starts every slot blindly, never stops any slot, and obeys C8.
 
@@ -374,9 +423,15 @@ native ABI; and the controller's state machine run against a fake SCM.
   cannot, record that, and every SCM stop becomes an authorised destructive action (C6.2).
 - **V3** — Environment, working directory and the per-incarnation log path reach the process.
 - **V4** — Automatic (Delayed Start) behaves as specified on Windows 11 Home build 26200.
-- **V11** — Fence 2: a start or stop issued by a client killed mid-call in one boot has no effect
-  after a reboot. This is a property of the operating system that V11 confirms on this build; it is
-  not a timing bound, and no outcome of V11 converts `QUIESCE_MS` into permission.
+- **V11** — Challenge Fence 2's assumptions on this build: a full restart gives `services.exe` a new
+  start time; Fast Startup shutdown and power-on, sleep, and hibernate do NOT, and are therefore
+  treated as the same epoch; a request from a client killed mid-call has no effect once `services.exe`
+  has restarted. Finite observation can falsify these and cannot prove them. No outcome of V11
+  converts `ESCALATE_MS` into permission.
+- **V12** — Fence 1b containment: with the chosen wrapper, killing the wrapper process terminates the
+  relay and every descendant, by the Job Object's kill-on-close, with no survivor.
+- **V13** — Fence 1b launch: the wrapper starts one relay, never restarts it, and exits when it exits;
+  the `--axona-slot` marker is visible in the relay's command line for the no-orphan check.
 - **V10** — `Global\axona-relayctl` is visible to the controller (session 0) and the CLI (an ssh
   session); abandonment is reported as specified; the controller holds it on the one thread that
   runs its loop.
@@ -404,6 +459,11 @@ native ABI; and the controller's state machine run against a fake SCM.
 - A crash loop reaching quarantine; repeated reboots with a slot failing each time; UTC set
   backwards; UTC set FORWARD across a reboot; the host left powered off for longer than a day.
 - A controller killed mid-SCM-call, and its request landing after the next holder's first reading.
+- A wrapper killed while its relay keeps running; then a start of that slot.
+- A Fast Startup shut down and power on; sleep and resume; hibernate and resume. Each must be
+  classified as the SAME epoch.
+- A crash after `drain` and before `switch`; after `switch` and before `start`; after `start` and before
+  readiness: each across a full restart and within one epoch.
 - A HALTED operation with an unresolved intent, followed by a new `apply`.
 - A torn `accepted` record; a torn later record; a missing `active` pointer with an open journal.
 - A slot whose desired state is `stopped`, through a swap of another slot and through a reboot.
@@ -429,17 +489,22 @@ native ABI; and the controller's state machine run against a fake SCM.
 | Vega `037d75df` #1 | the timeouts are unbound, so the scenarios are too | C0 defaults table |
 | Vega `037d75df` #2 | the `fleet.sh` refusal is prose, not enforced | §4: the manifest is the switch; stage C gated on the guard and its negative test |
 
-| Aster `ee657b8c` #1 | a dead holder's request can still land; wrapper and relay pids | C4 quiescence fence, V11, incarnation as a pair; C11 starts only proven-stopped |
+| Aster `ee657b8c` #1 | a dead holder's request can still land; wrapper and relay pids | v0.4 answered with a quiescence wait, WITHDRAWN in v0.5; now C4 epoch rules; incarnation as a pair; C11 starts only proven-stopped |
 | Aster `ee657b8c` #2 | a HALTED op is not history; torn records hide scope; the pointer | C5 durable scope, atomic pointer, the operation table |
 | Aster `ee657b8c` #3 | a forward UTC jump ages charges early | C8 measured uptime only; expiry separate from release |
 | Aster `ee657b8c` | policy values must fail closed | C0 |
-| Aster `fc7d5766` | a timing bound is not a fence | C4: Fence 1 (one instance per service) and Fence 2 (the boot); same-boot unresolved stays UNKNOWN; QUIESCE_MS demoted to observation |
+| Aster `fc7d5766` | a timing bound is not a fence | C4: Fence 1 (one instance per service) and Fence 2 (the boot); same-boot unresolved stays UNKNOWN; ESCALATE_MS demoted to observation |
 | Aster `fc7d5766` (a) | C11 must inherit guards; a switch record is not permission | C11 step 4 |
 | Aster `fc7d5766` (b) | all-slot scope excluded every slot | C11 step 2: scope vs obligation |
 | Aster `fc7d5766` | a `resolved` label settles nothing | C5: evidence or an authorised override |
+| Aster `18ecc644` #1 | one wrapper is not one relay | C4 Fence 1a/1b; V12, V13 |
+| Aster `18ecc644` #2 | a changed boot time is not a fresh SCM | C4 Fence 2: `services.exe` epoch, issuer gone, no replay source; V11 |
+| Aster `18ecc644` #3 | the liveness promise contradicted step 4; action vs migration completion | C11 phase table; promise narrowed to its rows |
+| Aster `18ecc644` | residual quiescence wording | removed; the timer renamed `ESCALATE_MS` |
 
 **Dispositions on v0.3:** Vega **ACCEPT as the stage-A candidate** (`037d75df`), conditional on
-the two rows above, which this amendment answers. Aster: CHANGES REQUIRED on v0.3 (`ee657b8c`) and on v0.4 (`fc7d5766`), answered in v0.4 and v0.5.
+the two rows above, which this amendment answers. Aster: CHANGES REQUIRED on v0.3 (`ee657b8c`), v0.4 (`fc7d5766`) and v0.5 (`18ecc644`), answered in
+v0.4, v0.5 and v0.6. Vega: ACCEPT v0.5 for design freeze (`eb9d7f3e`); v0.6 disposition pending.
 Orion: no disposition on any version.
 
 ## 9. Open decisions, all David's
