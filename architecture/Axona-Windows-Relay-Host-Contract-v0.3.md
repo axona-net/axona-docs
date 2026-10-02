@@ -84,11 +84,30 @@ action. A slot's desired state lives in the manifest and the journal, never in a
 **The operator CLI, `relayctl.ps1`.** It never mutates a slot. It submits requests through the
 spool (C5) and reads status.
 
-**No third driver** (Vega, `268cf8f3`). From the start of stage C, `ops/fleet.sh` refuses
-`axona-win` with a pointer to this contract, and the legacy `windows-roll.sh` path is not run
-there.
+**No third driver** (Vega, `268cf8f3`), and it is enforced, not described (Vega, `037d75df`).
+The switch is the manifest itself: when `axona-relay/hosts/<host>.json` exists with
+`"supervisor": "scm"`, `ops/fleet.sh` refuses that host for `roll`, `add` and cold start, and
+names this contract; `ops/release.sh check` prints that host's row as "relayctl, not fleet.sh".
+**Stage C cannot begin until that guard is in `fleet.sh` and its negative test passes**: with the
+manifest present, a roll of `axona-win` must exit non-zero having touched nothing.
+RELEASE-PROCEDURE.md row 8 records the same rule.
 
 ## 5. The contract
+
+**C0 — Normative defaults** (Vega, `037d75df`: without bound values the §7 scenarios are
+unbounded). The manifest may override any of these per host. Each is grounded in today's code
+or practice, and the one that is not yet measured on this host says so.
+
+| name | default | basis |
+|---|---|---|
+| `POLL_MS` | 3 000 | `fleet-cadence.sh` `POLL=3` |
+| `LEAVE_TIMEOUT_MS` | 30 000 | `fleet-cadence.sh` `LEAVE_TIMEOUT=30` |
+| `PENDING_MAX_MS` | 120 000 | four times `LEAVE_TIMEOUT_MS`: a stop that has not settled by then is UNKNOWN |
+| `READY_DEADLINE_MS` | 270 000 | the Windows roll's current `READY_TIMEOUT` (`fleet.sh` passes 3 × `WIN_ADVANCE_CAP`=90) |
+| `FRESH_MS` | 15 000 | a relay writes a state line every 1 000 ms (`src/index.js:322`); fifteen missed lines tolerate an event-loop stall. **Provisional until V9** measures the cadence under a service on this host |
+| `BOOT_GRACE_MS` | 600 000 | a slot failing within ten minutes of its boot start counts as a crash restart; more than twice `READY_DEADLINE_MS` |
+| restart budget | 3 per rolling 24 h | C8 |
+| wrapper stop timeout | moot if V2 shows a no-escalation stop; otherwise 60 000, and every stop is an authorised destructive action (C6.2) | C6.2 |
 
 **C1 — The count is a reviewed declaration.** `hosts/axona-win.json` names exactly twenty slots,
 `w01`…`w20`. Per slot: desired state (`running` | `stopped`), region, environment, release. N is
@@ -295,9 +314,12 @@ native ABI; and the controller's state machine run against a fake SCM.
 | Aster `f5442247` #4 | desired-stopped vs the precondition; recovery facing 19 not ready | C6 step 0, C11 |
 | Aster `f5442247` #5 | budget across boots | C8 |
 | Aster `f5442247` | relay-free stage B cannot show V5, V6, V9 | §3 B1/B2/B3, §6 |
+| Vega `037d75df` #1 | the timeouts are unbound, so the scenarios are too | C0 defaults table |
+| Vega `037d75df` #2 | the `fleet.sh` refusal is prose, not enforced | §4: the manifest is the switch; stage C gated on the guard and its negative test |
 
-Orion has not yet given a disposition. Vega's review was of v0.1; its v0.2 and v0.3 dispositions
-are still open.
+**Dispositions on v0.3:** Vega **ACCEPT as the stage-A candidate** (`037d75df`), conditional on
+the two rows above, which this amendment answers. Aster: review of v0.3 pending. Orion: no
+disposition on any version.
 
 ## 9. Open decisions, all David's
 
