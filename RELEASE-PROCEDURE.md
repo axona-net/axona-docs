@@ -188,6 +188,40 @@ Each is its own design and its own word.
       the tool reads "kernel unknown" (droplets), read the unit's start time against the
       vendored file's mtime and say the version is INFERRED, not seen.
 
+## 6a. The Windows fleet — restart, reboot, recover
+
+axona-win is not restarted by hand and is not inventoried again. Its facts are in
+`axona-relay/hosts/axona-win.json`. Its controller is `axona-relay/windows/relayctl.ps1`,
+run on the host as
+`powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\david\github\axona-relay\windows\relayctl.ps1 <command>`.
+Every command except `status` writes `relay-logs\relayctl-<UTC>.out` on the host and ends
+with `RESULT=OK` or `RESULT=FAIL <reason>`.
+
+| Need | Do | Done when |
+|---|---|---|
+| New kernel or relay code | `KERNEL=<ver> ops/fleet.sh roll axona-win` (calls `relayctl roll`) | `RESULT=OK`; `status` reads `services_live=20/20 bare=0 kernels=[20x<ver>]` |
+| Restart the fleet on the same code | `KERNEL=<current> ops/fleet.sh roll axona-win` | same |
+| One relay misbehaving | `relayctl stop -Slot N` then `relayctl start -Slot N` | `start` prints a ready state line |
+| Reboot the box | `ssh -n axona-win "shutdown /r /t 5"`, wait, then `relayctl status` | 20/20 within about 3 minutes of boot, with nobody logged in. Tested 2026-10-02: boot 20:19:49Z, 20/20 at 20:22:31Z |
+| A relay crashes | nothing; the service restarts it after 10 s, 30 s, then 60 s | `status` 20/20 |
+| Changed `windows/relaysvc.cs` | the roll builds `C:\axona\relaysvc-<hash>.exe`; each service takes it at its restart | — |
+| Fewer or more relays | David's word, then change `services.count` in the manifest, `relayctl install`, start the new slots | — |
+
+What it is, so a failure can be read:
+- Each relay is service `axona-relay-NN`, run by `relaysvc.exe` as LocalSystem, delayed
+  auto-start, environment from the manifest (region eagle, prod bridge, `SUB_TERMINAL_VERIFY=1`).
+- `relaysvc.exe` holds the relay in a Job Object with kill-on-close. Killing the wrapper
+  kills the relay (tested: dead within 2 s); killing the relay makes the wrapper exit
+  non-zero, and the SCM restarts the service (tested: back within 18 s).
+- `relayctl roll` pulls (discarding Windows npm lockfile drift), checks the vendored kernel,
+  load-tests node-datachannel, then restarts one slot at a time behind the bridged-and-bonded
+  gate (`-AdvanceCap`, 90 s) and the kernel banner. It stops at the first failed slot.
+- Logs: `relay-logs\svc-NN.log`, the previous run kept as `svc-NN.log.1`.
+- `windows-fleet.sh`, `windows-roll.sh`, `roll-fleet-windows.sh`, `win-*-logged.sh`,
+  `stop-fleet.sh` and `add-relays.sh` REFUSE on this host. Do not work around the refusal.
+- PowerShell 5.1 strips double quotes from a native command's arguments, and the ssh shell
+  is cmd.exe. Ship a `.ps1` with scp; never inline quoted code.
+
 ## 7. Apps   **GATE: the pin, again**
 
 - [ ] `ops/release.sh apps <ver>` — refuses unless the front-door bridge serves the version;
