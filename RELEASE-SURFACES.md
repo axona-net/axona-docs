@@ -92,9 +92,9 @@ the architecture scorecards, `implementation/`, and everything in `team-updates/
 | Site | Repo | Mechanism | Notes |
 |---|---|---|---|
 | **axona.net** | `axona-web` | Pages from `main`, `CNAME` in repo | Hosts the whitepaper mirror + doc links |
-| **demo.axona.net** | `axona-protocol` | Pages from `main`, `CNAME` in repo | `apps/` — minimal, share, pow-bench **AND `examples/`** — minimal-pubsub-browser, minimal-pubsub, s2-region-visualizer |
+| **demo.axona.net** | `axona-protocol` | Pages from `main`, `CNAME` in repo | `apps/axona-minimal`, `apps/axona-share`, `apps/lib` **AND `examples/`** — minimal-pubsub-browser, minimal-pubsub, s2-region-visualizer. There is no `apps/share` and no `apps/pow-bench`; both 404 (corrected 2026-10-02) |
 | **axona.chat** | `axona-chat` | Pages via `.github/workflows/deploy.yml` | Custom domain is a **Pages setting**, not a repo `CNAME` |
-| **axona-share** (standalone) | `axona-share` | Pages via `.github/workflows/pages.yml` | `axona-net.github.io/axona-share` |
+| **axona-share** (standalone) | `axona-share` | Pages via `.github/workflows/pages.yml` | `axona-net.github.io/axona-share`. NOT the same code as `demo.axona.net/apps/axona-share/`, which is a separate copy in `axona-protocol` that no release step moves — it read APP_VERSION 0.20.0 against the standalone's 0.33.0 on 2026-10-02 |
 | **testnet.axona.net** | droplet `161.35.234.165` | `git pull` on three `testnet` checkouts | bridge + peer app + demo-testnet |
 
 **Deploy branches:** work happens on `testnet`, live sites build from `main`. Web
@@ -192,12 +192,11 @@ would be a change to a repo that must not change.
 
 ## 5. Release checklist
 
-**Code, in dependency order** — kernel → consumers → deploy → verify:
-
-- [ ] `axona-protocol`: bump, tag `vX.Y.Z`, push `testnet` (+ `testnet:main` to deploy demo)
-- [ ] Re-vendor/re-pin: `axona-relay`, `axona-bridge`, `dht-sim`, `axona-chat` — **never `axona-peer`**
-- [ ] Deploy: testnet droplet → prod bridges (**east first**, west is the surviving bootstrap) → 9 prod relays
-- [ ] Verify by **fetching what each surface actually serves** — `/healthz`, the built bundle, the live page. Never trust the deploy command's own output.
+**The code sequence is NOT kept here.** It lives in one place, `RELEASE-PROCEDURE.md`, and
+`ops/release.sh check <ver>` is its completion gate. This section used to carry its own
+four-line copy, and by 2026-10-02 that copy said "9 prod relays" against a fleet of 52
+and omitted `axona-share` and `axona-portal`. Two checklists for one sequence drift
+apart. Follow the procedure.
 
 **Docs, once testnet is live on the new kernel:**
 

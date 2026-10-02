@@ -2,9 +2,34 @@
 
 **Written:** 2026-09-20 from the 4.86.0 promotion. **Revised:** 2026-09-21 from the 4.88.0
 promotion, after David: "We need a standard process for updating the full system like this
-so that you don't skip critical infrastructure and applications." Companion to
-`RELEASE-SURFACES.md` (what carries a version) and `ops/release.sh` / `ops/fleet.sh` /
-`ops/droplet-roll.sh` (the tools). This file is the order and the inventory.
+so that you don't skip critical infrastructure and applications." **Revised again:**
+2026-10-02 from the 4.100.0 promotion, after David: "Errors in the process are not
+acceptable when we have done this so many times." Companion to `RELEASE-SURFACES.md`
+(what carries a version) and `ops/release.sh` / `ops/fleet.sh` / `ops/droplet-roll.sh`
+(the tools). This file is the order and the inventory.
+
+## Before anything — the three rules that 4.100.0 broke
+
+The 4.100.0 promotion was the hundredth. It still went wrong in eight places, and not one
+of them was new. Every failure below was either already written in this file and not read,
+or written wrong in this file and not checked. So:
+
+1. **Read this whole file before the first command.** Not the section you think you need.
+   §6 said in September to read the Windows roll's log and never its ssh stdout. On
+   2026-10-01 the ssh stdout was read anyway, for two and a half hours, while the roll sat
+   dead with its abort message in the log.
+2. **`ops/release.sh check <ver>` is the first command and the last.** It is a gate, not a
+   display: it exits 1 and prints INCOMPLETE while any row it checks is behind. On
+   2026-10-01 the relays and both bridges reached 4.100.0, the apps were left on 4.99.0,
+   and the old `check` printed that mismatch while exiting 0. A promotion that stops
+   two-thirds through looks finished from inside. That evening David's council posts from
+   axona.chat did not arrive.
+3. **A tool's flags are its own.** `DRY=1` is honoured by `fleet.sh` and `droplet-roll.sh`
+   and was IGNORED by `release.sh`, which ran a real `npm install` under it. `release.sh`
+   now refuses `DRY` outright; its read-only mode is `check`. Do not carry a flag from one
+   tool to another on the assumption it means the same thing.
+
+A promotion is done when §13 says it is done, and not before.
 
 What has to be true, and in what order, before every node, app, seat, simulator and
 document that names a kernel names the new one? That question is the whole procedure.
@@ -33,13 +58,14 @@ exists that is not in this table, add the row before touching it.
 | 4 | testnet bridge B1 (droplet 161.35.234.165, systemd, branch `testnet`) | its checkout's `node_modules` | as user `axona`: fetch + reset to `origin/testnet`, `npm ci --omit=dev`, `systemctl restart axona-bridge` | local `/healthz` version + kernelVersion; `axona-ready` row |
 | 5 | testnet bridge B2 (M1, launchd `net.axona.testnet-bridge-b2`, branch `testnet`) | its checkout's `node_modules` | `PATH=/opt/homebrew/bin`: fetch + reset, `npm install --omit=dev`, `launchctl kickstart -k` | `/healthz` on 127.0.0.1:8090 with the on-host token |
 | 6 | production bridge east (`bridge.axona.net`, Docker, `main`) | image built from the checkout | `ops/release.sh bridges <ver>` (east first, verified on the PUBLIC endpoint, then west) | public `/healthz` |
-| 7 | production bridge west (`bridge-west.axona.net`, Docker, `main`) | same | same tool, second leg | public `/healthz` |
-| 8 | relay fleets: Air, M1, Linux, Windows | each host's checkout, pulled by the tool | `DRY=1 KERNEL=<ver> ops/fleet.sh roll` (pulls, starts nothing) then `KERNEL=<ver> ops/fleet.sh roll <host>…` | `ops/fleet.sh status`: live = target, banners on the version |
-| 9 | relay droplets (3, systemd units named by region) | `/opt/axona-relay`, branch `main` | per droplet, TWO passes: `ONLY=<ip> EXPECT_PER_DROPLET=<measured> EXPECT_KERNEL=<current> DRY=1 ops/droplet-roll.sh` (the pull) then `… EXPECT_KERNEL=<ver> ops/droplet-roll.sh` | unit start time later than the vendored file's mtime, and the banner when the journal is short enough to read |
-| 10 | `axona-chat` (axona.chat, Pages from `main`) | pin | `ops/release.sh apps <ver>` (refuses unless the bridge serves it); version bump; `vite build` (prebuild = pin check); bundle greps for the new version and NOT the old; push `main` | served `index-*.js` hash equals the local build |
-| 11 | `axona-share` (github.io AND demo.axona.net, Pages from `main`) | pin + `npm run link-kernel` symlink | same tool; version bump; five `?v=` tags in `index.html`; module tags + `APP_VERSION` in `app.js`; `check_kernel_pin.mjs`; push `main` | served `app.js?v=` and `APP_VERSION` on BOTH hosts |
-| 12 | demo.axona.net (`apps/`, `examples/` from the kernel's `main`) | the kernel repo itself | nothing beyond §1's push to `main` | served `?v=` tags |
-| 13 | `axona-portal` (Electron, no deploy surface) | pin | `npm install github:…#vX --save`; version bump; `npm test`; push `main` | pin + tests |
+| 7 | production bridge west (`bridge-west.axona.net`, Docker, `main`) — host `206.189.174.110` (sfo2) since 2026-09-30, checkout `/opt/axona-bridge-docker` | same | same tool, second leg | public `/healthz` through the NAME, never through an ssh to a host |
+| 8 | relay fleets: Air, M1, Linux, Windows | each host's checkout, pulled by the tool | `DRY=1 KERNEL=<ver> ops/fleet.sh roll` (pulls, starts nothing) then `KERNEL=<ver> ops/fleet.sh roll air m1 axona-linux`, then `axona-win` ALONE (§6). Never `ops/fleet.sh roll` with no host list | `ops/fleet.sh status`: live = target EXACTLY, banners on the version. axona-win read 21 against 20 for weeks and was reported as done each time; 21/20 is a FAIL |
+| 9 | relay droplets (FOUR since 2026-09-30, systemd units named by instance) | `/opt/axona-relay`, branch `main` | `ops/fleet.sh roll` drives `droplet-roll.sh` for all four, two passes each. Since 2026-10-02 `droplet-roll.sh` also REFUSES a droplet whose systemd does not resolve `SUB_TERMINAL_VERIFY=1` (`EXPECT_ARM=0` for a deliberate control arm) | unit start time later than the vendored file's mtime; or the variable read from `/proc/<pid>/environ` |
+| 10 | `axona-chat` (axona.chat, Pages from `main`) | pin | `ops/release.sh apps <ver>` (refuses unless BOTH bridges serve it); version bump; `npm test`; `npm run build`; push `main` | served `index-*.js` FILENAME equals the local `dist/assets/index-*.js` — the hash is the proof, a version grep is weaker |
+| 11a | `axona-share` STANDALONE (`axona-net.github.io/axona-share`, repo `axona-share`) | pin + `npm run link-kernel` symlink | same tool; §7's tag rule; `check_kernel_pin.mjs`; push `main` | served `index.html` reads five `?v=<ver>`; served `app.js` reads the new `APP_VERSION` |
+| 11b | `axona-share` DEMO COPY (`demo.axona.net/apps/axona-share/`, a SEPARATE directory inside `axona-protocol`) | the kernel repo; its tags are written by `sync-cachebust.mjs` | nothing — its kernel follows §1 automatically, and NO step moves its app code | served tags read `<ver>`. On 2026-10-02 its `APP_VERSION` read **0.20.0** against the standalone's 0.33.0. Two codebases, one name. Whether to retire, sync or keep it is David's call and is still open |
+| 12 | demo.axona.net (`apps/axona-minimal`, `apps/axona-share`, `apps/lib`; `examples/minimal-pubsub-browser`, `examples/s2-region-visualizer`, `examples/minimal-pubsub`) | the kernel repo itself | nothing beyond §1's push to `main` | served `?v=` tags. There is NO `apps/share` and NO `apps/pow-bench` — both 404, and the surface map listed both until 2026-10-02 |
+| 13 | `axona-portal` (Electron, no deploy surface) | pin | `npm install github:…#vX --save`; version bump; `npm test`; push `main` | pin + tests. Read **v4.92.0** on 2026-10-02 — eight promotions skipped without anything saying so. `release.sh check` now gates it |
 | 14 | `dht-sim` graphical (Pages from `main`) | `vendor/axona-protocol/` via `scripts/sync-vendor-kernel.sh` (three gates) | sync; bump the legend version in `index.html`; push `testnet` AND `main` | served legend version; vendored `KERNEL_VERSION` |
 | 15 | `dht-sim` Node harness | `file:../axona-protocol` symlink | nothing — it runs whatever the sibling checkout is on; say which commit that is | `node_modules/@axona/protocol` → the checkout at the tag |
 | 16 | `axona-stress` harness | imports `../axona-relay/vendor/…` | nothing beyond §2 | the relay checkout at the commit |
@@ -112,7 +138,14 @@ Each is its own design and its own word.
 ## 5. Production bridges   **GATE: production**
 
 - [ ] `ops/release.sh bridges <ver>`: east first, verified on the public `/healthz` before
-      west is touched. ~4 minutes. Each leg is a container recreate: every socket closes
+      west is touched. ~4 minutes. Before either leg the tool asserts that each ssh target
+      IS the address its public name resolves to, and refuses if not. That check exists
+      because on 2026-10-02 the script still named the pre-migration west host,
+      `24.199.98.119`, which is now a relay droplet that still carries a dead
+      `/opt/axona-bridge-docker` with a compose file. The next run would have started a
+      ghost bridge, Caddy and coturn beside three grizzly relays, verified THAT, and
+      reported west done while the real west was never touched. Every bridge migration
+      updates `WEST_HOST` / the `axona-bridge` ssh alias in the same change as the DNS. Each leg is a container recreate: every socket closes
       with 1001, clients reconnect by name within ~20 s, Caddy answers 502 for the seconds
       the container is down. A recreate under load took 76 s on 2026-09-21.
 - [ ] Both bridges' full `/healthz` through their public names with the on-host token
@@ -123,10 +156,37 @@ Each is its own design and its own word.
 - [ ] `DRY=1 KERNEL=<ver> ops/fleet.sh roll` — pulls every laptop/box checkout, verifies
       the vendored kernel, starts nothing. It refuses a droplet whose live count is not the
       table's target; that is expected when a droplet is short.
+- [ ] **Count before you roll.** `ops/fleet.sh status` must read live = target on every host
+      BEFORE the roll, not only after. The Windows branch is handed `N=$live` and the
+      target is consulted only when growing, so NO path in the tool ever reduces a count:
+      a roll of a host at 21 against 20 produces 21 again, on the new kernel, and reads as
+      success. Correcting a count is not a version promotion and needs David's word.
 - [ ] `KERNEL=<ver> ops/fleet.sh roll air m1 axona-linux` (hosts in parallel, slots serial
-      within a host, each replacement integrated before its predecessor leaves). Then
-      `axona-win` on its own — it is slower and can abort on its advance gate with the heir
-      in fact bonded; read `win-roll-logged.sh`'s log, never the ssh stdout.
+      within a host, each replacement integrated before its predecessor leaves). NEVER
+      `ops/fleet.sh roll` with no host list: that includes axona-win in the same parallel
+      run, which is what happened on 2026-10-01.
+- [ ] Then `KERNEL=<ver> ops/fleet.sh roll axona-win` on its own, and read its result from
+      the HOST, never from the local session. `fleet.sh` buffers each host group's output
+      until that group's ssh closes, and the axona-win ssh can stay open long after the
+      roll behind it has exited. On 2026-10-01 the roll aborted at 22:02:52Z on its ADVANCE
+      gate, correctly, and the channel stayed open until it was killed at 00:31Z the next
+      day. For those 2 h 28 m the local log read 61 lines and the roll was believed to be
+      running. The roll's own words were on the host the whole time:
+      ```bash
+      WINBASH='"C:\Program Files\Git\bin\bash.exe"'
+      ssh -n axona-win "$WINBASH -lc 'cd /c/Users/david/github/axona-relay; ls -t relay-logs'"
+      ssh -n axona-win "$WINBASH -lc 'cd /c/Users/david/github/axona-relay; tail -n 12 relay-logs/winroll-<YYYYMMDD-HHMMSS>.out'"
+      ```
+      Read it within two minutes of the last slot being due. No pipes in the remote
+      command: cmd.exe consumes `|`, `&`, `>` and `$( )` before git-bash sees them. The
+      `winroll-*.out` filename uses the HOST's local clock, which is UTC-4.
+- [ ] **An ADVANCE abort at slot k leaves a known shape.** Slots 1 … k−1 are rolled; slot k's
+      heir is running but never bonded; the old relays k … N are still serving. The count is
+      one HIGHER than before. Do not roll again on top of it. Inventory the host first —
+      `wmic` is removed from it, so use PowerShell `Get-CimInstance Win32_Process` from a
+      `.ps1` shipped with `scp` — and take the remediation to David. On 2026-10-01 slot 17's
+      heir burned 3.2 CPU seconds against 59.9–290 for its sixteen siblings and never wrote
+      a state line, which matches GH #61's description; its mechanism is not established.
 - [ ] Droplets one at a time with the MEASURED count, two passes each (DRY on the current
       kernel performs the pull; live on the new one). Write the three invocations out in
       full: a `for spec in "ip n"; set -- $spec` loop under zsh does NOT split the string,
@@ -138,16 +198,43 @@ Each is its own design and its own word.
 ## 7. Apps   **GATE: the pin, again**
 
 - [ ] `ops/release.sh apps <ver>` — refuses unless the front-door bridge serves the version;
-      re-pins `axona-chat` and `axona-share` and stops.
-- [ ] `axona-share`: bump `package.json`; the five `?v=` tags in `index.html`; the module
-      tags AND `APP_VERSION` in `app.js` (the `image.js?v=` tag is easy to miss);
-      `npm run link-kernel`; `node check_kernel_pin.mjs`; commit; push `main`.
-- [ ] `axona-chat`: bump; `npm run build` (prebuild is the pin check); grep the bundle for
-      the new version and for the absence of the old; commit; push `main`.
+      re-pins `axona-chat` and `axona-share` and stops. It is NOT a dry run and has none.
+      It writes `package.json` and `package-lock.json` in both repos the moment it runs.
+- [ ] `axona-share`, the tag rule, which is mechanical so that nobody has to judge it:
+      - `index.html`: the FIVE kernel tags (four importmap entries and `app.js`) → `?v=<ver>`.
+      - `app.js`: `APP_VERSION` → the new app version, AND both module tags,
+        `./axona.js?v=` and `./image.js?v=`, → the same new app version.
+      - `axona.js`: `./region.js?v=0.16.0` stays. region.js last changed at 0.10.0.
+
+      Move every tag the rule names, every release, whether or not you believe its file
+      changed. A tag moved over unchanged bytes costs one extra fetch. A tag left behind
+      over changed bytes keeps a returning browser on stale code, and `curl` cannot see
+      it. The seven releases 0.26.0 to 0.32.0 all followed this rule. 0.33.0 broke it on a
+      judgment that `axona.js` and `image.js` had not changed — true, harmless that
+      once, and exactly the kind of call this rule exists to remove.
+
+      Then `npm run link-kernel`; `npm run check:kernel-pin` must read
+      declared = locked = installed; commit only the files the rule touched plus
+      `package.json` and `package-lock.json`; push `main`.
+
+      Grep `index.html`, `app.js` and `axona.js` with QUOTED globs:
+      `grep -rnoE '[A-Za-z0-9_./-]+\?v=[0-9.]+' . --include='*.html' --include='*.js'
+      --exclude-dir=node_modules`. zsh eats an unquoted `--include=*.js` and the grep
+      silently searches nothing.
+- [ ] `axona-chat`: bump; `npm test`; `npm run build` (prebuild is the pin check); the
+      BUILT bundle must contain the new kernel and app versions and ZERO of the old ones;
+      commit `package.json` and `package-lock.json` (dist is gitignored); push `main`.
 - [ ] `axona-portal`: `npm install github:…#v<ver> --save`; bump; `npm test`; push `main`.
-- [ ] Verify the SERVED page, not the workflow, and give Pages a few minutes:
-      `axona.chat`'s `index-*.js` hash equals the local build; `axona-net.github.io/axona-share`
-      AND `demo.axona.net/apps/axona-share/` read the new `app.js?v=` and `APP_VERSION`.
+- [ ] Watch the Pages runs to `completed/success` with `gh run list --repo axona-net/<app>`.
+      Then verify what is SERVED, with a cache-buster on every fetch: `axona.chat`'s
+      `index-*.js` filename equals the local build's; `axona-net.github.io/axona-share`'s
+      `index.html` reads five `?v=<ver>` and its `app.js` reads the new `APP_VERSION`.
+      `demo.axona.net/apps/axona-share/` is row 11b — it will NOT read the new
+      `APP_VERSION`, and that is not a failure of this step.
+- [ ] Tell anyone with axona.chat open to CLOSE every tab and reopen. axona.chat is a PWA:
+      its service worker can keep serving the previous bundle to a returning tab after
+      the server has the new one, and a plain reload may not dislodge it. Verifying with
+      `curl` proves the server. It proves nothing about a tab that was already open.
 - [ ] An app pinned ABOVE its bridge connects and silently never completes (Safari,
       2026-09-08). Bridges precede apps, and the tool enforces it.
 
@@ -192,8 +279,29 @@ Each is its own design and its own word.
 - [ ] `ops/STATE.md` — every step with `date -u` read at the time, the command, the tool's
       verdict. Never a guessed time.
 - [ ] Council: what was done, by whose word, counts by unit and by host, with the limits.
+      A council post is recorded when a poll returns it WITH ITS SEQ. Not when `publish`
+      returns `ok:true` — that means dispatched (GH #66). And not by a watch's `total`,
+      which is that peer's cumulative receive counter and not the topic's length (GH #74).
+      On 2026-10-02 reading `total` instead of a seq produced a published false report of
+      write loss.
 - [ ] Memory: the deploy-state note, and the one thing about this promotion that was not
       obvious.
+
+## 13. Done means
+
+A promotion to `<ver>` is finished when all of these read back, and it is reported as
+finished only then:
+
+- `ops/release.sh check <ver>` exits 0 and prints COMPLETE.
+- `ops/fleet.sh status`: every host at live = target exactly, every banner on `<ver>`.
+  Droplets reading "kernel unknown" are reported INFERRED from start time against mtime.
+- Every row of §0 has its proof column read back, and rows the tools do not check
+  (MCP seats, Howard, 11b) are named in the report with what was and was not verified.
+- §10's documents carry `<ver>`.
+- §12 is written.
+
+Anything short of that is reported as PARTIAL, with the rows still behind named. "Rolled"
+is not "done", and "the tool said ✓" is not "verified".
 
 ## Traps the tools do not absorb, each of which cost a wrong result once
 
@@ -211,6 +319,26 @@ Each is its own design and its own word.
   their own (`grizzly1`, `useast`, `uswest`).
 - "kernel unknown" on a droplet is not "old"; it is a journal too long to grep. Infer from
   unit start time versus vendored mtime and say INFERRED.
+- A refusal can be the tool's bug. `release.sh` refused 4.100.0's apps on 2026-10-02 with
+  "tag v4.100.0 is not on origin" when it was. `ls-remote | grep -q` under
+  `set -o pipefail`: `grep -q` exits on its first match, SIGPIPEs git, and the pipeline
+  returns 141. Racy, so every earlier release passed. Fixed. The rule stands — do not work
+  around a refusal — but read the refusal against the fact it names before obeying it.
+- A host list goes stale the day a host moves. `release.sh` named a west bridge that had
+  become a relay droplet; `check` showed an empty west line and nobody read it. Both
+  bridges are now verified through their public names and deploys assert the target.
+- The fleet moving is not the system moving. The relays and bridges reached 4.100.0 on
+  2026-10-01 and the apps did not. Only `check`'s exit status catches that.
+- A long-lived ssh is not a status. The axona-win roll was dead for 2 h 28 m behind an open
+  channel. Status is read from the host's log, by a second connection.
+- An env var carried between tools is a guess. `DRY=1` meant nothing to `release.sh`.
+- One app name, two codebases. "axona-share" is the standalone repo on github.io AND a
+  separate copy in `axona-protocol/apps/` on demo.axona.net. A probe of the wrong path
+  (`/apps/share/`, from the old surface map) returns 404 and looks like proof there is
+  no second copy. There is.
+- A curl check proves the server, never a returning browser. axona.chat is a PWA.
+- Two council signers are both David: `c9b2bdfb` and `6c47f277` ("David on Air"). A
+  witness's per-signer maximum for one says nothing about the other.
 
 ## What this procedure does not cover
 
