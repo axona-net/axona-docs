@@ -1,8 +1,9 @@
-# Windows relay host contract — v0.3, a candidate for council review
+# Windows relay host contract — v0.4, a candidate for council review
 
 *axona.bot, 2026-10-02. v0.1 (ed2ece8) was the consolidation Aster asked for in council 709, on
-David's 708. v0.2 (5b88197, amended 85f4e12) answered Aster's `4d410f51`. v0.3 answers Aster's
-`f5442247`, which accepted v0.2's structure and named five remaining counterexamples.*
+David's 708. v0.2 (5b88197, 85f4e12) answered Aster's `4d410f51`. v0.3 (2c6f5e1, amended 36ceef7)
+answered Aster's `f5442247` and Vega's `037d75df`. v0.4 answers Aster's `ee657b8c`: three recovery
+obligations.*
 
 How should twenty relays live on a Windows host so that the count is a declaration, a reboot is a
 non-event, and the operator always knows what happened? That is the question.
@@ -12,7 +13,19 @@ nothing has been run, and no live process is touched by it. Its scope is one hos
 is not a bridge change, not a kernel change, and it does not decide `SUB_TERMINAL_VERIFY` policy.
 Stage A (design) is under David's 708; stages B, C and D each need their own word (§3).
 
-**What v0.3 changes.** v0.2's structure stands: one controller, Manual slots with no recovery
+**What v0.4 changes.** Three recovery contracts are made explicit (§8 has the full record).
+
+1. A previous controller's request to SCM can still take effect after that controller has died,
+   and SCM offers no way to cancel it. C4 now waits out a bounded quiescence fence before any
+   action, distinguishes the wrapper's process from the relay's, and leaves any slot it cannot
+   prove settled UNKNOWN.
+2. A HALTED operation is not history while any of its actions is unresolved. C5 now has an
+   ordering and recovery table, and every operation declares its scope durably BEFORE its first
+   action, so a torn record never hides which slots are at risk.
+3. Across a reboot, nothing local bounds elapsed time. C8 now counts restart charges against
+   MEASURED uptime only, so a forward clock jump cannot age a charge out early.
+
+**What v0.3 changed.** v0.2's structure stands: one controller, Manual slots with no recovery
 actions, an operating-system exclusion taken before anything mutates, a reviewed migration table.
 v0.3 closes five gaps in it.
 
@@ -95,7 +108,11 @@ RELEASE-PROCEDURE.md row 8 records the same rule.
 ## 5. The contract
 
 **C0 — Normative defaults** (Vega, `037d75df`: without bound values the §7 scenarios are
-unbounded). The manifest may override any of these per host. Each is grounded in today's code
+unbounded). They form a versioned policy: the manifest names the policy version it uses and may
+override values per host. The controller validates the policy at load. **An unset, unparseable or
+out-of-range value fails closed**: the controller refuses to act and `status` reads UNKNOWN. A
+missing value never becomes an unlimited wait (Aster, `ee657b8c`). Values that affect only liveness
+may stay evidence-dependent, as `FRESH_MS` is. Each is grounded in today's code
 or practice, and the one that is not yet measured on this host says so.
 
 | name | default | basis |
@@ -103,6 +120,7 @@ or practice, and the one that is not yet measured on this host says so.
 | `POLL_MS` | 3 000 | `fleet-cadence.sh` `POLL=3` |
 | `LEAVE_TIMEOUT_MS` | 30 000 | `fleet-cadence.sh` `LEAVE_TIMEOUT=30` |
 | `PENDING_MAX_MS` | 120 000 | four times `LEAVE_TIMEOUT_MS`: a stop that has not settled by then is UNKNOWN |
+| `QUIESCE_MS` | 150 000 | `PENDING_MAX_MS` plus Windows' default 30 000 ms service-control timeout: the longest a previous holder's request can plausibly stay in flight. **Provisional until V11** |
 | `READY_DEADLINE_MS` | 270 000 | the Windows roll's current `READY_TIMEOUT` (`fleet.sh` passes 3 × `WIN_ADVANCE_CAP`=90) |
 | `FRESH_MS` | 15 000 | a relay writes a state line every 1 000 ms (`src/index.js:322`); fifteen missed lines tolerate an event-loop stall. **Provisional until V9** measures the cadence under a service on this host |
 | `BOOT_GRACE_MS` | 600 000 | a slot failing within ten minutes of its boot start counts as a crash restart; more than twice `READY_DEADLINE_MS` |
@@ -130,11 +148,24 @@ The mutex fences controllers. It does NOT fence an action one controller already
 (Aster, `f5442247`). A start or stop issued by holder A may still be in flight when holder B
 acquires the abandoned mutex. So:
 
-- **Pending-action proof.** Before B issues ANY action on a slot, that slot must be in a terminal
-  SCM state, `Running` or `Stopped`, not `StartPending` or `StopPending`, AND the process table
-  must agree with it: for `Stopped`, no process of any recorded incarnation; for `Running`, exactly
-  one process whose pid and start time are recorded. A slot still pending after `PENDING_MAX` is
-  **UNKNOWN**.
+- **A terminal state is not proof that an old request cannot still land** (Aster, `ee657b8c`).
+  Holder A can flush an intent, issue a start or stop, and die before seeing the outcome. A request
+  from a client that has died may still be delivered and executed, and SCM has no cancellation for
+  it. A snapshot cannot rule that out, so the contract does not pretend it does.
+- **The quiescence fence.** A holder that acquired an ABANDONED mutex first waits `QUIESCE_MS`. It
+  then reads every slot whose last journal record is an intent without a result, twice, at least
+  `POLL_MS` apart. A slot passes only if both readings agree: a terminal SCM state (`Running` or
+  `Stopped`, never `StartPending` or `StopPending`) AND a process table consistent with it. A slot
+  that changes between the readings, or is still pending, is **UNKNOWN**. Whether `QUIESCE_MS`
+  actually bounds a dead client's request is V11, and until V11 is shown the bound is a stated
+  assumption, not a guarantee.
+- **What may follow the fence.** A slot proven `Stopped`, with no process of any recorded
+  incarnation and no descendant of one, may be STARTED. A slot found `Running` is INSPECTED, never
+  started again and never stopped by recovery. A slot that later makes a transition the current
+  holder did not issue is UNKNOWN, and the global stop halt applies.
+- **Two processes per slot.** The SCM service's process is the WRAPPER; the relay is its child
+  `node.exe`. An incarnation is the pair: wrapper pid and start time, relay pid and start time. Every
+  ownership and readiness check uses the pair (C7).
 - **The global swap halt.** While ANY slot is UNKNOWN or pending, NO slot may be intentionally
   stopped. Slots may still be STARTED to restore a desired `running` state, because a start cannot
   reduce the number of ready relays. v0.2's "the rest proceed" is withdrawn: it would have let a
@@ -160,10 +191,32 @@ acquires the abandoned mutex. So:
   journal is unaccepted; one with a journal is accepted, whatever the spool shows.
 - **Canonical opId.** `opId = sha256` of the canonical JSON of `{manifestSha, releaseSha,
   generation, verb, slots}`, with `slots` sorted.
-- **One active operation.** At most one operation is active, recorded in a flushed `active` file
-  naming its opId. Journals of finished or halted operations are read-only history. Recovery reads
-  only the active operation's journal, plus live state. Two journals claiming to be active is
-  impossible by construction; if it is ever observed, the whole host is UNKNOWN.
+- **Scope is durable before any action.** An operation's `accepted` record names its full scope:
+  every slot it may touch, the release it moves them to, and the policy version. It is flushed
+  before the operation's first intent. A torn LATER record therefore never hides which slots are at
+  risk: every slot in the scope is treated as possibly affected. A torn `accepted` record leaves the
+  operation's scope unknown, and the HOST is UNKNOWN.
+- **The `active` pointer** names the one operation currently in progress. It is replaced
+  atomically: written to a temporary file, flushed, then moved over the old one with
+  `MoveFileEx(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)`. A pointer that is unreadable is
+  host UNKNOWN. A pointer that is MISSING does not mean "no operation": the controller reads the tail
+  of every journal, and if any holds an intent with no result and no `resolved` record, the host is
+  UNKNOWN.
+- **An operation's states, and what each obliges:**
+
+| durable state found | what it means | recovery |
+|---|---|---|
+| request in `spool\pending\`, no journal | submitted, not accepted | may be accepted, once no other operation is open |
+| `accepted` record, pointer not yet naming it | accepted, not active | write the pointer, then proceed; the scope is known |
+| last record an `intent` with no `result` | its effect may or may not have happened | that slot is pending: C4 quiescence fence |
+| `halted` record, every intent has a result | stopped cleanly part-way | closed; read-only history |
+| `halted` record, some intent has NO result | **still open** | its slots stay pending and the global stop halt stays in force until each is reconciled to a result, or an operator writes a `resolved` record naming it |
+| `complete` record | done | read-only history |
+| `resolved` record | an operator settled an open slot by hand, journalled with who and why | closed for that slot |
+
+- **One open operation at a time.** A new operation may become active only when every earlier
+  operation is `complete`, or `halted` with every intent resolved. A HALTED operation with an
+  unresolved effect is not history (Aster, `ee657b8c`): its fence survives any later request.
 - **Time.** Every record carries UTC, `bootId` (the last boot time) and monotonic milliseconds.
   Monotonic values are compared only within one `bootId`.
 
@@ -215,11 +268,16 @@ UNKNOWN.
   monotonic time. The budget file and every QUARANTINE flag persist across reboots.
 - A slot with three automatic restarts inside a 24-hour window is QUARANTINED: not restarted, shown
   in `status`, released only by `relayctl release <slot>`.
-- **Clock discontinuity, handled conservatively.** Within one boot, elapsed time comes from the
-  monotonic clock. Across boots it comes from UTC. A record leaves the window only when BOTH clocks
-  that can speak to it agree that 24 hours have passed. If UTC has gone backwards, or a boot's
-  elapsed time cannot be bounded, no record leaves the window. A clock jump can extend a quarantine.
-  It can never end one early.
+- **Only measured uptime ages a charge** (Aster, `ee657b8c`: a forward UTC jump across a reboot
+  would otherwise age charges out early). Nothing on this host supplies a trusted lower bound on
+  elapsed time across a reboot, so the contract does not use one. The controller keeps a persisted
+  counter of MEASURED monotonic milliseconds, flushed at least every `POLL_MS` and at shutdown. A
+  charge leaves the 24-hour window only when that counter has advanced 24 hours past it. Time the
+  host spent off, and any movement of UTC, count for nothing. The cost is that a charge can last
+  longer than 24 wall-clock hours. That error is on the safe side.
+- **Expiry and release are different things.** A rolling charge expires as above. A QUARANTINE never
+  expires: it ends only with an explicit `relayctl release <slot>`, however many charges have aged
+  out.
 - **Reboots cannot reset the budget.** A slot that starts at boot and then fails within
   `BOOT_GRACE_MS` counts as a crash restart. A slot that fails readiness across three consecutive
   boots is quarantined.
@@ -238,11 +296,13 @@ a state-format boundary is unresolved until V7.
 
 **C11 — Boot recovery, in order.** On every controller start, after acquiring the mutex:
 
-1. **Prove pending actions finished**, per C4, for every slot. Slots that cannot be proven are
-   UNKNOWN.
-2. **Restore the OTHER desired-running slots first, by STARTING only.** Every slot that is desired
-   `running`, is not the subject of an incomplete operation, is not UNKNOWN and is not quarantined
-   is started, one at a time, each to readiness. Starting cannot reduce the number of ready relays,
+1. **Pass the quiescence fence**, per C4, for every slot. Slots that cannot be proven settled are
+   UNKNOWN. Every operation that is open per C5's table keeps its fence.
+2. **Restore the OTHER desired-running slots first, by STARTING only.** A slot is started only if
+   it is desired `running`, is in no open operation's scope, is not UNKNOWN, is not quarantined, AND
+   is proven `Stopped` with no process of any recorded incarnation and no descendant of one. A slot
+   found `Running` is inspected, never started again. Each started slot is brought to readiness
+   before the next. Starting cannot reduce the number of ready relays,
    so this does not bypass the global swap halt (C4). An incomplete swap after a reboot may face
    nineteen slots that are not yet ready. This step is what brings them back before the swap is
    touched again.
@@ -268,6 +328,10 @@ native ABI; and the controller's state machine run against a fake SCM.
   cannot, record that, and every SCM stop becomes an authorised destructive action (C6.2).
 - **V3** — Environment, working directory and the per-incarnation log path reach the process.
 - **V4** — Automatic (Delayed Start) behaves as specified on Windows 11 Home build 26200.
+- **V11** — A start or stop issued by a client that is killed mid-call either takes effect within
+  `QUIESCE_MS` or never does. Shown by killing the issuing process at points inside the call. If
+  some effect lands later than `QUIESCE_MS`, that bound is wrong and must be raised, or a slot with
+  an unresolved intent stays UNKNOWN indefinitely.
 - **V10** — `Global\axona-relayctl` is visible to the controller (session 0) and the CLI (an ssh
   session); abandonment is reported as specified; the controller holds it on the one thread that
   runs its loop.
@@ -293,7 +357,10 @@ native ABI; and the controller's state machine run against a fake SCM.
 - The same opId twice; two different opIds.
 - An unmanaged `node.exe` present throughout.
 - A crash loop reaching quarantine; repeated reboots with a slot failing each time; UTC set
-  backwards.
+  backwards; UTC set FORWARD across a reboot; the host left powered off for longer than a day.
+- A controller killed mid-SCM-call, and its request landing after the next holder's first reading.
+- A HALTED operation with an unresolved intent, followed by a new `apply`.
+- A torn `accepted` record; a torn later record; a missing `active` pointer with an open journal.
 - A slot whose desired state is `stopped`, through a swap of another slot and through a reboot.
 - A rollback.
 
@@ -317,9 +384,13 @@ native ABI; and the controller's state machine run against a fake SCM.
 | Vega `037d75df` #1 | the timeouts are unbound, so the scenarios are too | C0 defaults table |
 | Vega `037d75df` #2 | the `fleet.sh` refusal is prose, not enforced | §4: the manifest is the switch; stage C gated on the guard and its negative test |
 
+| Aster `ee657b8c` #1 | a dead holder's request can still land; wrapper and relay pids | C4 quiescence fence, V11, incarnation as a pair; C11 starts only proven-stopped |
+| Aster `ee657b8c` #2 | a HALTED op is not history; torn records hide scope; the pointer | C5 durable scope, atomic pointer, the operation table |
+| Aster `ee657b8c` #3 | a forward UTC jump ages charges early | C8 measured uptime only; expiry separate from release |
+| Aster `ee657b8c` | policy values must fail closed | C0 |
+
 **Dispositions on v0.3:** Vega **ACCEPT as the stage-A candidate** (`037d75df`), conditional on
-the two rows above, which this amendment answers. Aster: review of v0.3 pending. Orion: no
-disposition on any version.
+the two rows above, which this amendment answers. Aster: CHANGES REQUIRED (`ee657b8c`), answered in v0.4. Orion: no disposition on any version.
 
 ## 9. Open decisions, all David's
 
