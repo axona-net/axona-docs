@@ -7,6 +7,196 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.99.0 → v4.100.0 — `health()` carries the whole role row; `instrument` becomes an author class (2026-10-01)
+
+**In production on both bridges and all 52 relays. Additive. One compatibility caveat for old readers.**
+
+Can a relay answer "do I hold a role with no subscribers and no messages"? Before 4.100.0 the
+answer was no on 52 of 54 nodes. `AxonaManager.inspectRoles()` always computed the whole row;
+`AxonaPeer.health()` copied four fields and dropped the rest, and relays serve no `/diag`, so
+the question was answerable on the two bridges only.
+
+- `health().axonRoles[]` now carries `nature`, `holder`, `subscribers`, `lastReplicaAt` and
+  `lastReplicaAgeMs`. `subscribers` is `null`, never `0`, when the row did not supply it.
+- `health().axonRolesComplete` is `false` when role inspection threw or no manager exists. A
+  throwing node used to report an empty array, which a fleet census would have counted as a
+  clean zero.
+- `instrument` joins `human`, `agent` and `service` as a principal author class, on David's
+  decision (council 449, 481): an automatic data source that reports readings and acts on
+  nobody's behalf. A signature authenticates WHICH author made the declaration, never that the
+  declared nature is true.
+- 4.100.0, not 5.0.0: every version gate routes through `compareVersions()`, which compares
+  integers; `compareVersions('4.100.0','4.99.0') === 1` was checked, and no string comparison of
+  version fields exists in the relay, bridge or kernel.
+
+**Caveat.** A kernel at 4.99.0 or older answers `verifyAuthorClass` on an `instrument` declaration
+with `{ ok: false, reason: 'bad_class' }`. Until a reader is on 4.100.0, an instrument's class
+reads as unverified there.
+
+Rides on it: **axona-bridge 2.143.0**, **axona-relay 0.138.0**, **axona-chat 0.74.0**,
+**axona-share 0.33.0**, **axona-portal 0.9.0**, **dht-sim 0.116.0**. The apps, portal and dht-sim
+followed on 2026-10-02, a day after the fleet; until then the chat app ran 4.99.0 against a
+4.100.0 mesh. New fence `fence_health_role_projection` (21 checks): with the projection deleted
+the relay's suite stays green at 44/44 while this fence drops to 12/21. The release commit
+reports the kernel suite at **195/196**; the one failure is a manifest drift present on a clean
+tree before the change (194/196 there). It shipped with that failure open.
+
+## v4.98.0 → v4.99.0 — the replica stamp leaves the process (2026-09-25)
+
+**Read-only. No behaviour change.**
+
+Is a backup's principal still speaking? The stamp that answers it, `lastReplicaAt`, existed and
+was on no surface outside the process, so every claim about the standby population that week
+rested on inference, and several were withdrawn for exactly that reason.
+
+- `inspectRoles()` returns `lastReplicaAt` (epoch ms; `0` = never) and `lastReplicaAgeMs`, which
+  is `null` when never stamped. `now − 0` is fifty-six years, which would read as the stalest
+  backup imaginable rather than as no reading. The age floors at 0 against a backwards clock.
+- Only a BACKUP is ever stamped, and an empty REPLICATE counts, because it is the keepalive.
+
+Rides on it: **axona-relay 0.136.0** (the whole fleet), **axona-chat 0.66.0**,
+**axona-share 0.32.0**.
+
+## v4.97.0 → v4.98.0 — one obligation read per enforcement pass (2026-09-24)
+
+**Cost and documentation fix. Inert in production while `BRIDGE_MESH_MAX_PEERS=0`.**
+
+4.97.0 said in four places that the obligation set is read once per enforcement pass. It was
+implemented in none of them: the resolver walked every upstream and every role once per
+candidate, so on west at 40 open channels that was 40 full walks every 3 seconds. Every answer
+was correct; each was computed the expensive way.
+
+- The mesh stamps each pass with a monotonic id and the resolver caches the duty set for that
+  id. Cached on the PASS, never on a clock: a time-based cache would let a duty acquired seconds
+  ago go unseen, which is the failure this protection exists to prevent.
+- All four comments corrected.
+
+Rides on it: **axona-bridge 2.141.0**. Fence §7 asserts one provider call for six candidates in a
+pass; negative-tested by dropping the pass id (six calls). 27 checks, suite 196/196.
+
+## v4.96.0 → v4.97.0 — the mesh cap can tell a duty from a spare (2026-09-24)
+
+**Makes re-enabling the mesh cap possible. Re-enables nothing.**
+
+The WebRTC mesh holds channels and knows nothing about roles, so a bounded degree could retire the
+link carrying a topic's root as easily as a spare. Both reviewers made that a precondition for
+the cap running at all, and the cap was contained on both bridges until it landed.
+
+- A channel is protected when it carries a duty: the UPSTREAM we are homed under, the PRINCIPAL
+  replicating to our backup, a REPLICA our durability claim names, or any SEATED SUBSCRIBER.
+  Peers we merely route through are not protected; routing is re-derivable and the mesh heals it.
+- The protection reader is read per pass, not snapshotted, so a duty acquired between passes is
+  honoured on the next.
+- It fails closed at every step. No provider, a throwing provider or an unresolvable binding all
+  report PROTECTED.
+
+Rides on it: **axona-bridge 2.140.0**. `fence_mesh_obligations` (24 checks) drives the real
+enforcement path; flipping one fail-closed branch retires four channels that should have been kept.
+Suite 196/196.
+
+## v4.95.0 → v4.96.0 — the mesh cap reads the authenticated node id (2026-09-24)
+
+**4.95.0's cap could never fire. This makes it able to.**
+
+A mesh `peerId` is the bridge's connection handle (`c1`, `c17`, `cz`), not a node id. 4.95.0 read
+the region as the first byte of a hex id, got `null` for every handle, and so never had an
+eligible peer to retire. West sat at 40 open channels against a trigger of 18.
+
+- The region now comes from the binding recorded at authentication (`bindPeer` → `nodeIdFor`), so
+  "never retire an unauthenticated peer" is a real rule rather than an accident.
+- `meshDegreeStats()` reports `cap`, `slack`, `open`, `retired`, `refused` and `inCooldown`, so an
+  outpaced cap and a cap that cannot fire are no longer indistinguishable.
+
+Six new checks pin the failure: forty candidates through the 4.95.0 resolver retire nothing; through
+the authenticated one, one. Suite 195/195.
+
+## v4.94.0 → v4.95.0 — a bounded WebRTC mesh degree, off by default (2026-09-24)
+
+**Off unless a node asks for it. Browsers and relays are untouched.**
+
+The bridge's degree cap governed one side of the node. Measured inside each production container
+on 2026-09-24: east held 17 inbound WebSockets and 1 UDP channel; west held 1 WebSocket and 7 UDP.
+West was a full mesh participant wearing a bridge's clothes, and `BRIDGE_MAX_PEERS` could not see it.
+
+- With `degree.maxPeers` set, the mesh GRADUATES rather than refuses: hysteresis at cap + slack,
+  one retirement per interval, keyspace balance first, never a region's last representative.
+- The cooldown is enforced on this node's own door. A DataChannel close tells the remote nothing,
+  so without it a bridge at cap retires and re-accepts the same peer for ever.
+
+Shipped with a defect: the cap could not fire until 4.96.0. `fence_mesh_degree` 26 checks, suite
+195/195.
+
+## v4.93.0 → v4.94.0 — a backup seat is a standby successor (2026-09-24)
+
+**Restores the root election that 4.92.0 pruned.**
+
+4.92.0 reaped an empty backup on sight. West went from 144 roles to 23 and it was called fixed.
+What it actually did was cut the election: a backup's subscribe renewal IS its candidacy, and an
+empty backup emitted one subscribe and was reaped in the same tick. Production showed it as 2.8
+reaps per second on west, flat for 2.4 hours.
+
+- Neither reaper may take a backup seat, with no freshness test, because the obligation is about
+  the root being GONE. The existing discharge path still retires a backup that has re-homed and
+  heard nothing for `BACKUP_EVICT_MS`, after which it is an ordinary role.
+- West's resident role count rises again as a result. That is membership, and the lever on it is
+  cohort size, not reaping standbys.
+
+**Open:** a backup whose root vanished and never re-homes is retained for ever; nothing yet
+discharges that state (see axona-protocol#72 and #73). Rides on it: **axona-bridge 2.137.0**.
+`fence_backup_standby` 17 checks, 8 fail without the fix. Suite 194/194.
+
+## v4.92.0 → v4.93.0 — the reap counters become visible (2026-09-24)
+
+**Read-only.**
+
+A climbing role count reads the same whether a bridge holds 84 empty roles or its reaper has
+stopped. `inspectAdmission()` now carries `reaped: { dead, idle }`, monotonic since start, and
+`/healthz` and `/diag` publish it behind the operator token. Suite 193/193.
+
+## v4.91.0 → v4.92.0 — the dead-topic reap actually fires (2026-09-23)
+
+**Measured in production, not reasoned.**
+
+4.91.0 ran on west for two minutes holding 144 roles, 22 of them root, with zero children and zero
+cached messages, and logged zero reaps. It exempted `_backupTopics` as local intent; it is inbound
+state, set when this node RECEIVES a replica, in the same breath as `role.backupOf`. Exempting it
+blocked the reap on exactly the roles it was written for. Dropped from the exemptions.
+
+Rides on it: **axona-bridge 2.135.0**. Suite 193/193. Superseded in part by 4.94.0, which found that
+reaping empty backups pruned the election.
+
+## v4.90.0 → v4.91.0 — reap a topic with no subscribers and no messages (2026-09-23)
+
+**On David's rule: "We should always reap any topic that has no subscribers and no messages immediately."**
+
+- `subscribers === 0` and an empty cache end the role in the tick that notices it. "No
+  subscribers" includes this node: `peer.sub()`, `peer.host()`, backup membership and keyspace
+  hosting count as subscribers, so a topic this node wants is never reaped out from under it.
+- Both reaps share one row, `pubsub:role-reaped`, tagged `why=dead|idle`.
+
+Shipped reaping nothing in production; see 4.92.0. Rides on it: **axona-bridge 2.134.0**. Suite
+193/193; `fence_topic_independent_routed` failed once inside the suite and passed alone, recorded
+as a second flaky test, cause unconfirmed.
+
+## v4.88.0 → v4.90.0 — reap an empty role whose last message is over 24 hours old (2026-09-23)
+
+**There is no 4.89.0 release.** 4.89.0 is the bridge air-gap line, pushed and left unmerged on
+David's word on 2026-09-23. None of its commits is in 4.90.0 or later.
+
+A node that won ROOT kept the seat for ever. Measured on the west bridge on 2026-09-23: 141 roles
+over 141 distinct topics, 45 rooted, zero children, zero cached messages, back to 193 within three
+minutes of a restart, about 39% of one core while it held a single connection.
+
+- An EMPTY cache whose last message is older than `ROLE_IDLE_TTL_MS` (24 h) ends the role, root or
+  child, with or without subscribers. A subscriber that still wants the topic renews and the role
+  is rebuilt, which is what makes that safe.
+- `role.lastTs` survives the cache emptying and is the measure; a role that never carried a message
+  is measured from its admission. The TTL is env-overridable and `0` disables it.
+
+Rides on it: **axona-bridge 2.133.0**, which also gained `init: true` so PID 1 reaps zombies.
+`fence_role_idle_reap` 24 checks; three failed on first run because the test premises were wrong,
+and each was corrected, not the code. Suite 192/192.
+
 ## v4.87.0 → v4.88.0 — a system region for the bridge directory (2026-09-21)
 
 **Production-bound. Wire-compatible: no flag day. One reserved region byte gains a meaning.**
