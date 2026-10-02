@@ -59,7 +59,7 @@ exists that is not in this table, add the row before touching it.
 | 5 | testnet bridge B2 (M1, launchd `net.axona.testnet-bridge-b2`, branch `testnet`) | its checkout's `node_modules` | `PATH=/opt/homebrew/bin`: fetch + reset, `npm install --omit=dev`, `launchctl kickstart -k` | `/healthz` on 127.0.0.1:8090 with the on-host token |
 | 6 | production bridge east (`bridge.axona.net`, Docker, `main`) | image built from the checkout | `ops/release.sh bridges <ver>` (east first, verified on the PUBLIC endpoint, then west) | public `/healthz` |
 | 7 | production bridge west (`bridge-west.axona.net`, Docker, `main`) — host `206.189.174.110` (sfo2) since 2026-09-30, checkout `/opt/axona-bridge-docker` | same | same tool, second leg | public `/healthz` through the NAME, never through an ssh to a host |
-| 8 | relay fleets: Air, M1, Linux, Windows | each host's checkout, pulled by the tool | `DRY=1 KERNEL=<ver> ops/fleet.sh roll` (pulls, starts nothing) then `KERNEL=<ver> ops/fleet.sh roll air m1 axona-linux`, then `axona-win` ALONE (§6). Never `ops/fleet.sh roll` with no host list | `ops/fleet.sh status`: live = target EXACTLY, banners on the version. axona-win read 21 against 20 for weeks and was reported as done each time; 21/20 is a FAIL. **Once `axona-relay/hosts/axona-win.json` exists with `"supervisor": "scm"`, axona-win leaves this row**: `fleet.sh` refuses it, and it is moved by `relayctl` under `architecture/Axona-Windows-Relay-Host-Contract` (stage C onward) |
+| 8 | relay fleets: Air, M1, Linux, Windows | each host's checkout, pulled by the tool | `DRY=1 KERNEL=<ver> ops/fleet.sh roll` (pulls, starts nothing) then `KERNEL=<ver> ops/fleet.sh roll air m1 axona-linux`, then `KERNEL=<ver> ops/fleet.sh roll axona-win` ALONE (§6). Never `ops/fleet.sh roll` with no host list | `ops/fleet.sh status`: live = target EXACTLY, banners on the version. axona-win's row reads `scm: services_live=20/20 bare=0 kernels=[20x<ver>]`; anything else is a FAIL |
 | 9 | relay droplets (FOUR since 2026-09-30, systemd units named by instance) | `/opt/axona-relay`, branch `main` | `ops/fleet.sh roll` drives `droplet-roll.sh` for all four, two passes each. Since 2026-10-02 `droplet-roll.sh` also REFUSES a droplet whose systemd does not resolve `SUB_TERMINAL_VERIFY=1` (`EXPECT_ARM=0` for a deliberate control arm) | unit start time later than the vendored file's mtime; or the variable read from `/proc/<pid>/environ` |
 | 10 | `axona-chat` (axona.chat, Pages from `main`) | pin | `ops/release.sh apps <ver>` (refuses unless BOTH bridges serve it); version bump; `npm test`; `npm run build`; push `main` | served `index-*.js` FILENAME equals the local `dist/assets/index-*.js` — the hash is the proof, a version grep is weaker |
 | 11a | `axona-share` STANDALONE (`axona-net.github.io/axona-share`, repo `axona-share`) | pin + `npm run link-kernel` symlink | same tool; §7's tag rule; `check_kernel_pin.mjs`; push `main` | served `index.html` reads five `?v=<ver>`; served `app.js` reads the new `APP_VERSION` |
@@ -157,36 +157,29 @@ Each is its own design and its own word.
       the vendored kernel, starts nothing. It refuses a droplet whose live count is not the
       table's target; that is expected when a droplet is short.
 - [ ] **Count before you roll.** `ops/fleet.sh status` must read live = target on every host
-      BEFORE the roll, not only after. The Windows branch is handed `N=$live` and the
-      target is consulted only when growing, so NO path in the tool ever reduces a count:
-      a roll of a host at 21 against 20 produces 21 again, on the new kernel, and reads as
-      success. Correcting a count is not a version promotion and needs David's word.
+      BEFORE the roll, not only after. A laptop or box roll is handed `N=$live` and NO path
+      in the tool ever reduces a count, so a host one over target rolls to one over target
+      and reads as success. axona-win's count is the manifest's `services.count`, not a
+      census. Correcting a count is not a version promotion and needs David's word.
 - [ ] `KERNEL=<ver> ops/fleet.sh roll air m1 axona-linux` (hosts in parallel, slots serial
       within a host, each replacement integrated before its predecessor leaves). NEVER
       `ops/fleet.sh roll` with no host list: that includes axona-win in the same parallel
       run, which is what happened on 2026-10-01.
-- [ ] Then `KERNEL=<ver> ops/fleet.sh roll axona-win` on its own, and read its result from
-      the HOST, never from the local session. `fleet.sh` buffers each host group's output
-      until that group's ssh closes, and the axona-win ssh can stay open long after the
-      roll behind it has exited. On 2026-10-01 the roll aborted at 22:02:52Z on its ADVANCE
-      gate, correctly, and the channel stayed open until it was killed at 00:31Z the next
-      day. For those 2 h 28 m the local log read 61 lines and the roll was believed to be
-      running. The roll's own words were on the host the whole time:
+- [ ] Then `KERNEL=<ver> ops/fleet.sh roll axona-win` on its own. Since 2026-10-02 every
+      axona-win relay is a Windows service, `axona-relay-01` … `-20`, and the host's only
+      controller is `axona-relay/windows/relayctl.ps1`. Its facts and layout are recorded in
+      `axona-relay/hosts/axona-win.json`; read that file, never re-inventory the host.
+      `fleet.sh` hands the roll to `relayctl roll -Kernel <ver>`, which pulls, checks the
+      vendored kernel, load-tests node-datachannel, then restarts one service at a time and
+      waits for that slot to bridge and bond before the next. It stops at the first slot
+      that fails the gate and leaves every other slot running. Its transcript is on the host:
       ```bash
-      WINBASH='"C:\Program Files\Git\bin\bash.exe"'
-      ssh -n axona-win "$WINBASH -lc 'cd /c/Users/david/github/axona-relay; ls -t relay-logs'"
-      ssh -n axona-win "$WINBASH -lc 'cd /c/Users/david/github/axona-relay; tail -n 12 relay-logs/winroll-<YYYYMMDD-HHMMSS>.out'"
+      ssh -n axona-win "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\david\github\axona-relay\windows\relayctl.ps1 status"
+      ssh -n axona-win "dir /b /o-d C:\Users\david\github\axona-relay\relay-logs\relayctl-*.out"
       ```
-      Read it within two minutes of the last slot being due. No pipes in the remote
-      command: cmd.exe consumes `|`, `&`, `>` and `$( )` before git-bash sees them. The
-      `winroll-*.out` filename uses the HOST's local clock, which is UTC-4.
-- [ ] **An ADVANCE abort at slot k leaves a known shape.** Slots 1 … k−1 are rolled; slot k's
-      heir is running but never bonded; the old relays k … N are still serving. The count is
-      one HIGHER than before. Do not roll again on top of it. Inventory the host first —
-      `wmic` is removed from it, so use PowerShell `Get-CimInstance Win32_Process` from a
-      `.ps1` shipped with `scp` — and take the remediation to David. On 2026-10-01 slot 17's
-      heir burned 3.2 CPU seconds against 59.9–290 for its sixteen siblings and never wrote
-      a state line, which matches GH #61's description; its mechanism is not established.
+      `RESULT=OK` on its last line is done; `RESULT=FAIL <reason>` names the slot. No pipes
+      in a remote command: the ssh shell is cmd.exe. The services restart at boot and after
+      a crash, so a Windows Update reboot no longer empties the host.
 - [ ] Droplets one at a time with the MEASURED count, two passes each (DRY on the current
       kernel performs the pull; live on the new one). Write the three invocations out in
       full: a `for spec in "ip n"; set -- $spec` loop under zsh does NOT split the string,
