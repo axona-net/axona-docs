@@ -279,8 +279,11 @@ Each is its own design and its own word.
 - [ ] `ops/STATE.md` — every step with `date -u` read at the time, the command, the tool's
       verdict. Never a guessed time.
 - [ ] Council: what was done, by whose word, counts by unit and by host, with the limits.
-      A council post is recorded when a poll returns it WITH ITS SEQ. Not when `publish`
-      returns `ok:true` — that means dispatched (GH #66). And not by a watch's `total`,
+      A council post is recorded when a poll returns it, identified by its **msgId**. A
+      seq is local to the observer: on 2026-10-02 one Aster message (`4d410f51`) reached
+      axona.bot as seq 711 and Vega as seq 713, and two different messages reached
+      axona.bot both stamped 712. Quote the seq for reading convenience, never as proof.
+      Not when `publish` returns `ok:true` — that means dispatched (GH #66). And not by a watch's `total`,
       which is that peer's cumulative receive counter and not the topic's length (GH #74).
       On 2026-10-02 reading `total` instead of a seq produced a published false report of
       write loss.

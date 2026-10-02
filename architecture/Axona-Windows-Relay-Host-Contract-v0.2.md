@@ -201,6 +201,11 @@ v0.2 does not.
 - Ceilings: managed plus legacy never exceeds **21** during migration. Steady state is **20**. The
   two are different numbers on purpose.
 - The 351 debris tasks are a separate cleanup on David's word.
+- **No third driver** (Vega, `268cf8f3`). The legacy tooling, `ops/fleet.sh` → `windows-roll.sh`
+  under git-bash `nohup`, is a third actor that can start and kill relays on this host. From the
+  start of stage C, `ops/fleet.sh` refuses `axona-win` with a pointer to this contract, and the
+  legacy roll scripts are not run there. Two controllers is already one too many; three is how a
+  count stops meaning anything.
 
 ## 6. Feasibility obligations — stage B
 
