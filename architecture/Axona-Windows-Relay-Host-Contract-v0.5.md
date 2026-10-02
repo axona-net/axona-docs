@@ -1,9 +1,9 @@
-# Windows relay host contract — v0.4, a candidate for council review
+# Windows relay host contract — v0.5, a candidate for council review
 
 *axona.bot, 2026-10-02. v0.1 (ed2ece8) was the consolidation Aster asked for in council 709, on
 David's 708. v0.2 (5b88197, 85f4e12) answered Aster's `4d410f51`. v0.3 (2c6f5e1, amended 36ceef7)
-answered Aster's `f5442247` and Vega's `037d75df`. v0.4 answers Aster's `ee657b8c`: three recovery
-obligations.*
+answered Aster's `f5442247` and Vega's `037d75df`. v0.4 (d05746b) answered Aster's `ee657b8c`. v0.5
+answers Aster's `fc7d5766`: a timing bound is not a fence.*
 
 How should twenty relays live on a Windows host so that the count is a declaration, a reboot is a
 non-event, and the operator always knows what happened? That is the question.
@@ -13,7 +13,23 @@ nothing has been run, and no live process is touched by it. Its scope is one hos
 is not a bridge change, not a kernel change, and it does not decide `SUB_TERMINAL_VERIFY` policy.
 Stage A (design) is under David's 708; stages B, C and D each need their own word (§3).
 
-**What v0.4 changes.** Three recovery contracts are made explicit (§8 has the full record).
+**What v0.5 changes.** v0.4 let a 150-second quiescence wait and two stable readings act as
+permission to recover a slot after a controller died mid-action. That is a timing heuristic, not a
+fence: no finite set of tests can show a delayed SCM request will never land (Aster, `fc7d5766`).
+v0.5 withdraws it. Recovery now rests on two fences the operating system actually provides, and
+where neither applies, it gives up automatic recovery for that slot and says so.
+
+- **Fence 1, the count.** SCM runs at most one instance of a service. Each slot is one service, so
+  however late a start lands, no more than twenty relays can be managed. The count invariant does not
+  depend on timing at all.
+- **Fence 2, the boot.** SCM restarts with the operating system, so a request issued in one boot
+  cannot take effect in a later one. After a reboot, a slot's live state is the final outcome of
+  anything the previous boot issued, and recovery may act on it.
+- **Neither fence: a controller that died mid-action within the SAME boot.** A late stop there is
+  unbounded. That slot stays UNKNOWN, the global stop halt stays in force, and an operator settles
+  it. Automatic recovery is lost for that one slot, and the contract accepts that loss in writing.
+
+**What v0.4 changed.** Three recovery contracts are made explicit (§8 has the full record).
 
 1. A previous controller's request to SCM can still take effect after that controller has died,
    and SCM offers no way to cancel it. C4 now waits out a bounded quiescence fence before any
@@ -120,7 +136,7 @@ or practice, and the one that is not yet measured on this host says so.
 | `POLL_MS` | 3 000 | `fleet-cadence.sh` `POLL=3` |
 | `LEAVE_TIMEOUT_MS` | 30 000 | `fleet-cadence.sh` `LEAVE_TIMEOUT=30` |
 | `PENDING_MAX_MS` | 120 000 | four times `LEAVE_TIMEOUT_MS`: a stop that has not settled by then is UNKNOWN |
-| `QUIESCE_MS` | 150 000 | `PENDING_MAX_MS` plus Windows' default 30 000 ms service-control timeout: the longest a previous holder's request can plausibly stay in flight. **Provisional until V11** |
+| `QUIESCE_MS` | 150 000 | how long after a same-boot controller death the controller re-reads an unresolved slot and raises it to the operator. **It schedules observation and escalation. It confers NO permission to act** (Aster, `fc7d5766`) |
 | `READY_DEADLINE_MS` | 270 000 | the Windows roll's current `READY_TIMEOUT` (`fleet.sh` passes 3 × `WIN_ADVANCE_CAP`=90) |
 | `FRESH_MS` | 15 000 | a relay writes a state line every 1 000 ms (`src/index.js:322`); fifteen missed lines tolerate an event-loop stall. **Provisional until V9** measures the cadence under a service on this host |
 | `BOOT_GRACE_MS` | 600 000 | a slot failing within ten minutes of its boot start counts as a crash restart; more than twice `READY_DEADLINE_MS` |
@@ -152,16 +168,30 @@ acquires the abandoned mutex. So:
   Holder A can flush an intent, issue a start or stop, and die before seeing the outcome. A request
   from a client that has died may still be delivered and executed, and SCM has no cancellation for
   it. A snapshot cannot rule that out, so the contract does not pretend it does.
-- **The quiescence fence.** A holder that acquired an ABANDONED mutex first waits `QUIESCE_MS`. It
-  then reads every slot whose last journal record is an intent without a result, twice, at least
-  `POLL_MS` apart. A slot passes only if both readings agree: a terminal SCM state (`Running` or
-  `Stopped`, never `StartPending` or `StopPending`) AND a process table consistent with it. A slot
-  that changes between the readings, or is still pending, is **UNKNOWN**. Whether `QUIESCE_MS`
-  actually bounds a dead client's request is V11, and until V11 is shown the bound is a stated
-  assumption, not a guarantee.
-- **What may follow the fence.** A slot proven `Stopped`, with no process of any recorded
-  incarnation and no descendant of one, may be STARTED. A slot found `Running` is INSPECTED, never
-  started again and never stopped by recovery. A slot that later makes a transition the current
+- **What actually fences a late effect.** Two things, and only two.
+  - **Fence 1, the count.** SCM runs at most one instance of a service, and each slot is one
+    service. A late START can only make its own slot `Running`, on whatever release that slot is
+    configured with at that moment. No late effect of any kind can bring the managed count above
+    twenty. The count invariant holds with no timing assumption.
+  - **Fence 2, the boot.** Every intent carries its `bootId`. SCM is a process of the operating
+    system and restarts with it, so a request issued under one `bootId` cannot take effect under a
+    later one. For an unresolved intent from an EARLIER boot, the slot's live state is therefore the
+    final outcome of that intent, and recovery may act on it after a stability read (two readings
+    `POLL_MS` apart that agree on a terminal SCM state and a consistent process table). V11 confirms
+    this on the host; it is a property of the operating system, not of a timer.
+- **Neither fence: an unresolved intent from THIS boot.** A controller that died mid-action without
+  a reboot may have issued a stop that has not landed yet, and nothing bounds when it will. That slot
+  is **UNKNOWN by default**. The global stop halt applies. The controller re-reads it at `QUIESCE_MS`
+  and escalates to the operator, and that is all the timer does. **Automatic recovery is lost for
+  that slot until an operator settles it** (C5 `resolved`), and the contract accepts that loss
+  rather than calling a timing assumption safe.
+- **What would restore it, not relied on here.** A stop the relay honours only when it names the
+  relay's own incarnation would turn a stale stop into a no-op for any newer incarnation: a real
+  generation fence inside one boot. That needs a relay change, recorded as R1 (§9). Until R1 exists
+  and is accepted, the paragraph above stands.
+- **What recovery may do once a slot is settled.** A slot proven `Stopped`, with no process of any
+  recorded incarnation and no descendant of one, may be STARTED. A slot found `Running` is INSPECTED,
+  never started again and never stopped by recovery. A slot that makes a transition the current
   holder did not issue is UNKNOWN, and the global stop halt applies.
 - **Two processes per slot.** The SCM service's process is the WRAPPER; the relay is its child
   `node.exe`. An incarnation is the pair: wrapper pid and start time, relay pid and start time. Every
@@ -212,7 +242,7 @@ acquires the abandoned mutex. So:
 | `halted` record, every intent has a result | stopped cleanly part-way | closed; read-only history |
 | `halted` record, some intent has NO result | **still open** | its slots stay pending and the global stop halt stays in force until each is reconciled to a result, or an operator writes a `resolved` record naming it |
 | `complete` record | done | read-only history |
-| `resolved` record | an operator settled an open slot by hand, journalled with who and why | closed for that slot |
+| `resolved` record | an operator settled an open slot | closed for that slot, ONLY if the record carries one of: (a) evidence the old effect can no longer arrive, which today means a `bootId` change since the intent (Fence 2); or (b) a separately authorised override, naming who authorised it and stating the guarantee it gives up. A label alone settles nothing (Aster, `fc7d5766`) |
 
 - **One open operation at a time.** A new operation may become active only when every earlier
   operation is `complete`, or `halted` with every intent resolved. A HALTED operation with an
@@ -298,21 +328,37 @@ a state-format boundary is unresolved until V7.
 
 1. **Pass the quiescence fence**, per C4, for every slot. Slots that cannot be proven settled are
    UNKNOWN. Every operation that is open per C5's table keeps its fence.
-2. **Restore the OTHER desired-running slots first, by STARTING only.** A slot is started only if
-   it is desired `running`, is in no open operation's scope, is not UNKNOWN, is not quarantined, AND
-   is proven `Stopped` with no process of any recorded incarnation and no descendant of one. A slot
-   found `Running` is inspected, never started again. Each started slot is brought to readiness
-   before the next. Starting cannot reduce the number of ready relays,
+2. **Separate the operation's authorised SCOPE from its actual OBLIGATIONS.** An all-slot roll has
+   all twenty slots in scope, and v0.4 excluded every slot in scope from restoration, which would
+   have restored nothing (Aster, `fc7d5766`). Operations move one slot at a time, so within a readable
+   journal each slot in scope is exactly one of: **finished** (its last intent has a result), **not
+   started** (no intent), or **open** (an intent with no result, at most one slot). Only an OPEN slot
+   is an obligation. If the journal is damaged so that this cannot be told apart, every slot in scope
+   is treated as open.
+3. **Restore every desired-running slot that is not an obligation, by STARTING only.** A slot is
+   started only if it is desired `running`, is not an obligation, is not UNKNOWN, is not quarantined,
+   AND is proven `Stopped` with no process of any recorded incarnation and no descendant of one. A
+   slot found `Running` is inspected, never started again. Each is brought to readiness before the
+   next. Starting cannot reduce the number of ready relays,
    so this does not bypass the global swap halt (C4). An incomplete swap after a reboot may face
    nineteen slots that are not yet ready. This step is what brings them back before the swap is
    touched again.
-3. **Then resolve the incomplete operation's slot.**
-   - If its durable records show a complete `switch` to a verified release, it is started on that
-     release and the operation resumes from step 8.
-   - If they do not, the slot is UNKNOWN and left stopped. **There is NO automatic return to the
-     predecessor release while V7 is unresolved.** v0.2 allowed one, and it would have crossed a
-     state-format boundary nobody has checked.
-4. Report the result through `status`.
+4. **Then the open slot, if any, under every C4 and C8 guard.** A historical `switch` record is not
+   permission to start (Aster, `fc7d5766`).
+   - If its intent is from an EARLIER boot (Fence 2), take the stability read. Found `Running`:
+     inspect it, and if it is a single incarnation on the switched, verified release, record `ready`
+     or not per C7; never start it again. Found `Stopped` with no incarnation or descendant, and the
+     durable records show a completed `switch` to a verified release: start it once, subject to C8,
+     and resume from C6 step 8. Anything else: UNKNOWN.
+   - If its intent is from THIS boot: UNKNOWN, per C4. No automatic action.
+   - **There is NO automatic return to the predecessor release while V7 is unresolved.**
+5. Report the result through `status`.
+
+**The liveness this buys, stated conditionally.** After a REBOOT, every slot that is not
+quarantined and whose journal is readable is restored automatically, including the one a swap was
+interrupted on. After a controller crash WITHOUT a reboot, every slot except the open one is
+restored automatically; the open one waits for an operator. After journal damage, every slot in that
+operation's scope waits for an operator.
 
 Recovery never starts every slot blindly, never stops any slot, and obeys C8.
 
@@ -328,10 +374,9 @@ native ABI; and the controller's state machine run against a fake SCM.
   cannot, record that, and every SCM stop becomes an authorised destructive action (C6.2).
 - **V3** — Environment, working directory and the per-incarnation log path reach the process.
 - **V4** — Automatic (Delayed Start) behaves as specified on Windows 11 Home build 26200.
-- **V11** — A start or stop issued by a client that is killed mid-call either takes effect within
-  `QUIESCE_MS` or never does. Shown by killing the issuing process at points inside the call. If
-  some effect lands later than `QUIESCE_MS`, that bound is wrong and must be raised, or a slot with
-  an unresolved intent stays UNKNOWN indefinitely.
+- **V11** — Fence 2: a start or stop issued by a client killed mid-call in one boot has no effect
+  after a reboot. This is a property of the operating system that V11 confirms on this build; it is
+  not a timing bound, and no outcome of V11 converts `QUIESCE_MS` into permission.
 - **V10** — `Global\axona-relayctl` is visible to the controller (session 0) and the CLI (an ssh
   session); abandonment is reported as specified; the controller holds it on the one thread that
   runs its loop.
@@ -388,9 +433,14 @@ native ABI; and the controller's state machine run against a fake SCM.
 | Aster `ee657b8c` #2 | a HALTED op is not history; torn records hide scope; the pointer | C5 durable scope, atomic pointer, the operation table |
 | Aster `ee657b8c` #3 | a forward UTC jump ages charges early | C8 measured uptime only; expiry separate from release |
 | Aster `ee657b8c` | policy values must fail closed | C0 |
+| Aster `fc7d5766` | a timing bound is not a fence | C4: Fence 1 (one instance per service) and Fence 2 (the boot); same-boot unresolved stays UNKNOWN; QUIESCE_MS demoted to observation |
+| Aster `fc7d5766` (a) | C11 must inherit guards; a switch record is not permission | C11 step 4 |
+| Aster `fc7d5766` (b) | all-slot scope excluded every slot | C11 step 2: scope vs obligation |
+| Aster `fc7d5766` | a `resolved` label settles nothing | C5: evidence or an authorised override |
 
 **Dispositions on v0.3:** Vega **ACCEPT as the stage-A candidate** (`037d75df`), conditional on
-the two rows above, which this amendment answers. Aster: CHANGES REQUIRED (`ee657b8c`), answered in v0.4. Orion: no disposition on any version.
+the two rows above, which this amendment answers. Aster: CHANGES REQUIRED on v0.3 (`ee657b8c`) and on v0.4 (`fc7d5766`), answered in v0.4 and v0.5.
+Orion: no disposition on any version.
 
 ## 9. Open decisions, all David's
 
@@ -399,5 +449,8 @@ the two rows above, which this amendment answers. Aster: CHANGES REQUIRED (`ee65
 - Each of stages B1, B2, B3, C and D.
 - The migration table.
 - The 351 debris tasks.
+- **R1**, a relay change: a stop honoured only when it names the relay's own incarnation. It would
+  restore automatic recovery after a same-boot controller crash. Not part of this contract until
+  separately designed and accepted.
 - Whether axona-win is rolled again before this design is frozen. The recommendation is that it is
   not.
