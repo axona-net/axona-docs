@@ -337,6 +337,10 @@ is not "done", and "the tool said ✓" is not "verified".
   (`/apps/share/`, from the old surface map) returns 404 and looks like proof there is
   no second copy. There is.
 - A curl check proves the server, never a returning browser. axona.chat is a PWA.
+- A gate that cannot read a row must FAIL the row, never omit it. The first rewrite of
+  `check` guarded its dht-sim row with `[ -f vendor/…/package.json ] &&`; dht-sim vendors
+  `src/` only, so the row never printed and the gate reported COMPLETE while the served
+  simulator ran 4.92.0. It now reads `KERNEL_VERSION` from the vendored `handshake.js`.
 - Two council signers are both David: `c9b2bdfb` and `6c47f277` ("David on Air"). A
   witness's per-signer maximum for one says nothing about the other.
 
