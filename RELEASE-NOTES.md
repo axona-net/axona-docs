@@ -7,6 +7,38 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.100.0 → v4.101.0 — every WebRTC connection carries its own incarnation token (2026-10-04)
+
+**In production on both bridges and all 52 relays. Additive. Diagnostic only; no protocol or wire change.**
+
+Which connection does a log line describe? Before 4.101.0 the mesh's lifecycle events named a
+connection by `peerId`, the bridge's connection handle, and a same-process retry reuses that
+handle. Two RTCPeerConnections to one peer could not be told apart in a log, so a channel's
+opening, path and close could not be joined with certainty (council 6a46f038).
+
+- Each RTCPeerConnection gets `inc` when the mesh creates it: a random per-process run tag and a
+  counter. It is never persisted, never sent to a peer, and is not a node identity.
+- `inc` is carried on `ice-state`, `stats`, `dc-open`, `dc-close`, `pc-state`, `retry` and
+  `teardown`, and set on the connection as `pc.axonaInc` so a host's own observer can join on it.
+- New fence `smoke_mesh_incarnation` (9 checks). With the change removed it fails on its first
+  check.
+
+Rides on it: **axona-relay 0.142.0**, which also lets the kernel's channel lifecycle events reach
+its log. `teardown`, `pc-state`, `dc-open` and `retry` were emitted at debug level and dropped by
+the relay's filter, so a relay could never say why a channel closed. They now pass through an
+explicit field allowlist (no addresses). The relay's `ice-pair` line records each connection's
+selected candidate types (host/srflx/relay) and a LAN flag, keyed by `inc`. Also
+**axona-bridge 2.144.0**, **axona-chat 0.75.0**, **axona-share 0.34.0**, **axona-portal 0.10.0**,
+**dht-sim 0.117.0**.
+
+Fixed on the way: `fence_health_role_projection` was committed in 4.100.0 without a test-manifest
+entry, so the full suite's manifest guard failed. It is registered;
+`npm test` reads 198/198. `ops/droplet-roll.sh` now discards the host's own `package-lock.json`
+drift before its fast-forward pull. Without that, a commit that touched the lockfile stopped every
+droplet with a false "diverged".
+
+---
+
 ## v4.99.0 → v4.100.0 — `health()` carries the whole role row; `instrument` becomes an author class (2026-10-01)
 
 **In production on both bridges and all 52 relays. Additive. One compatibility caveat for old readers.**
