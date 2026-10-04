@@ -363,6 +363,10 @@ is not "done", and "the tool said ✓" is not "verified".
   touched the lockfile (4.101.0, 2026-10-04) stopped every droplet's pull with "local
   diverged" when each was simply behind with a dirty lockfile. `droplet-roll.sh` and
   `relayctl.ps1` now discard that one file before pulling; anything else dirty still blocks.
+- A gate row can pass on the wrong version. `check`'s cache-bust row printed the WANTED
+  version whenever `sync-cachebust --check` passed, but `--check` compares the tags with the
+  kernel's own `package.json`, not with `<ver>`. At the start of 4.102.0 it showed ✓ for a
+  version nothing had been bumped to. It now prints the version the tags carry (2026-10-04).
 - A long-lived ssh is not a status. The axona-win roll was dead for 2 h 28 m behind an open
   channel. Status is read from the host's log, by a second connection.
 - An env var carried between tools is a guess. `DRY=1` meant nothing to `release.sh`.

@@ -7,6 +7,43 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.101.0 → v4.102.0 — a node that steps down holds the seat for five minutes (2026-10-04)
+
+**In production on both bridges and all 52 relays. Changes root-claim behaviour. One accepted cost.**
+
+What should a node do when it yields a topic's root to a closer node it then cannot reach? Before
+4.102.0 it took the root back as soon as the closer root's beacon went quiet, 45–89 s later. When
+the closer root was alive but unreachable from that node, the result was two live roots for one
+topic: council on 2026-10-02/03 numbered posts twice and delivered some hours late (GH #58).
+
+- After `demote()` to a STRICTLY CLOSER named root, the node holds for `STEPDOWN_HOLD_MS`
+  (default 300 s; 0 restores the old behaviour). `promote()` and `claimReachable()` refuse while it
+  holds. Yielding to a farther node arms nothing, so the keyspace-closest node can always reclaim.
+- A bare SUB, PUB or KILL that ends at a held node goes to the held root on exactly the evidence
+  the existing gate for that verb accepts. Otherwise nothing is sent and the message is logged
+  undeliverable (`step-down-hold`); the sender's own retry or renewal carries it.
+- A forward carries a random return token bound to its topic and verb. A copy that comes back
+  through a dead-waypoint fallback is never forwarded again, so the forward cannot loop. Without
+  that guard, a test fabric with a dead held root looped to its 200-step cap. The guard holds at
+  most 256 outstanding tokens and fails closed when full.
+- After the hold the node may claim again, at an epoch above any it has heard.
+
+**The cost, chosen by David.** A root that really died is replaced after up to five minutes, not
+at once. `smoke_root_reconcile` phase 4 was rewritten to that contract. Expiry permits a later
+claim; it does not guarantee recovery within five minutes, and a repeated partition can repeat the
+hold and the split. In a chain of holds a forwarded copy is dropped and recovered only by the
+sender's next retry. This stops retaking. It does not prove a single root; that needs a fenced
+authority, which is not built.
+
+Reviewed by Aster through four rounds (two real defects found and fixed: an existing-role KILL
+bypass and an unbounded re-entry loop), closed 08865429; Orion concurred 39fd89be. Rides on it:
+**axona-relay 0.143.0**, **axona-bridge 2.145.0**, **axona-chat 0.76.0**, **axona-share 0.35.0**,
+**axona-portal 0.11.0**, **dht-sim 0.118.0**. New fence `smoke_root_stepdown_hold` (83 checks);
+`npm test` 199/199. Pre-existing flake recorded: `smoke_interloper_convergence` c2 failed once in a
+full run and fails 1 run in 8 alone on released 4.101.0 with the same result (cause unconfirmed).
+
+---
+
 ## v4.100.0 → v4.101.0 — every WebRTC connection carries its own incarnation token (2026-10-04)
 
 **In production on both bridges and all 52 relays. Additive. Diagnostic only; no protocol or wire change.**
