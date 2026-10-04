@@ -14,8 +14,14 @@ arithmetic refused two requests where one should proceed; the guard's `end()`
 would have fired twice; `cancel` was missing from the voluntary reasons; "a
 competing inbound bind opens a slot" was backwards; the `closeConnection`
 change was scheduled before the duty gate that makes it safe; and *Bilateral*
-said both-full is a refusal while case 8 said two full cohorts swap. Earlier
-drivers: Aster `8f082cec`, `40fa6895`, `14d11520`, `79d241d7`, `ac344f10`,
+said both-full is a refusal while case 8 said two full cohorts swap. Aster
+`6866077d`, before this file was frozen: a full mark table that drops a new
+mark forgets exhaustion into permission, so overflow is a quarantine; nonce
+eviction can re-admit a replayed presence record, so each identity carries a
+high-water mark; and "no duty by construction" on an unadmitted channel is
+only true if pubsub traffic is fenced to admitted peers, so `admit()` is the
+transition that opens the fence and every voluntary close consults the gate
+regardless. Earlier drivers: Aster `8f082cec`, `40fa6895`, `14d11520`, `79d241d7`, `ac344f10`,
 `2552a639`, `4a58b7fb`, `1b2a24ad`; Vega `127cb170`, `0dbc5da6`; David's
 direction of 2026-10-04; the thread `16b554bd` → `dbd5d95f` → `6fbadf9d`.
 
@@ -55,7 +61,7 @@ Every deletion from the admitted table carries one reason from a closed set:
 | `policy` | involuntary: identity or admission refusal discovered after admission | no |
 | `swap` | voluntary, at cap only | yes |
 | `cap-change` | voluntary: the operator lowered the cap | yes |
-| `cancel` | voluntary: a PENDING or STAGED record withdrawn | no duty can attach to those states |
+| `cancel` | voluntary: a PENDING or STAGED record withdrawn | yes; trivially true behind the routability fence, consulted anyway |
 | `refused-grace` | voluntary: a BOUND record admission refused, closed after grace | yes |
 
 "Idle" is not in the set. Anneal prunes below cap today and is retired by
@@ -182,6 +188,21 @@ could violate, commits, then schedules async work.
   capacity is NOT released.
 - `cancel(id)`: `retire(id, 'cancel')` from PENDING or STAGED. From PENDING it
   also consumes `k` with `end(id, k, false)`. From STAGED there is no `k`.
+  `mayRetire` is consulted like any voluntary reason; behind the fence below
+  it returns true for these states, and the design does not rely on that.
+
+**The routability fence.** A channel carries pubsub traffic, in either
+direction, only while its peer is ADMITTED. Before `admit()`, the transport
+passes handshake and mesh-control frames (`mesh:signal`, `mesh:admit`, ping,
+pong) and drops every application frame with a count, `fence-drop`. `admit()`
+is the atomic transition that sets the channel's `routable` flag and inserts
+the peer into the synaptome in one step; `retire()` clears the flag in the
+same step it moves the channel to CLOSING. Role allocation reads the
+synaptome, so no obligation can be assigned to a peer that is not ADMITTED,
+and no obligation can arrive over a channel that is not routable. That is the
+invariant "a BOUND, STAGED or PENDING peer carries no duty". It is enforced at
+the frame boundary and tested there (case 22); it is not assumed from the
+handshake.
 - `closed(t)`: channel CLOSING → GONE, matched by `t`. Releases that channel's
   physical reservation and nothing else. If the peer record still points at
   `t` (an involuntary close), the peer → RESTING and the loss path runs. If
@@ -194,9 +215,18 @@ could violate, commits, then schedules async work.
   `CLOSE_ESCALATE_MS` gets a forced `pc.close()`; capacity is still released
   only on the transport's confirmation.
 - `mark(id, reason, lifetime)`: on a peer reaching RESTING with a `loss` or
-  `policy` reason. Fail-closed at the bound: when `marks = M_marks`, a new
-  `loss` mark is not written and the id is simply not nominated this cycle;
-  a `policy` mark is never evicted to make room for anything.
+  `policy` reason. A mark holds the reason, its lifetime, the retry count,
+  and the identity's presence high-water (below). At the bound the rule is a
+  QUARANTINE, because a dropped mark would let the same identity look UNKNOWN
+  on the next tick and dial again, and "not this cycle" does not bound that.
+  When `marks = M_marks` the node enters MARKS-FULL: no identity without a
+  mark and not already BOUND or ADMITTED may be nominated or dialed, inbound
+  or outbound, until marks fall below `M_marks − M_hyst` by expiry. A new
+  `policy` rejection at a full table is always stored, evicting the oldest
+  `loss` mark; the evicted identity is now untracked and MARKS-FULL blocks it.
+  A `policy` mark is never evicted. MARKS-FULL is reported with its duration.
+  The quarantine is conservative on purpose: under mark pressure the node
+  stops meeting strangers; it never forgets one it had refused.
 
 **Stale callbacks.** Every transport callback carries `t`. A callback whose
 `t` is not in the channel table, or whose `t` is in GONE, is stale: reported
@@ -376,9 +406,19 @@ The four classes keep their names.
   guard's schedule; the id re-enters the candidate pool when the mark expires;
   a re-dial goes out like any other dial. Exhaustion reactivates on fresh
   evidence only: a `bind` from that identity, or a signed presence record
-  that is inside `PRESENCE_FRESH_MS`, carries a per-identity nonce not seen
-  before, and is counted against `R_react` reactivations per identity per
-  window and `R_tick` per tick globally. A replayed record is suppressed.
+  that passes all of: its timestamp is inside `PRESENCE_FRESH_MS` of the
+  receiver's clock; its timestamp is strictly greater than the HIGH-WATER
+  stored in that identity's mark (the largest timestamp ever accepted from
+  it); and the reactivation is inside `R_react` per identity per guard
+  window and `R_tick` per tick globally. The high-water lives in the mark,
+  so it is bounded by `M_marks` and survives nonce-cache eviction; a replayed
+  record has a timestamp at or below the high-water and is rejected without
+  consulting any nonce cache. There is no separate nonce cache. The clock
+  assumption is stated: the signer's timestamps are non-decreasing per
+  identity, and the receiver tolerates skew up to `PRESENCE_FRESH_MS`; a
+  signer whose clock steps backward cannot reactivate until it passes its own
+  high-water, which is the safe failure. If the identity's mark was evicted
+  (MARKS-FULL), there is nothing to reactivate and the quarantine applies.
 - Class C (graduation watchdog): unchanged, a backstop. `graduation-collapse`
   (`8fead6d`) stays on its branch.
 - Class D: the fill.
@@ -482,9 +522,13 @@ Offline cases, each a test before any live run.
 14. Reactivation: an exhausted `loss` mark reactivates on a bind, or on a
     fresh signed presence inside `PRESENCE_FRESH_MS` with an unseen nonce,
     bounded by `R_react` and `R_tick`; on nothing else.
-15. Marks at the bound: a new `loss` mark is not written and the id is not
-    nominated; a `policy` mark is never evicted; a formerly forbidden peer is
-    never nominated because a mark was dropped.
+15. Marks at the bound: at `M_marks` the node is MARKS-FULL; an identity
+    nominated on every tick for ten ticks with no mark is never dialed; a
+    fresh set of `2·M_marks` identities arriving one per tick dials at most
+    until the table fills and then none; a new `policy` rejection at a full
+    table is stored and the evicted `loss` identity is blocked by the
+    quarantine, not re-dialed; a `policy` mark is never evicted; the
+    quarantine lifts only below `M_marks − M_hyst`.
 16. Guard token: `begin(id, k)` once; `end(id, k, ·)` exactly once at bind,
     cancel or deadline; a stage cancel of a bound channel never calls `end`.
 17. Glare: two bound channels to one identity resolve to one by the sorted
@@ -495,6 +539,17 @@ Offline cases, each a test before any live run.
     retires nothing, reports the gap; raising it ends the drain.
 20. Fences for every repair row, each failing with the repair removed.
 21. `smoke_root_stepdown_hold` 83/83 and the full suite green at every step.
+22. Routability fence: an application frame over a BOUND, STAGED or PENDING
+    channel is dropped and counted `fence-drop`; a role allocation never
+    names a peer outside the synaptome; `admit()` flips `routable` and
+    inserts into the synaptome in one step, and `retire()` clears it in the
+    step it moves the channel to CLOSING; a frame that arrives between the
+    two is dropped.
+23. Presence replay after eviction: a signed record accepted once, then
+    replayed after the mark's retry count was reset by expiry, is rejected on
+    the high-water; a record with a timestamp inside the freshness window but
+    not above the high-water is rejected; a signer whose clock stepped back
+    cannot reactivate until its timestamps pass the high-water.
 
 ## What this design does not establish
 
@@ -506,8 +561,11 @@ Offline cases, each a test before any live run.
 - The cause of the 04:33Z event.
 - Global convergence of the at-cap rule; it terminates between epoch resets
   and reports.
-- SATURATED-COHORT BRIDGING. Two full cohorts with no free slot on either side
-  do not join under this design. Open.
+- SATURATED-COHORT BRIDGING, an UNRESOLVED REQUIREMENT. David's objective is
+  connectivity everywhere. Two full cohorts with no free slot on either side
+  do not join under this design, and refusal is recorded as the limitation,
+  not as an answer. A bounded bilateral staging protocol is the candidate
+  remedy and is its own design.
 
 ## Parameters for David
 
@@ -521,7 +579,7 @@ Offline cases, each a test before any live run.
 | `C_inbound` | 4 | inbound refusal count at step 4 |
 | `S_overlap` | 1 | never above 2 without a measured reason |
 | `K_cache` | 64 | cache eviction rate at step 4 |
-| `M_marks` | 256 | mark refusals at step 4 |
+| `M_marks` / `M_hyst` | 256 / 32 | MARKS-FULL duration at step 4; a quarantine that holds for more than one guard cycle under normal load means `M_marks` is too small |
 | fill tick / per tick | 15 s / 3 | the step-4 storm check |
 | guard schedule | 30 s, ×2, 4 attempts | unchanged until a measured reason |
 | stage TTL / `CLOSE_ESCALATE_MS` | 30 s / 10 s | measured bind and close times |
