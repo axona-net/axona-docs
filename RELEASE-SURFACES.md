@@ -146,6 +146,7 @@ nothing publicly.
 | `axona-web` | No | — |
 | `axona-mcp` | No | Cites bridge URLs |
 | `alert-bot` | No | 12 lines |
+| `axona-track` (Orion's) | **YES** — his pin | Not in this workspace; Orion reports moves on council; owner-reported |
 | `dht-sim` | No | 1546 lines, oldest (2026-06-08); prose likely drifted |
 
 ---

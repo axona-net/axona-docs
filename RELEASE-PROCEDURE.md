@@ -72,6 +72,7 @@ exists that is not in this table, add the row before touching it.
 | 17 | `alert-bot` (Howard's suite) | Howard's `civildefense.io` pin resolves it | `npm install --no-save github:…#vX` before a run; Howard's `package.json` untouched; say so in the run's conditions | installed version in the run header |
 | 18 | MCP servers: Aster, Orion, Vega, axona.bot | `axona-relay/src/mcp.js` loads the checkout's `vendor/` at process start | each seat's owner reloads their host app (Cursor, codex, Antigravity, the Claude app); never kill another seat's process | the front-door bridge's `/diag` `peerVersion` per seat |
 | 19 | `civildefense.io` (Howard) | his semver pin | his; tell him | his |
+| 19a | `axona.track` (Orion's mobile PWA mesh observer, `axona-net/axona-track`, Pages) | Orion's pin `github:…#vX` | Orion moves it; tell him | owner-reported: the served app's kernel version. Added 2026-10-05 when Orion reported v0.3.6 on 4.103.0 (`c48c62fe`); the gate does not check it |
 | 20 | `axona-web` (axona.net) | none — links only | nothing; check its doc links are not to a version that no longer exists | — |
 | 21 | `axona-peer` | FROZEN at 4.38.0 | NEVER | — |
 | 22 | `axona-relay-canary` | vendored, stale, not deployed anywhere known | nothing until it is deployed; listed so it is not forgotten | — |

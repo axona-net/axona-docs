@@ -7,6 +7,47 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.102.0 → v4.103.0 — the accounting release: Hold-and-Fill Phase 1, rows 1 to 6, 10 and 13 (2026-10-05)
+
+**On both production bridges (2.146.0), both testnet bridges, all 52 relays, axona.chat 0.77.0, axona-share 0.36.0, axona-portal 0.12.0 and dht-sim 0.119.0 as of 2026-10-05 19:51Z (`release.sh check 4.103.0` COMPLETE). demo.axona.net lagged at that hour: its GitHub Pages build ran into a GitHub Actions incident and was still rebuilding. Changes no routing decision below cap. Nothing is armed.**
+
+What does a node know about the channels it holds, and what does it refuse to close? Before
+4.103.0 a dead-peer mark was a bare set membership with no reason, a never-opened dial left no
+mark at all, `closeConnection` only unbound (the RTCPeerConnection stayed open), and a lookup
+could prune a peer below cap through the anneal. The gate's grace close and overflow asked no one
+whether the peer carried a duty. 4.103.0 is the accounting for all of that, from Hold-and-Fill
+v0.15 (axona-docs `e4809d2`), seven rows reviewed one by one and then together.
+
+- Row 1: a dead-peer mark is `{kind, cause, at}`; `add()` is membership only and never
+  overwrites a known cause. Row 10: marks run an automaton, ELIGIBLE / FAIL / CONSUME / BIND,
+  with backoff `B·factor^(n−1)` (30 s, ×2), exhaustion at `A_max` 4, a lazy refill every
+  `R_refill` 60 s, and two bounds in one table: loss marks ≤ 256 drive MARKS-FULL and its
+  hysteresis of 32; policy marks ≤ 1024 drive POLICY-FULL. Outbound dials consult eligibility,
+  not membership. Inbound is UNCHANGED: a marked identity that offers a channel is still
+  accepted and its mark deleted, as 4.102.0 did; the acceptance transaction is designed, not
+  built. Row 13: a dial that never opens (negotiation timeout, PC closed, peer left,
+  disconnect) now reaches the marks, and only when no OPEN channel to that identity exists.
+- Row 2b: the client-hello carries the node's id as an unauthenticated hint, so a bridge on
+  2.146.0 can order a newcomer's anchors by region. A 4.102.0 client without it admits unchanged.
+- Row 3: a channel ledger, one record per RTCPeerConnection and one per bound identity, with
+  the bounds `C_phys` 66, `C_inbound` 4, `P_pending` 8. ENFORCE IS OFF: the ledger counts what it
+  would have refused and refuses nothing. A close escalates to a second `pc.close()` after
+  10 s and releases nothing; only the transport's `closed` releases a record.
+- Row 4: `mayRetire(id)` names the duty this node owes a peer, from installed roles, handoff
+  parties in flight and queued ingest dependencies. The grace close, the overflow close and
+  the swap victim each ask it first; a refused close keeps the channel and re-arms.
+- Row 5: `closeConnection` unbinds, then closes. A voluntary close fires no death and writes
+  no mark.
+- Row 6: the anneal is gone (the temperature still cools). At cap, `_addByVitality` returns
+  before any open, counted `vitality-swap-skipped`. Below cap it admits as before.
+
+**What this does not change.** No fill runs; rows 7, 8, 9, 11, 12 and 14 are not started. A
+node at cap holds and does not swap. Two below-cap admissions racing across one `await` can
+still both insert (row 15, design case 61), as on 4.102.0. Every fence behind this release is
+offline, on the sim transport or a fake RTCPeerConnection; this promotion is the first time any
+of it runs on a relay or a browser, and the ledger's would-refuse counters are the first thing
+to read from it.
+
 ## v4.101.0 → v4.102.0 — a node that steps down holds the seat for five minutes (2026-10-04)
 
 **In production on both bridges and all 52 relays. Changes root-claim behaviour. One accepted cost.**
