@@ -702,6 +702,27 @@ attempt's missing effects, idempotently, instead of assuming anything ran:
      derived and written; `owner` released. An admission outcome is the
      primitive's RETURN; it is not the closes, which have their own
      entries (Vega `7b87dcc4`).
+   - INTENT, REQUEST, OUTCOME, GONE (Aster `d12836ff`). Four things, and
+     the record names which one it holds. INTENT is the completer's
+     decision to close a channel; it is not recorded, because an intent
+     that never became a request leaves nothing to avoid repeating.
+     REQUEST is the call into the transport's close; a `closes` entry
+     means exactly "the request was issued", and the entry is written in
+     the same synchronous step as the request. The assumption that makes
+     "after the request, before the next" a boundary is stated from
+     source: on the web transport `closeConnection` (`webrtc.js`, row 5)
+     runs `unbindPeer` and `mesh.disconnect` with no `await` before them
+     and the disconnect wrapped, so issuing the request cannot throw to
+     the caller and no other completer can interleave between the request
+     and the record; on the sim transport the close is awaited and the
+     entry is written when it resolves, which the fence drives explicitly.
+     If a transport is added whose close can throw before issuing, the
+     entry is written BEFORE the call and the fail-closed rule treats an
+     entry with no outcome as issued. OUTCOME is uncertain at the record:
+     the request may be refused, lost or late. GONE is the ledger's state
+     and only the transport's 'closed' sets it (row 3); `peer(PENDING)`
+     and `chan(all)` read the ledger, never `closes`. "Closed once" in
+     this document means one REQUEST per channel per attempt.
    - RESUME, NEVER RE-ENTER. A completer that finds progress continues
      from the first unwritten boundary: `markCleared` false → do (1);
      `admission` null → do (2); `admission = 'entered'` with no outcome →
