@@ -7,6 +7,64 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.103.0 → v4.104.0 — the fill: Hold-and-Fill Rule 2, rows 7, 8, 9, 11 and 12 (2026-10-06)
+
+**On both production bridges (2.147.0), both testnet bridges, all 51 relays (Air 6, M1 8, Linux 5, Windows 20 as services, four droplets at 3; the droplets' kernel inferred from unit start time against the vendored file), axona.chat 0.78.0, axona-share 0.37.0, axona-portal 0.13.0 and dht-sim 0.120.0 as of 2026-10-06 18:08Z (`release.sh check 4.104.0` COMPLETE). demo.axona.net served the new tags at 18:08Z. The relay is 0.145.0 and carries the launcher refusal. Changes no routing decision below cap. NOTHING IS ARMED.**
+
+Why does a node that is allowed fifty peers sit at six? Before 4.104.0 the maintenance tick
+refilled the five nearest successors and nothing else, a peer that bound but was never
+admitted stayed bound and out of the table for the life of its channel, a dial's guard token
+ended before the dial went out, and the hop-cache frame that the receiver has understood since
+the hop-cache design was never sent. The survey after 4.103.0 read the same peer counts as
+before it, because Rule 1 held what the node had and nothing filled toward cap. 4.104.0 is the
+fill, from Hold-and-Fill v0.15 (axona-docs `e4809d2`), five rows reviewed one by one and then
+pinned together.
+
+- Row 7: the tick RECONCILES first. Every identity the transport holds bound that is not in
+  the table is offered to the admit path with zero dials; refusal leaves it bound and charged,
+  and with the gate armed its grace timer starts. The reconcile runs before the search backoff
+  gate, so an empty search never suppresses it.
+- Row 8: one guard token per attempt, ended exactly once, at bind, cancel or deadline, and
+  correlated with the channel incarnation the attempt started: a stale channel's late bind or
+  deadline ends nothing, deletes no mark and admits nothing. The composite transport carries
+  the incarnation through to the kernel. A fresh presence record refills the attempt budget
+  and keeps a live token. The sweep at 45 s is the fail-safe for a lost signal; it runs at the
+  fill's own tick boundary, so a full pending set cannot hide it.
+- Row 9: a lookup that FINDS its target sends `hop_cache` to up to three hops nearest the end
+  of the trace. The counts are attempts, not deliveries; nothing in the sender knows whether
+  a frame arrived.
+- Row 11: self-integration dials with the right identity type and re-reads eligibility at the
+  dial and after the awaited open.
+- Row 12: the fill. The tick's target is cap, not kNear. Candidates come through a cache of
+  64 fed by closest-set responses, lookahead responses and the bridge's peer-list; the node
+  asks the bridge for introductions on a timer drawn in [5, 15] minutes while below cap. Each
+  dial passes a preflight (pending slots under 8, the ledger's pure predicate) and then
+  reserves at the allocation boundary itself: a transport that refuses capacity answers
+  `null`, the dial releases its token, consumes nothing and keeps the candidate nominated.
+  Availability, cap minus admitted minus attempts in flight, is read at every issue, never
+  from a snapshot taken before an awaited search. The tick dials at most three attempts, dials
+  and cancels alike, and stops at cap EXACTLY. It reports why it stalls: no supply, no answer
+  from the directory it holds, every candidate on its backoff; silence after a sent request is
+  reported unknown and infers nothing.
+
+ARMING. The fill runs only when maintenance, the attempt guard and the admission gate are all
+present. Maintenance with either missing is the legacy near refill, byte for byte, and says so
+once. On a relay, `RELAY_SYNAPTOME_MAINTAIN=1` without `RELAY_ATTEMPT_GUARD=1` and
+`RELAY_ADMISSION_GATE=1` is refused at launch (relay 0.145.0), in the same shape as the
+kernel-floor refusal beside it. Every fleet harness already sets all four.
+
+**What this does not change.** NOTHING IS ARMED by this release: no relay, bridge or app sets
+the maintenance env, so the fill tick does not run anywhere until a host is armed on David's
+word. The bridge side of discovery (the directory registry, the sample, the re-contact
+admission) is not built, so a graduated node's re-contact timer will report rendezvous stalls
+until it is. Inbound acceptance is designed, not built: a marked identity that offers a channel
+is still accepted. Two below-cap admissions racing across one `await` can still both insert
+(row 15, design case 61). Every fence behind this release is offline, on the sim transport or
+a fake socket; no node has yet filled toward cap over a real mesh. The survey at matched age,
+after a controlled arming, is the measurement this release exists to move.
+
+---
+
 ## v4.102.0 → v4.103.0 — the accounting release: Hold-and-Fill Phase 1, rows 1 to 6, 10 and 13 (2026-10-05)
 
 **On both production bridges (2.146.0), both testnet bridges, all 52 relays, axona.chat 0.77.0, axona-share 0.36.0, axona-portal 0.12.0 and dht-sim 0.119.0 as of 2026-10-05 19:51Z (`release.sh check 4.103.0` COMPLETE). demo.axona.net lagged at that hour: its GitHub Pages build ran into a GitHub Actions incident and was still rebuilding. Changes no routing decision below cap. Nothing is armed.**
