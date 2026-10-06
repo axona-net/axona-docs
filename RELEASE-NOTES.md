@@ -7,6 +7,54 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.104.0 → v4.105.0 — one pinger per channel: the mesh heartbeat (2026-10-06)
+
+**On both production bridges (2.148.0), both testnet bridges, all 51 relays (Air 6, M1 8, Linux 5, Windows 20 as services, four droplets at 3; the droplets' kernel inferred from unit start times of 22:42–22:44Z against vendored files written 22:28–22:29Z), axona.chat 0.79.0, axona-share 0.38.0, axona-portal 0.14.0 and dht-sim 0.121.0 as of 2026-10-06 22:49Z (`release.sh check 4.105.0` COMPLETE). By 22:50Z axona.chat served the proven bundle, axona-share and demo.axona.net the new tags, dht-sim the new legend. The relay is 0.146.0. The fill stays armed on the Air and M1 relays as before; this release changes no routing decision. The council seats and any browser still open keep the kernel they started on and are legacy peers to the fleet until they reload.**
+
+Who checks that a channel is still alive, and how often? Before 4.105.0 both ends of every
+WebRTC data channel pinged each other once a second and both echoed a pong: four small frames
+a second per channel, about two hundred a second for a relay at the fill's cap of 50, and the
+two loops knew nothing of each other. David set the contract on 2026-10-06 and 4.105.0 is
+that contract:
+
+- ONE pinger per channel. The offerer pings every 2 s; the other end pongs at once and sends
+  nothing of its own.
+- A side that has received no ping for 5 s takes the role and pings. The offerer waits 1 s
+  longer, so two pongers do not take the role in the same tick.
+- A side that receives a ping while it is itself pinging asks whether it is still actively
+  sending. If its own last ping is older than one interval plus a tick, its loop stalled or
+  slept: the far end took the role and it yields, whatever its role — when A goes quiet and
+  B takes over, A pongs and does not resume. If it is actively sending, the two pings crossed,
+  and the responder yields; the offerer keeps.
+- Nothing received for 10 s marks the channel stale. Nothing received for 20 s evicts the
+  peer. The clock is any receipt, ping or pong, so a channel that opens and never hears
+  anything dies at 20 s too; before, such a channel lived until a send threw.
+- The ping carries the pinger's last measured round trip, so the ponger learns the same
+  latency without pinging. Routing on the ponger's side keeps its distance per millisecond.
+- The ping carries a protocol marker. A ping without it is a 4.104.0 peer's: against such a
+  peer the new end never yields and keeps its own 2 s pings for its own measurement, while
+  still ponging every one of the old loop's pings. A mixed fleet is safe through the roll;
+  the old pair of loops stays on a channel until both ends are on 4.105.0.
+
+Frames per channel fall from four a second to one. Stale and eviction move from 3 s and
+10 s to 10 s and 20 s: a channel that has gone dead stays a routing candidate about twice as
+long before `onPeerLost` moves traffic around it. That is a cost of the thresholds chosen,
+recorded by Vega in review, not a defect.
+
+**What is claimed and what is not.** In steady state exactly one end pings; the fence
+observes it. After a disturbance — a stalled loop, a sleep of one or both ends, frames queued
+across a pause and delivered on resume — the fence observes one pinger again within its own
+scaled window, with transient zero or two pingers on the way; each such frame is a receipt and
+moves no liveness clock toward eviction. That is an observation of those schedules. NO finite
+convergence bound is claimed: a timer the host runs late can hold a side in the wrong role
+past any window, and nothing in the code constrains lateness. The property the code is
+written to — if every due tick and delivered frame is eventually run, the pair reaches one
+pinger and holds it — is a conditional, stated and not proven; Aster's review left it as an
+open obligation and it stands on the follow-up list. The bridge's own WebSocket ping is
+untouched. Nothing in this release changes the fill or its arming.
+
+---
+
 ## v4.103.0 → v4.104.0 — the fill: Hold-and-Fill Rule 2, rows 7, 8, 9, 11 and 12 (2026-10-06)
 
 **On both production bridges (2.147.0), both testnet bridges, all 51 relays (Air 6, M1 8, Linux 5, Windows 20 as services, four droplets at 3; the droplets' kernel inferred from unit start time against the vendored file), axona.chat 0.78.0, axona-share 0.37.0, axona-portal 0.13.0 and dht-sim 0.120.0 as of 2026-10-06 18:08Z (`release.sh check 4.104.0` COMPLETE). demo.axona.net served the new tags at 18:08Z. The relay is 0.145.0 and carries the launcher refusal. Changes no routing decision below cap. NOTHING IS ARMED.**
