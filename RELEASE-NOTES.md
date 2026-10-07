@@ -7,6 +7,56 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.105.0 → v4.106.0 — the composite has one dialer: the kernel half of the bridge fill (2026-10-07)
+
+**On both production bridges (2.149.0, unarmed), both testnet bridges, all 51 relays (Air 6, M1 8, Linux 5, Windows 20 as services, four droplets at 3; the droplets' kernel inferred from unit start times of 16:56–16:59Z against vendored files written 16:46–16:47Z), axona.chat 0.80.0, axona-share 0.39.0, axona-portal 0.15.0 and dht-sim 0.122.0 as of 2026-10-07 16:59Z (`release.sh check 4.106.0` COMPLETE; the first check at 16:36Z read ten rows behind). The relay is 0.147.0 and the bridge is 2.149.0, which carries the bridge half of the design and arms nothing: with the three `BRIDGE_*` flags unset, every bridge behaves as it did, and its operator `/healthz` now says so in a `fill` block (armed false, cap null). The fill stays armed on the Air and M1 relays as before. The council seats and any browser still open keep the kernel they started on until they reload.**
+
+Why does the node that introduces everyone hold almost no one? On 2026-10-07 at 14:49Z the
+east bridge had 21 inbound sockets and a synaptome of 1, and west held 47 mesh channels every
+one of which somebody else had opened. Neither bridge had dialled a peer since 2026-06-29.
+David's direction that day: a bridge also needs to continuously build its connections; it
+should prioritize external connections, as it does once it is fully populated, but otherwise
+grow its connections in the same way regular nodes do. The design is Bridge fill v0.8
+(axona-docs `9b1ed08`), accepted at design level by the council the same afternoon. This
+release is its kernel half and changes nothing a relay or a browser does.
+
+A bridge's node transport is a `CompositeTransport` over two sub-transports, the inbound
+WebSocket server and the outbound uplink to the other bridge. Until now the composite routed
+an open to whichever sub-transport already owned the peer and returned false for anyone
+else, and it forwarded none of the surfaces the kernel's fill dials through, so a fill armed
+on a bridge would have dialled nothing. 4.106.0 gives the composite ONE DIALER:
+
+- The sub-transport that exposes `connectViaRelay` becomes the dialer as it is added. A
+  second one refuses to be added. A composite with none has no `connectViaRelay` at all, so
+  the kernel's `openIsTheDial` reads true exactly as before: the sim and every legacy
+  composite are untouched.
+- `connectViaRelay`, `mayDial`, `canAllocate` and `allocRefusedFor` forward to the dialer
+  and return its answers unchanged: the incarnation string, true, false or null mean to the
+  kernel what the dialer meant. The ledger the kernel reads before a dial is the ledger the
+  dial allocates against.
+- `openConnection` is NOT changed. It stays owner-or-false and allocates nothing, which is
+  what the kernel takes a bound-only open for on a transport that has `connectViaRelay`;
+  the CONSUME and the incarnation stay at the relay issue. The first two drafts of the
+  design had the composite dialling inside the open. Aster's review showed that path ends a
+  dial as a bind with nothing consumed and no incarnation; the fence's third mutant
+  reproduces that exact failure.
+- `onPeerList` fans in from every sub-transport that emits it, through a registrar, so the
+  bridge's uplink, which is added after the kernel subscribes, is wired.
+
+The fence, `fence_composite_dialer.mjs`, drives the real `AxonaPeer` on the composite: a peer
+the door owns opens true with zero dials; an unowned peer gets open=false and one
+`connectViaRelay`, whose four answers end as the kernel's four outcomes with CONSUME exactly
+once and only on the two issues. The stale-incarnation handlers it does not drive are fenced
+through the real composite by `fence_guard_token` B15–B16, unchanged here.
+
+**What is claimed and what is not.** Nothing is armed. No bridge fills until the bridge
+release that pins this kernel is deployed and David arms it, per bridge, with an explicit
+cap. Whether a bridge at 50 routes better than a bridge at 1 is measured after, not asserted
+here. The all-path admission race from Hold-and-Fill v0.15 and saturated-cohort convergence
+stay open.
+
+---
+
 ## v4.104.0 → v4.105.0 — one pinger per channel: the mesh heartbeat (2026-10-06)
 
 **On both production bridges (2.148.0), both testnet bridges, all 51 relays (Air 6, M1 8, Linux 5, Windows 20 as services, four droplets at 3; the droplets' kernel inferred from unit start times of 22:42–22:44Z against vendored files written 22:28–22:29Z), axona.chat 0.79.0, axona-share 0.38.0, axona-portal 0.14.0 and dht-sim 0.121.0 as of 2026-10-06 22:49Z (`release.sh check 4.105.0` COMPLETE). By 22:50Z axona.chat served the proven bundle, axona-share and demo.axona.net the new tags, dht-sim the new legend. The relay is 0.146.0. The fill stays armed on the Air and M1 relays as before; this release changes no routing decision. The council seats and any browser still open keep the kernel they started on and are legacy peers to the fleet until they reload.**
