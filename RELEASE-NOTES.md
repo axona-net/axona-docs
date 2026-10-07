@@ -11,6 +11,20 @@ build is always visible in each app's version row and at the bridge's
 
 **On both production bridges (2.149.0, unarmed), both testnet bridges, all 51 relays (Air 6, M1 8, Linux 5, Windows 20 as services, four droplets at 3; the droplets' kernel inferred from unit start times of 16:56–16:59Z against vendored files written 16:46–16:47Z), axona.chat 0.80.0, axona-share 0.39.0, axona-portal 0.15.0 and dht-sim 0.122.0 as of 2026-10-07 16:59Z (`release.sh check 4.106.0` COMPLETE; the first check at 16:36Z read ten rows behind). The relay is 0.147.0 and the bridge is 2.149.0, which carries the bridge half of the design and arms nothing: with the three `BRIDGE_*` flags unset, every bridge behaves as it did, and its operator `/healthz` now says so in a `fill` block (armed false, cap null). The fill stays armed on the Air and M1 relays as before. The council seats and any browser still open keep the kernel they started on until they reload.**
 
+**Bridge 2.150.0 and 2.151.0 (same kernel, 2026-10-07 18:14Z testnet, 18:54Z production): the directory feed.** Arming the two
+testnet bridges at 17:49Z showed the one thing the bridge half had left out. The kernel's
+fill asks its transport for introductions every few minutes while below cap and takes the
+answer through its peer-list handler; on a relay both are the web transport's frames to the
+bridge. A bridge's own transport asks no bridge for anything, so its directory step read
+"none" and the fill reported `fill-stalled:supply` with the door's population standing right
+there. 2.150.0 adds the feed: a peer-less sub-transport, present only when the bridge is
+armed, that answers the kernel's request with a sample of at most sixteen identities the
+bridge already knows, its admitted sockets and the peers it has graduated off the door, the
+bridge itself excluded, delivered on the next turn so the kernel records "sent" and then
+"answered" in that order. An empty pool is an answer. Nothing is dialled by the feed; the
+kernel's cache ranks and refuses as it does on a relay. Unarmed bridges are unchanged, and
+both production bridges are unarmed. 2.151.0 carries two corrections from Aster's review: a source that throws or returns something that is not a list is reported to the kernel as unavailable, not as an empty answer, and a deferred answer is dropped if the handler unsubscribed or the feed stopped before it fired. On David's word west was armed at 18:54Z with the three flags and `BRIDGE_MESH_MAX_PEERS=50`, the first fill on a production bridge; east and both testnet bridges' states are as the next entry's header says. The testnet bridges were armed at 17:49Z; on a testnet with no relays their fill reports `fill-stalled:supply`, which is the right answer.
+
 Why does the node that introduces everyone hold almost no one? On 2026-10-07 at 14:49Z the
 east bridge had 21 inbound sockets and a synaptome of 1, and west held 47 mesh channels every
 one of which somebody else had opened. Neither bridge had dialled a peer since 2026-06-29.
