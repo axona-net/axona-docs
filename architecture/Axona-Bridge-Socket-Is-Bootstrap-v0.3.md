@@ -145,11 +145,17 @@ A bridge is a relay. Its socket is the way in and nothing more:
    used, trusted or needed before the channel's handshake. The negotiation
    is bounded by the mesh's own negotiation timeout and is cancelled when
    its socket closes.
-3. BIND ON THE CHANNEL. The axona/4 handshake runs over the new data
-   channel as on any mesh channel; the kernel binds the node id there
-   through the same path a relay uses. The composite's route-token rule
-   (§ Ownership) decides what that bind does to a socket route the same
-   identity already holds.
+3. BIND ON THE CHANNEL. The authenticated `hello` runs over the new data
+   channel and binds the node id to the channel's key through the path
+   every door-dialled channel takes today: `meshAuth.onHello` →
+   `webrtc.bindPeer(nodeId, meshId, channelKey)` → `onPeerBound`
+   (`index.js:1111`, `:1090`, `webrtc.js:212`). The mesh entry stays
+   under its door key `d<doorEpoch>:<connId>`; the node id is bound
+   beside it, as a client's door-dialled channels carry a connection id
+   beside a node id today. This is NOT the relayed path, whose mesh entry
+   is the node id from the first signal (correction after Vega
+   `50252eaa`). The composite's route-token rule (§ Ownership) decides
+   what that bind does to a socket route the same identity already holds.
 4. RETIRE THE SOCKET. Once the newcomer's channel to the bridge is bound
    AND the newcomer's last `meshBound` report is fresh (within
    `GRADUATION_VITALITY_TTL_MS`, 20 s) and at least `GRADUATION_SAFE_FLOOR`
