@@ -368,6 +368,14 @@ is not "done", and "the tool said ✓" is not "verified".
   version whenever `sync-cachebust --check` passed, but `--check` compares the tags with the
   kernel's own `package.json`, not with `<ver>`. At the start of 4.102.0 it showed ✓ for a
   version nothing had been bumped to. It now prints the version the tags carry (2026-10-04).
+- `fleet.sh roll axona-win` exits 0 whatever `relayctl` wrote; the verdict is the host
+  transcript's last line, read by a second connection. On 2026-10-08 22:44Z that line was
+  `RESULT=FAIL npm notice`: npm's once-a-day update notice on stderr became a terminating
+  error under PowerShell 5.1's `$ErrorActionPreference = 'Stop'`, even behind `*> $null`,
+  after the pull and before any service restart (services stayed 20/20 on the old code; the
+  16:41Z roll the same day had passed because the notice had not been due). Fixed in relay
+  0.150.1 (exit code decides; `--no-update-notifier`), and `npm config set update-notifier
+  false` set on the host. Native stderr is never a verdict.
 - A long-lived ssh is not a status. The axona-win roll was dead for 2 h 28 m behind an open
   channel. Status is read from the host's log, by a second connection.
 - An env var carried between tools is a guess. `DRY=1` meant nothing to `release.sh`.
