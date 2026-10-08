@@ -598,18 +598,23 @@ thing. Nothing is released or armed; both branches are pushed for review.
   a newer binding when an older socket closes. `channelIdFor` names the
   admitted route's token, skips superseded sub-transports and recurses into
   a nested composite. Fences J1–J8 (kernel) and H1–H5 (bridge).
-- A FIFTH, FOUND DURING THE PROMOTION (Aster `88f4c2f7`), fixed on a
-  successor to 4.107.0: a nested composite's inner switch fires no bind
-  upward, so the parent's admitted token for the child stayed the inner
-  socket's while the child's later death carried the inner mesh token; the
-  parent's stale-token check would then swallow the admitted route's death.
-  A composite now announces its route changes (`onRouteChanged`), a parent
-  follows the token for a child that is its admitted route and announces
-  onward, and a death is forwarded with the forwarding level's admitted
-  token, so every level validates the same way. Fences J9–J12 (two and
-  three levels, stale and admitted deaths). Flag-independent; reachable in
-  production for an identity bound on a bridge uplink's socket and then
-  dialled on its mesh.
+- A FIFTH, FOUND DURING THE PROMOTION (Aster `88f4c2f7`, `16e50f0a`),
+  closed on a successor to 4.107.0: the compositional token contract was
+  missing. In 4.107.0 a composite forwards a child's death WITHOUT a token,
+  so a parent's stale-token check never runs for a nested child and every
+  nested death is forwarded, stale or not (the behaviour before the route
+  rule; nothing is swallowed, no identity is left behind). Forwarding the
+  token alone would have been worse: a child's inner switch fires no bind
+  upward, the parent's admitted token for the child would stay the inner
+  socket's, and the child's real mesh death would read as stale and be
+  swallowed. The successor does both halves: a composite announces its
+  route changes (`onRouteChanged`), a parent follows the token for a child
+  that is its admitted route and announces onward, and a death is forwarded
+  with the forwarding level's admitted token, so every level validates the
+  same way. Fences J9–J12 (two and three levels, stale and admitted
+  deaths). An earlier wording here said "ghost identity, reachable in
+  production"; that described the half-fixed state, not the shipped one,
+  and is withdrawn.
 - THE MESH RETIRE EVICTS THE VICTIM'S IDENTITY SYNCHRONOUSLY, so the
   kernel's own admit-or-improve, running after it for the newcomer, sees a
   table below cap and does not swap a second incumbent. One newcomer costs
