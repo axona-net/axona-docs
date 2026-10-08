@@ -537,6 +537,74 @@ nothing else; live measurements inform liveness, not safety.
 - FLAG OFF / NO POLICY / NO ATTEMPT ID: door behaviour byte-identical to
   2.151.0; `_enforceDegree` and `onSignal` byte-identical to 4.106.0.
 
+## As built (2026-10-08, kernel `socket-bootstrap` 69a09f9, bridge `socket-bootstrap` 45e64dd)
+
+David said "Let's build" at about 21:40Z on 2026-10-07. The build follows
+this note with the differences below, each found by a fence or a review
+during the build and recorded here so the note and the code say the same
+thing. Nothing is released or armed; both branches are pushed for review.
+
+- A NEW ATTEMPT AGAINST AN OPEN CHANNEL IS IGNORED, not settled at bind.
+  § Signalling domains said a new offer for a key holding an open channel
+  becomes a second channel settled by the duplicate rule. The mesh keeps one
+  state per key, so a second channel under one key cannot exist; the build
+  drops the new offer (`offer-on-open-ignored`) and lets the open channel's
+  own heartbeat free the key. No unauthenticated frame closes an
+  authenticated channel.
+- THE LEDGER DOES NOT BOUND PROVISIONAL OPEN CHANNELS (Aster `156d2e1d`,
+  Vega `ee0796a3`): `enforce` is false by default and the inbound count
+  covers pre-open records only, and the negotiation deadline is cleared at
+  open. § Capacity's "its bound is the ledger's inbound allowance" is
+  replaced in the build by the mesh degree policy's own two bounds:
+  `BRIDGE_PROVISIONAL_MAX` (20; the newest provisional above it is retired)
+  and `BRIDGE_BIND_DEADLINE_MS` (15 s; an open channel still unbound that
+  long is retired). The ledger stays what it is.
+- THE GATE IS SPLIT INTO DECISION AND COMMIT. `_admitOrImprove` mutated
+  (lane state, insert), so it could not be a preflight (Aster `156d2e1d`).
+  The kernel now has `_gateDecision` (pure) and `_gateCommit`;
+  `gatePreflight(sponsor)` is public and the bridge's bind policy calls it
+  before any retire. The preflight predicts the commit exactly within one
+  synchronous tick because both run the same decision code.
+- THE BIND POLICY SITS IN THE COMPOSITE. `setBindPolicy(fn)` is consulted
+  for a bind that would admit a new route, after step 0 and before any
+  kernel handler; never for a switch. The bridge's policy runs: identity
+  cooldown → `gatePreflight` → at the mesh cap counting the newcomer:
+  budget → dry-run victim → retire one incumbent → pass. A refusal closes
+  the newcomer's own channel on the next tick (unbind first, so no death is
+  reported) and touches no incumbent.
+- THE MESH RETIRE EVICTS THE VICTIM'S IDENTITY SYNCHRONOUSLY, so the
+  kernel's own admit-or-improve, running after it for the newcomer, sees a
+  table below cap and does not swap a second incumbent. One newcomer costs
+  at most one incumbent. The order is fenced.
+- A MISSING ATTEMPT ID IS REQUIRED ON DOOR SESSIONS (Aster `156d2e1d` 4).
+  `setAttemptPolicy({requireFor})`: on the bridge every own-door key, on the
+  client every `c-self-*` key; a frame without an id there is dropped and
+  counted, never accepted as legacy.
+- `dc.onopen` RE-VALIDATES ITS STATE after the degree pass (Vega `4cd16bde`):
+  a channel the pass retired starts no heartbeat and no path poll.
+- A SEED BRIDGE'S MESH is a `meshOnly` web transport: no upstream socket, no
+  handshake awaited, its only signalling domain the door sink.
+- THE DOOR'S OWN DEATH HANDLER bypassed the composite. The bridge registers
+  a death handler directly on its WebSocket transport to mark dead peers;
+  it marked a born-superseded identity dead on socket close. It now asks
+  the composite's route record first. Lesson for the note: every handler a
+  bridge registers directly on a sub-transport is outside the route rule.
+- A KERNEL PIN WITHOUT THE SURFACES REFUSES with the flag on
+  (`assertKernelSurfaces` at `startUplink`), as the arming refuses a bad
+  cap. With the flag off a bridge on an older kernel is unchanged.
+- THE BORN-SUPERSEDED `return` in the bridge's handshake is not what
+  protects the identity; the composite's rule is, and the existing
+  synaptome check already skips a second admission. The return saves work.
+  Named here because the fence's mutant set showed it.
+
+Fences: kernel `fence_route_token` (44) and `fence_mesh_attempt` (32),
+bridge `fence_socket_bootstrap` (51, pin-gated), with thirteen mutants
+caught across the three; suite 215/216 on the kernel with the one failure a
+pre-existing random setup draw in `smoke_empty_root_pull` that passes on
+rerun; the bridge chain green against the new kernel. The verification
+section above lists what these fences establish and what only the testnet
+measurements can.
+
 ## What this document does not establish
 
 - That a bridge whose channels are WebRTC routes or delivers better than
