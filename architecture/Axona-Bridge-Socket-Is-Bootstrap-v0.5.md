@@ -572,6 +572,17 @@ thing. Nothing is released or armed; both branches are pushed for review.
   budget → dry-run victim → retire one incumbent → pass. A refusal closes
   the newcomer's own channel on the next tick (unbind first, so no death is
   reported) and touches no incumbent.
+- THE TRIGGER IS "ABOVE THE TARGET", NOT "AT OR ABOVE" (Vega `ca661612`).
+  § Make room said an incumbent is retired when the open channels counting
+  the newcomer stand at or above the target. That is off by one: with the
+  newcomer counted, a count EQUAL to the target fits the target and nothing
+  is retired (49 incumbents + 1 = 50 at cap 50); one above it retires one
+  (50 + 1 = 51). The code and the fence (eight incumbents at cap 8 admit
+  with no retire; the ninth retires one) say the latter; this note now does.
+- A REFUSAL CLOSES BY TOKEN. The refused channel is closed one tick later
+  through the transport only if the identity still sits on it; if the
+  identity bound elsewhere in that tick, the refused key alone is retired
+  and the identity's current channel is untouched (Vega `ca661612`).
 - THE MESH RETIRE EVICTS THE VICTIM'S IDENTITY SYNCHRONOUSLY, so the
   kernel's own admit-or-improve, running after it for the newcomer, sees a
   table below cap and does not swap a second incumbent. One newcomer costs
