@@ -7,6 +7,85 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.107.1 → v4.107.2 — a channel that never says who it is does not get to stay (2026-10-08)
+
+**Deployed 2026-10-08, David's word ("Let's do the fixes and then roll out the updated version"): kernel 4.107.2 (tag b6b3b3e → 6521515), relay 0.149.0 (66543eb), bridge 2.154.0 (2de176b). Bridges: testnet B1 and B2, then east and west by `release.sh bridges`, both verified on their public names at 16:34Z, `STRICT_MIN_KERNEL=4.99.0` on east and west in the same recreate. Relays: Air 6/6, M1 8/8, Linux 5/5, Windows 20/20 (`RESULT=OK`), four droplets 3/3 each (kernel INFERRED from unit start after the pull) — 54 of 54 by 16:49Z. Apps: axona-chat 0.82.0 (served bundle = local build), axona-share 0.41.0 (five tags, APP_VERSION and both module tags), axona-portal 0.17.0, dht-sim 0.124.0. `release.sh check 4.107.2` read COMPLETE at 16:56Z. Measured at east after the bridge deploy and before the roll: a newcomer bound 8 of 8 anchors within 1.5 s and held 29 of 29 at 60 s, against 1 of 8 and 2 that morning; the same probe, host and door. The council seats reload on their owners' word; Howard's suite on the new fleet is recorded in `ops/STATE.md` when it lands.**
+
+Why did Howard's suite go from 0 of 95 topics mismatched on 2026-09-21 to 84 of 92 on the
+uniform 4.107.0 fleet? Not the kernel. East's door held seventeen sockets, sixteen of them
+from one host running a kernel-4.84.0 application that passed the client-hello gate, received
+its welcome, answered every ping and never sent the authenticated hello. They sat admitted and
+nameless for forty minutes. The idle sweep could not see them, because they pong. The anchor
+selection ranked them first, because score is uptime minus load and nothing else. And a
+newcomer that dialled them opened eight data channels, bound one, and kept the other seven as
+live for the whole run, because only a PROVISIONAL channel had a bind deadline and nothing is
+provisional with the socket-is-bootstrap flag off. Every client bootstrapping at east routed
+through one peer. The lookups in Howard's diagnostics ended after one hop, at that peer. A
+4.84.0 kernel that does run the handshake binds a 4.107.0 node in 0.2 s, both ways, measured on
+testnet; the version was a bystander.
+
+Three fences close it from both sides, and none of them is the version floor.
+
+- **Kernel: a bind deadline on every mesh channel.** An open channel whose peer has not
+  bound an identity within 30 s is retired (`bind-timeout`, counted in `degreeStats`), on
+  the offerer's side and the responder's. `ledgerBind` clears it. `webTransport` takes
+  `meshBindDeadlineMs`; 0 turns it off. Fence `fence_bind_deadline_all_channels`, eight
+  checks, four of which fail with the arming deleted.
+- **Bridge 2.154.0: anchors are bound identities first.** The bounded selection's fill pass
+  takes bound sockets by score and an unbound socket only when fewer than `BRIDGE_ANCHOR_K`
+  bound ones exist. A peer that joined twenty seconds ago with a name outranks one that has
+  sat forty minutes without one. Seven checks added to `smoke-anchor-select`.
+- **Bridge 2.154.0: an admitted socket that never binds is closed.** `BRIDGE_UNBOUND_KICK_MS`
+  (120 s) closes it with 4401, a code the kernel treats as a plain disconnect; `/healthz`
+  `nursery.unboundKicked` counts them. Fence `fence_unbound_socket_kick` against a real
+  bridge child: open at half the deadline, closed after it, the silence path still 4408,
+  disabled at 0.
+
+The production floor moves from `STRICT_MIN_KERNEL=4.84.0` to `4.99.0` on both bridges in the
+same deploy. That removes this host and two other stale 4.84.0 installs with a clean 4426 and
+cuts nothing that is current: Howard's published package resolves at or above 4.99.0, and the
+oldest council seat runs 4.99.0. It is not the fix. An application on a newer kernel that
+never authenticates walks through a version gate; it does not walk through the three fences.
+
+Also in 4.107.2: the ChannelLedger called the host's `setTimeout` as a method of itself,
+which Chrome refuses (`Illegal invocation`) inside `mesh._retire` before the peer is deleted,
+so every browser client has carried zombie channels since the ledger shipped in 4.103.0
+(David, axona.chat console, 2026-10-08). The timers are now called as free functions;
+`fence_ledger_browser_timers` injects browser-strict timers through the ledger and a real
+retire. And 4.107.1's nesting contract, tagged on 2026-10-08 and never deployed, ships here.
+
+## v4.107.0 → v4.107.1 — the composite's route contract holds across nesting (2026-10-08)
+
+**Tagged 2026-10-08 03:1xZ and never deployed: superseded by 4.107.2 the same day. Its change ships in 4.107.2.**
+
+What does a parent composite know about a child composite's routes? In 4.107.0, nothing it
+could check: a child's death reached the parent without a route token, so the parent forwarded
+every nested death, stale or not, as the composite always had, and a child's internal switch
+from its bootstrap socket to its mesh announced nothing upward. Nothing was swallowed and no
+identity was left behind, but the route-token rule stopped at the first nesting boundary, and
+the one production composite that nests, a bridge's node transport over its uplink's web
+transport, is where the bootstrap design will live. Aster found the gap during the 4.107.0
+promotion (`88f4c2f7`) and two holes in the first two fixes (`b4d4516c`, `6a8d4ab9`).
+
+The contract now holds at every level. A composite announces its route changes
+(`onRouteChanged`), fired on a switch and on a same-sub token update; a parent subscribes
+when it adds a child and, when that child is the identity's admitted route, follows the
+child's AUTHORITATIVE admitted token (`admittedTokenOf`, the child's route table alone, never
+a sub's bound mapping), re-announcing to its own parent; a death is forwarded with the
+forwarding level's admitted token, so a parent reads a child's stale death as stale and its
+admitted death as the death. The parent never copies a notification's value: under the
+synchronous listener API a listener registered on the child before the parent can, inside the
+notification for one token, cause a replacement to another whose nested notification has
+already moved the parent, and the resumed loop would write the old token back. A notification
+for a child whose admission is gone changes nothing; the death that follows settles it.
+Route-only changes run no admission policy and fire no kernel bind, which the fence counts.
+
+Fences: `fence_route_token` J9–J15 (two and three levels; a re-entrant replacement mid-notification;
+a same-child replacement followed by a stale death and the current death; the null branch
+reached with the child still bound but no longer admitted), 71 checks in the file, each new
+one proven by its mutant. No bridge or relay code changes; the relay vendors the kernel and
+the bridge pins it.
+
 ## v4.106.0 → v4.107.0 — the bridge socket is bootstrap: one identity, one admitted route, one direction (2026-10-08)
 
 **On both production bridges (2.152.0, flag unset), both testnet bridges, all 54 relays (Air 6, M1 8, Linux 5, Windows 20 as services, four droplets at 3; the droplets' kernel INFERRED from unit start times of 02:46–02:49Z against vendored files written 02:37–02:38Z), axona.chat 0.81.0, axona-share 0.40.0, axona-portal 0.16.0 and dht-sim 0.123.0 as of 2026-10-08 02:49Z (`release.sh check 4.107.0` COMPLETE, exit 0; the first check at 01:44Z read ten rows behind). The relay is 0.148.0 and the bridge is 2.152.0. `BRIDGE_SOCKET_IS_BOOTSTRAP` is unset on every bridge: the door behaves as 2.151.0 did, and the four bridges' fill stays armed at cap 50 as before. The council seats and any browser still open keep the kernel they started on until they reload. One gap found by Aster during the promotion, in the kernel's composite and independent of the flag, is closed on a successor branch and goes to David as 4.107.1: a nested composite forwards a child's death without its route token, so a parent cannot tell a child's stale death from its admitted route's and forwards both (the behaviour before the route rule); and had the token been forwarded alone, without the parent following the child's route changes, an inner switch would have left the parent's token stale and the child's real death swallowed. In the shipped kernel no death is swallowed and no identity is left behind; the compositional contract is what is missing. An earlier wording of this entry said "ghost identity, reachable today"; that was wrong and is withdrawn. The kernel's GitHub Actions `tests` workflow has failed on every push since 2026-10-06, including 4.106.0; the two failing fences pass locally on this commit and the cause is unconfirmed.**
