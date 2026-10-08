@@ -583,6 +583,33 @@ thing. Nothing is released or armed; both branches are pushed for review.
   through the transport only if the identity still sits on it; if the
   identity bound elsewhere in that tick, the refused key alone is retired
   and the identity's current channel is untouched (Vega `ca661612`).
+- FOUR CODE-REVIEW DEFECTS FIXED BEFORE THE 4.107.0 TAG (Aster `8fb51cdb`
+  `3d778257`, Vega `580255ec`): the refusal callback fenced the door KEY,
+  which a later attempt can reuse, so it captures the refused channel's
+  incarnation and returns when the key no longer holds it; the composite's
+  existing-peer REPLAY admitted a new route without the bind policy and now
+  runs the same admission as live delivery; a REPEATED death from a
+  superseded socket was forwarded once its entry was cleared, and a death
+  from a sub-transport that is not the identity's admitted route is now
+  swallowed wherever a bootstrap route is involved (a composite with no
+  bootstrap sub keeps its earlier forwarding), with the sub-transport's
+  route token riding on the death so a same-sub stale death is fenced; the
+  door fires a death only for the identity's current connection and keeps
+  a newer binding when an older socket closes. `channelIdFor` names the
+  admitted route's token, skips superseded sub-transports and recurses into
+  a nested composite. Fences J1–J8 (kernel) and H1–H5 (bridge).
+- A FIFTH, FOUND DURING THE PROMOTION (Aster `88f4c2f7`), fixed on a
+  successor to 4.107.0: a nested composite's inner switch fires no bind
+  upward, so the parent's admitted token for the child stayed the inner
+  socket's while the child's later death carried the inner mesh token; the
+  parent's stale-token check would then swallow the admitted route's death.
+  A composite now announces its route changes (`onRouteChanged`), a parent
+  follows the token for a child that is its admitted route and announces
+  onward, and a death is forwarded with the forwarding level's admitted
+  token, so every level validates the same way. Fences J9–J12 (two and
+  three levels, stale and admitted deaths). Flag-independent; reachable in
+  production for an identity bound on a bridge uplink's socket and then
+  dialled on its mesh.
 - THE MESH RETIRE EVICTS THE VICTIM'S IDENTITY SYNCHRONOUSLY, so the
   kernel's own admit-or-improve, running after it for the newcomer, sees a
   table below cap and does not swap a second incumbent. One newcomer costs

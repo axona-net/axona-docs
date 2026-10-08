@@ -7,6 +7,73 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.106.0 → v4.107.0 — the bridge socket is bootstrap: one identity, one admitted route, one direction (2026-10-08)
+
+**On both production bridges (2.152.0, flag unset), both testnet bridges, all 54 relays (Air 6, M1 8, Linux 5, Windows 20 as services, four droplets at 3; the droplets' kernel INFERRED from unit start times of 02:46–02:49Z against vendored files written 02:37–02:38Z), axona.chat 0.81.0, axona-share 0.40.0, axona-portal 0.16.0 and dht-sim 0.123.0 as of 2026-10-08 02:49Z (`release.sh check 4.107.0` COMPLETE, exit 0; the first check at 01:44Z read ten rows behind). The relay is 0.148.0 and the bridge is 2.152.0. `BRIDGE_SOCKET_IS_BOOTSTRAP` is unset on every bridge: the door behaves as 2.151.0 did, and the four bridges' fill stays armed at cap 50 as before. The council seats and any browser still open keep the kernel they started on until they reload. One defect found by Aster during the promotion, in the kernel's composite and independent of the flag, is fixed on a successor branch and goes to David as 4.107.1: a nested composite's inner switch left the parent's admitted token stale, so the inner route's later death could be read as stale and swallowed, leaving a ghost identity; reachable today only for an identity bound on a bridge uplink's socket and then dialled on its mesh. The kernel's GitHub Actions `tests` workflow has failed on every push since 2026-10-06, including 4.106.0; the two failing fences pass locally on this commit and the cause is unconfirmed.**
+
+What is a bridge's WebSocket for, once the node on the other end has a kernel identity and a
+WebRTC stack? Until this release it was three things at once: the way in, the signalling path
+for the newcomer's first dials, and a kernel channel the bridge's own node admitted into its
+synaptome and never replaced. The afternoon of 2026-10-07 showed the cost: east, armed to fill
+at 50, dialled 63 times in twelve minutes and opened nothing, because a bridge relays
+signalling only to a peer holding a socket on it, and on west that peer was east alone. East
+read zero open mesh channels at every reading of the day while its door held seventeen
+sockets. David's direction that evening: once we establish a websocket connection to a bridge,
+we need to replace it with a webrtc connection; the bridge relay should be the same as a
+regular relay except that it can graduate a connected node to make room for a newly introduced
+node. The design is Socket-is-bootstrap v0.5 (axona-docs `7a27d24`, as-built section
+`1a8952f`), five council rounds in one evening; this kernel is its first half and the bridge
+release that follows it is the second, behind a flag that is off everywhere.
+
+THE COMPOSITE. A node's transport can hold one identity on two sub-transports at once: a
+browser's bridge socket and its mesh channel to the same bridge, a bridge's door socket and its
+mesh channel to the same newcomer. Before this release the first sub-transport in order owned
+a disputed identity and every sub-transport's death reached the kernel, so closing a bootstrap
+socket after a mesh channel to the same identity had bound evicted that identity from the
+synaptome. The composite now keeps ONE ADMITTED ROUTE per identity and runs a route-token rule
+on every bind and every death before the attempt guard and before any kernel side effect: a
+bind whose token is not the sub-transport's current token for the identity is ignored; a bind
+on a sub-transport that declares itself bootstrap, arriving while a mesh route is admitted, is
+born superseded; a mesh bind arriving while a bootstrap route is admitted switches the route
+with no re-admission, in that direction only. A superseded route is skipped by routing, its
+pending requests fail at once with a named error, its death is swallowed however many times it
+arrives, and it is never re-promoted. The admitted route's death kills the identity. A bind
+policy may be installed and is consulted for a bind that would admit a new route, by the live
+path and by the replay a late handler receives alike. A composite with no bootstrap
+sub-transport, the simulator and every two-mesh composite, behaves as before.
+
+THE MESH. Signalling carried no attempt id: a later offer, answer or candidate under one key
+acted on whatever the key held. Every offer now carries an attempt id the offerer mints, the
+responder stores and echoes in its answer and every candidate, and both ends drop a frame whose
+id is not the key's current one; a continuation that resumes after its attempt ended applies
+nothing. A new attempt replaces an unbound negotiation and is ignored against an open channel:
+no unauthenticated frame closes an authenticated one. A key the attempt policy names (a bridge's
+own door, a client's reserved bridge id) requires the id and accepts no legacy frame; every
+other key is byte-identical to 4.106.0. Under a degree policy, open channels whose identity has
+not yet bound are PROVISIONAL: neither counted nor candidates in the degree pass, bounded by a
+maximum and by a bind deadline, because the channel ledger's inbound count covers records before
+they open and the negotiation deadline is cleared at open. `retireForNewcomer` retires one
+non-provisional incumbent with the newcomer excluded, outside the degree pass and its interval.
+`dc.onopen` re-validates its state after the degree pass and starts no timers on a channel the
+pass retired.
+
+THE GATE. `_admitOrImprove` is now a pure decision followed by a commit, and `gatePreflight`
+exposes the decision, so a bridge can learn whether a bind would be admitted before it retires
+anyone for it; the preflight predicts the commit exactly within one synchronous tick because
+both run the same code.
+
+THE WEB TRANSPORT. A `meshOnly` mode opens no upstream socket and awaits no handshake, for a
+seed bridge with nothing above it; a door signal sink lets a bridge answer its own door's
+negotiations; a client requires attempt ids on a bridge's reserved id.
+
+Fences: `fence_route_token` (54 checks, including nested composites with both bootstrap bindings
+retained through a switch, handler replay after the switch, repeated and stale deaths) and
+`fence_mesh_attempt` (32), each proven by deleting the fix; the kernel suite in full. Council
+review of the code by Aster and Vega found four defects before the tag and each is in this
+release: the replay path skipping the bind policy, a repeated superseded death forwarded, a
+same-sub stale death unfenced, and the bridge's refusal callback fencing a reusable key instead
+of the channel's incarnation.
+
 ## v4.105.0 → v4.106.0 — the composite has one dialer: the kernel half of the bridge fill (2026-10-07)
 
 **On both production bridges (2.149.0, unarmed), both testnet bridges, all 51 relays (Air 6, M1 8, Linux 5, Windows 20 as services, four droplets at 3; the droplets' kernel inferred from unit start times of 16:56–16:59Z against vendored files written 16:46–16:47Z), axona.chat 0.80.0, axona-share 0.39.0, axona-portal 0.15.0 and dht-sim 0.122.0 as of 2026-10-07 16:59Z (`release.sh check 4.106.0` COMPLETE; the first check at 16:36Z read ten rows behind). The relay is 0.147.0 and the bridge is 2.149.0, which carries the bridge half of the design and arms nothing: with the three `BRIDGE_*` flags unset, every bridge behaves as it did, and its operator `/healthz` now says so in a `fill` block (armed false, cap null). The fill stays armed on the Air and M1 relays as before. The council seats and any browser still open keep the kernel they started on until they reload.**
