@@ -209,6 +209,62 @@ socket and must find it through the mesh.
   A run after the mesh has matured, and one with the Windows senders staggered, would tighten
   the numbers above.
 
+# Part 3 — the same matrix nineteen hours later, with every bridge in 0xFF (2026-10-09 17:52Z)
+
+David's word this afternoon: every bridge lives in the system region 0xFF. West, B1 and B2
+had still minted their ids in their geo region (0x80); each got `BRIDGE_REGION=bridge` and a
+restart at 17:00–17:01Z, testnet first. Fifty minutes later the fleet was asked again: the same
+51 relays, the same 52 targets with west's new id, three samples. 49 relays answered the
+request. Rows in `ops/p2p-rtt-20261009T1752Z-relays/`.
+
+## Answer
+
+**Fifty-one of fifty-three targets answered every relay. No target answered only some.** The
+two that answered none are two Windows relays whose processes had frozen hours earlier (below).
+Direct sends succeeded 6,117 of 6,117. Routed round trips succeeded 7,350 of 7,644, and every
+miss is one of those two relays. No sample took over 2 s.
+
+| hops | samples | p50 ms | p90 ms | max ms |
+|---|---|---|---|---|
+| 1 | 6027 | 51 | 90 | 1007 |
+| 2 | 1026 | 84 | 162 | 917 |
+| 3 | 3 | 1 | 1 | 1 |
+
+## What changed against Part 2
+
+- **The west bridge: 14 of 51 → 49 of 49**, routed p50 112 ms. The address moved from 0x80 to
+  0xFF and the mesh had fifty minutes to find it. Part 2's reading, that a greedy walk needs
+  someone on the way to hold the target, is unchanged; what changed is that a bridge in the
+  bridge region is where the walk already goes.
+- **The mutual local-minimum pair (svc-05 and m1/relay-4): both 48 of 48**, 25 ms and 55 ms.
+  Nineteen hours of mesh growth put each into enough synaptomes that no walk lands on the
+  other first. The mechanism is still in the kernel; this run did not meet it.
+- **Four-hop walks: 36 → 0; three-hop: 145 → 3.** With relays holding 40 to 53 neighbours,
+  almost every pair is one hop.
+- **The five-second strand cost: 386 → 294 samples, all to the two dead relays.** It is the
+  same timeout; it now fires only where nothing can answer.
+- **nyc3** stayed loaded (its relays answered; its sender rows read 100 to 300 ms against the
+  fleet's 51 ms), the size question stands.
+
+## The two unreachable relays, and why
+
+svc-02 and svc-17 on the Windows box stopped writing their logs at 14:10Z and 02:41Z. Their
+processes exist: the service wrapper and `relayctl status` count both as Running, and each
+still holds 90 to 111 socket handles. Their CPU time did not advance over 15 s (a healthy relay
+advanced one second), both sit at 55 MB where a healthy relay sits at 116 MB, and neither
+picked up either probe request, so their event loops are dead. Every walk toward them ended
+`exhausted` at the origin, 147 times each, because no live node held a channel to a frozen one.
+Both were restarted by the procedure's per-slot path after the run. The liveness the wrapper
+checks is "the process exists"; a relay whose loop has died passes it. That is the one new
+finding of this run, and it belongs to the Windows service wrapper, not the protocol.
+
+## What would make these numbers wrong
+
+- Two runs, one day apart, on a fleet that was not restarted between them; a run right after
+  a roll reads like Part 2, not like this.
+- 49 senders, not 51.
+- West's reachability is read fifty minutes after its restart; its own mesh was at 24 of 50.
+
 ## Tables (part 1, the vantage run)
 
 ### Per vantage (routed path, listed targets = 51 relays + 2 bridges)
