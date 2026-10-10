@@ -9,8 +9,7 @@ build is always visible in each app's version row and at the bridge's
 
 ## v4.107.2 → v4.108.0 — step out of the door before you shut it (2026-10-10)
 
-**NOT YET TAGGED. Built and fenced on branches `release-4.108.0` (kernel) and `release-2.155.0`
-(bridge); the version and the roll are David's word.**
+**Deployed 2026-10-10, David's word ("Let's release 4.108.0 and roll it out"): kernel 4.108.0 (tag → abbd905), relay 0.151.0 (1e9fe7a), bridge 2.155.0 (1171566). Testnet B1 and B2, then east and west by `release.sh bridges`, both verified on their public names at 17:58Z and still minting in 0xFF. Relays: Air 6/6, M1 8/8, Linux 5/5, Windows 20/20 (`RESULT=OK`), four droplets 3/3 each (kernel INFERRED from unit start) — 51 of 51 by 18:39Z. Apps: axona-chat 0.83.0 (served bundle = local build), axona-share 0.42.0 (five tags, APP_VERSION and both module tags), axona-portal 0.18.0, dht-sim 0.125.0. `release.sh check 4.108.0` read COMPLETE at 18:49Z. From the first credential refresh after the roll (1 h 55 min), every graduated relay re-dials for its credential only; the bridges' `nursery.turnRefreshOnly` counters are the proof to read. Howard's suite on this fleet is recorded in `ops/STATE.md` when it lands.**
 
 Why did two Windows relays stop for five and sixteen hours with their processes alive, their
 sockets held and their event loops dead? Both logs end in the same second of the same sequence.
