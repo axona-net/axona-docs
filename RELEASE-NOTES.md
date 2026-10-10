@@ -7,6 +7,51 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.107.2 → v4.108.0 — step out of the door before you shut it (2026-10-10)
+
+**NOT YET TAGGED. Built and fenced on branches `release-4.108.0` (kernel) and `release-2.155.0`
+(bridge); the version and the roll are David's word.**
+
+Why did two Windows relays stop for five and sixteen hours with their processes alive, their
+sockets held and their event loops dead? Both logs end in the same second of the same sequence.
+A graduated relay's TURN credential was about to lapse. It had no socket to refresh it on, so it
+re-dialled the bridge as a newcomer, every 1 h 55 min, and the bridge did what it does for a
+newcomer: a peer list and an announcement. The relay dialled an anchor it already held, the
+new channel opened, the hello arrived on it, the kernel found the identity already bound on
+the older channel and retired the new one, and that retire called `pc.close()` while the new
+channel's own data-channel callback was still on the stack. libdatachannel documents that a
+PeerConnection closed from inside one of its own callbacks can deadlock. Twenty relays on one
+box make that race common. One relay drew it on its second re-dial, the other on its eighth.
+
+Two changes, either of which alone would have stopped these two freezes; together they close
+both the trigger and the hazard.
+
+- **The native close leaves the stack that retired the channel.** `MeshManager._retire` does
+  its bookkeeping now, teardown log, map delete, ledger CLOSING, and closes the data channel
+  and the PeerConnection on the next macrotask. Every reader sees the channel gone at once;
+  only the native call moves. `dispose()` keeps the immediate close, since no callback is on
+  the stack at shutdown. Fence `fence_retire_deferred_close`: seven checks on the real
+  MeshManager with a fake RTCPeerConnection; the synchronous-close mutant fails four.
+- **A graduate comes back for the credential only.** When the refresh timer fires on a
+  graduate whose mesh is above the floor, its client-hello carries `intent: 'turn-refresh'`.
+  A 2.155.0 bridge answers with the welcome and its credential and nothing else, no peer
+  list, no announcement, no bootstrap hello, and releases the socket with 4200 a quarter
+  second later. The node installs the credential, releases the socket itself with 4200 if the
+  bridge has not, and is graduated again with the next refresh scheduled. A bridge that does
+  not know the intent still sends its list; the node ignores it. A graduate below the floor
+  re-bootstraps in full as before. Fences: `fence_turn_refresh_graduated` (ten checks over a
+  scripted fake bridge; three mutants fail) and the bridge's `fence_turn_refresh_intent`
+  (nine checks against a real bridge child; the mutant fails five).
+
+What this does not do: it does not prove the deadlock. The fences prove the close is off the
+stack and the re-dial carries nothing but the credential; the two frozen processes were
+restarted before a native stack could be taken. If a relay freezes again at a different line,
+that reading is wrong and the logs will say so.
+
+Also for the Windows service wrapper, outside this release: its liveness check is "the
+process exists", which both frozen relays passed for most of a day. A log-age or heartbeat
+check is the operator's fix.
+
 ## v4.107.1 → v4.107.2 — a channel that never says who it is does not get to stay (2026-10-08)
 
 **Deployed 2026-10-08, David's word ("Let's do the fixes and then roll out the updated version"): kernel 4.107.2 (tag b6b3b3e → 6521515), relay 0.149.0 (66543eb), bridge 2.154.0 (2de176b). Bridges: testnet B1 and B2, then east and west by `release.sh bridges`, both verified on their public names at 16:34Z, `STRICT_MIN_KERNEL=4.99.0` on east and west in the same recreate. Relays: Air 6/6, M1 8/8, Linux 5/5, Windows 20/20 (`RESULT=OK`), four droplets 3/3 each (kernel INFERRED from unit start after the pull) — 51 of 51 by 16:49Z. Apps: axona-chat 0.82.0 (served bundle = local build), axona-share 0.41.0 (five tags, APP_VERSION and both module tags), axona-portal 0.17.0, dht-sim 0.124.0. `release.sh check 4.107.2` read COMPLETE at 16:56Z. Measured at east after the bridge deploy and before the roll: a newcomer bound 8 of 8 anchors within 1.5 s and held 29 of 29 at 60 s, against 1 of 8 and 2 that morning; the same probe, host and door. The council seats reload on their owners' word; Howard's suite on the new fleet is recorded in `ops/STATE.md` when it lands.**
