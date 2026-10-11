@@ -390,6 +390,16 @@ is not "done", and "the tool said ✓" is not "verified".
   simulator ran 4.92.0. It now reads `KERNEL_VERSION` from the vendored `handshake.js`.
 - Two council signers are both David: `c9b2bdfb` and `6c47f277` ("David on Air"). A
   witness's per-signer maximum for one says nothing about the other.
+- The LOCAL `main` of a checkout is stale by construction. Every release pushes
+  `<branch>:main` and never moves the local branch, so a `git checkout main` by anyone —
+  a tool, an editor, a second session — lands the checkout on the last version that was
+  ever committed on local main. On 2026-10-11 the kernel checkout was found on local `main`
+  at 4.103.0 mid-promotion; the `check` cache-bust row read that tree and reported the
+  promotion INCOMPLETE, and a comment-only commit landed on the stale branch. Nothing the
+  release reads from the checkout had run after the move. After every release push, level
+  the local branches: `git -C axona-protocol branch -f main origin/main` (and `testnet`),
+  and read `git -C axona-protocol reflog -5` before trusting the tree a tool is about to
+  vendor from.
 
 ## What this procedure does not cover
 
