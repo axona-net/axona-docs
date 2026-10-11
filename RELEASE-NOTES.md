@@ -7,6 +7,48 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.109.0 → v4.110.0 — a terminal must be able to serve (2026-10-11)
+
+**NOT YET DEPLOYED — this header is rewritten when `release.sh check 4.110.0` reads COMPLETE. David's word 2026-10-11 ("Release 4.110.0 and roll it out"): kernel 4.110.0 (tag → b6dc0f2), relay 0.153.0, bridge 2.157.0. Design: `architecture/Axona-Routed-Walk-Terminals-v0.6.md` (88d6871), R4 only; R5 and R1 are not in this release.**
+
+Who is allowed to be the end of a routed walk? Until 4.109.0 the answer was anyone. A node whose
+connected table held nothing closer than itself, and whose lookahead found nothing, called itself
+terminal, and a terminal could root the topic: a browser tab admitted at the door with no mesh
+behind it, or a relay four minutes old with an empty table, held the same standing as a relay with
+fifty peers. On 2026-10-11 one such tab became the greedy destination for `axona.chat`, and the
+full-fleet acceptance probe that evening still found one newborn relay terminal at itself at hop 0.
+
+4.110.0 asks one question before a node takes that standing: can it serve? The transport answers.
+For browsers and relays the answer is yes when the live mesh holds at least the graduation floor
+of three bound peers, so a door-only node and a tab whose mesh never formed both answer no. The
+bridge's node answers yes when it is seated and not never-root, and no once stopped. A node that
+cannot serve is not a terminal: the handlers see it as a forwarding hop, so nothing roots there,
+and the walk goes on to the bridge's node when the transport holds it, else to the closest
+connected peer off the walk's path, else stops and says `no-capable-terminal`. Path memory from
+4.109.0 keeps that fallback from looping. Every root birth passes one gate, subscribe, publish,
+kill, metrics and handoff heir alike, and promotion repeats the test; the capability test runs
+before the terminal verify, so the two oracles cannot disagree. The exception that lets a solo
+node root on its own publish is withdrawn: its subscriber is itself.
+
+What a transport without the predicate gets is the one exception, named as one: it is treated as
+capable, logged once, and counted as the exception and never as capable. No production transport
+is in that branch today; the counter is there so one cannot appear unnoticed.
+
+What the fences proved, each by a mutant that fails it: let the route treat every terminal as
+capable and the walk ends at the node that cannot serve; let the birth never refuse and the five
+births all root on it. The bridge's fence found two facts the design did not state: the bridge
+engine reads its never-root flag from the process environment, and stopping the node clears the
+node but not its manager, so the predicate reads both.
+
+What this release does not do. A starved door node still re-requests the peer list without bound
+(R5). The reply chain is still the walk (R1). A node that cannot serve forwards to a peer it
+cannot assess; the fallback is the closest connected peer, not a known-capable one, and path
+memory is what bounds a chain of incapable nodes. The acceptance measurement is the full-fleet
+probe: every walk ends terminal at one node per topic, and no node declares itself terminal at
+hop 0 unless it is that topic's one end node.
+
+---
+
 ## v4.108.0 → v4.109.0 — a walk must end, and it must not go back (2026-10-11)
 
 **Deployed 2026-10-11, David's word ("Release 4.109.0 and roll it out"): kernel 4.109.0 (tag → e73b4f7), relay 0.152.0 (8851f56), bridge 2.156.0 (81cea7c). Testnet B1 and B2 at 05:26Z, then east and west by `release.sh bridges` at 05:45Z, both verified on their public names. Relays: Air 6/6, M1 8/8, Windows 20/20 (`RESULT=OK`), four droplets 3/3 each (kernel INFERRED from unit start), 46 of 51 by 15:24Z; the Linux box and its five relays were unreachable from 15:12Z and are not rolled. Apps: axona-chat 0.84.0 (served bundle = local build), axona-share 0.43.0 (five tags, APP_VERSION and both module tags), axona-portal 0.19.0, dht-sim 0.126.0. `release.sh check 4.109.0` read COMPLETE at 16:05Z. Acceptance, 16:07Z, every reachable relay routing one probe at each of four standing topics: 184 of 184 walks ended terminal at one node per topic in 1 to 3 hops, 74 to 283 ms, none over 2 s, none at the cap. The same probe on 4.108.0 the day before read council 49 of 50 exhausted at hop 0 and axona.chat 28 of 50 at the cap. Howard's basic check from the M4 at 16:05Z: 0 of 92 topics mismatched. Design: `architecture/Axona-Routed-Walk-Terminals-v0.6.md`, R2 and R3 only; R4, R5 and R1 are not in this release.**
