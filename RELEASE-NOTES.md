@@ -7,6 +7,59 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.108.0 → v4.109.0 — a walk must end, and it must not go back (2026-10-11)
+
+**NOT YET DEPLOYED — this header is rewritten when `release.sh check 4.109.0` reads COMPLETE. David's word 2026-10-11 ("Release 4.109.0 and roll it out"): kernel 4.109.0 (tag → e73b4f7), relay 0.152.0 (8851f56), bridge 2.156.0. Design: `architecture/Axona-Routed-Walk-Terminals-v0.5.md` (10f43fc), R2 and R3 only; R4, R5 and R1 are not in this release.**
+
+Why did a chat message fail twice across a reload while the jokes chime from the same mesh
+landed four times that evening? Not the topic, and not the keyspace. The walk. On 2026-10-10
+and 2026-10-11 every relay routed a probe at each standing topic. Toward `jokes` all fifty
+walks ended at one relay in 89 to 398 ms. Toward `council` forty-nine of fifty died at hop 0
+in 4999 to 5153 ms. Toward `axona.chat` eighteen died at hop 0 and twenty-eight ran to the
+40-hop cap, trading the frame between two nodes. Every failure was either one request
+timeout or one loop. No walk failed in under a timeout and none succeeded in over one.
+
+The timeout was the two-hop lookahead. When a hop holds nothing closer than itself it asks
+its whole synaptome, unfiltered, and waits for the slowest reply. One silent synapse costs
+5000 ms, which is also the upstream request timeout, so the origin gives up while the hop
+is still asking, and reports `exhausted` at hop 0. The loop was the same lookahead's first
+hop, which need not be closer than the node holding the message, forwarding to a node whose
+own greedy step sends the frame straight back. Nothing on the wire said where the message
+had been.
+
+4.109.0 changes two things and nothing else about routing:
+
+- **R2.** The lookahead is a bounded round. It probes only the synapses greedy would
+  consider, connected and not dead and not on the walk's path. It locks on the first reply
+  that names a node closer than self and stops. A round with no such reply ends at
+  `LOOKAHEAD_MS`, 1500 ms, with nothing. The free pass over reverse channels runs first and
+  costs no network. The reply's two-hop node travels in the forward as `via`, and the
+  receiving hop forwards there before any selection of its own when it is connected and
+  off the path. This is a semantics change: best-among-all-settled bought XOR progress with
+  wall-clock; first-closer-wins buys the fastest closer hop.
+- **R3.** `route_msg` carries `path`, the last `PATH_MEMORY` (8) node ids of the walk, and
+  no hop forwards onto it. A frame from a 4.108.0 hop carries no path; the one node such a
+  frame is known to have visited is its sender, so that is the path.
+
+Both ride a mixed fleet: a 4.108.0 hop drops `path` and `via` and stays loop-prone until the
+fleet is homogeneous. The census gains counters for the filter's skips, the round clock and
+the via commitment, and `answeredWithinK` now means the rank of the chosen first hop.
+
+What the fences proved, each by a mutant that fails it: drop the connected filter and the
+silent synapse is probed again; wait for every reply instead of locking and the round returns
+nothing at the budget; delete the path exclusions and the simulated two-node loop runs to hop
+39, the production shape. One thing the fence found that the design did not: the round timer
+must not be unref'd, or a process whose only live handle is a round exits under it.
+
+What this release does not do. It does not make a terminal able to serve: a browser tab whose
+node id lands beside a topic can still be that topic's greedy destination and may still root
+it (R4, not built). It does not bound a starved door node's re-requests (R5). It does not
+replace the recursive reply chain (R1). The acceptance measurement is the same probe that found
+the defects: every relay routes one probe at each standing topic, and every walk ends
+`terminal` at one node per topic, with zero walks at hop 0 over 2 s and zero at the cap.
+
+---
+
 ## v4.107.2 → v4.108.0 — step out of the door before you shut it (2026-10-10)
 
 **Deployed 2026-10-10, David's word ("Let's release 4.108.0 and roll it out"): kernel 4.108.0 (tag → abbd905), relay 0.151.0 (1e9fe7a), bridge 2.155.0 (1171566). Testnet B1 and B2, then east and west by `release.sh bridges`, both verified on their public names at 17:58Z and still minting in 0xFF. Relays: Air 6/6, M1 8/8, Linux 5/5, Windows 20/20 (`RESULT=OK`), four droplets 3/3 each (kernel INFERRED from unit start) — 51 of 51 by 18:39Z. Apps: axona-chat 0.83.0 (served bundle = local build), axona-share 0.42.0 (five tags, APP_VERSION and both module tags), axona-portal 0.18.0, dht-sim 0.125.0. `release.sh check 4.108.0` read COMPLETE at 18:49Z. From the first credential refresh after the roll (1 h 55 min), every graduated relay re-dials for its credential only; the bridges' `nursery.turnRefreshOnly` counters are the proof to read. Howard's suite on this fleet is recorded in `ops/STATE.md` when it lands.**
