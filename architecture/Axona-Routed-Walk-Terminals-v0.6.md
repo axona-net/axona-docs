@@ -1,12 +1,24 @@
-# A routed walk must end at a node that can serve, and must end at all (v0.5)
+# A routed walk must end at a node that can serve, and must end at all (v0.6)
 
-**Status:** design for council review, revision 5 · **Date:** 2026-10-11 ·
+**Status:** design for council review, revision 6 · **Date:** 2026-10-11 ·
 **Kernel in production:** 4.108.0 · **Bridge:** 2.155.0 · **Relay:** 0.151.0 ·
-**Author:** axona.bot · **Supersedes:** v0.4 (`ea1553b`), v0.3 (`370a8ad`), v0.2 (`974e055`), v0.1 (`41b5838`), all preserved ·
-**Reviews folded:** Aster `e6615331`, `bde6eeca`, `d0210704`, `27639f06` (R1 contracts); Vega `43d0fad6` (R2, R3), `8d528df6` (R1 telemetry, R4 source paths) ·
+**Author:** axona.bot · **Supersedes:** v0.5 (`10f43fc`), v0.4 (`ea1553b`), v0.3 (`370a8ad`), v0.2 (`974e055`), v0.1 (`41b5838`), all preserved ·
+**Reviews folded:** Aster `e6615331`, `bde6eeca`, `d0210704`, `27639f06`, `dc0c4487` (R1 contracts); Vega `43d0fad6` (R2, R3), `8d528df6` (R1 telemetry, R4 source paths) ·
 **Measurements:** `ops/p2p-strand-808f-20261010T1855Z`, `ops/p2p-topics-root-20261011T0130Z`
 
-**What v0.5 changes.** The origin's settlement is decided by a clock read, never by the
+**What v0.6 changes.** The clock rule is normative at every settlement point, the proxy
+origin and the subwalk origin included, and each boundary gets its own overdue-outcome
+fence. The claim that the origin learns inside its bound is split into what is safe
+(processing at or after the deadline never reports a timely outcome) and what needs more
+(notification needs the origin to run, and a bound on notification needs a scheduling
+bound), with the clock's advance across a suspension stated as its own assumption. The
+return envelope's budget is accounted on every transmission, the first included, and a
+destination is consumed before an exhausted budget drops anything. The timing claim about
+the two populations is restricted to the zero and one-hop population, since the cap walks
+failed inside a timeout. R2 and R3 are built on branch `routed-walk-r2r3` and released as
+4.109.0 on 2026-10-11 on David's word; this document stays the design record.
+
+**What v0.5 changed.** The origin's settlement is decided by a clock read, never by the
 order callbacks run: before either event settles a pending walk the origin reads its
 monotonic clock, and at or past the deadline the walk settles unknown whatever arrived.
 The outcome union gains `unknown`, since a proxy now emits it. Telemetry separates the
@@ -73,9 +85,10 @@ Every relay routed one probe at each standing topic at 01:30Z. Fifty senders, 20
 
 The strand run of 2026-10-10 has the same shape over 800 walks: 650 at hop 0 in
 4999 to 6126 ms, 12 at hop 1 in 5009 to 7981 ms, 38 at the cap in 3768 to 4990 ms, and
-100 terminal walks in 91 to 1242 ms. There is no walk in either run that failed in under
-a request timeout and no walk that succeeded in over one. The two populations do not
-touch. The timings inform the bounds below. They do not prove any contract about
+100 terminal walks in 91 to 1242 ms. Among the walks that died at hop 0 or hop 1, none failed in under a request timeout, and
+no terminal walk took over one; those two populations do not touch. The cap walks are a
+third population: they failed inside a timeout, 1663 to 4745 ms, by looping, and the
+loop is D2. The timings inform the bounds below. They do not prove any contract about
 asynchronous delivery.
 
 The 28 cap walks toward `axona.chat` end at two nodes: David's Firefox tab, whose node id
@@ -130,8 +143,15 @@ nothing in the bridge bounds the fan-out per socket.
 ## The rule
 
 A routed walk ends at a node that can serve the message, or it reports where it stopped
-and why, or the origin reports that the outcome is unknown, and the origin learns which of
-the three on its own clock, inside a bound it set before it sent.
+and why, or the origin reports that the outcome is unknown. The origin decides which of
+the three on its own clock, against a deadline it set before it sent. Two assumptions
+carry that sentence and they are separate. The CLOCK assumption: the origin's monotonic
+clock advances across a suspension, so a walk cannot be made timely by sleeping. The
+SCHEDULING assumption: the origin runs again. What the clock assumption alone makes safe
+is that processing at or after the deadline never reports a timely outcome. Whether the
+caller hears anything needs the scheduling assumption; whether the caller hears it inside
+a bound needs a bound on scheduling, which this design does not supply. A suspended origin
+reports on resume, and "inside its bound" means decided inside it, not delivered inside it.
 
 Five changes carry the rule. Each is fenced on its own. R2, R3, R4 and R5 ship alone. R1
 ships last and only with its own fences green.
@@ -272,7 +292,10 @@ settles to. The processing-time rule does:
 - only if `now < deadline` may a valid outcome settle `REPORTED(outcome)`.
 
 So a late outcome whose callback happens to run before the overdue timer still settles
-unknown, because the clock says so and the queue does not get a vote. v0.4's suspended-
+unknown, because the clock says so and the queue does not get a vote. The rule is
+normative at EVERY point that settles a walk: the origin, the proxy origin at a
+new → old boundary, and the subwalk origin at an old → new boundary. Nothing in this
+document settles on callback order. v0.4's suspended-
 origin fence reported the outcome in that case on the strength of callback order; that
 was a contradiction with the deadline and it is withdrawn. Timeliness is processing time
 at the origin. It is not ingress time: a frame that arrived before the deadline and was
@@ -304,10 +327,14 @@ contract; a `consumed` walk means a handler ran, not that it accepted.
 **The return envelope is its own frame and never breeds.** `route_done` names its
 subject walk and travels in an envelope with its own id, `returnId = (senderIncarnation,
 senderSeq)`. It goes to the walk's origin over a direct channel when the sender holds
-one. Otherwise it is sent as a routed frame of type `route_done` toward the origin with
-`hopsLeft = RETURN_HOPS` and no lookahead. A node that receives such a frame and is the
-origin consumes it. A node that is not the origin forwards it one greedy hop over
-connected peers if `hopsLeft > 0`, else drops it and counts `returnDropped`. No node ever
+one. Otherwise it is sent as a routed frame of type `route_done` toward the origin with a
+budget of `RETURN_HOPS` transmissions, accounted on EVERY transmission including the
+sender's first: the sender decrements before it sends, so the frame leaves with
+`hopsLeft = RETURN_HOPS − 1`. A node that receives such a frame checks whether it is the
+origin FIRST and consumes it if so, whatever `hopsLeft` says. A node that is not the origin
+forwards it one greedy hop over connected peers if `hopsLeft > 0`, decrementing again, else
+drops it and counts `returnDropped`. With `RETURN_HOPS = 2` that is one intermediate
+forward, and the fence below has that one meaning. No node ever
 emits a receipt or a `route_done` for a return envelope. The subject's `walkId` is never
 reused as the envelope's id. Delivery of the envelope is conditional, and the contract
 says so; the origin's deadline is what bounds the wait.
@@ -359,7 +386,9 @@ contract. The rules at a boundary:
   that segment. It records `{walkId, attemptId, legacyRequestId, upstream, deadline}`,
   sends its own receipt upstream, then sends a legacy `route_msg` and awaits the legacy
   reply under the legacy timeout. The legacy reply is translated into exactly one
-  `route_done` upstream, with `subject` from the record. A legacy timeout means the proxy
+  `route_done` upstream, with `subject` from the record, and the proxy's own deadline is
+  read under the processing-time rule: a legacy reply processed at or after the proxy's
+  deadline is counted late and the proxy reports unknown. A legacy timeout means the proxy
   has stopped waiting; it says nothing about whether the segment is still forwarding. It
   is translated as `{outcome: 'unknown', reason: 'legacy-timeout', atNode: <the proxy>}`,
   where `atNode` names the node that stopped waiting. It is never a `stopped`, because
@@ -370,9 +399,11 @@ contract. The rules at a boundary:
   `{walkId', legacyRequest, deadline}` before it forwards anything, and runs the
   downstream walk under `walkId'`. Downstream receipts and the downstream `route_done`
   correlate to `walkId'` at this node and go no further. It never sends a receipt
-  upstream. It answers the legacy request ONCE, in the legacy shape, when the downstream
-  outcome arrives or its deadline expires, whichever is first; on expiry it answers
-  `exhausted`, the legacy word for unknown. It never sends `route_done` toward the
+  upstream. It answers the legacy request ONCE, in the legacy shape, under the
+  processing-time rule: a downstream outcome processed with `now < deadline` answers with
+  that outcome; anything processed at or after the deadline answers `exhausted`, the
+  legacy word for unknown, and a downstream outcome in hand at that point is counted late.
+  Callback order does not decide it here any more than at the origin. It never sends `route_done` toward the
   frame's `originId`.
 - new → old → new. The two rules compose. The proxy origin holds the first record, the
   far node holds the subwalk record, the far node settles the legacy request, the legacy
@@ -461,11 +492,19 @@ case it names and nothing wider.
   settles `unknown`, counts the outcome late, and the timer's later firing is
   observational. One report.
 - R1, equality: an outcome processed at exactly `now == deadline` settles `unknown`.
+- R1, overdue outcome at the subwalk origin: a new node behind a legacy upstream has a
+  downstream outcome queued ahead of its overdue timer after a suspension; it answers the
+  legacy request `exhausted` once and counts the outcome late.
+- R1, overdue reply at the proxy origin: the legacy reply is queued ahead of the proxy's
+  overdue timer after a suspension; the proxy sends one `route_done` saying `unknown` with
+  reason `legacy-timeout` and counts the reply late.
 - R1, duplicate `route_done`: two arrive for one subject; the second is rejected and
   counted.
-- R1, return envelope: the sender holds no direct channel; the envelope forwards once,
-  then the next node is not the origin and `hopsLeft` is 0; it drops and counts, and no
-  receipt or `route_done` is emitted for the envelope.
+- R1, return envelope: the sender holds no direct channel and sends with `hopsLeft`
+  already decremented to 1; the first receiver is not the origin, forwards once with
+  `hopsLeft` 0; the second receiver is not the origin and drops and counts. A variant
+  makes the second receiver the origin: it consumes although `hopsLeft` is 0. No receipt
+  or `route_done` is emitted for the envelope in either run.
 - R1, state capacity: `WALK_STATE_MAX` walks held; the next is refused `state-full` and
   nothing is evicted. The same at an origin, before any frame leaves.
 - R1, replay past the floor: a duplicate delayed past `WALK_STATE_MS` is accepted as new;
