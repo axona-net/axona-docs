@@ -9,7 +9,7 @@ build is always visible in each app's version row and at the bridge's
 
 ## v4.110.0 → v4.111.0 — ask less, cost others less (2026-10-12)
 
-**NOT YET DEPLOYED — this header is rewritten when `release.sh check 4.111.0` reads COMPLETE. David's word 2026-10-12 ("Release 4.111.0 and roll it out"): kernel 4.111.0 (tag → 8620dc5), relay 0.154.0 (d7e5970), bridge 2.158.0. Design: `architecture/Axona-Routed-Walk-Terminals-v0.6.md` (88d6871), R5 only; R1 is not in this release.**
+**Deployed 2026-10-12, David's word ("Release 4.111.0 and roll it out"): kernel 4.111.0 (tag → 8620dc5), relay 0.154.0 (d7e5970), bridge 2.158.0 (10e7621). Testnet B1 and B2 at 03:54Z, then east and west by `release.sh bridges` at 03:59Z, both verified on their public names, both reporting the new `signals` meter at zero. Relays: Air 6/6, M1 8/8, Linux 5/5 at 14:26Z; Windows 20/20 (`RESULT=OK`) at 15:38Z on the second pass, after one relay FROZE on the first pass — slot 2 wrote nothing after its first second, used 1 s of CPU in nineteen minutes and never pinged the bridge, the 2026-10-09 signature under the 4.108.0 fix, recovered by the controller and recorded in `ops/STATE.md` with its log; four droplets 3/3 each at 15:47Z (kernel INFERRED from unit start) — 51 of 51. Apps: axona-chat 0.86.0 (served bundle = local build), axona-share 0.45.0 (five tags, APP_VERSION and both module tags), axona-portal 0.21.0, dht-sim 0.128.0. `release.sh check 4.111.0` read COMPLETE at 16:06Z. Acceptance, 15:53Z, 50 of 51 relays routing one probe at each of four standing topics: 200 of 200 terminal at one node per topic, the only hop-0 terminal per topic that end node itself, none over 2 s, none at the cap, no walk stopped for want of a capable terminal. Howard's check from the Linux box six minutes after the droplet roll: 2 of 92 mismatched and 0 failed lookups; diagnostics 3 of 260 and 6 failed lookups — a reading minutes past a roll, with the hour-later repeat recorded in `ops/STATE.md`. Design: `architecture/Axona-Routed-Walk-Terminals-v0.6.md` (88d6871), R5 only; R1 is not in this release.**
 
 What does a node do when its offers never complete? Until now it asked the bridge for the
 peer list again every minute, and with each list it re-offered to everyone on it. On
@@ -40,7 +40,11 @@ at zero. One existing smoke asserted the old contract, a re-fire after one coold
 re-pinned to the doubled gap with the reason in the file.
 
 What this release does not do. It does not make a Safari tab's offers complete; why they do
-not is still unverified and needs that tab's console. It does not replace the reply chain
+not is still unverified and needs that tab's console. It does not stop a relay freezing on
+restart: one did, on Windows, during this roll, with the 4.108.0 deferred close in place, so
+the close running inside its own callback was not the whole mechanism. The next suspect is the
+native close itself on that platform, a call that joins a worker thread which may be waiting to
+call back into JavaScript; the frozen log is in `ops/`, and the fix is not in this release. It does not replace the reply chain
 (R1). A node under backoff that gains one channel asks again at once, which is intended:
 a sign of life is the reason to try again.
 
