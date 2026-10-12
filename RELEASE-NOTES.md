@@ -7,6 +7,45 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.110.0 → v4.111.0 — ask less, cost others less (2026-10-12)
+
+**NOT YET DEPLOYED — this header is rewritten when `release.sh check 4.111.0` reads COMPLETE. David's word 2026-10-12 ("Release 4.111.0 and roll it out"): kernel 4.111.0 (tag → 8620dc5), relay 0.154.0 (d7e5970), bridge 2.158.0. Design: `architecture/Axona-Routed-Walk-Terminals-v0.6.md` (88d6871), R5 only; R1 is not in this release.**
+
+What does a node do when its offers never complete? Until now it asked the bridge for the
+peer list again every minute, and with each list it re-offered to everyone on it. On
+2026-10-11 one Safari tab at the east door did that 272 times in five hours and sent 5699
+relayed signals in the last hour of it, a third of the door's signalling, at every other
+socket including the operator's fresh tabs. Nothing in the kernel bounded the asking and
+nothing in the bridge bounded the fan-out.
+
+4.111.0 bounds both, and closes neither.
+
+- **The kernel.** The re-warm ask backs off. The gap doubles after every ask that finds the
+  mesh still starved, one minute, two, four, eight, then ten, and resets to one minute the
+  moment any channel binds, or when the mesh reaches its floor. The first ask still comes
+  on the third starved tick; what changes is the second and every ask after it. Health
+  reports the ask count and the live gap.
+- **The bridge.** Relayed signals are metered per socket per minute. Above `BRIDGE_SIGNAL_RATE`,
+  600 by default, the excess is dropped and `signal-rate-limited` is logged once per window
+  with the socket's connection id. The socket stays open. A node that cannot complete an
+  offer is not a fault to punish; it is a node that should ask less and cost others less.
+  Zero turns the meter off, and `/healthz` counts the drops.
+
+The numbers come from the door that day: Chrome tabs ran 150 to 250 signals an hour, the
+Safari tab 5699. Six hundred a minute is ten times a busy join and a fortieth of the storm.
+
+What the fences proved, each by a mutant that fails it: remove the doubling and the gaps
+read sixty seconds throughout; remove the drop and all eight signals arrive with the counter
+at zero. One existing smoke asserted the old contract, a re-fire after one cooldown, and is
+re-pinned to the doubled gap with the reason in the file.
+
+What this release does not do. It does not make a Safari tab's offers complete; why they do
+not is still unverified and needs that tab's console. It does not replace the reply chain
+(R1). A node under backoff that gains one channel asks again at once, which is intended:
+a sign of life is the reason to try again.
+
+---
+
 ## v4.109.0 → v4.110.0 — a terminal must be able to serve (2026-10-11)
 
 **Deployed 2026-10-11, David's word ("Release 4.110.0 and roll it out"): kernel 4.110.0 (tag → b6dc0f2), relay 0.153.0 (764dcf2), bridge 2.157.0 (63b7e17). Testnet B1 and B2 at 20:17Z, then east and west by `release.sh bridges` at 20:19Z, both verified on their public names, both seated and not never-root. Relays: Air 6/6, M1 8/8, Linux 5/5, Windows 20/20 (`RESULT=OK`), four droplets 3/3 each (kernel INFERRED from unit start), 51 of 51 by 21:20Z. Apps: axona-chat 0.85.0 (served bundle = local build), axona-share 0.44.0 (five tags, APP_VERSION and both module tags), axona-portal 0.20.0, dht-sim 0.127.0. `release.sh check 4.110.0` read COMPLETE at 23:04Z. Acceptance, 22:59Z, all 51 relays routing one probe at each of four standing topics: 204 of 204 walks ended terminal at one node per topic, and the only hop-0 terminal per topic was that end node itself; none over 2 s, none at the cap, no walk stopped for want of a capable terminal. Howard's check and diagnostics from the Linux box at 23:00Z: 0 of 92 topics mismatched and 0 failed lookups, like for like with the 4.108.0 readings of 22 of 92 and 69. Design: `architecture/Axona-Routed-Walk-Terminals-v0.6.md` (88d6871), R4 only; R5 and R1 are not in this release.**
