@@ -7,6 +7,51 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## relay 0.154.0 → 0.155.0 on kernel 4.111.0 — a frozen relay becomes a dead relay (2026-10-12)
+
+**Deployed 2026-10-12, David's word ("Release 0.155.0 and roll it out"): relay 0.155.0 (e950a11, `main` = `testnet`), kernel unchanged at 4.111.0, bridges and apps untouched. Rolled by the tools behind their gates: Air 6/6, M1 8/8, Linux 5/5 at 17:06Z; Windows 20/20 at 17:08Z, every slot restarted and bonded, `RESULT=OK`, no freeze on this pass; four droplets 3/3 each at 17:12Z on node-datachannel 0.33.4 (kernel INFERRED from the restart against the vendored file) — 51 of 51. Proof read on every host by a second connection: `watchdog-armed` in 51 of 51 new relay logs, zero stall lines, native 0.33.4 installed. `release.sh check 4.111.0` COMPLETE at 17:17Z. Not moved: the MCP seats, which take the native bump at their owners' next restart, and Howard's pin.**
+
+What happens to a relay whose event loop stops? Three Windows relays answered that on
+2026-10-09 and 2026-10-12: nothing. The process kept its sockets, its CPU time stopped
+climbing, the service read Running, and the bridge idle-kicked its socket after twenty
+seconds without a ping. The first two sat that way for five and sixteen hours. The third
+sat for nineteen minutes until a roll's readiness gate tripped over it, with the 4.108.0
+deferred close already in place. The only thread that could have logged, ticked or pinged
+was the one that had stopped.
+
+The lock is not identified. The relay's native layer (node-datachannel 0.33.1,
+libdatachannel 0.24.3) closes a peer connection on the JS thread with its callbacks still
+registered, and its thread-safe callbacks queue without bound, so a native worker never
+waits on JS; the frozen log shows the deferred close returning and the loop dying on the
+next native entry. Nothing in that reading names the lock, and the freeze has not been
+reproduced. So 0.155.0 bounds the failure and keeps the evidence that will name it.
+
+- **The watchdog.** A worker thread counts the beats the main thread fails to post. After
+  thirty seconds of silence (`RELAY_WATCHDOG_MS`, zero turns it off) it writes
+  `event-loop-stalled` straight to the log's file descriptor, on Windows writes a minidump
+  of the process beside the logs, and kills the process. The service wrapper exits
+  non-zero and the service manager restarts the slot. Beats are counted, not clocked, so a
+  sleeping laptop is not a stalled relay. A late beat after half the budget leaves
+  `event-loop-stall-recovered` with the count.
+- **The gate.** The Windows controller's readiness gate now dumps the process it waited on
+  before it aborts, and names the file in its result line. Only that process: a slot the
+  watchdog already restarted is a different pid with a dump of its own.
+- **The native layer.** node-datachannel moves to 0.33.4 (libdatachannel 0.24.5, libjuice
+  1.7.2). It carries two synchronization fixes in the DTLS and TLS input paths. It is a
+  candidate and is named as one; it is not claimed as the fix.
+
+What the fence proved on real child processes: a main thread blocked in a wait that never
+returns is killed within the budget plus two beats, with the evidence on the file
+descriptor; a live loop past the budget exits on its own, untouched; a stall shorter than
+the budget is not killed. Delete the kill and the first case fails. The minidump command
+was run on the Windows host against a live relay before anything shipped: one second, a
+dump file, the relay unaffected.
+
+What this release does not do: name the lock. The next freeze leaves a dump whose thread
+stacks will.
+
+---
+
 ## v4.110.0 → v4.111.0 — ask less, cost others less (2026-10-12)
 
 **Deployed 2026-10-12, David's word ("Release 4.111.0 and roll it out"): kernel 4.111.0 (tag → 8620dc5), relay 0.154.0 (d7e5970), bridge 2.158.0 (10e7621). Testnet B1 and B2 at 03:54Z, then east and west by `release.sh bridges` at 03:59Z, both verified on their public names, both reporting the new `signals` meter at zero. Relays: Air 6/6, M1 8/8, Linux 5/5 at 14:26Z; Windows 20/20 (`RESULT=OK`) at 15:38Z on the second pass, after one relay FROZE on the first pass — slot 2 wrote nothing after its first second, used 1 s of CPU in nineteen minutes and never pinged the bridge, the 2026-10-09 signature under the 4.108.0 fix, recovered by the controller and recorded in `ops/STATE.md` with its log; four droplets 3/3 each at 15:47Z (kernel INFERRED from unit start) — 51 of 51. Apps: axona-chat 0.86.0 (served bundle = local build), axona-share 0.45.0 (five tags, APP_VERSION and both module tags), axona-portal 0.21.0, dht-sim 0.128.0. `release.sh check 4.111.0` read COMPLETE at 16:06Z. Acceptance, 15:53Z, 50 of 51 relays routing one probe at each of four standing topics: 200 of 200 terminal at one node per topic, the only hop-0 terminal per topic that end node itself, none over 2 s, none at the cap, no walk stopped for want of a capable terminal. Howard's check from the Linux box six minutes after the droplet roll: 2 of 92 mismatched and 0 failed lookups; diagnostics 3 of 260 and 6 failed lookups — a reading minutes past a roll, with the hour-later repeat recorded in `ops/STATE.md`. Design: `architecture/Axona-Routed-Walk-Terminals-v0.6.md` (88d6871), R5 only; R1 is not in this release.**

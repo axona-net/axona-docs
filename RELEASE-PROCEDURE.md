@@ -390,6 +390,12 @@ is not "done", and "the tool said ✓" is not "verified".
   simulator ran 4.92.0. It now reads `KERNEL_VERSION` from the vendored `handshake.js`.
 - Two council signers are both David: `c9b2bdfb` and `6c47f277` ("David on Air"). A
   witness's per-signer maximum for one says nothing about the other.
+- A version a tool PRINTS can be a string someone typed into the tool. `droplet-roll.sh`'s
+  load-test line read `load-test: 0.33.1 OK` on every droplet of the 0.155.0 roll
+  (2026-10-12), the roll that moved node-datachannel to 0.33.4; the line beside it, read
+  from `node_modules`, said 0.33.4. The label had been a literal since the pin was 0.33.1.
+  Fixed to read the installed package. A tool's version line is a reading only if the tool
+  reads it from the thing; a literal is a label, and a label is not proof.
 - The LOCAL `main` of a checkout is stale by construction. Every release pushes
   `<branch>:main` and never moves the local branch, so a `git checkout main` by anyone —
   a tool, an editor, a second session — lands the checkout on the last version that was
