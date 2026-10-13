@@ -1,9 +1,9 @@
 # Team update — soak of 2026-10-13 on kernel 4.112.0
 
-**Status:** the alert-bot half ran the night; the connectivity half ran six daytime
-cycles and was stopped by hand at 17:01Z when it began to cost the fleet. The second
-alert-bot run is still going (hourly to about 21:16Z) and this note will be amended
-with its last cycles.
+**Status:** complete. The alert-bot half ran the night and a second six-cycle run
+through the afternoon; the connectivity half ran six daytime cycles and was stopped by
+hand at 17:01Z when it began to cost the fleet. Four fleet changes were made during the
+window on David's word and are listed under the results.
 
 ## What was tested
 
@@ -85,9 +85,34 @@ no stall line between 05:00Z and 16:00Z. The cause of cycles 7 and 8 is not know
 
 ### Alert-bot, run 2 (from 16:16Z, ongoing)
 
-Cycle 1 (16:16 to 16:31Z): check 89 of 260 mismatched (29 differing between runs),
-diagnostics 83 of 260 (40 differing), all region 128, 59 of them "received 0 and 0".
-This cycle ran inside the sfo3 kill storm. Later cycles will be added here.
+| cycle | check (of 260) | diagnostics (of 260) | what the fleet looked like |
+|---|---|---|---|
+| 1 (16:16Z) | 89, 29 differing between runs | 83, 40 differing | inside the sfo3 kill storm |
+| 2 (17:16Z) | 79, 32 differing | 81, 0 differing | sfo3 still at 99% pressure |
+| 3 (18:16Z) | 4, 4 differing | 41, 16 differing | first cycle after the sfo3 resize |
+| 4 (19:16Z) | 41, 16 differing | 27, 0 differing | nyc-side 0x80 relays being killed |
+| 5 (20:16Z) | 64, 14 differing | 11, 0 differing | sfo3-region droplet resized at 20:12Z |
+| 6 (21:16Z) | 47 | 1 | tor1 and nyc3 at two relays since 20:48Z |
+
+Every run exited 0 with zero `found:false`; every named failure was a region-128 topic.
+The check never returned to the overnight 0 while any 0x80 relay sat on a one-core
+shared host under the role mass; the diagnostics run did, twice.
+
+### Fleet changes made during the window, on David's word
+
+- 17:49Z: the sfo3-grizzly droplet resized in place to `c-2` and one of its three relays
+  retired (75 s down). Read afterwards: steal 0 to 5 percent, pressure 8 percent, no
+  swap, no stall, its two relays holding about 1000 roles each.
+- 19:40Z: the Air relay killed at 17:43Z restored through the fleet tool's add path.
+- 20:12Z: the sfo3-region relay droplet (three relays) resized to `c-2` (77 s down).
+- 20:48Z: tor1 and nyc3 set to two relays each by retiring the zero-role eagle unit on
+  each; `c-2` is not offered in those regions. Thirty minutes later: no stall line on
+  either, pressure 79 and 42 percent, steal still half a core on both, and the grizzly
+  relays' roles fallen from 544 and about 1000 to 84 and 11 while the Air relays rose
+  to 1000 to 2000 each. The mechanism of that move was not read.
+
+The fleet ends the day at 48 relays: Air 6, M1 8, Linux 5, Windows 20, droplets 2, 3,
+2 and 2.
 
 ## What we learned
 
