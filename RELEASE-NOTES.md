@@ -7,12 +7,17 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
-## v4.112.0 → v4.113.0 — the ROOT obligation's deadline is three push periods (built 2026-10-13, UNRELEASED)
+## v4.112.0 → v4.113.0 — the ROOT obligation's deadline is three push periods (2026-10-13)
 
-**Built on kernel branch `root-deadline` only. Nothing tagged, nothing on `main` or
-`testnet`, nothing deployed. David's word (2026-10-13): "Fix the ROOT deadline with
-fences, don't release yet." The relay and bridge are untouched; the entry moves
-below the deployed line when David calls the release.**
+**Deployed 2026-10-13 23:12Z, David's word ("Release 4.113.0 and roll it out"):
+kernel 4.113.0 (tag → 4e1a510), relay 0.157.0 (1f1fccb), bridge 2.160.0 (7a32605),
+both testnet bridges, both production bridges, 48 relays (Air 6, M1 8, Linux 5,
+Windows 20, droplets 3 + 2 + 2 + 2), chat 0.88.0, share 0.47.0, portal 0.23.0,
+dht-sim 0.130.0. The fleet is 48 and not 51 because three droplet relays were
+retired earlier the same day; that is a fleet change, recorded in the soak team
+update, not part of this release. Seen live within a minute of the bridge deploy:
+west read pressure 0.28 at a ROOT age of about 50 s, a phase that read 0.80 and
+`degraded` that afternoon.**
 
 Why did both bridges report `degraded` with two roles each and zero refusals? The
 kernel's capacity metric measures every obligation as age over deadline and calls
