@@ -7,6 +7,56 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.111.0 → v4.112.0 — the perimeter: one policy for who a node keeps (2026-10-13)
+
+**Deployed 2026-10-13, David's word ("Release 4.112.0 and roll it out"): kernel 4.112.0 (tag → 5507bbb), relay 0.156.0 (61c90b1), bridge 2.159.0 (6b98191). Testnet B1 and B2 at 00:43Z; east and west recreated by `release.sh bridges` at 00:47Z, each verified on its public name, both seated with uplinks connected. Relays: Air 6/6, M1 8/8, Linux 5/5 at 01:02Z; Windows 20/20 at 01:13Z (`RESULT=OK`, no freeze); four droplets 3/3 each at 01:19Z (kernel INFERRED from the restart against the vendored file; the one-core sfo3 host logged two watchdog near-misses and no kill) — 51 of 51. Apps: axona-chat 0.87.0 (served bundle = local build), axona-share 0.46.0 (five tags, APP_VERSION and both module tags), axona-portal 0.22.0, dht-sim 0.129.0. `release.sh check 4.112.0` read COMPLETE at 01:39Z. Not moved: the MCP seats (each owner's restart) and Howard's pin; Howard's suite on 4.112.0 is running from the Linux box with its hour-later repeat chained, and the readings go to `ops/STATE.md` and axona.dev with their conditions.**
+
+Which peers may a node close on its own, and which never? Before this release the
+kernel answered twice. The admission gate held the five nearest peers, the sparse
+bands and the duty-holders; the mesh's own two retire sites, the degree cap and
+make-room, held the duty-holders alone. A bridge could retire one of its nearest
+peers that its gate would have kept. And no rule let a closer node in: at a full
+table, a newcomer nearer than every held peer was refused whenever its band was
+already the densest.
+
+4.112.0 carries Aster's perimeter design (v0.1 with the v0.2 and v0.3 amendments,
+accepted at design level after David's request for comments). The rule is one
+policy with four reasons, re-derived from current state at every ask and never
+leased: NEAR, among the K nearest and not stale; BAND, alone or nearly alone in its
+distance band; SERVICE, the bridge's node; DUTY, a role the node owes. Every
+elective close asks it, in the gate and in the mesh. Resource-release closes, a
+failed negotiation, a replaced attempt, a page resume, consult nothing.
+
+- **A closer node pushes one off.** At a full table a newcomer strictly closer than
+  the K-th nearest held peer is admitted, displacing the lowest-vitality edge that
+  no reason protects. The displaced near peer keeps its channel if a band or a duty
+  names it. Strictly closer is monotone, so the swap needs no oscillation margin
+  and cannot ping-pong; under churn that is a tendency, not a bound.
+- **A full table still improves.** Once at cap, each maintenance tick searches the
+  nearest and dials at most one candidate the gate predicts it will admit by
+  displacement. That is the one case where the fill's deficit deferral is bypassed.
+- **The bands get their own search.** One probe per tick toward the sparsest band
+  inside the held span, so the crossing edges are sought and not merely found by
+  chance, and the dial order alternates between the near and band classes.
+- **A stale channel loses only its NEAR reason.** It stays charged and stays open;
+  the heartbeat's own eviction is what closes it.
+- **One K.** The kernel refuses a gate K unequal to the maintenance K at
+  construction, and the relay launcher feeds both from one value.
+
+No default number moves: K stays 5, the cap 50, the heartbeat 2 s. The channel
+ledger stays in observation mode. Nothing persists across a restart. The five
+fences and their six mutants are in the kernel's manifest; one existing smoke was
+re-pinned because its refusal had relied on the margin the design removes, and
+the file says so.
+
+What would make this wrong: a stale marker that lags the channel's real state
+would hold a dead peer as NEAR for up to ten seconds, the heartbeat's own bound.
+And K=5 on a fleet of fifty-one relays is close to full connection, so the
+displacement rule will rarely fire there; its effect is measurable only on a
+population where the nearest five are not everyone.
+
+---
+
 ## relay 0.154.0 → 0.155.0 on kernel 4.111.0 — a frozen relay becomes a dead relay (2026-10-12)
 
 **Deployed 2026-10-12, David's word ("Release 0.155.0 and roll it out"): relay 0.155.0 (e950a11, `main` = `testnet`), kernel unchanged at 4.111.0, bridges and apps untouched. Rolled by the tools behind their gates: Air 6/6, M1 8/8, Linux 5/5 at 17:06Z; Windows 20/20 at 17:08Z, every slot restarted and bonded, `RESULT=OK`, no freeze on this pass; four droplets 3/3 each at 17:12Z on node-datachannel 0.33.4 (kernel INFERRED from the restart against the vendored file) — 51 of 51. Proof read on every host by a second connection: `watchdog-armed` in 51 of 51 new relay logs, zero stall lines, native 0.33.4 installed. `release.sh check 4.111.0` COMPLETE at 17:17Z. Not moved: the MCP seats, which take the native bump at their owners' next restart, and Howard's pin.**
