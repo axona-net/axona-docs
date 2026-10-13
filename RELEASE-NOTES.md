@@ -7,6 +7,59 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.112.0 → v4.113.0 — the ROOT obligation's deadline is three push periods (built 2026-10-13, UNRELEASED)
+
+**Built on kernel branch `root-deadline` only. Nothing tagged, nothing on `main` or
+`testnet`, nothing deployed. David's word (2026-10-13): "Fix the ROOT deadline with
+fences, don't release yet." The relay and bridge are untouched; the entry moves
+below the deployed line when David calls the release.**
+
+Why did both bridges report `degraded` with two roles each and zero refusals? The
+kernel's capacity metric measures every obligation as age over deadline and calls
+the node saturated at 0.6. The ROOT obligation is the full-state push to a root's
+replica cohort. Its deadline was the push period itself, 60 s, the same number at
+which the push re-arms. So on every node holding a root with state, the ROOT age
+swept from 0 to 60 s each minute and the pressure from 0 to 1.0 with it, crossing
+0.6 at 36 s. A root serviced ON SCHEDULE read saturated for the last 24 s of every
+minute. While it did, the node soft-refused pushed roles and HANDOFF, and the
+bridge's `/healthz` reported the phase it was read in: east 0.874 degraded and
+west 0.589 ok in one read on 2026-10-13, two phases of the same cycle. Every other
+obligation measures a 60 s renewal against a 180 s drop, three to one. ROOT
+measured 60 against 60. The defect dates from the D0 obligation table
+(2026-07-30), not from 4.112.0.
+
+- **ROOT's deadline is now three push periods.** A new constant,
+  `ROOT_FULL_DEADLINE_MS = 3 × ROOT_REPLICATE_FULL_MS` (180 s), is what the
+  obligation row reads. The push cadence does not move: the full push still
+  re-arms at 60 s of age.
+- **What the numbers mean after the change.** A push on schedule, 60 s plus one
+  5 s tick, peaks at 0.36. Saturation (0.6) now means a push 48 s late, most of
+  a period. Overdue (1.0) means two pushes missed. Before, the worst phase of a
+  healthy cycle read 1.08: overdue and saturated at once.
+- **What does not change.** The renewal rows (CHILD, BACKUP, HOLDER, APP_SUB) keep
+  their 180 s deadline. The 0.6 threshold, the hello-pressure half of the metric
+  and the role-count ceiling are untouched. A node whose event loop stalls still
+  reads saturated on tick lag, and a root whose push is late by most of a period
+  still reads saturated on ROOT.
+- **Fence.** `fence_root_obligation_deadline.mjs` (23 checks) drives a root with
+  state through the real `refreshTick` at 5 s for 30 simulated minutes with a
+  consuming cohort: 30 pushes, max gap 60 s, peak pressure 0.306, never
+  saturated, overdue 0 on every tick. With ticks suspended it saturates at 108 s,
+  counts overdue past 180 s, and one resumed tick discharges it. Reverting the
+  deadline to the period fails 10 of its checks and 3 in
+  `fence_service_pressure.mjs`, which is re-pinned to the ratio.
+
+What would make this wrong: a node holding so many roots with state that the
+per-tick full-push budget (32 roles) defers a root for ten ticks or more now reads
+saturated at a 48 s backlog instead of at the first deferral. Such a node was
+reading saturated on every phase before, so the change hides nothing it showed;
+it moves the signal from "always" to "when the backlog is most of a period." The
+bridges' `degraded` reading was the only place the artefact was visible; after
+the release a bridge that reads `degraded` is one whose root push is late, or
+whose event loop is lagging.
+
+---
+
 ## v4.111.0 → v4.112.0 — the perimeter: one policy for who a node keeps (2026-10-13)
 
 **Deployed 2026-10-13, David's word ("Release 4.112.0 and roll it out"): kernel 4.112.0 (tag → 5507bbb), relay 0.156.0 (61c90b1), bridge 2.159.0 (6b98191). Testnet B1 and B2 at 00:43Z; east and west recreated by `release.sh bridges` at 00:47Z, each verified on its public name, both seated with uplinks connected. Relays: Air 6/6, M1 8/8, Linux 5/5 at 01:02Z; Windows 20/20 at 01:13Z (`RESULT=OK`, no freeze); four droplets 3/3 each at 01:19Z (kernel INFERRED from the restart against the vendored file; the one-core sfo3 host logged two watchdog near-misses and no kill) — 51 of 51. Apps: axona-chat 0.87.0 (served bundle = local build), axona-share 0.46.0 (five tags, APP_VERSION and both module tags), axona-portal 0.22.0, dht-sim 0.129.0. `release.sh check 4.112.0` read COMPLETE at 01:39Z. Not moved: the MCP seats (each owner's restart) and Howard's pin; Howard's suite on 4.112.0 is running from the Linux box with its hour-later repeat chained, and the readings go to `ops/STATE.md` and axona.dev with their conditions.**
