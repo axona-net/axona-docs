@@ -144,7 +144,8 @@ Each is its own design and its own word.
       because on 2026-10-02 the script still named the pre-migration west host,
       `24.199.98.119`, which is now a relay droplet that still carries a dead
       `/opt/axona-bridge-docker` with a compose file. The next run would have started a
-      ghost bridge, Caddy and coturn beside three grizzly relays, verified THAT, and
+      ghost bridge, Caddy and coturn beside the grizzly relays (three then; two since
+      2026-10-13, when the host was resized to c-2 and grizzly3 retired), verified THAT, and
       reported west done while the real west was never touched. Every bridge migration
       updates `WEST_HOST` / the `axona-bridge` ssh alias in the same change as the DNS. Each leg is a container recreate: every socket closes
       with 1001, clients reconnect by name within ~20 s, Caddy answers 502 for the seconds
