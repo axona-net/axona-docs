@@ -1,5 +1,14 @@
 # Alert-bot region-128 failures — evidence ledger, 2026-10-13/14
 
+**Revision 2 (2026-10-14 01:1xZ), after Aster's review (council a18842f1).** The first
+snapshot is axona-docs dd207dc. Five corrections, each marked "rev 2" where it lands:
+the closing paragraph no longer claims client roots in every failing cycle; the sfo3
+kill row is removed from section A (its window does not overlap 21:16Z); 83 against 68
+is explained (warning lines against unique twelve-hex prefixes) and the 27-of-47
+intersection is labelled prefix-only; a handoff warning is read as an attempted transfer
+of a held role and a mismatch drop as the rejection of one copy; the 00:31Z row's
+inference is tightened.
+
 **What this is.** Every observation used in the council's mechanism thread (bot 263d78e1,
 1cb720bb, e10734c8, 2742a664; Aster 10d23f33, 95f99de7), keyed by the exact topic,
 message or flight where a log carried one, with what was OBSERVED in a named log kept
@@ -30,11 +39,10 @@ Columns: **when** (UTC), **key** (topic id prefix; message or flight id where lo
 | when | key | observed | inferred | limit |
 |---|---|---|---|---|
 | 21:16:55 | all 92 topics | suite: "Subscribing to 92 topics" (suite line) | — | — |
-| 21:17:45–21:18:29 | 83 topics (12-hex ids in the lines) | suite, WARN: `pubsub:handoff-unacked { topic, heir: 807cbba851 / 80ab49650c, fallback: 804fd71196 }`, one per topic, from client 890ec4ee…/89e8ddce… | the client held ROOT for those topics at leave time (a node hands off only roles it holds) | the client's root-formed lines are info, unprinted; WHEN it became root is unknown |
+| 21:17:45–21:18:29 | 83 warning lines; 68 unique 12-hex topic prefixes (rev 2: some topics warned more than once) | suite, WARN: `pubsub:handoff-unacked { topic, heir: 807cbba851 / 80ab49650c, fallback: 804fd71196 }` from client 890ec4ee…/89e8ddce… | the client attempted to transfer a role it held for each of those topics at leave time (rev 2: an attempted transfer of a held role, not custody of every expected publication) | the client's root-formed lines are info, unprinted; WHEN it took the role is unknown; the line prints 12 hex of the topic id |
 | 21:17:45 | 1 topic | suite, WARN: `replicate-all-failed` | — | — |
 | 21:18:29 | 47 topics | suite: "published 2 but received 0 and 0" (and 0/1, 0/2, 0/3 variants) | — | — |
-| cross-reference | 47 failed topics vs 68 handed-off topics | computed with `resolveTopic({region:128, name})` on the installed kernel: 27 of the 47 failed topics are among the 68 handed off; 20 are not | the 27: data at the client-root, readers elsewhere. The 20: rooted elsewhere | the 20's roots were not traced for this cycle |
-| 16:00–16:40 | — | sfo3 journals: `event-loop-stalled … action: kill` ×4 (16:22:10, 16:25:22, 16:29:48, 16:36:45), near-misses before each; `pubsub:undeliverable { why: 'step-down-hold' }` on grizzly1 | the 20 non-client failures coincide with the stall window | coincidence in time, not a per-topic trace |
+| cross-reference | 47 failed topics vs 68 handed-off prefixes | computed with `resolveTopic({region:128, name})` on the installed kernel, matched on the FIRST 12 HEX only (rev 2: prefix-only; the warning lines truncate): 27 of the 47 failed topics match a handed-off prefix; 20 do not | the 27: the client held a role for the topic; where the readers' walks ended is not recorded. The 20: no client role evidence; rooted elsewhere or unknown | prefix-only match; the 20 were not traced for this cycle; (rev 2) the sfo3 kills of 16:22–16:36Z do NOT overlap this 21:16Z window and the earlier row joining them is withdrawn; at 21:16Z sfo3 had been on c-2 since 17:50Z with no stall line |
 
 ### B. The 23:12Z diagnostics on 4.113.0 (25 of 260, all "received N and 0")
 
@@ -42,7 +50,7 @@ Columns: **when** (UTC), **key** (topic id prefix; message or flight id where lo
 |---|---|---|---|---|
 | 23:12:09–23:12:52 | run | suite: publish, then "Subscribing to 92 topics" with the SAME node; "received N" for run 1 | the writer read its own data | — |
 | 23:12:37–23:12:43 | 80949cee7bd9, 809be1647345 (sfo3 grizzly1); 80fc097921a4 (Air relay-1); 80d139b3a754 (nyc2 grizzly1) | relay logs, info: `root-formed`, `root-transition { why: 'pub-terminal', born: true }` | real 0x80 relays became root on the WRITE for these topics | — |
-| 23:12:41–43 | the same topics | relay logs, WARN: `drop-topic-mismatch { computed, held, region:128, owner:null, name, write:'open' }` at the moment of formation | the root formed and dropped the publication it formed on; it holds nothing for it | which copy was dropped (the one whose embedded name differs) is read from the `name` field; the message id in the line is present |
+| 23:12:41–43 | the same topics | relay logs, WARN: `drop-topic-mismatch { computed, held, region:128, owner:null, name, write:'open' }` at the moment of formation | the root rejected THAT copy (rev 2: a mismatch drop proves the rejection of one copy, not that the root holds nothing) | which copy was dropped is read from the `name` field; the message id is in the line; whether another copy was accepted for the same topic is not read |
 | 23:12:42 | 80fc097921a4 | nyc2 grizzly1, info: `role-nature { nature:'backup', principal: 80f91153f3, why:'replicate' }` | the Air root replicated to nyc2 | — |
 | 23:16–23:20 | 264 flights | nyc2 grizzly1, info/WARN: `write-flight-promoted` ×264, `write-flight-ack-unbound` ×264, `receipt-probe` ×264, `root-evicted … no correlated receipt within the flight budget — incarnation tombstoned` ×264 | the forwarder's flights never bound an ack and evicted the roots | 264 ≈ the diag's 260 publications; the per-flight ids are in the lines and were not joined to topics here |
 | 23:17:17 | 70 topics | suite, WARN: `handoff-unacked { heir: 804affe160 / 809be67bdb / 8012620956 / 80f91153f3 / 80cae18252 }` | the first client held root for 70 topics and left ("creating new node to confirm delivery" at 23:17:17) | — |
@@ -65,7 +73,7 @@ Columns: **when** (UTC), **key** (topic id prefix; message or flight id where lo
 | 00:10:26–00:10:37 | the same topic | Air relay-4, WARN: ~40 × `drop-topic-mismatch { held: 8025952aec9b…, computed: <other>, name: civildefense.io:…:<other cell>:firetest }` | copies of the alert whose embedded cell name differs from the topic's own name are dropped at the root; the suite fans one alert to many cell topics | which copies the suite intended for this topic is not known from the relay side |
 | 00:10:25, 00:11:39, 00:12:41 | the same topic | Air relay-3: `role-nature backup, principal 802b849a57 (relay-4), why replicate`; sfo3 grizzly1: `backup, principal 89a5387b5c, why replicate`, then `child, why rehomed-idle` | the topic was replicated to at least two backups, one of them from a 0x89 principal | the six-fold delivery count is the suite's; whether the extra copies are distinct message ids or repeats of two is not read |
 | 00:13:34 | diagnostics run | suite log: `TransportError: bridge socket closed before open`, exit 1; bridge log 00:13:05–00:14:18: our client-hello admitted at 00:13:35, two foreign 4.84.0 hellos refused as too old | a separate transport outcome; the refusals are not ours | — |
-| 00:31:02 | diagnostics re-run | suite: 0 of 260 mismatched; 12 `handoff-unacked` | the client rooted 12 topics and both readers reached them | which route served them is not recorded |
+| 00:31:02 | diagnostics re-run | suite: 0 of 260 mismatched; 12 `handoff-unacked` | the client held a role for 12 topics at leave time; (rev 2) nothing here says which root or route served the readers | the serving route is unrecorded; a clean run, not a failing-cycle witness |
 
 ### D. The day in one row
 
@@ -81,18 +89,22 @@ Columns: **when** (UTC), **key** (topic id prefix; message or flight id where lo
 
 ## What the ledger establishes, and what it does not
 
-Established by observation: in every failing cycle the suite's own clients held ROOT for
-region-128 topics (section A, B, and the 00:31Z re-run); 0x80 relays form roots on
-the suite's writes and drop the publications they formed on when the embedded cell
-name differs from the topic (B, C); the forwarding relay evicts roots whose write
-acks never bind (B); in the 00:10Z cycle three never-delivered topics had reader-side
-empty roots on Air relays and no write-side root on any inspected node (C); the
-mismatch-drop rate in that window was two orders of magnitude above the clean
-overnight rate (C).
+Established by observation (rev 2): in the cycles that printed handoff warnings (the
+21:16Z check, the 23:12Z diagnostics, and the 4.112.0 cycles listed in section D with
+a non-zero count), the suite's own client held a role for region-128 topics at leave
+time; in the cycles with zero warnings (19:16Z, 00:10Z) the client's role state is
+UNKNOWN, since its root events are unprinted, and unknown is neither no-root nor
+proof-of-root. 0x80 relays form roots on the suite's writes and reject copies whose
+embedded cell name differs from the topic (B, C); the forwarding relay evicts roots
+whose write acks never bind (B); in the 00:10Z cycle three never-delivered topics had
+reader-side empty roots on Air relays and no write-side root on any inspected node
+(C); the mismatch-drop rate in that window was two orders of magnitude above the
+clean overnight rate (C).
 
 Inferred, and marked so above: that those three writes stayed at the writing client;
-that the clean hours differ by the client's introductions; that the 23:08Z and 00:31Z
-clean runs had readers that reached the writer.
+that the clean hours differ by the client's introductions. (Rev 2: the clean 23:08Z
+and 00:31Z runs show client roles and no failures; which root served their readers is
+unrecorded, so nothing is inferred about it.)
 
 Not read: the writer's own root transition (unprinted); which root served any
 successful reader; the per-flight join between the 264 evictions and topics; whether
