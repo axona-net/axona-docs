@@ -3,7 +3,7 @@
 **Status:** BUILT, UNRELEASED. David's word (council 1ae52b23, seq 140,
 2026-10-15 18:03Z): "I authorize the caller inventory and implementation
 packet", then "build it" (direct, 18:2xZ). The build is kernel 4.114.0 on
-branch `two-pool` (35af93e) and dht-sim 0.131.0 on branch `two-pool`
+branch `two-pool` (35af93e; review fixes 9851505) and dht-sim 0.131.0 on branch `two-pool`
 (007c1c8): nothing tagged, nothing on `main` or `testnet`, nothing deployed,
 no profile adopted, enforcement still off. Part 2 below is the packet as
 written before the build; the RELEASE-NOTES entry for 4.114.0 records what

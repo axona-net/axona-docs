@@ -9,7 +9,7 @@ build is always visible in each app's version row and at the bridge's
 
 ## v4.113.0 → v4.114.0 — two pools: 50 managed and 50 incoming (built 2026-10-15, UNRELEASED)
 
-**Built on kernel branch `two-pool` (35af93e) and dht-sim branch `two-pool`
+**Built on kernel branch `two-pool` (35af93e, review fixes at 9851505) and dht-sim branch `two-pool`
 (007c1c8, sim 0.131.0) only. Nothing tagged, nothing on `main` or `testnet`,
 nothing deployed, no relay or bridge touched. David's word (2026-10-15):
 "build it", after "I authorize the caller inventory and implementation packet."
@@ -97,6 +97,38 @@ attempt; no reject sent; immunity outliving the transaction; closing on a
 refused promotion; counting a suspect incoming peer; a victim choice that
 ignores class. Suite 236 of 236 on the branch; dht-sim's kernel smokes 69
 and the new fence 17.
+
+**Review round, 2026-10-15 20:08–20:40Z (branch moved to 9851505).** Aster's
+independent review (council b583c31c) found two P1s and a P2 in 35af93e, and
+Vega (590b119b) asked for one armed-path row per legacy table insert. All
+four landed on the branch:
+
+- **Armed allocation fails closed.** `allocate` with no consumed reservation
+  under an armed ledger recorded an unclassified charge. Now it records
+  nothing, returns null and counts `allocUnreserved`; the mesh refuses to
+  build a PeerConnection for a state holding no reservation. Fence
+  `fence_pool_reservation` A12, B5.
+- **The two-hop probe set is the full union.** The first-hop fan-out was the
+  usable managed set only; an incoming peer that is not itself closer can
+  still name a closer second hop, so every usable incoming peer is probed.
+  Fence `fence_pool_union_selector` 5c.
+- **Promotion at a full managed pool is a capacity transfer.** The reclass
+  was asked before the gate retired its victim, so at M full it could only
+  refuse and the lawful-replacement path was unreachable. Now the commit
+  runs first (the victim leaves the table, its close is issued) and the
+  reclass names the victim: the ledger moves the class at once if there is
+  room, or defers the move to the victim's confirmed close and applies it
+  there. Nothing is charged twice; the sponsor stays incoming until the
+  transfer lands; `reclassPending` counts the window. Fence
+  `fence_pool_reservation` A13, `fence_pool_promotion` J.
+- **The legacy table inserts** (`_addByVitality`, `_evictAndReplace`) take
+  no reservation because the web transport's `openConnection` is bound-only
+  and cannot allocate; what they could do was seat an incoming-class channel
+  in the table without a reclass. Armed, they now reclass or refuse. Fence
+  `fence_pool_promotion` I1–I4.
+
+Five more mutants, each red on its named check. Suite re-run on the branch
+after the fixes: 236 of 236.
 
 What the build does not do: it adopts no profile, flips no enforcement,
 changes no default, moves no number. The regional hybrid, the Howard envelope
