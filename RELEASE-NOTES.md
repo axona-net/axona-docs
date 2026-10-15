@@ -7,16 +7,19 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
-## v4.113.0 → v4.114.0 — two pools: 50 managed and 50 incoming (built 2026-10-15, UNRELEASED)
+## v4.113.0 → v4.114.0 — two pools: 50 managed and 50 incoming (2026-10-15)
 
-**Built on kernel branch `two-pool` (35af93e, review fixes at 9851505) and dht-sim branch `two-pool`
-(007c1c8, sim 0.131.0) only. Nothing tagged, nothing on `main` or `testnet`,
-nothing deployed, no relay or bridge touched. David's word (2026-10-15):
-"build it", after "I authorize the caller inventory and implementation packet."
-The packet is `architecture/Axona-Two-Pool-Caller-Inventory-and-Implementation-Packet-v0.1.md`
-(ca52384); the design is Aster's amendment v1.1 (council bc4fe433) with the
-v1.2 gate map (b395fe8f). The entry moves below the deployed line when David
-calls the release.**
+**Deployed 2026-10-15 21:48Z, David's word ("Let's do it"): kernel 4.114.0 (tag →
+734cf6a), relay 0.158.0 (0f39e22), bridge 2.161.0 (4eb830f), both testnet bridges,
+both production bridges, 48 relays (Air 6, M1 8, Linux 5, Windows 20, droplets 3 +
+2 + 2 + 2; the droplets' kernel inferred from unit start times after the vendored
+file's mtime), chat 0.89.0, share 0.48.0, portal 0.24.0, dht-sim 0.131.0 (its served
+build also carries the simulator's two-pool link model, G7). `release.sh check`
+COMPLETE at 21:48Z. NOTHING IS ARMED: no node carries a `meshPools` profile and
+`enforce` is false everywhere, so every node runs this code byte-identically to
+4.113.0. Built on branch `two-pool` (35af93e), reviewed by Aster, Orion and Vega, the
+review's three findings fixed at 9851505 (the addendum below). MCP seats move when
+their owners reload; Howard's pin is his.**
 
 How does a node hold 100 peers when its table holds 50? It holds two things.
 The MANAGED pool is the 50 peers the node selects and keeps for coverage: the
