@@ -7,6 +7,101 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.113.0 → v4.114.0 — two pools: 50 managed and 50 incoming (built 2026-10-15, UNRELEASED)
+
+**Built on kernel branch `two-pool` (35af93e) and dht-sim branch `two-pool`
+(007c1c8, sim 0.131.0) only. Nothing tagged, nothing on `main` or `testnet`,
+nothing deployed, no relay or bridge touched. David's word (2026-10-15):
+"build it", after "I authorize the caller inventory and implementation packet."
+The packet is `architecture/Axona-Two-Pool-Caller-Inventory-and-Implementation-Packet-v0.1.md`
+(ca52384); the design is Aster's amendment v1.1 (council bc4fe433) with the
+v1.2 gate map (b395fe8f). The entry moves below the deployed line when David
+calls the release.**
+
+How does a node hold 100 peers when its table holds 50? It holds two things.
+The MANAGED pool is the 50 peers the node selects and keeps for coverage: the
+table it has always had. The INCOMING pool is up to 50 more channels the node
+accepts so that nodes which select IT can reach it. The two are disjoint
+accounting classes assigned when a channel is reserved, never by who sent the
+first packet, and they share one physical bound H. Until this build the kernel
+had one table and no class: an unsolicited channel that bound was offered to
+the table's gate and, refused, sat bound and charged until a grace timer
+closed it. That is the whole of what "incoming" meant.
+
+NOT ARMED BY DEFAULT. A node built without a profile is byte-identical to
+4.113.0: one table, the ledger's direction-only predicate, no class on any
+record, `enforce: false`. The pools arm only through an explicit
+`meshPools` profile at the launcher, and no profile row is adopted here; the
+relay M50/I50/H100 and leaf M6/I6/H12 rows are the council's review examples,
+carried by the fence and nothing else. Arming them on the fleet is a separate
+word, and so is turning enforcement on.
+
+- **G4, the profile.** `pool_profile.js` builds one frozen `{M, I, H,
+  pPending, cInbound, serveFloor, promoteMs, hostBudget}` and REFUSES any
+  overcommit with the field named: M + I > H, pPending > M, cInbound > I,
+  serveFloor > M, a host budget below H plus the door's sockets. Nothing is
+  trimmed and nothing borrows. `webTransport({ meshPools })` refuses before
+  the mesh exists. Fence `fence_pool_profile` (14 checks).
+- **G1, the reservation.** The ledger reserves BEFORE anything physical
+  exists: `reserve({ cls, dir, attempt, generation })` under charged +
+  reserved ≤ M, ≤ I and ≤ H; `allocate` consumes the token in the same
+  synchronous step the PeerConnection is built; an unconsumed token expires
+  with the negotiation window; the ONE release stays at the transport's
+  confirmed close of the matching incarnation. With enforcement off the
+  would-be refusals are counted by class, which is the measurement that
+  precedes any flip. The two pending bounds (the guard's `pPending` and
+  `MAX_PENDING_RELAY_NEGOTIATIONS`) collapse to one when armed. Fence
+  `fence_pool_reservation` (29 checks): M50/I0 enforcing plus forty
+  unsolicited offers builds zero PeerConnections.
+- **G2, reserve, then retire.** A replacement attempt for a key holding an
+  unbound negotiation reserves FIRST; refused at cap, the old attempt stays
+  and the offer is rejected on the wire. Until this build the old attempt was
+  retired first and the key could end with neither. Replacements on one key
+  are bounded (three per negotiation window, then the key sheds). The retry
+  takes a fresh reservation, so two incarnations are charged while the old
+  PeerConnection closes, as v1.1 §2 says they must be. Fence
+  `fence_pool_attempt_fence` (17 checks).
+- **G5, the reject frame.** A refused offer is answered, not dropped:
+  `sdp-reject {v, attempt, generation, reason}`. The offerer ends only the
+  current never-opened attempt the frame names, and the kernel reads a
+  capacity reject as a deferral, releasing the guard token without a mark.
+  A legacy peer still gets silence and the bounded timeout. Eight saturated
+  responders hold a dialer's pending work for no longer than the frames take
+  to arrive. The bridge relays the payload untouched (`server.js:1573`). Fence
+  `fence_pool_reject_frame` (12 checks).
+- **G6, promotion.** An incoming peer offered to the table is PROMOTED in one
+  transaction: the gate decides, the ledger moves the class, the table
+  commits. At M full and duty-saturated it ends in a deficit and the incoming
+  channel is KEPT, since an incoming peer is lawfully incoming; nothing closes.
+  While the transaction runs the identity is exempt from elective eviction,
+  for at most `promoteMs`. The fill may nominate a bound incoming peer (its
+  dial is a promotion). The degree selector releases an incoming channel
+  before a managed one. Fence `fence_pool_promotion` (19 checks).
+- **G3, one usable set.** `_usablePeers()` is the one iterator over managed ∪
+  incoming, deduplicated, filtered the same way (not dead, connected, not
+  SUSPECT), read by greedy, the two-hop first-hop set, the fallback hop, the
+  `route_msg` handler and `health().degree`. A SUSPECT incoming peer is
+  neither routed through nor counted, which closes the green-badge
+  counterexample. The two-hop free pass reads the incoming pool, the only
+  reverse set that exists in production: `incomingSynapses` has no producer in
+  the kernel. Fence `fence_pool_union_selector` (13 checks).
+- **G7, the simulator.** dht-sim's link model carries the same classes,
+  ceilings and promotion, M-only swap victims, and `poolStats()` says
+  `armed: false` on any node that is not armed, so no matrix from the legacy
+  single cap can be called "50+50". Fence `fence_sim_two_pools` (17 checks).
+
+**Twelve mutants, each deleting one thing, each red on its named check:**
+the M + I > H rule; allocate without a token; release at CLOSING; the class
+bound; retire-before-reserve; the shed bound; a reject applied regardless of
+attempt; no reject sent; immunity outliving the transaction; closing on a
+refused promotion; counting a suspect incoming peer; a victim choice that
+ignores class. Suite 236 of 236 on the branch; dht-sim's kernel smokes 69
+and the new fence 17.
+
+What the build does not do: it adopts no profile, flips no enforcement,
+changes no default, moves no number. The regional hybrid, the Howard envelope
+and the architecture tex stay separate words.
+
 ## v4.112.0 → v4.113.0 — the ROOT obligation's deadline is three push periods (2026-10-13)
 
 **Deployed 2026-10-13 23:12Z, David's word ("Release 4.113.0 and roll it out"):

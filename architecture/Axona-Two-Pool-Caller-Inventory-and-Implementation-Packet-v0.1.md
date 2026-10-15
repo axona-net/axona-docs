@@ -1,9 +1,19 @@
 # Axona Two-Pool (50 M + 50 I) — caller inventory and implementation packet v0.1
 
-**Status:** design packet, no code. David's word (council 1ae52b23, seq 140,
+**Status:** BUILT, UNRELEASED. David's word (council 1ae52b23, seq 140,
 2026-10-15 18:03Z): "I authorize the caller inventory and implementation
-packet." This is that packet. It changes no file in the kernel, moves no
-number, flips no enforcement. "Build it" is a separate word.
+packet", then "build it" (direct, 18:2xZ). The build is kernel 4.114.0 on
+branch `two-pool` (35af93e) and dht-sim 0.131.0 on branch `two-pool`
+(007c1c8): nothing tagged, nothing on `main` or `testnet`, nothing deployed,
+no profile adopted, enforcement still off. Part 2 below is the packet as
+written before the build; the RELEASE-NOTES entry for 4.114.0 records what
+the build did where it departs from it: the retry takes a FRESH reservation
+(two incarnations charged while the old PeerConnection closes, v1.1 §2) in
+place of "reuses the attempt's reservation"; the graduation floor keeps its
+own option and the profile's `serveFloor` is reported in `health().degree`
+rather than driving it; the SUSPECT filter applies to managed peers only when
+the pools are armed, so an unarmed node routes as 4.113.0 did. The line
+numbers in Part 1 are those of 4e1a510 and have moved.
 
 **Design lineage:** Aster's amendment v1 (be501a60, seq 120), amendment v1.1
 (bc4fe433, seq 134, the semantic baseline the council accepted), the v1.2
