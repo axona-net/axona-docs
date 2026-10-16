@@ -7,6 +7,47 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.114.0 → v4.114.1 — the gate-off seed, and enforcement on (2026-10-15)
+
+**Deployed 2026-10-16 00:04Z, David's word ("Release and turn on enforcement"):
+kernel 4.114.1 (tag → 6bc3ff4), relay 0.160.0 (25da74a), bridge 2.163.0
+(58fa25f), both testnet bridges, both production bridges, 48 relays (Air 6, M1 8,
+Linux 5, Windows 20, droplets 3 + 2 + 2 + 2), chat 0.90.0, share 0.49.0, portal
+0.25.0, dht-sim 0.132.0. `release.sh check` COMPLETE at 00:04Z. From this roll
+every armed node ENFORCES: M 50, I 50, H 100, pPending 8, cInbound 4 on all 48
+relays and both production bridges; the testnet bridges carry the version only.
+The relay reads `RELAY_LEDGER_ENFORCE=1`, the bridge `BRIDGE_LEDGER_ENFORCE=1`,
+and each hands the kernel `meshLedger: { enforce: true }`; unset keeps the
+kernel's default, counting only.**
+
+What did the armed fleet show, an hour after 4.114.0 arming? A relay that runs
+the admission gate promoted nine incoming channels and kept one as incoming on a
+deficit. A relay that runs no gate, the Linux box, showed zero promotions and
+zero incoming, with the ledger holding every accepted channel as incoming while
+the table counted it managed. The gate-off seed path was a legacy table insert
+that the 4.114.0 guard did not cover.
+
+- **The gate-off seed goes through the same guard as the other legacy inserts.**
+  With the pools armed, an accepted (incoming-class) channel offered to a
+  gate-off table is reclassed to managed before its entry lands, or the entry
+  stays out and a deficit is counted; a managed channel seats as before.
+  Fence `fence_pool_promotion` K1–K3; mutant: drop the guard and K1/K2 go red.
+- **Enforcement is a launcher switch, not a profile field.** The profile says
+  what the bounds are; the switch says whether they refuse. The relay's start
+  line now reads the ledger's `enforce` back from the transport, so a node that
+  believes it is enforcing has read it, not assumed it.
+
+Suite on the branch: 235 of 236. The red one is `smoke_turn_cred_refresh`,
+"back to open with a fresh credential": red in the run, red alone, and red on
+the committed tree without this change, though it passed in the full run twice
+earlier the same evening. Cause unconfirmed; the log is kept with the session.
+
+What enforcement changes on the wire: a refused offer is answered with a reject
+frame and the dialer defers; an unbound inbound negotiation past the fourth is
+refused; a promotion at a full managed pool waits for its victim's confirmed
+close or ends in a deficit. What it does not change: no node's profile, no
+default, nothing on a node that is not armed.
+
 ## v4.113.0 → v4.114.0 — two pools: 50 managed and 50 incoming (2026-10-15)
 
 **Deployed 2026-10-15 21:48Z, David's word ("Let's do it"): kernel 4.114.0 (tag →
