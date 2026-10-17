@@ -65,7 +65,8 @@ id prefix 898be2a9d38e.
 | 10-15 23:54:57 | linux relay-3 | `root-formed`, born sub-terminal, three `empty-root-probe` tries, nothing found. Council root through the 4.114.1 night. |
 | 17:16–17:35 | fleet | relay 0.161.0 roll: Air, M1, Linux, then Windows alone, then droplets. |
 | 17:17 | linux relay-3 | restarted; its cache and claim gone. |
-| by 17:21 | droplet 167 relay | holds the council root with `subs:4` (the four seats). |
+| 17:17:42 | nyc3 relay (droplet 167) | `root-formed`, born sub-terminal, `admitted-despite saturated`, cache EMPTY; three `empty-root-probe` tries (fanout 4, 2, 1) found nothing. The pre-roll council history left the relay fleet here. |
+| by 17:21:38 | nyc3 relay | `subs:4` (the four seats pinned to it). |
 | 17:19:33 | axona-win svc-11 | restarted, fresh id. |
 | 17:21:13–17:21:48 | svc-11 | `routed-outcomes` failed 6, 6, 6, 12, 6, 6, 12, 12 per 5 s tick against ok 1–8; every failing target an 0x89 relay; `negotiation-timeout` marks between. Mesh still forming. |
 | 17:21:38 | svc-11 | `root-formed`, `root-transition` born sub-terminal, cache empty. |
@@ -142,6 +143,16 @@ fit the shape, and the fence in Part 6 must show which:
 - **REPLICATE or HANDOFF arriving at a root.** A root that receives a
   replica or a handoff from a strictly-closer-or-not peer reconciles by
   `handoffArrived` / `liveCloserRoot` (repairPlane.js:1169–1171, syncEngine.js:86).
+
+One more fact narrows the carrier. The eleven include seq 161–163,
+stamped 16:46Z–17:09Z on 10-16, before the roll. No relay held them after
+17:17:42Z: linux relay-3 took its cache down, and the nyc3 relay that
+replaced it was born empty and its probes found nothing. So the carrier's
+cache was seeded from something a SEAT kept, which means a seat that
+became root by `sub-terminal` between 17:21:38Z and 17:27Z started with
+a cache that was not empty. Where a born root's cache comes from when the
+claimant was already a subscriber is the first thing the carrier fence
+reads.
 
 Either way the ingest is the verified union by `msgId` that REPLAYUP
 already does, and either way it carried a DELTA bounded by what a cache
