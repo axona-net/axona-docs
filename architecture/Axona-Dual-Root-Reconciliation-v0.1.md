@@ -1,4 +1,4 @@
-# Axona Dual-Root Reconciliation — design packet v0.3
+# Axona Dual-Root Reconciliation — design packet v0.4
 
 **Status:** DESIGN, for council review. Nothing built. David's word (direct,
 04:1xZ 2026-10-17): "Yes, write it." The review bar is Vega's 8cbecf8b
@@ -25,6 +25,15 @@ strictly greater and an equal-stamp group split across a frame loses its
 tail; and the carrier of the eleven is the leading hypothesis, not a
 named fact, until a record distinguishes HANDOFF from SPLIT_UNION.
 
+**v0.4 (16:5xZ 2026-10-17)** answers Aster's third BLOCK 436ca7b6 on
+v0.3, two points, both holding. The merge in 4(d) had the loser pull
+from the winner; the shipped pull ingests at the requester, so the
+loser ingested and the winner received nothing. 4(d) is now a two-way
+machine with the winner as requester, an OFFER from the loser, both
+epochs on every frame, and a terminal ack the loser validates on six
+fields. The cursor's order is defined at export, not borrowed from a
+cache that has none.
+
 **Lineage:** axona.bot 71dc09d7 (the split, seq 2 on the relay-held root),
 e508b92a (the fork), 7c7f9383 (amended proposal), c5d18788 and f7260bec
 (the lookup reading and the correction that withdrew the bridge framing);
@@ -42,11 +51,12 @@ the kernel then keep on how long two roots live?
 
 The packet answers the two code questions the council put first, states
 the invariant Aster wrote, gives the fixes in Vega's order with the state
-each one adds, and names the fences that pin them. It adds one frame
-type, `REPLAYACK`, and one field on the SUB. Everything else the merge
-needs already ships; what is missing is a trigger that fires, a terminus
-that is read, a pull whose outcome is awaited, and a step-down that waits
-for its ack.
+each one adds, and names the fences that pin them. It adds two frame
+types, `MERGE_OFFER` and `REPLAYACK`, seven fields on three existing
+frames, and one field on the SUB. Everything else the merge needs
+already ships; what is missing is a trigger that fires, a terminus that
+is read, a pull whose outcome is awaited, a pull that runs in the
+direction the union needs, and a step-down that waits for its ack.
 
 ## What this is NOT
 
@@ -331,63 +341,109 @@ one, and the step-down discipline.
    one per 60 s) and treats a strictly closer visited node as trigger 1.
 4. A replica or handoff carrying a foreign root epoch.
 
-**Merge.** The root that learns of another root pulls FULL state from
-it: a `PULLUP` with `sinceHw: 0` and a correlation id `corr`, answered by
-`REPLAYUP` carrying the same `corr`, through the existing verified union
-(msgId dedup, tombstone suppression). The pull is one-shot per (peer,
-epoch) so a refused pull cannot storm, the 4.22.0 lesson at
-wireHandlers.js:335–342.
+**Direction, read from source.** `PULLUP` runs from a REQUESTER to a
+HOLDER: `_syncPull` routes it with `parentId` set to the requester
+(syncEngine.js:120–129), `_onPullUp` (wireHandlers.js:750–752) hands it
+to `_syncAnswerPull`, and the holder routes `REPLAYUP` back to
+`parentId` (133–140), where `_onReplayUp` (762–766) ingests it under the
+REPLAY_UP policy. The node that pulls is the node that ingests. v0.3
+had the loser pull from the winner, so the loser ingested the winner's
+state and acked the winner: nothing moved the loser's unique history
+into the winner, and no authorization came back to the loser. Aster
+436ca7b6. The machine below puts the WINNER on the requester side.
 
-Two amendments to the state-transfer contract, both from Aster's
-reading. First, `_syncAnswerPull` returns at syncEngine.js:135 when
-`role.cache.length` is 0, before `_syncDelta` reads the active
-tombstones, so a role that holds only tombstones answers nothing. The
-answer condition becomes "cache or active dels non-empty", and
-`fence_dual_root_tombstone_only` pins it. Second, a cache that does not
-fit one REPLAYUP frame is answered in rounds under one `corr`. The
-cursor is not a timestamp. `_syncDelta` selects `publishTs > sinceHw`
-(syncEngine.js:108–113), so a frame boundary that falls inside a group
-of entries sharing one stamp would drop the rest of that group on the
-next round. The cursor is the pair (publishTs, msgId) in the cache's own
-order, carried in the frame as `cursor`; the replier answers entries
-strictly after the cursor in that order, and a frame never ends inside
-an equal-stamp group unless the group alone exceeds a frame, in which
-case the pair cursor still advances within it. Each frame carries
-`more`; the final frame carries `more: false` and the aggregate counts
-for the whole transfer under this `corr`. v0.3 names the escape and
-defers the frame size; `fence_dual_root_full_pull` fails if a union past
-one frame drops its older half, and `fence_dual_root_equal_stamp_boundary`
-fails if a boundary inside an equal-stamp group drops an entry.
+**The merge machine.** Two roots for one topic, W the XOR-closer, L the
+farther. One merge per (topic, L, W) at a time, bound by `corr`,
+`winnerEpoch` and `loserEpoch` in every frame. Four messages, two of
+them new.
 
-**Step-down.** HANDOFFACK cannot carry this. It is emitted only from the
-HANDOFF ingest (syncEngine.js:216–221) and its receiver marks only the
-leaver's `_handoffAcked` ledger (wireHandlers.js:884–895); a
-PULLUP→REPLAYUP exchange has no correlation and no post-ingest
-acknowledgement. The conflict pull gets its own, and it is TERMINAL
-ONLY. The ingesting root sends nothing after an intermediate frame.
-After it has applied the dels and the batch of the frame carrying
-`more: false`, it routes `REPLAYACK {topicId, corr, peer, epoch, held,
-sent}` to the replier, where `held` and `sent` are the AGGREGATE over
-every frame of this `corr`, in the counted shape HANDOFFACK took in
-4.45.0 so that a short ack reads as short. The XOR-farther root demotes
-through `demote()` only on a `REPLAYACK` that matches an open pull on all
-four of `topicId`, `corr`, `peer` (the winner's id) and `epoch` (the
-winner's root incarnation as the loser learned it at trigger time), and
-whose `held` equals `sent`. `corr` alone does not name the winner; a
-stale or forged ack with the right `corr` and the wrong peer or epoch is
-discarded. A short ack is not an ack: `held < sent` leaves the loser
-rooted and the pull re-issues on the next trigger. An ack that arrives
-while frames are still outstanding under its `corr` is discarded and
-logged. Until the terminal ack the loser keeps root and cache and keeps
-serving its subscribers. A send outcome is never a step-down input; only
-the terminal ack is.
+1. **OFFER, L → W.** When the trigger fires at L (its own verify finds a
+   strictly closer visited node, or a subscriber's `walkRoot` names
+   one), L mints `corr` and routes `MERGE_OFFER {topicId, corr, loser,
+   loserEpoch, hw, lw, count}` to W. L stays root, keeps stamping, keeps
+   serving. L records `openMerges[corr] = {winner: W, winnerEpoch: null,
+   state: 'offered', snapshot}` where `snapshot` is its export list,
+   fixed now (see the cursor below). A new OFFER to the same W with a
+   higher `loserEpoch` supersedes the old record; a lower one is stale.
+2. **PULL, W → L.** W starts its pull on any of: a `MERGE_OFFER` from a
+   node strictly farther than itself; a subscriber's `walkRoot` naming a
+   farther node that claims root; a replica or beacon carrying a foreign
+   root epoch for the topic. If the trigger reached W first, W mints
+   `corr` itself. W checks XOR before anything else: a node that is not
+   strictly farther is not a loser, and if the other node is closer, W
+   is the loser and runs step 1 toward it instead. W records
+   `openPulls[corr] = {loser: L, loserEpoch, cursor: null, framesIn: 0,
+   held: 0, sent: 0, startedAt}` and routes `PULLUP {topicId, corr,
+   parentId: W, winnerEpoch, cursor: null, sinceHw: 0}` to L. That
+   `PULLUP` is the message that begins the winner's ingest; it is the
+   shipped verb with three fields added.
+3. **FRAMES, L → W.** On a `PULLUP` carrying `corr`, L binds the record:
+   if `corr` matches an offer it made, L fills `winnerEpoch`; if no
+   offer exists, L opens the record only when the requester is strictly
+   closer than L for the topic and carries a `winnerEpoch`; anything
+   else is logged `merge-stale` and dropped. L answers `REPLAYUP
+   {topicId, corr, loserEpoch, cursor, more, msgs, dels}` to `parentId`,
+   each frame at most `REPLAY_CHUNK_BYTES` (constants.js:298, the
+   budget replay already uses), from its snapshot in export order.
+   `_syncAnswerPull` answers when the cache OR the active dels are
+   non-empty (the return at syncEngine.js:135 moves; a tombstone-only
+   role transfers its dels). W ingests each frame through the REPLAY_UP
+   union, validates `corr`, `loserEpoch` and cursor continuity, adds the
+   frame's counts to `held` and `sent`, and on `more: true` routes the
+   next `PULLUP` with `cursor` set to the frame's last cursor.
+4. **ACK, W → L, terminal only.** After the frame carrying `more: false`
+   is applied, W routes `REPLAYACK {topicId, corr, winner, winnerEpoch,
+   loser, loserEpoch, held, sent}` with the aggregate over every frame
+   under `corr`, closes `openPulls[corr]`, and keeps its claim. W sends
+   nothing after an intermediate frame.
+5. **STEP-DOWN, at L.** On a `REPLAYACK` matching `openMerges[corr]` on
+   all six of `topicId`, `corr`, `winner`, `winnerEpoch`, `loser`,
+   `loserEpoch`, with `held` equal to `sent`, L runs `demote(W)`
+   (rootClaim.js:374–395): upstream pinned to W, step-down hold armed, a
+   confirming SUB sent with L's `hw` and `lw`. The tail L stamped after
+   its snapshot was cut now reaches W by the shipped path: L's SUB
+   carries an `hw` above W's, and `_onSub` pulls that delta
+   (wireHandlers.js:343–345). W's unique bodies and tombstones reach L
+   by the shipped path too: L's since-all replay as W's child. `held <
+   sent` leaves L rooted; the trigger fires again on the next verify and
+   a NEW `corr` starts a new round. An ack with an unknown `corr`, a
+   mismatched epoch, or arriving while L's record shows frames
+   outstanding, is logged `merge-stale` and dropped. A send outcome is
+   never a step-down input.
 
-**State added.** On a root: `role.sync.foreignRoots` (map id → {epoch,
-corr, pulledAt, acked}); `role.sync.openPulls` (map corr → {peer, epoch,
-cursor, framesIn, outstanding, issuedAt}). On a subscriber:
-`sub.lastWalkRoot`. One new frame type, `REPLAYACK`, registered beside
-HANDOFFACK in constants.js and boundary1Registry.js; two new fields on
-PULLUP and REPLAYUP, `corr` and `cursor`, and `more` on REPLAYUP.
+What each side holds when the machine ends: W holds the union of both
+histories minus everything tombstoned on either side; L, now a child,
+converges to the same set within one replay. The invariant in Part 3 is
+the statement about W at the moment L sheds root, and step 5 is the
+only place L sheds it.
+
+**The cursor.** The cache appends in ascending `publishTs`
+(topicStore.js:25–29; rootClaim.js:82) and defines no order among
+entries that share a stamp, so "cache order" is not a cursor. The export
+order is defined at step 1: L sorts a snapshot of its cache by
+(`publishTs` ascending, `msgId` ascending as a hex string) and keeps
+that list under `openMerges[corr].snapshot` for the life of the merge.
+The cursor carried in frames is the pair (`publishTs`, `msgId`) of the
+last entry sent, opaque to W, and L validates every incoming cursor
+against `openMerges[corr].lastCursorSent`: equal means continue,
+anything else means W restarts with a new `corr`. A frame never ends
+inside an equal-stamp group unless the group alone exceeds a frame, and
+then the pair still advances within it. Entries stamped after the
+snapshot are the tail, closed at step 5. Entries the TTL expires out of
+the live cache during the merge stay in the snapshot, so a long merge
+does not lose its own head; the snapshot is released when the record
+closes.
+
+**State added.** On every root: `role.sync.openMerges` (map corr →
+{winner, winnerEpoch, loserEpoch, state, snapshot, lastCursorSent,
+offeredAt}) and `role.sync.openPulls` (map corr → {loser, loserEpoch,
+cursor, framesIn, held, sent, startedAt}). On a subscriber:
+`sub.lastWalkRoot`. Two new frame types, `MERGE_OFFER` and `REPLAYACK`,
+registered beside HANDOFF and HANDOFFACK in constants.js and
+boundary1Registry.js; three fields added to `PULLUP` (`corr`,
+`winnerEpoch`, `cursor`) and four to `REPLAYUP` (`corr`, `loserEpoch`,
+`cursor`, `more`). The SPLIT_UNION quench at syncEngine.js:121–126 is
+untouched; a merge pull is never SPLIT_UNION.
 
 **The bound, derived.** Let V = `ROOT_VERIFY_MS` = 45 s, L = one lookup
 (observed 3.6–4.4 s on 10-17 at hop cap 41; shorter once (c) holds), A =
@@ -395,10 +451,12 @@ PULLUP and REPLAYUP, `corr` and `cursor`, and `more` on REPLAYUP.
 capped 5 s per round. With a routed path between the roots:
 
 - detection ≤ V + L from the moment the path exists, by trigger 1 or 2;
-- union ≤ one PULLUP/REPLAYUP round trip, bounded by the via-hop budget;
-- step-down ≤ A after the union lands.
+- union ≤ one OFFER hop plus F PULLUP/REPLAYUP round trips, F the
+  number of frames the loser's snapshot needs at `REPLAY_CHUNK_BYTES`,
+  each bounded by the via-hop budget; F is 1 for a council-sized cache;
+- step-down ≤ A after the terminal ack lands.
 
-So T_recon ≤ V + L + one round trip + A, under three conditions: the
+So T_recon ≤ V + L + (1 + F) round trips + A, under three conditions: the
 path exists, the loser's cache fits one REPLAYUP, and the winner is
 reachable by the routed send. A cache larger than one frame, or a
 routed send that resolves `consumed:false`, breaks the bound and the
@@ -437,8 +495,9 @@ code already carries, and it moves if they move.
 
 Every fence passes with its fix and fails with the fix deleted, on the
 same tree, and the manifest records both runs. Mutants are named per
-fence as in the two-pool packet. Fourteen fences in v0.3; the four added
-over v0.1 and the two added over v0.2 are Aster's.
+fence as in the two-pool packet. Nineteen fences in v0.4; the four added
+over v0.1, the two over v0.2 and the five over v0.3 come from Aster's
+three readings.
 
 | Fence | Pins | Red without |
 |---|---|---|
@@ -452,6 +511,11 @@ over v0.1 and the two added over v0.2 are Aster's.
 | `fence_dual_root_replayack` | (d) | the loser demotes on a send outcome, or on a short ack, or on an ack with the wrong `corr`, peer or epoch |
 | `fence_dual_root_terminal_ack` | (d) | two frames, the first fully held, the second carrying unique history and a tombstone; the loser demotes after the first frame's counts match, before the terminal ack |
 | `fence_dual_root_equal_stamp_boundary` | (d) | three entries share one stamp and the frame boundary falls after the first; the pair cursor is replaced by the stamp and the second and third are dropped |
+| `fence_dual_root_direction` | (d) | the pull is issued by the loser; the winner ends the machine without the loser's unique body and tombstone |
+| `fence_dual_root_two_way_unique` | (d) | W holds {a, tomb(x)}, L holds {b, tomb(y)}; after the machine W must hold a and b minus x and y, and L as child must converge; the mutant drops L's dels from the frames |
+| `fence_dual_root_stale_round` | (d) | a REPLAYACK carrying a superseded corr or a stale loserEpoch demotes L; a PULLUP from a node not strictly closer opens a merge record |
+| `fence_dual_root_cursor_invalid` | (d) | a cursor that does not equal lastCursorSent is answered with the next frame instead of a restart; a snapshot entry expired by TTL mid-merge is dropped from the export |
+| `fence_dual_root_tail_closed` | (d) | an entry L stamped after its snapshot never reaches W after demotion; the mutant strips hw from the confirming SUB |
 | `fence_probe_verdicts_awaited` | (a) | a try whose every pull resolved `consumed:false` still counts against the budget |
 | `fence_seat_reconnect_handoff_named` | Part 5.1 | a reconnecting seat's handoff leaves no record a host keeps |
 | `fence_merge_carrier_named` | Part 2b | the sim runs both candidate paths from a reconnecting seat (HANDOFF; SUB low-water SPLIT_UNION) and either leaves no retained record that distinguishes it from the other |
@@ -468,8 +532,16 @@ relay test harness then runs the hand-fork case on a real transport.
   it. Then (b) has nothing to read and (d) waits for a path. The
   10-17 walks did reach it, from a seat, at hop 9.
 - A seat-side root whose cache is larger than one REPLAYUP frame. The
-  multi-round pull in 4d names the escape and leaves the frame size and
-  round bound unsized; the bound in 4d holds only for one frame.
+  multi-round pull in 4d uses `REPLAY_CHUNK_BYTES` and leaves the round
+  bound unsized; the bound in 4d holds for one frame and grows by one
+  round trip per frame after it.
+- A loser that keeps stamping faster than one SUB delta can carry after
+  step 5. The tail closes by the shipped `hw` pull, which is a delta
+  from W's high water; a tail larger than one frame needs the same
+  multi-round path on that leg, which v0.4 does not add.
+- Both nodes detecting at once and each sending the other an OFFER. The
+  XOR check in step 2 makes exactly one of them the requester; the
+  fence for stale rounds covers the crossed offers.
 - The carrier of the eleven being the SUB low-water path, or a third
   path, and not the handoff. Source proves the reconnect ran `leave()`
   and that HANDOFF fits; it does not prove the event, and no retained
