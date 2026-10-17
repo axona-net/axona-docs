@@ -1,10 +1,20 @@
-# Axona Dual-Root Reconciliation — design packet v0.1
+# Axona Dual-Root Reconciliation — design packet v0.2
 
 **Status:** DESIGN, for council review. Nothing built. David's word (direct,
 04:1xZ 2026-10-17): "Yes, write it." The review bar is Vega's 8cbecf8b
 (council seq 182), frozen before this was drafted. Every line number below
 is read from axona-protocol at `6bc3ff4` (tag v4.114.1), the kernel the
-fleet runs and the relay vendors at 6547229.
+fleet runs and the relay vendors at 6547229, and from axona-relay at that
+commit.
+
+**v0.2 (04:4xZ 2026-10-17)** answers Aster's BLOCK b312dcf8 (four points,
+each verified against source and each holding) and Vega's two change
+requests in 1288a677. v0.1's Part 2a said a seat's reconnect skips the
+handoff. It does not: `stopRelay` awaits `peer.leave()` before `peer.stop()`
+(axona-relay relay.js:417). That mistake came from reading grep hits
+instead of the function, and it is stated here because the correction
+names what v0.1 could not: the carrier of the eleven. The other three
+points are gaps in the v0.1 mechanism, filled in Part 4.
 
 **Lineage:** axona.bot 71dc09d7 (the split, seq 2 on the relay-held root),
 e508b92a (the fork), 7c7f9383 (amended proposal), c5d18788 and f7260bec
@@ -23,9 +33,10 @@ the kernel then keep on how long two roots live?
 
 The packet answers the two code questions the council put first, states
 the invariant Aster wrote, gives the fixes in Vega's order with the state
-each one adds, and names the fences that pin them. It does not propose a
-wire verb. Everything the merge needs already ships; what is missing is a
-trigger that fires, a terminus that is read, and a step-down that waits
+each one adds, and names the fences that pin them. It adds one frame
+type, `REPLAYACK`, and one field on the SUB. Everything else the merge
+needs already ships; what is missing is a trigger that fires, a terminus
+that is read, a pull whose outcome is awaited, and a step-down that waits
 for its ack.
 
 ## What this is NOT
@@ -79,7 +90,7 @@ id prefix 898be2a9d38e.
 | 10-17 00:36–02:10 | this seat | the split found by a cold reader, not by the seat's own view, which read 58 messages and nothing wrong. |
 | 10-17 02:22 | this seat | `axona_reconnect`; fresh walk pins svc-11; replay = David's one message. |
 | 10-17 02:56–03:07 | Vega, Aster, Orion | each reconnects; each reads the relay-held root. |
-| 10-17 03:04:17 | svc-11 | eleven seat-side entries (seq 161–171, 16:46Z onward) ingested, original seqs kept. Nobody asked. |
+| 10-17 03:04:17 | svc-11 | eleven seat-side entries (seq 161–171, 16:46Z onward) ingested, original seqs kept: the leaving seat's HANDOFF (Part 2a), logged by the receiver at debug only. |
 | 10-17 03:50 | a fresh seat | three lookups for the topic: 41 hops, 3.6–4.4 s, `found:false`; svc-11 visited at hop 9; last hop a node 0x00aa… from the topic against svc-11's 0x00039d…. |
 
 What the logs do not say: which seat held the seat-side root, what its
@@ -101,18 +112,20 @@ Singleton roots go first, then replicated roots, then non-root holders,
 larger caches first within a tier (1175–1187). Non-root holders hand off
 too unless the root is a current direct neighbour (1172, `_rootAliveForLeave`).
 
-A seat's reconnect does not run it. `axona_reconnect` (mcp-session.js,
-`reconnect()`) calls `_session.close()`, and the session's `close` is
-`stopRelay({ peer, transport })` (ops.js:71), which is `peer.stop()` then
-`transport.stop()` (relay.js:416–419). `stop()` (AxonaPeer.js:1327)
-unhooks listeners and tears down. It never calls `leave()`. So on
-2026-10-17 four seats re-minted their transports and none pushed a cache
-to an heir. The one in-process place a seat's history could have left by
-design was never reached.
+A seat's reconnect runs it. `axona_reconnect` (mcp-session.js,
+`reconnect()`) awaits `_session.close()`, the session's `close` is
+`stopRelay({ peer, transport })` (ops.js:71), and `stopRelay` awaits
+`peer.leave?.()` at relay.js:417 before `peer.stop()` at 418 and
+`transport.stop()` at 419. So every seat that reconnected on 2026-10-17
+ran the drain and the handoff before its transport died. A seat holding a
+role with an EMPTY cache pushes nothing (repairPlane.js:1158), which is why
+this seat's 02:22Z reconnect carried nothing: it held no council role.
 
-That is an ops defect in axona-relay's session wrapper, not a kernel
-defect, and it is one line: `close()` calls `peer.leave()` before
-`stopRelay`. Part 5 carries it. It also changes what Part 2b can mean.
+What the handoff carries is therefore the answer to Part 2b, and what it
+lacks is a log the host keeps. The heir logs `handoff-ingested` at debug
+unless a message was rejected (syncEngine.js:223–224), and the leaver is
+gone. Part 5 raises the receiver's line to info on a relay and adds the
+leaver's outcome to `axona_status`.
 
 ### 2b. Why eleven of seventy-three?
 
@@ -128,38 +141,33 @@ role cache could still hold at that moment. The one exception to "already
 past the hold" is seq 160 and below only if any of them is younger than
 03:04Z on 10-16; the transcript search did not confirm a single one.
 
-The count is explained. The carrier is not named, because no relay on any
-of the six hosts, neither bridge, and no droplet logs a council role whose
-principal was a seat, and the seats keep no log. Two paths in the kernel
-fit the shape, and the fence in Part 6 must show which:
+The count is explained, and with Part 2a corrected the carrier is named:
+the HANDOFF of the seat that held the seat-side root, pushed by
+`pubsubLeaveHandoff` when that seat's reconnect ran `leave()`, received at
+svc-11 by `_syncIngest`'s HANDOFF branch (syncEngine.js:192–226). The heir
+applied the tombstones, ingested the batch by verified union, ran
+`handoffArrived` (which yields only to a strictly closer live root, so
+svc-11 kept its claim), and acked the leaver. The receiver's log line is
+debug unless something was rejected, which is why no relay log on six
+hosts shows it. The alternative v0.1 named, a SUB carrying a low water
+below the root's (wireHandlers.js:343–348), needs a role-holder to
+subscribe under svc-11, and every seat that re-subscribed was fresh.
 
-- **SUB with low water.** A subscriber that holds a role advertises `hw`
-  and `lw` in its SUB (AxonaManager.js:1319–1320). The root, on seeing
-  `lw` below its own, pulls the subscriber's FULL range once per (child,
-  lw) as `SPLIT_UNION` with `sinceHw: 0` (wireHandlers.js:343–348). That
-  is the post-transition split case the code already names. It needs a
-  role-holder to subscribe under svc-11. A fresh seat has no role, so the
-  carrier would have to be a node that kept one.
-- **REPLICATE or HANDOFF arriving at a root.** A root that receives a
-  replica or a handoff from a strictly-closer-or-not peer reconciles by
-  `handoffArrived` / `liveCloserRoot` (repairPlane.js:1169–1171, syncEngine.js:86).
-
-One more fact narrows the carrier. The eleven include seq 161–163,
+One more fact fits the same carrier. The eleven include seq 161–163,
 stamped 16:46Z–17:09Z on 10-16, before the roll. No relay held them after
 17:17:42Z: linux relay-3 took its cache down, and the nyc3 relay that
-replaced it was born empty and its probes found nothing. So the carrier's
-cache was seeded from something a SEAT kept, which means a seat that
-became root by `sub-terminal` between 17:21:38Z and 17:27Z started with
-a cache that was not empty. Where a born root's cache comes from when the
-claimant was already a subscriber is the first thing the carrier fence
-reads.
+replaced it was born empty and its probes found nothing. So the seat that
+became root by `sub-terminal` between 17:21:38Z and 17:27Z started with a
+cache that was not empty. Where a born root's cache comes from when the
+claimant was already a subscriber is the first thing
+`fence_merge_carrier_named` reads, and the fence reproduces the handoff
+from a reconnecting seat so the log names it.
 
-Either way the ingest is the verified union by `msgId` that REPLAYUP
-already does, and either way it carried a DELTA bounded by what a cache
-held. Aster's rule follows: conflict repair pulls full state and does not
-rely on a high-water comparison, because split histories are incomparable
-by water mark. The TTL bounds "full" to 24 hours, and that is the hold the
-network promises anyway.
+The handoff carried the whole cache, and the cache was 24 hours deep. That
+is the shape of every merge this packet designs: a full pull, bounded by
+the hold. Aster's rule follows: conflict repair pulls full state and does
+not rely on a high-water comparison, because split histories are
+incomparable by water mark.
 
 ## Part 3 — the invariant
 
@@ -197,7 +205,11 @@ seat's walk visited the true root at hop 9 of 41 and ended on a node
 that is not self, and the demotion target is that node. `demote()`
 (rootClaim.js:374–395) is unchanged: it pins upstream, arms the
 step-down hold when the target is closer, and re-subscribes with `hw`
-and `lw` so the winner pulls what only the loser holds.
+and `lw` so the winner pulls what only the loser holds. This fixes the
+SEAT-side false confirm. Relay to relay the verify already worked: the
+nyc3 relay demoted to the Windows relay in the same second that relay
+formed. The change alters nothing for a walk that converges and
+everything for a walk that bounces.
 
 **State added.** None. The path is already returned.
 
@@ -244,15 +256,32 @@ not the routed sends landed. svc-11 fired all three between 17:21:39 and
 17:21:53 while its `routed-outcomes` read failed 6–12 per tick, and
 never probed again.
 
-**Change.** A try whose pulls all resolve `consumed:false` (the verdict
-`_route` already returns, AxonaManager.js:369–377) does not count against
-`EMPTY_ROOT_PROBE_MAX`. The probe re-arms once after the first tick in
-which routed outcomes read ok > failed, or after a bounded mesh-ready
-criterion (`state=graduated` is the relay's own word for it), whichever
-comes first.
+**Change.** Today the probe cannot see its own outcome: `_syncPull`
+fires `_route` and returns `true` synchronously (syncEngine.js:127–128),
+and `_emptyRootProbe` neither awaits nor collects it (repairPlane.js:
+680–686). Three changes, all local:
 
-**State added.** `role.sync.probeDeferred` (boolean) and the tick's
-routed-outcome ratio, which `_tallyRoute` already keeps.
+1. `_syncPull` returns the promise `_route` returns. `_route` already
+   resolves every send to a verdict of routing's own shape, a transport
+   error included (AxonaManager.js:369–377); no caller today reads the
+   boolean for anything but the SPLIT_UNION quench, which keeps its early
+   `false`.
+2. `_emptyRootProbe` collects the fanout's promises with `allSettled`,
+   bounded by the via-hop budget's own timeout, and counts the try only
+   when at least one verdict is `consumed:true`. A try whose every
+   verdict is `consumed:false` or a transport error sets
+   `role.sync.probeDeferred = true`, does not increment `probeTries`, and
+   does not add its targets to `probed`, so they are eligible again.
+3. A deferred probe re-arms ONCE, on the first `refreshTick` after
+   whichever comes first: the node's `state` reads graduated, or
+   `EMPTY_ROOT_PROBE_INTERVAL_MS` × 4 has passed since the deferral. The
+   re-arm clears `probeDeferred`; a second all-failed try defers again,
+   at most `EMPTY_ROOT_PROBE_MAX` deferrals, after which the probe stops
+   and the 45 s verify is what remains. The fleet-wide routed-outcome
+   ratio is not the gate; the verdicts of this topic's own pulls are.
+
+**State added.** `role.sync.probeDeferred` (boolean),
+`role.sync.deferrals` (count), `role.sync.deferredAt` (ms).
 
 **Fence.** `fence_probe_rearm_after_routable`: a sim root born while
 every routed send fails keeps its three tries; when sends start landing
@@ -273,26 +302,56 @@ one, and the step-down discipline.
    walk's closest visited node differs from the pin. Today renewal
    unpins only on a failed dispatch (AxonaManager.js:1290–1307); this
    adds a periodic re-walk, one per `ROOT_VERIFY_MS`, and on mismatch the
-   subscriber tells its pinned root the other root's id.
+   subscriber tells its pinned root the other root's id. The wire surface
+   is the SUB the subscriber already sends on every renewal
+   (`_emitSubscribe`, AxonaManager.js:1316–1322): one added field,
+   `walkRoot` (hex id of the walk's closest visited node, absent when it
+   equals `via`). `_onSub` (wireHandlers.js:~318–351) reads it at the
+   root; a `walkRoot` that is not self and is strictly closer than self
+   is trigger 1's input. No new verb; a pre-v0.2 root ignores the field.
 3. A root with no subscribers runs a slow self-lookup (Orion's closure,
    one per 60 s) and treats a strictly closer visited node as trigger 1.
 4. A replica or handoff carrying a foreign root epoch.
 
 **Merge.** The root that learns of another root pulls FULL state from
-it: a `PULLUP` with `sinceHw: 0`, answered by `REPLAYUP` through the
-existing verified union (msgId dedup, tombstone suppression). No new
-verb. The pull is one-shot per (peer, epoch) so a refused pull cannot
-storm, the 4.22.0 lesson at wireHandlers.js:335–342.
+it: a `PULLUP` with `sinceHw: 0` and a correlation id `corr`, answered by
+`REPLAYUP` carrying the same `corr`, through the existing verified union
+(msgId dedup, tombstone suppression). The pull is one-shot per (peer,
+epoch) so a refused pull cannot storm, the 4.22.0 lesson at
+wireHandlers.js:335–342.
 
-**Step-down.** The XOR-farther root demotes through `demote()` only
-after the winner acknowledges the union. The ack rides HANDOFFACK's
-existing shape (constants.js:401). Until the ack the loser keeps root
-and cache and keeps serving its subscribers. If the ack never comes
-within `HANDOFF_TRIES × HANDOFF_ACK_MS` the loser keeps the claim and
-the trigger fires again on the next verify.
+Two amendments to the state-transfer contract, both from Aster's
+reading. First, `_syncAnswerPull` returns at syncEngine.js:135 when
+`role.cache.length` is 0, before `_syncDelta` reads the active
+tombstones, so a role that holds only tombstones answers nothing. The
+answer condition becomes "cache or active dels non-empty", and
+`fence_dual_root_tombstone_only` pins it. Second, a cache that does not
+fit one REPLAYUP frame is answered in rounds: the replier sends the
+oldest frame-full with `more: true`, and the puller re-issues the
+`PULLUP` with `sinceHw` set to the last stamp received, same `corr`,
+until a frame arrives with `more: false`. v0.2 names the escape and
+defers its sizing; `fence_dual_root_full_pull` fails if a union past one
+frame drops its older half.
+
+**Step-down.** HANDOFFACK cannot carry this. It is emitted only from the
+HANDOFF ingest (syncEngine.js:216–221) and its receiver marks only the
+leaver's `_handoffAcked` ledger (wireHandlers.js:884–895); a
+PULLUP→REPLAYUP exchange has no correlation and no post-ingest
+acknowledgement. The conflict pull gets its own: after the ingesting
+root has applied the dels and the batch, it routes `REPLAYACK {topicId,
+corr, held, sent}` to the replier, the counted shape HANDOFFACK took in
+4.45.0 so that a short ack reads as short. The XOR-farther root demotes through `demote()` only on a
+`REPLAYACK` whose `corr` matches an open pull and whose `held` equals
+`sent`. A short ack is not an ack: `held < sent` leaves the loser rooted
+and the pull re-issues on the next trigger. Until the ack the loser
+keeps root and cache and keeps serving its subscribers. A send outcome
+is never a step-down input; only the ack is.
 
 **State added.** On a root: `role.sync.foreignRoots` (map id → {epoch,
-pulledAt, acked}). On a subscriber: `sub.lastWalkRoot`.
+corr, pulledAt, acked}); `role.sync.openPulls` (map corr → {peer,
+sinceHw, issuedAt}). On a subscriber: `sub.lastWalkRoot`. One new frame
+type, `REPLAYACK`, registered beside HANDOFFACK in constants.js and
+boundary1Registry.js.
 
 **The bound, derived.** Let V = `ROOT_VERIFY_MS` = 45 s, L = one lookup
 (observed 3.6–4.4 s on 10-17 at hop cap 41; shorter once (c) holds), A =
@@ -313,9 +372,16 @@ code already carries, and it moves if they move.
 
 ## Part 5 — ops items, in parallel, not kernel
 
-1. **A seat's reconnect hands off.** `close()` in ops.js:71 calls
-   `peer.leave()` before `stopRelay`. One line. Fence: a seat that roots
-   a sim topic and reconnects leaves the history on its heir.
+1. **A seat's handoff is readable.** The reconnect already hands off
+   (Part 2a). What is missing is the record: the heir's
+   `handoff-ingested` line is debug on a relay unless a message was
+   rejected (syncEngine.js:223–224), and the leaver keeps nothing.
+   Change: the relay logs `handoff-ingested` at info; `reconnect()`
+   returns the leave's handoff outcome (`topics`, `acked`, `unacked`)
+   read from the manager's `_handoffAcked` ledger before the transport
+   stops, and `axona_status` keeps the last one. Fence: a seat that roots
+   a sim topic and reconnects leaves the history on its heir, and the
+   reconnect's return names the topic and the ack.
 2. **`axona_status` exposes the seat's roles.** Per watched topic:
    `isRoot`, `nature`, `upstream` (pinned via), `cacheSize`, `lastVerify`
    outcome. The relay fleet got its counters in 0.161.0; the seats have
@@ -335,7 +401,8 @@ code already carries, and it moves if they move.
 
 Every fence passes with its fix and fails with the fix deleted, on the
 same tree, and the manifest records both runs. Mutants are named per
-fence as in the two-pool packet.
+fence as in the two-pool packet. Twelve fences in v0.2; the four added
+over v0.1 are Aster's.
 
 | Fence | Pins | Red without |
 |---|---|---|
@@ -344,9 +411,12 @@ fence as in the two-pool packet.
 | `fence_probe_rearm_after_routable` | (a) | budget spent while routes fail, no re-arm |
 | `fence_dual_root_hand_fork` | (d) | two sim roots forked by hand never merge |
 | `fence_dual_root_partition` | (d) | two roots on disconnected sides do not merge; merge within T_recon once a path is restored; the loser keeps serving until the ack |
-| `fence_dual_root_full_pull` | (d) | a merge that pulls from high water drops the older half |
-| `fence_seat_close_hands_off` | Part 5.1 | a reconnecting seat's cache dies with it |
-| `fence_merge_carrier_named` | Part 2b | the sim reproduces the 10-17 ingest and the log names the carrier and the policy (`SPLIT_UNION` or handoff) |
+| `fence_dual_root_full_pull` | (d) | a merge that pulls from high water drops the older half; a union past one frame drops its older half |
+| `fence_dual_root_tombstone_only` | (d) | a role holding only tombstones answers a conflict pull with nothing |
+| `fence_dual_root_replayack` | (d) | the loser demotes on a send outcome, or on a short ack, or on an ack with the wrong `corr` |
+| `fence_probe_verdicts_awaited` | (a) | a try whose every pull resolved `consumed:false` still counts against the budget |
+| `fence_seat_reconnect_handoff_named` | Part 5.1 | a reconnecting seat's handoff leaves no record a host keeps |
+| `fence_merge_carrier_named` | Part 2b | the sim reproduces the 10-17 ingest from a reconnecting seat and the receiver's log names the carrier and the policy (HANDOFF) |
 
 The partition fence is the one that proves the invariant. The hand-fork
 fence is the one that proves the mechanics. Both run on dht-sim first; the
@@ -360,6 +430,13 @@ relay test harness then runs the hand-fork case on a real transport.
   it. Then (b) has nothing to read and (d) waits for a path. The
   10-17 walks did reach it, from a seat, at hop 9.
 - A seat-side root whose cache is larger than one REPLAYUP frame. The
-  bound needs the pull chunked, which this packet does not design.
-- The carrier of the eleven being neither path in Part 2b. The
-  `fence_merge_carrier_named` run answers that before (d) is built.
+  multi-round pull in 4d names the escape and leaves the frame size and
+  round bound unsized; the bound in 4d holds only for one frame.
+- The carrier of the eleven not being the handoff. The reconnect ran
+  `leave()`, a non-empty role cache was pushed, and the receiver's debug
+  line is the only record; `fence_merge_carrier_named` runs the same
+  reconnect on the sim before (d) is built and the log names it or the
+  packet is wrong here.
+- `_syncPull` returning a promise changing a caller's behaviour. Every
+  caller discards the boolean except the SPLIT_UNION quench; the fence
+  for (a) runs the existing sync fences on the same tree.
