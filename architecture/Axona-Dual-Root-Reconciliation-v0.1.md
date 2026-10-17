@@ -1,4 +1,4 @@
-# Axona Dual-Root Reconciliation — design packet v0.10
+# Axona Dual-Root Reconciliation — design packet v0.11
 
 **Status:** DESIGN, for council review. Nothing built. David's word (direct,
 04:1xZ 2026-10-17): "Yes, write it." The review bar is Vega's 8cbecf8b
@@ -129,6 +129,18 @@ TTL is each manager's local clock (`_expireCache(role, now)`,
 topicStore.js:48, called with `this._now()` at repairPlane.js:244), so
 "expired by the same clock" assumed a clock the two sides do not share.
 v0.10 removes the assumption: L never releases on W's expiry claim.
+
+**v0.11 (18:4xZ 2026-10-17)** answers Aster's BLOCK ea859948 on v0.10,
+two safety gaps, both holding. One: v0.10's TTL margin excluded live
+entries from the export, so a body with two minutes to live at L and
+absent at W passed the ack and left W without it, which contradicts
+Part 3; and W released its pins when it sent the ack, before L could
+have received it. v0.11 exports every live-at-cut entry and holds W's
+pins through the handover. Two: v0.10 said a refused ADOPT leaves the
+parent its subscribers; source says the parent deletes the batch from
+its set before it sends the ADOPT, fire-and-forget (wireHandlers.js:
+424–425, 430–433), so a refusing child strands them. v0.11 adds a
+parent-side pending delegation with an acknowledgement.
 
 **Lineage:** axona.bot 71dc09d7 (the split, seq 2 on the relay-held root),
 e508b92a (the fork), 7c7f9383 (amended proposal), c5d18788 and f7260bec
@@ -687,10 +699,46 @@ of `_set`: it returns `{committed: true}` or `{committed: false,
 reason}`, and every caller branches on it. On `committed: false`:
 `demote()` returns `false` with nothing else done, no upstream, no
 hold, no SUB; `adoptChild` returns `null` and sets no upstream;
-`_onAdopt` on a `null` role accepts no subscriber and sends no SUB,
-returning `'consumed'` so the delegating parent keeps its subscribers
-and re-delegates by its own schedule; `handoffArrived`'s yield and
-`promote()`'s flip read the result the same way. The refusal is one
+`_onAdopt` on a `null` role accepts no subscriber, sends no SUB, and
+answers the parent (below); `handoffArrived`'s yield and `promote()`'s
+flip read the result the same way.
+
+The child's refusal is only half of ADOPT, and the parent's half is
+broken today. `_promoteChild` marks the child, builds the batch, and
+DELETES the batch from `role.subscribers` (wireHandlers.js:424) before
+`_delegateTo` routes the ADOPT fire-and-forget (425, 430–433). Nothing
+comes back, so a child that refuses, or an ADOPT lost in routing,
+leaves those subscribers with no serving parent on either side. That is
+a kernel gap that exists without this packet; the custody gate makes it
+reachable on purpose, so the packet closes it. v0.11 adds a parent-side
+pending delegation:
+
+- `_promoteChild` moves the batch to `role.pendingDelegation[nonce] =
+  {child, subs, at}` and KEEPS the subscribers in `role.subscribers`,
+  serving them as before, until adoption is confirmed. The ADOPT
+  carries `nonce`.
+- The child answers `ADOPTACK {topicId, nonce, accepted: [ids],
+  refused: reason}` after `adoptChild` committed and the subscribers
+  were accepted, or at once on refusal. One new frame; a hop-local
+  `consumed` verdict on the ADOPT is not adoption.
+- On an `ADOPTACK` with `accepted`, the parent deletes exactly those
+  subscribers and clears the entry. On `refused`, on `ADOPT_ACK_MS`
+  without an answer, or on a lost response, the parent clears the
+  entry, keeps the subscribers, and may delegate to another leaf by
+  its own schedule. A late `ADOPTACK` after the entry cleared is
+  dropped and logged; the child then holds subscribers the parent also
+  serves, which the subscribers' own renewals reconcile by the
+  existing upstream rules, and a duplicate delivery is deduplicated by
+  `msgId` at the app.
+- Every subscriber has a serving parent at every instant of this:
+  the old one until the ack, the new one after it, and both for the
+  width of one lost late ack.
+
+`fence_dual_root_adopt_pending_delegation` runs parent → custody-
+refusing child with an immediate refusal, a delayed refusal, and a lost
+response, and asserts at every step that each delegated subscriber is
+in a serving parent's set; the mutant restores the delete-before-send
+at 424. The refusal is one
 log line, `custody-refused`, with the caller's `why`. This holds
 whether or not a round is open: a root with custody that meets a
 closer beacon with no round open gets `custody-refused` from `_set`,
@@ -883,27 +931,47 @@ v0.8 replaces them:
   each manager's own `now` (topicStore.js:48–49, called from
   repairPlane.js:244 with `this._now()`), so a W whose clock runs
   ahead can expire a body that is live at L, and L must not release
-  on W's say-so. v0.10's rule has two halves. At W, pinned entries
-  are exempt from `_expireCache` for the round's life, so W expires
-  nothing it was asked to hold while the round runs; after the
-  handover W expires by its own clock as today. At L, the cut
-  excludes from the manifest any body or tombstone that is within
-  `MERGE_TTL_MARGIN_MS` of expiring by L's own clock, where the margin
-  is `MERGE_TIMEOUT_MS` plus `FUTURE_TOLERANCE_MS` (constants.js:299,
-  the kernel's existing bad-clock allowance, 5 min); those entries are
-  L's to expire and are not transferred. The terminal check then has
-  no "expired" category: every manifest body is held or tombstoned at
-  W or the ack is short. A clock at W ahead by more than the allowance
-  makes rounds fail short until L's own margin excludes the entry,
-  which is safety holding under a bad clock, and the fence says so.
-  Backward or forward clock changes at W during the round touch
-  nothing, because pins are exempt; after the handover they are W's
-  problem as they are today. `fence_dual_root_ttl_skew` runs W ahead
-  of L by less than the allowance with an entry inside L's margin
-  (excluded, round completes) and with an entry outside it (pinned,
-  held, round completes), then W ahead by more than the allowance
-  (ack short, L keeps custody); the mutant lets W report expired as
-  retained.
+  on W's say-so. v0.10 answered this with a margin at the cut, and
+  that was wrong: an entry near expiry is live, and excluding it from
+  the export let L demote while W lacked it. v0.11's rule: the export
+  carries EVERY body and tombstone live at L at the cut, by L's clock,
+  with no margin, and W's retention is defined through the handover,
+  not to the ack:
+  - At W, pinned entries are exempt from `_expireCache` from admission
+    until the handover closes, so W expires nothing it was asked to
+    hold, whatever its clock says.
+  - W does not close the round when it SENDS the ack. On sending the
+    terminal `REPLAYACK`, `openPulls[corr]` moves to `acked` and the
+    pins stay. The handover closes when W receives L's confirming SUB
+    naming W as upstream (the SUB `demote()` sends at step 5, with L's
+    `hw` and `lw`), or when `MERGE_HANDOVER_MS` (= `MERGE_TIMEOUT_MS`)
+    has passed since the ack. On the SUB, the pinned entries become
+    ordinary custody at W and expire by W's clock from then on, as any
+    entry W holds. On the timeout with no SUB, W keeps the pins one
+    further interval and then releases them; either L never received
+    the ack and still holds custody, so nothing is lost, or L demoted
+    and its SUB was lost in flight, and L's next renewal re-sends it.
+  - The terminal check has no "expired" category: every manifest body
+    is held or tombstoned at W and every manifest tombstone is active
+    at W, or the ack is short. A W clock ahead of L's changes nothing
+    during the round, because pins are exempt from expiry; after the
+    handover the entries are W's and expire by W's clock, which is the
+    24-hour hold the network promises and no more.
+  - The one residual, stated: if L demotes on the ack and no SUB from
+    L ever reaches W inside two handover intervals, W's pins release
+    and entries older than the hold by W's clock expire there. That is
+    the hold, applied by one clock, on an entry whose other copy left
+    with L's demotion; it is bounded by `TTL_MS` and by two intervals,
+    and `fence_dual_root_handover_retention` measures it rather than
+    hides it.
+  `fence_dual_root_ttl_live_at_cut` places a body and a tombstone two
+  minutes from expiry at L and absent at W: both must be in the export,
+  both retained at W at L's release; the mutant applies v0.10's
+  margin. `fence_dual_root_handover_retention` delays the ack's
+  delivery to L past the point where v0.10 released pins and past an
+  entry's expiry by W's clock: W must still hold every manifest entry
+  when L releases, and must hold them until L's SUB arrives; the
+  mutant releases pins at ack send.
   `fence_dual_root_full_w_unique_baseline` fills W to its cap with
   unique bodies, offers a small export, and requires W to refuse with
   its baseline intact; the mutant evicts baseline to admit.
@@ -962,8 +1030,11 @@ manifest's msgIds, pinned for the round) and `role.merge.reserve` on W;
 `role.merge.nextCandidate`, `role.merge.releaseToken` and
 `role.merge.acceptedWinner` ({id, epoch, at, exp}) on L; a header frame
 (`header` on REPLAYUP) as the first answer under every `corr`; `_set`
-returns `{committed, reason}` and every caller branches on it.
-Constants: `MERGE_TTL_MARGIN_MS`, `MERGE_TIMEOUT_MS`,
+returns `{committed, reason}` and every caller branches on it;
+`role.pendingDelegation` on a delegating parent and one new frame,
+`ADOPTACK`; `openPulls[corr]` holds an `acked` state until the
+handover closes. Constants: `MERGE_HANDOVER_MS`, `ADOPT_ACK_MS`,
+`MERGE_TIMEOUT_MS`,
 `MERGE_OFFER_TIMEOUT_MS`, `MERGE_WRITE_RESERVE`, each derived or sized
 below. One new function, `_mergeCandidate`, the single entry every
 demotion path takes for a root with custody. One new handler,
@@ -1059,11 +1130,12 @@ them move with S.
 
 Every fence passes with its fix and fails with the fix deleted, on the
 same tree, and the manifest records both runs. Mutants are named per
-fence as in the two-pool packet. Forty-eight fences in v0.10; the four
-added over v0.1, the two over v0.2, the five over v0.3, the four over
-v0.4 (one replacing `tail_closed`), the four over v0.5, the two over
-v0.6, the eight over v0.7, the seven over v0.8 and the five over v0.9
-come from Aster's nine readings.
+fence as in the two-pool packet. Fifty fences in v0.11; the four added
+over v0.1, the two over v0.2, the five over v0.3, the four over v0.4
+(one replacing `tail_closed`), the four over v0.5, the two over v0.6,
+the eight over v0.7, the seven over v0.8, the five over v0.9 and the
+three over v0.10 (one replacing `ttl_skew`) come from Aster's ten
+readings.
 
 | Fence | Pins | Red without |
 |---|---|---|
@@ -1110,7 +1182,9 @@ come from Aster's nine readings.
 | `fence_dual_root_repromotion_held` | (d) | A closer at epoch 1 demoted into B farther at epoch 2; a bare PUB and a bare SUB at A within the record's life are redirected to B, A does not promote and mints no epoch; the mutant keeps the closeness test on the hold |
 | `fence_dual_root_record_expiry` | (d) | the accepted-winner record expires with no beacon from B; A promotes on the next request and the next contact runs a round, not a direct demote; the mutant demotes directly |
 | `fence_dual_root_gen_across_awaits` | (d) | a body, a delete and a kill paused in their awaits across a cut with the gate set and across a cut then demotion then gate clear; all refused at the mutation in both; the mutant checks the gate only |
-| `fence_dual_root_ttl_skew` | (d) | W ahead of L by less than the allowance with entries inside and outside L's margin, then by more than it; the first two complete, the third acks short and L keeps custody; the mutant counts W's expired as retained |
+| `fence_dual_root_ttl_live_at_cut` | (d) | a body and a tombstone two minutes from expiry at L and absent at W; both exported, both retained at W at L's release; the mutant applies v0.10's margin |
+| `fence_dual_root_handover_retention` | (d) | the ack's delivery to L delayed past W's former pin release and past an entry's expiry by W's clock; W still holds every manifest entry at L's release and until L's SUB; the mutant releases pins at ack send |
+| `fence_dual_root_adopt_pending_delegation` | (d) | parent → custody-refusing child with immediate refusal, delayed refusal and lost response; each delegated subscriber has a serving parent at every step; the mutant restores delete-before-send |
 | `fence_probe_verdicts_awaited` | (a) | a try whose every pull resolved `consumed:false` still counts against the budget |
 | `fence_seat_reconnect_handoff_named` | Part 5.1 | a reconnecting seat's handoff leaves no record a host keeps |
 | `fence_merge_carrier_named` | Part 2b | the sim runs both candidate paths from a reconnecting seat (HANDOFF; SUB low-water SPLIT_UNION) and either leaves no retained record that distinguishes it from the other |
