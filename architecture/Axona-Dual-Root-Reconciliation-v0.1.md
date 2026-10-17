@@ -1,4 +1,4 @@
-# Axona Dual-Root Reconciliation — design packet v0.7
+# Axona Dual-Root Reconciliation — design packet v0.8
 
 **Status:** DESIGN, for council review. Nothing built. David's word (direct,
 04:1xZ 2026-10-17): "Yes, write it." The review bar is Vega's 8cbecf8b
@@ -67,6 +67,27 @@ present. v0.7 gives the merge flight an explicit epoch authority: the
 `winnerEpoch` carried by the validated PULLUP, passed into the flight,
 never 0, never read from a beacon, and states what happens when W
 re-mints during the gate.
+
+**v0.8 (18:1xZ 2026-10-17)** answers Aster's consolidated review
+2915bb37, which cleared 93a10c3b and raised four obligations on the
+machine as a whole, each read and each holding. One: the packet had two
+demotion authorities, since (b) demoted on the closest visited node
+while 4(d) said step 5 was the only place a root sheds its claim, and
+the kernel has two more that demote directly, beacon reconciliation
+(rootElection.js:125–127) and the forward helper on attributed
+consumption (AxonaManager.js:938–940). Two: the gate was checked at the
+handler's entry, and `_ingestPublish` awaits signature verification
+(wireHandlers.js:501) and topic derivation (509) before it stamps and
+caches (536–541), so a write admitted before the cut could commit after
+it. Three: the ack counted ingests, and `_ingestStampedBatch` counts
+"held" (782–798) while `_cachePush` evicts at the count and byte caps
+(topicStore.js:35–40), so held equal to sent did not prove retention.
+Four: the bound treated `VIA_HOP_BUDGET` as a duration; it is 8 hops
+(constants.js:295). v0.8 gives merge-capable roots one demotion
+authority and inventories every path into it, moves the cut to the
+mutation point, replaces counts with a retention manifest and a capacity
+admission, and separates safety, which is unconditional, from a bound,
+which is conditional on named assumptions.
 
 **Lineage:** axona.bot 71dc09d7 (the split, seq 2 on the relay-held root),
 e508b92a (the fork), 7c7f9383 (amended proposal), c5d18788 and f7260bec
@@ -240,12 +261,24 @@ tombstones are unioned into the winner before the loser sheds ROOT, and
 the loser does not release its cache until the winner has confirmed the
 union.
 
-The winner is the node XOR-closer to the topic id. A tie is impossible
-between distinct ids.
+The winner is chosen by the adoption rule the kernel already applies
+when two claims meet (rootElection.js:123–127): a claim whose epoch
+supersedes the other's and is not tombstoned wins; otherwise the node
+XOR-closer to the topic id wins. A tie on closeness is impossible
+between distinct ids; a tie on epoch falls to closeness. This is the
+same predicate for every path in Part 4 that can name a winner.
+
+The custody condition: a root sheds its claim only when it holds
+nothing, or when the winner has confirmed retention of everything it
+held. "Holds nothing" means an empty cache and no active tombstone.
+Every other case goes through the machine in 4(d). This condition
+binds the paths that demote today; Part 4(d) lists them.
 
 What the invariant does not promise: that a publisher whose walk ends at
 a spurious root sees its message at the true root before the bound
 elapses. Delivery latency inside the bound is a separate measurement.
+Nor does it promise convergence: Part 4(d)'s last section states what
+safety holds without any assumption and what the bound needs.
 
 ## Part 4 — the fixes, in Vega's order
 
@@ -264,11 +297,13 @@ seat's walk visited the true root at hop 9 of 41 and ended on a node
 0x00aa… from the topic. The verify never looked at hop 9.
 
 **Change.** The terminus becomes the strictly-closest node in `r.path`
-that is not self, and the demotion target is that node. `demote()`
-(rootClaim.js:374–395) is unchanged: it pins upstream, arms the
-step-down hold when the target is closer, and re-subscribes with `hw`
-and `lw` so the winner pulls what only the loser holds. This fixes the
-SEAT-side false confirm. Relay to relay the verify already worked: the
+that is not self. What the verify does with it is no longer a direct
+`demote()`: for a root that holds nothing the demotion is as today,
+and for a root that holds cache or tombstones the terminus becomes the
+candidate winner handed to the merge machine in 4(d), which runs step 1
+toward it. `demote()` (rootClaim.js:374–395) itself is unchanged; what
+changes is who may call it on a root with custody, which is step 5 and
+nothing else. This fixes the SEAT-side false confirm. Relay to relay the verify already worked: the
 nyc3 relay demoted to the Windows relay in the same second that relay
 formed. The change alters nothing for a walk that converges and
 everything for a walk that bounces.
@@ -542,6 +577,132 @@ about W at the moment L sheds root, and step 5 is the only place L
 sheds it. The cost of the gate is a latency bubble for L's subscribers,
 bounded by the gate's duration, which the bound below states.
 
+**One authority for demotion.** The kernel at 6bc3ff4 demotes a root
+from five places, and v0.7 added a sixth and contradicted itself. For
+a MERGE-CAPABLE root, one that runs this packet's kernel, every path
+that would call `demote()` on a role with custody instead calls one
+function, `_mergeCandidate(topic, winner, winnerEpoch, source)`, which
+applies the Part 3 winner rule and, if the candidate wins, runs step 1
+or joins the open round. `demote()` on a role with custody is reachable
+only from step 5. A role without custody (empty cache, no active
+tombstone) demotes directly, as today. The inventory, each with its
+source and its v0.8 disposition:
+
+| Path at 6bc3ff4 | Where | v0.8 for a root with custody |
+|---|---|---|
+| verify-closer | rootElection.js:363 | candidate (b) |
+| beacon-closer, epoch-superseded | rootElection.js:125–127 | candidate; a beacon naming the open round's W is a no-op; a beacon naming a different winner is queued as the next candidate and applied after the round ends |
+| defer-confirmed on attributed consumption | AxonaManager.js:938–940 | never on a gated forward (v0.6); on an ungated forward from a root with custody, candidate, not demote |
+| handoff heir reconciliation | rootClaim.handoffArrived, syncEngine.js:208–211 | a heir with custody that learns of a closer live root: candidate |
+| step-down hold target | rootClaim.holdTarget, wireHandlers.js:239–249 | unchanged: a held node has already shed its claim and holds no custody of the topic's root |
+| write-flight recovery promotion | writeFlight.js re-flight after `INGEST_ACK_MS` | promotion creates a root; a root created by promotion that then meets any of the above goes through the candidate path like any other |
+
+During an open round, a beacon or a verify result that would name a
+different winner does not demote and does not abort; it is queued.
+After step 5 or an abort, the queued candidate is evaluated against the
+Part 3 rule from scratch. `fence_dual_root_authority_single_path` pins
+every row.
+
+**Mixed versions.** A legacy peer does not run this machine. The
+guarantee holds only when both roots are merge-capable, and the packet
+says what happens otherwise rather than letting a legacy peer inherit
+it silently. L merge-capable, W legacy: W drops `MERGE_OFFER` as an
+unknown frame, and a PULLUP from W never carries `corr`. If no bound
+arrives within `MERGE_OFFER_TIMEOUT_MS` and W's kernel version, read
+from its beacon or handshake, is below this packet's, L logs
+`merge-legacy-fallback` and takes today's path: `demote()` with the SUB
+carrying `hw` and `lw`, so the legacy W pulls what the shipped
+SPLIT_UNION rule pulls (wireHandlers.js:343–348), with the delta-only
+weakness v0.2 named. L merge-capable, W merge-capable: the machine. L
+legacy, W merge-capable: W's trigger sends a PULLUP with `corr`; the
+legacy L answers plain REPLAYUP without `corr`; W ingests it as a
+legacy union, logs `merge-legacy-peer`, cannot ack-demote L, and L
+demotes by its own legacy paths when they fire. Fence
+`fence_dual_root_legacy_fallback` covers the first case; the third is
+today's behaviour and needs no fence beyond the existing suite.
+
+**The cut at the mutation point.** A check at the handler's entry is
+not a cut. `_onPub` enters `_ingestPublish` (wireHandlers.js:496) and
+that function awaits `verifyEnvelope` (501) and `deriveTopicIdBig`
+(509) before the stamp and `_cachePush` at 536–541; a write admitted
+before the cut can resume after it and commit into a cache the export
+has already left. KILL has the same shape: `_onKill` awaits
+`verifyKill` and then commits through `_applyKill` (wireHandlers.js:
+1058); the stamped ingests (`_ingestStamped`, from REPLAYUP, REPLICATE
+and HANDOFF) commit through `_cachePush` too, and their tombstones
+through `_applyDels` (topicStore.js:111). So the cut is defined at the
+commit, not the entry:
+
+- Every role carries `role.gen`, an integer. The cut increments it and
+  takes the snapshot in the same synchronous run, with no await
+  between.
+- Every commit path captures `gen` once, synchronously, immediately
+  before its mutation, and compares it to the value it captured at
+  entry. `_ingestPublish` does this at 536, before the stamp: if `gen`
+  moved, or `role.merge.gate` is set, the write is not stamped; it is
+  handed to the gate's forward (v0.6) as if it had arrived after the
+  cut, and the function returns a disposition the caller treats as
+  forwarded, not ingested, so no ingest ack is sent for it from L.
+  `_onKill` does the same immediately before `_applyKill`.
+- `_ingestStamped` at a gated L refuses: a REPLAYUP, REPLICATE or
+  HANDOFF that would add to L's cache after the cut returns
+  `rejected`, which the sender already treats as not held (HANDOFF
+  retries and cohort-sprays, a replica keepalive re-sends), so no
+  foreign history enters L's cache behind its export.
+- The `_mergeGateIntercept` at the handler entry stays, as the cheap
+  early path; the check at the commit is the one the invariant relies
+  on.
+
+`fence_dual_root_cut_async_ingress` pauses a verifier across the cut
+and requires the resumed write to reach W and never L's cache;
+`fence_dual_root_gated_ingest_refused` sends a HANDOFF at a gated L and
+requires `rejected` and the leaver's retry.
+
+**Retention, not count.** `_ingestStampedBatch` returns `held`, which
+counts an ingest that was newly cached, already cached or suppressed
+by a tombstone (782–798 and the outcome contract below it), and
+`_cachePush` evicts at the count and byte caps the moment the cache is
+over them (topicStore.js:35–40). A W that ingests every frame can
+report `held` equal to `sent` and have evicted the first frame, or its
+own history, before the ack. Counts do not authorize custody release.
+v0.8 replaces them:
+
+- **Manifest.** The export carries a manifest under `corr`: the ordered
+  list of body `msgId`s and the list of tombstone `msgId`s, with a hash
+  over both. Each frame carries its slice; the terminal frame carries
+  the whole manifest's hash and counts.
+- **Admission.** On the OFFER's `count` and bytes, before issuing the
+  first PULLUP, W checks that its cache can hold its current contents
+  plus the export under `_cacheMax` and `_cacheBytes` with a reserve
+  for its own writes during the round, `MERGE_WRITE_RESERVE` entries
+  and bytes. If not, W answers `REPLAYACK {disposition:
+  'refused-capacity', retained: 0, ...}` at once; L keeps custody, the
+  gate was never set, and the round ends. A refusal is logged on both
+  sides. The topic stays split until capacity exists or the TTL
+  reduces the export, and the packet says so: that is safety over
+  liveness, chosen.
+- **Pinned custody.** For the round's life W pins the manifest's
+  `msgId`s; `_cachePush`'s eviction loop skips pinned entries, and
+  W's own writes during the round consume the reserve. If the reserve
+  is exhausted W refuses further writes of its own for the topic by
+  the same forward path L uses, toward itself after the round, which
+  is a stall of at most the gate's duration and is stated as such.
+- **Terminal check.** The `REPLAYACK` carries `retained` and
+  `delsActive`, computed at ack time from W's `cacheIds` and active
+  dels against the manifest, and the manifest hash. L releases custody
+  only when every manifest body is either in W's `cacheIds` or covered
+  by a tombstone active at W, every manifest tombstone is active at W,
+  and the hash matches. Anything less is a short ack: L keeps custody,
+  the round ends, and the next trigger starts a new one.
+
+`fence_dual_root_retention_ack` has W ingest every frame and evict one
+manifest entry by cap before the ack: L must not release.
+`fence_dual_root_capacity_refused` has two individually valid caches
+whose union exceeds W's cap, with W writing concurrently and a
+tombstone-only export among the cases: W must refuse, L must keep
+custody. `fence_dual_root_manifest_dels` has a manifest tombstone that
+W failed to apply: the ack must be short.
+
 **The cursor.** The cache appends in ascending `publishTs`
 (topicStore.js:25–29; rootClaim.js:82) and defines no order among
 entries that share a stamp, so "cache order" is not a cursor. The export
@@ -566,8 +727,13 @@ offeredAt, boundAt}), `role.merge.gate` ({winner, winnerEpoch, corr,
 at} or null), `role.merge.gateFwd` (bounded nonce ledger, the shape of
 the hold's) and `role.sync.openPulls` (map corr → {loser, loserEpoch,
 cursor, framesIn, held, sent, startedAt}). On a subscriber:
-`sub.lastWalkRoot`. One constant, `MERGE_TIMEOUT_MS`, derived below.
-One new handler, `_mergeGateIntercept`; one sibling of `_forwardToRoot`
+`sub.lastWalkRoot`; `role.gen` on every role; `role.merge.pins` (the
+manifest's msgIds, pinned for the round) and `role.merge.reserve` on W;
+`role.merge.nextCandidate` on L. Constants: `MERGE_TIMEOUT_MS`,
+`MERGE_OFFER_TIMEOUT_MS`, `MERGE_WRITE_RESERVE`, each derived or sized
+below. One new function, `_mergeCandidate`, the single entry every
+demotion path takes for a root with custody. One new handler,
+`_mergeGateIntercept`; one sibling of `_forwardToRoot`
 that shares its dispatch and flight, omits its demotion, and passes the
 epoch; one new optional argument on `_flightOpen`, `expectedEpoch`,
 which when present overrides the beacon-derived epoch, forbids 0, and
@@ -579,32 +745,50 @@ boundary1Registry.js; three fields added to `PULLUP` (`corr`,
 `cursor`, `more`). The SPLIT_UNION quench at syncEngine.js:121–126 is
 untouched; a merge pull is never SPLIT_UNION.
 
-**The bound, derived.** Let V = `ROOT_VERIFY_MS` = 45 s, L = one lookup
-(observed 3.6–4.4 s on 10-17 at hop cap 41; shorter once (c) holds), A =
-`HANDOFF_ACK_MS` × `HANDOFF_TRIES` = 700 ms × 2 plus per-topic margin,
-capped 5 s per round. With a routed path between the roots:
+**Safety, unconditional.** Without any assumption about scheduling,
+reachability or delivery: a merge-capable root with custody sheds its
+claim only at step 5, on a terminal ack that passed the retention check,
+bound to one winner and one epoch; nothing admitted before the cut
+commits into a cache the export has left; nothing the loser held is
+released before the winner has shown it holds it; a refused, short,
+stale or late ack leaves the loser rooted. Two roots that never find
+each other stay two roots and lose nothing. That is the invariant's
+safety half, and it is what the fences in Part 6 exercise.
 
-- detection ≤ V + L from the moment the path exists, by trigger 1 or 2;
-- union ≤ one OFFER hop plus F PULLUP/REPLAYUP round trips, F the
-  number of frames the loser's export needs at `REPLAY_CHUNK_BYTES`,
-  each bounded by the via-hop budget; F is fixed at the cut, since no
-  entry is stamped at L after it, so a continuing publisher does not
-  move F; F is 1 for a council-sized cache;
-- step-down ≤ A after the terminal ack lands.
+**The bound, conditional.** `VIA_HOP_BUDGET` is 8 hops
+(constants.js:295), a count, not a duration; `ROOT_VERIFY_BATCH` is 3
+lookups per tick (354–356), so a root holding N topics due at once
+waits up to ⌈N/3⌉ ticks for its council verify; a path's existence does
+not make a lookup visit W or a frame arrive. A time bound therefore
+needs assumptions, named:
 
-The gate lasts from the bind to the terminal ack or to
-`MERGE_TIMEOUT_MS`, whichever is first, so `MERGE_TIMEOUT_MS` is set
-from the same terms: (1 + F) via-hop budgets plus A, times two for one
-retry round, and never less than `HANDOFF_ACK_MAX_MS`. A subscriber of
-L sees nothing new for at most that long.
+1. **Fair verify scheduling.** L's verify for the topic runs within
+   `ROOT_VERIFY_MS` + ⌈N/3⌉ × tick of its due time, N the roots L holds.
+2. **Lookup coverage.** With (b) and (c) in place, a lookup from L
+   visits W whenever a routed path exists between them.
+3. **Bounded service.** Every routed send and every ingest in the round
+   completes within S, a service time MEASURED on the fleet (the relay
+   RTT matrix of 2026-10-08 gives one-hop p50 of 39 ms; the merge's S
+   is the frame's end-to-end time and is read, not derived).
+4. **Retries succeed.** A round that aborts on a transport failure
+   succeeds within R further rounds.
 
-So T_recon ≤ V + L + (1 + F) round trips + A, under three conditions: the
-path exists, the loser's cache fits one REPLAYUP, and the winner is
-reachable by the routed send. A cache larger than one frame, or a
-routed send that resolves `consumed:false`, breaks the bound and the
-fence must show the trigger re-firing on the next verify instead of
-silence. The figure is not asserted; it is the sum of constants the
-code already carries, and it moves if they move.
+Under 1–4, with V = `ROOT_VERIFY_MS`, Lk = one lookup, F the frames the
+export needs at `REPLAY_CHUNK_BYTES` (fixed at the cut), and A =
+`HANDOFF_ACK_MS` × `HANDOFF_TRIES` plus the per-topic margin, capped
+`HANDOFF_ACK_MAX_MS` per round:
+
+- detection ≤ V + ⌈N/3⌉ × tick + Lk;
+- one round ≤ S (offer) + (1 + F) × 2S (pull and frames) + S (ack);
+- T_recon ≤ detection + (1 + R) × one round.
+
+`MERGE_TIMEOUT_MS` bounds ONE gate interval, not reconciliation: it is
+2 × ((2 + 2F) × S + A), never below `HANDOFF_ACK_MAX_MS`, measured from
+the bind, and a subscriber of L sees nothing new for at most that long
+per round. If assumption 3 fails the round aborts at that timeout and
+assumption 4 is what carries the next; if assumption 2 fails the roots
+stay two and safety holds. None of these figures is a floor and all of
+them move with S.
 
 ## Part 5 — ops items, in parallel, not kernel
 
@@ -637,10 +821,10 @@ code already carries, and it moves if they move.
 
 Every fence passes with its fix and fails with the fix deleted, on the
 same tree, and the manifest records both runs. Mutants are named per
-fence as in the two-pool packet. Twenty-eight fences in v0.7; the four
+fence as in the two-pool packet. Thirty-six fences in v0.8; the four
 added over v0.1, the two over v0.2, the five over v0.3, the four over
-v0.4 (one replacing `tail_closed`), the four over v0.5 and the two over
-v0.6 come from Aster's six readings.
+v0.4 (one replacing `tail_closed`), the four over v0.5, the two over
+v0.6 and the eight over v0.7 come from Aster's seven readings.
 
 | Fence | Pins | Red without |
 |---|---|---|
@@ -668,13 +852,25 @@ v0.6 come from Aster's six readings.
 | `fence_dual_root_gate_no_defer` | (d) | a consumed verdict attributed to W on a gated forward; L must not demote; the mutant forwards through the unmodified helper |
 | `fence_dual_root_gate_epoch_authority` | (d) | L holds no beacon for W, or a stale one at a different epoch; W's ingest ack carries the offered winnerEpoch and must discharge the write; an ack at any other epoch must not; L's claim must not move either way; the mutant lets the flight take its epoch from the beacon, so a missing record accepts any epoch |
 | `fence_dual_root_gate_w_reminted` | (d) | W re-mints after the bind and before acking; its new-epoch ack must be rejected, the round aborted, the gate cleared, L still root under its epoch, and the next offer must carry the new epoch; the mutant accepts the new-epoch ack |
+| `fence_dual_root_authority_single_path` | (d) | for each row of the demotion inventory, the path fires at a root with custody during an open round; the root must not demote and the candidate must be queued; the mutant restores the direct `demote()` on that row |
+| `fence_dual_root_authority_empty_cache` | (d) | a root with an empty cache and no tombstone meets a closer root; it must demote directly as today; the mutant routes it through the machine and the fence fails on the extra round |
+| `fence_dual_root_legacy_fallback` | (d) | W is a legacy peer; L's offer must time out, L must log the fallback and take today's demote with hw and lw; the mutant waits forever |
+| `fence_dual_root_cut_async_ingress` | (d) | a write's verifier is paused before the cut and resumed after it; the write must reach W and never L's cache; the mutant checks the gate only at handler entry |
+| `fence_dual_root_gated_ingest_refused` | (d) | a HANDOFF arrives at a gated L; it must return rejected and the leaver must retry elsewhere; the mutant ingests it |
+| `fence_dual_root_retention_ack` | (d) | W ingests every frame and evicts one manifest entry by cap before acking; the ack must report it and L must not release; the mutant acks on held equal to sent |
+| `fence_dual_root_capacity_refused` | (d) | two individually valid caches whose union exceeds W's cap, W writing concurrently, and a tombstone-only export among the cases; W must refuse and L must keep custody; the mutant admits |
+| `fence_dual_root_manifest_dels` | (d) | a manifest tombstone W failed to apply; the ack must be short; the mutant counts bodies only |
 | `fence_probe_verdicts_awaited` | (a) | a try whose every pull resolved `consumed:false` still counts against the budget |
 | `fence_seat_reconnect_handoff_named` | Part 5.1 | a reconnecting seat's handoff leaves no record a host keeps |
 | `fence_merge_carrier_named` | Part 2b | the sim runs both candidate paths from a reconnecting seat (HANDOFF; SUB low-water SPLIT_UNION) and either leaves no retained record that distinguishes it from the other |
 
-The partition fence is the one that proves the invariant. The hand-fork
-fence is the one that proves the mechanics. Both run on dht-sim first; the
-relay test harness then runs the hand-fork case on a real transport.
+No fence proves the invariant. A fence exercises one trace, and the
+partition fence exercises the trace that matters most; the universal
+claim is the argument in Part 3 and in 4(d)'s safety section, and the
+fences are what a build must pass before that argument is trusted on
+the fleet. The hand-fork fence exercises the mechanics. Both run on
+dht-sim first; the relay test harness then runs the hand-fork case on a
+real transport.
 
 ## What would make this wrong
 
