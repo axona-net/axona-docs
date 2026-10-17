@@ -1,4 +1,4 @@
-# Axona Dual-Root Reconciliation — design packet v0.14
+# Axona Dual-Root Reconciliation — design packet v0.15
 
 **Status:** DESIGN, for council review. Nothing built. David's word (direct,
 04:1xZ 2026-10-17): "Yes, write it." The review bar is Vega's 8cbecf8b
@@ -184,6 +184,22 @@ Two: role cleanup at repairPlane.js:352–371 reaps a role with no
 subscribers and an empty cache without reading tombstones or merge
 state, so a tombstone-only loser could lose its custodian role. v0.14
 gives custody an explicit exemption from both reapers.
+
+**v0.15 (19:1xZ 2026-10-17)** is the consolidated normative candidate
+Aster's disposition 68bcdf3d asked for, which closed 9f99b47d with
+QUALIFIED DESIGN CONCURRENCE for implementation planning: not
+implemented correctness, not executed fences, not deployment
+clearance. Two consolidations: the custody guarantee, which holds
+without assumptions, and the union-at-flip guarantee, which rests on
+assumptions 6 and 7, are now stated as two guarantees in Part 3 and in
+4(d)'s safety section, with the late-flip fallback keeping the first
+and declining the second; and the timing version is frozen with
+serialized-export bounds, since `_cacheBytes` bounds body accounting
+and not tombstones, headers or wire overhead. Part 7 is new: the map
+from every mutation, transition, expiry and reap site this review
+cited to its contract clause and its fence. The fifty-nine fences are
+requirements; none has been run. The build decision is David's and is
+separate from this candidate.
 
 **Lineage:** axona.bot 71dc09d7 (the split, seq 2 on the relay-held root),
 e508b92a (the fork), 7c7f9383 (amended proposal), c5d18788 and f7260bec
@@ -389,6 +405,21 @@ nothing, or when the winner has confirmed retention of everything it
 held. "Holds nothing" means an empty cache and no active tombstone.
 Every other case goes through the machine in 4(d). This condition
 binds the paths that demote today; Part 4(d) lists them.
+
+Two guarantees, and they are not the same guarantee. The first is
+CUSTODY: nothing a root held leaves the network except by that
+holder's own TTL, whatever the other side does, whatever the clocks
+do, whether or not any message arrives. It holds without assumptions,
+because the loser releases nothing on its own account before closure
+and keeps the export as a child after a flip. The second is UNION AT
+THE FLIP: at the moment the loser sheds its claim, the winner holds
+everything the loser held. That one rests on assumptions 6 and 7 in
+4(d), the clock-rate and commit-run bounds, which are assumptions
+about the platform and not properties this packet verifies. When they
+fail, the late-flip fallback keeps the first guarantee and declines
+the second: the data is at L, the winner may lack some of it until
+L's renewals carry it, and the packet says so rather than promising
+both under one word.
 
 What the invariant does not promise: that a publisher whose walk ends at
 a spurious root sees its message at the true root before the bound
@@ -1210,7 +1241,8 @@ record from its monotonic clock at the bind; `tS` on W's record at the
 ack's send; `timing: {version, A, E}` on the OFFER and echoed on the
 PULLUP, bound to `corr`; a custody-alive test read by both role reapers
 and the role delete. Constants: `MERGE_TIMING_VERSION`, `A_MIN`,
-`A_MAX`, `E_MAX`, `MERGE_RETENTION_MS` (R = A + E_L + E_W + P),
+`A_MAX`, `E_MAX`, `EXPORT_BYTES_MAX` and `S_MAX` (published with the
+version), `MERGE_RETENTION_MS` (R = A + E_L + E_W + P),
 `ADOPT_ACK_MS`, `MERGE_TIMEOUT_MS` (the constant A, a universal worst
 case, not a per-round derivation),
 `MERGE_OFFER_TIMEOUT_MS`, `MERGE_WRITE_RESERVE`, each derived or sized
@@ -1228,15 +1260,28 @@ boundary1Registry.js; three fields added to `PULLUP` (`corr`,
 `cursor`, `more`). The SPLIT_UNION quench at syncEngine.js:121–126 is
 untouched; a merge pull is never SPLIT_UNION.
 
-**Safety, unconditional.** Without any assumption about scheduling,
-reachability or delivery: a merge-capable root with custody sheds its
-claim only at step 5, on a terminal ack that passed the retention check,
-bound to one winner and one epoch; nothing admitted before the cut
-commits into a cache the export has left; nothing the loser held is
-released before the winner has shown it holds it; a refused, short,
-stale or late ack leaves the loser rooted. Two roots that never find
-each other stay two roots and lose nothing. That is the invariant's
-safety half, and it is what the fences in Part 6 exercise.
+**Safety, in two parts.** The first part is unconditional. Without
+any assumption about scheduling, reachability, delivery, clocks or
+suspension: a merge-capable root with custody sheds its claim only at
+step 5, on a terminal ack bound to one winner and one epoch; nothing
+admitted before the cut commits into a cache the export has left; a
+refused, short, stale or late ack leaves the loser rooted; after a
+flip the loser keeps the whole export pinned as a child and releases
+an entry only by its own TTL; a custody-alive role is not reaped. Two
+roots that never find each other stay two roots and lose nothing. An
+entry leaves the network only by its holder's TTL. That is CUSTODY,
+and it is what most of the fences in Part 6 exercise.
+
+The second part is conditional, and it is the one the merge exists
+to deliver: at the moment L flips, W holds everything L held. That
+is UNION AT THE FLIP, and it follows from the retention inequality in
+this section, which rests on assumption 6 (clock rate) and assumption
+7 (the commit run). Those are assumptions about the platform the
+packet does not verify. When either fails, `merge-late-flip` is logged,
+the first part still holds, and the second does not: W may lack
+entries until L's renewals carry them. The fences for the lease and
+the commit guard exercise exactly that fallback. Implementers get
+both statements and not one word for both.
 
 **The bound, conditional.** `VIA_HOP_BUDGET` is 8 hops
 (constants.js:295), a count, not a duration; `ROOT_VERIFY_BATCH` is 3
@@ -1281,7 +1326,7 @@ export needs at `REPLAY_CHUNK_BYTES` (fixed at the cut), and A =
 - one round ≤ S (offer) + (1 + F) × 2S (pull and frames) + S (ack);
 - T_recon ≤ detection + (1 + R) × one round.
 
-`MERGE_TIMEOUT_MS` bounds ONE gate interval, not reconciliation. It is a CONSTANT, not a figure each peer derives: v0.13 wrote it as 2 × ((2 + 2F) × S + A) and that made it a function of a frame count and a service time two peers need not share, which is why the retention inequality could not be about numbers. The constant is the universal worst case of that expression, 2 × ((2 + 2·F_MAX) × S_MAX + A_ack) with F_MAX = ⌈`_cacheBytes` / `REPLAY_CHUNK_BYTES`⌉, S_MAX a fixed service allowance published with the timing version, and A_ack = `HANDOFF_ACK_MAX_MS`; never below `HANDOFF_ACK_MAX_MS`; measured from the bind; and a subscriber of L sees nothing new for at most that long per round. If assumption 3 fails the round aborts at that timeout and
+`MERGE_TIMEOUT_MS` bounds ONE gate interval, not reconciliation. It is a CONSTANT, not a figure each peer derives: v0.13 wrote it as 2 × ((2 + 2F) × S + A) and that made it a function of a frame count and a service time two peers need not share, which is why the retention inequality could not be about numbers. The constant is the universal worst case of that expression, 2 × ((2 + 2·F_MAX) × S_MAX + A_ack), measured from the bind, never below `HANDOFF_ACK_MAX_MS`, and a subscriber of L sees nothing new for at most that long per round. Its three terms are frozen with the timing version, and each is what it is: F_MAX is a bound on the SERIALIZED export, not on the body cache. `_cacheBytes` bounds body accounting; the export also carries every active tombstone with its proof, the manifest slices, the header frame and the per-frame wire overhead, and entries do not pack frames exactly. So the version publishes `EXPORT_BYTES_MAX`, the serialized bound the implementation must demonstrate against the wire codec (bodies at `_cacheBytes`, tombstones at their count cap times the proof's maximum size, manifest and header at their fixed sizes, one frame of slack for packing), and F_MAX = ⌈`EXPORT_BYTES_MAX` / `REPLAY_CHUNK_BYTES`⌉ + 1 for the header. At the cut L measures its serialized export; if it exceeds `EXPORT_BYTES_MAX` the round is refused with `refused-export-bound` before the header, L keeps custody, and the fence for the bound fails if an export larger than the bound is ever admitted. S_MAX is an ASSUMED service allowance, published with the version: measurements inform it (the 2026-10-08 RTT matrix, the frame times a build will read) and do not prove a worst case, and the retention inequality uses the agreed numeric A whether or not any convergence estimate under S_MAX comes true. A_ack = `HANDOFF_ACK_MAX_MS`. If assumption 3 fails the round aborts at that timeout and
 assumption 4 is what carries the next; if assumption 2 fails the roots
 stay two and safety holds. None of these figures is a floor and all of
 them move with S.
@@ -1317,13 +1362,14 @@ them move with S.
 
 Every fence passes with its fix and fails with the fix deleted, on the
 same tree, and the manifest records both runs. Mutants are named per
-fence as in the two-pool packet. Fifty-nine fences in v0.14; the four
-added over v0.1, the two over v0.2, the five over v0.3, the four over
-v0.4 (one replacing `tail_closed`), the four over v0.5, the two over
-v0.6, the eight over v0.7, the seven over v0.8, the five over v0.9, the
-three over v0.10 (one replacing `ttl_skew`), the four over v0.11, the
-two over v0.12 and the three over v0.13 come from Aster's thirteen
-readings.
+fence as in the two-pool packet. Sixty fences in v0.15; the four added
+over v0.1, the two over v0.2, the five over v0.3, the four over v0.4
+(one replacing `tail_closed`), the four over v0.5, the two over v0.6,
+the eight over v0.7, the seven over v0.8, the five over v0.9, the three
+over v0.10 (one replacing `ttl_skew`), the four over v0.11, the two
+over v0.12, the three over v0.13 and the one over v0.14 come from
+Aster's fourteen readings. Every one is a requirement on a build and
+none has been run; this review executed no fence.
 
 | Fence | Pins | Red without |
 |---|---|---|
@@ -1381,6 +1427,7 @@ readings.
 | `fence_dual_root_timing_bound` | (d) | an OFFER with a different A, then an A outside limits, then another timing version; each refused before the cut; the mutant compares names and binds |
 | `fence_dual_root_commit_guard` | (d) | L suspended between the commit recheck and the flip past P; the flip logged late, no completion claimed, L holds as child, W's record fails at `tS + R`, nothing leaves before L's TTL; the mutant checks only at the ack |
 | `fence_dual_root_role_gc_custody` | (d) | lost completion, no subscribers, tombstone-only export, a full cleanup tick, W's retention expiry, late reappearance of the killed body; L's role and tombstones survive, the body is suppressed, the role is reaped only after the tombstone's TTL; the mutant restores the cache-only reap tests |
+| `fence_dual_root_export_bound` | (d) | a cache at `_cacheBytes` plus the tombstone cap at maximum proof size; the serialized export must be measured at the cut against `EXPORT_BYTES_MAX` and refused with `refused-export-bound` when larger, L keeping custody; the mutant bounds F by the body cache alone and admits |
 | `fence_dual_root_merge_closed` | (d) | L keeps re-sending the `merge` block on renewals until `MERGE_CLOSED`; a lost first SUB is recovered by the second; the mutant clears `completing` after one send |
 | `fence_probe_verdicts_awaited` | (a) | a try whose every pull resolved `consumed:false` still counts against the budget |
 | `fence_seat_reconnect_handoff_named` | Part 5.1 | a reconnecting seat's handoff leaves no record a host keeps |
@@ -1393,6 +1440,52 @@ fences are what a build must pass before that argument is trusted on
 the fleet. The hand-fork fence exercises the mechanics. Both run on
 dht-sim first; the relay test harness then runs the hand-fork case on a
 real transport.
+
+## Part 7 — the source-to-contract map
+
+Implementation acceptance maps every site this review cited to the
+clause that governs it and the fence that pins it. The rows are the
+graph of mutations, transitions, expiries and reaps at 6bc3ff4; a
+build that touches a site not in this table adds the row before it
+adds the code. "Clause" names the section of this packet.
+
+| Site at 6bc3ff4 | What it does today | Clause | Fence |
+|---|---|---|---|
+| `rootClaim._set` 215 | the one place `isRoot` changes; no result | 4(d) one authority; transaction | `authority_single_path`, `transition_atomic`, `adopt_during_merge` |
+| `rootClaim.demote` 374–395 | flips, pins upstream, arms hold if closer, sends SUB, returns true | 4(d) transaction; re-promotion | `transition_atomic`, `repromotion_held` |
+| `rootClaim.adoptChild` 482–493 | flips to child and pins upstream | 4(d) transaction | `transition_atomic`, `adopt_during_merge` |
+| `wireHandlers._onAdopt` 437–447 | accepts delegated subscribers, sends SUB | 4(d) transaction; pending delegation | `adopt_pending_delegation` |
+| `wireHandlers._promoteChild` 409–428 | deletes the batch before the ADOPT | 4(d) pending delegation | `adopt_pending_delegation` |
+| `rootClaim.promote` 353–367 | terminal promotion gated on closer beacon and hold | 4(d) re-promotion | `repromotion_held`, `record_expiry` |
+| `rootClaim.claimReachable` ~460–479 | reachable self-claim | 4(d) re-promotion | `repromotion_held` |
+| `rootElection._verifyRoots` 337–368 | last-hop terminus, direct demote | (b); 4(d) one authority | `verify_closest_visited`, `authority_single_path` |
+| `rootElection` beacon yield 123–128 | asymmetric yield predicate, direct demote | Part 3 relation; 4(d) one authority | `crossed_claims`, `authority_single_path` |
+| `AxonaManager._forwardToRoot` 909–960 | write flight, defer-confirmed demote on attributed consumption | 4(d) gate forward; one authority | `gate_no_defer`, `gate_self_return`, `gate_w_unreachable`, `gate_late_ack` |
+| `writeFlight._flightOpen` 75–96 / `_flightComplete` 111–129 | epoch from beacon or 0; 0 accepts any | 4(d) epoch authority | `gate_epoch_authority`, `gate_w_reminted` |
+| `wireHandlers._holdIntercept` 208–250 | hold redirect with nonce ledger | 4(d) gate forward; re-promotion | `gate_self_return`, `repromotion_held` |
+| `AxonaManager._reroute` 418–421 | pops a via, sends toward the topic id | 4(d) gate forward (never for a gated write) | `gate_self_return` |
+| `wireHandlers._onPub` 451–493 / `_ingestPublish` 496–545 | awaits at 501, 509; stamps at 536–541 | 4(d) cut at the mutation point | `cut_is_total`, `cut_async_ingress`, `gen_across_awaits`, `gate_forwards_writes` |
+| `wireHandlers._onKill` / `_applyKill` 1058 | awaits `verifyKill`, commits the tombstone | 4(d) cut; tombstones are mutations | `gen_across_awaits`, `migrated_delete_across_cut` |
+| `topicStore._cachePush` 25–41 | appends, evicts at caps | 4(d) cut; retention; pins | `cut_async_ingress`, `retention_ack`, `full_w_unique_baseline`, `reserve_exhaustion` |
+| `topicStore._applyDels` 111–124 | awaits proof, applies kills first | 4(d) cut; tombstone transfer | `migrated_delete_across_cut`, `manifest_dels`, `tombstone_only` |
+| `topicStore._expireCache` 48–56 | TTL by local clock | 4(d) retention; lease | `ttl_live_at_cut`, `handover_retention`, `lease_end_completion_lost` |
+| `syncEngine._syncPull` 120–129 / `_syncAnswerPull` 133–141 | requester→holder; returns on empty cache | 4(d) direction; tombstone-only answer; probe verdicts | `direction`, `tombstone_only`, `probe_verdicts_awaited` |
+| `syncEngine._syncDelta` 108–114 | `publishTs > sinceHw` | 4(d) cursor | `equal_stamp_boundary`, `cursor_invalid` |
+| `syncEngine._syncIngest` HANDOFF 189–226 | dels then bodies; HANDOFFACK | 4(d) cut; whole-transfer refusal; ack contract | `gated_ingest_refused`, `tombstone_only_handoff_gated`, `replayack`, `terminal_ack` |
+| `wireHandlers._ingestStampedBatch` 782–798 | counts held | 4(d) retention, not count | `retention_ack`, `manifest_dels` |
+| `wireHandlers._onSub` 318–351 / `AxonaManager._emitSubscribe` 1309–1335 | hw/lw pulls; SUB payload | 4(d) completion block; trigger 2 | `stale_sub_before_cut`, `sub_other_corr`, `merge_closed` |
+| `repairPlane._emptyRootProbe` 634–689 | three tries, verdicts not awaited | (a) | `probe_rearm_after_routable`, `probe_verdicts_awaited` |
+| `repairPlane` role reapers 272–371 | idle and dead reap; cache-only tests | 4(d) custody-alive role | `role_gc_custody` |
+| `repairPlane.pubsubLeaveHandoff` 1145– | full snapshot to heirs on leave | Part 2a; Part 5.1 | `seat_reconnect_handoff_named`, `merge_carrier_named` |
+| `AxonaPeer.lookup` 3304–3364 / `_lookupStep` 6575– | path, last hop, visited set | (c) | `lookup_no_revisit` |
+| `AxonaPeer.leave` 2269– / `stop` 1327 ; relay `stopRelay` 416–420 | leave with handoff, then stop | Part 2a | `seat_reconnect_handoff_named` |
+| `AxonaManager._set`-time epoch mint 220 | new epoch on every entry to ROOT | Part 3 relation; re-promotion | `crossed_claims`, `gate_w_reminted`, `record_expiry` |
+
+Every fence in Part 6 appears in at least one row; every row's fence
+list is the set a change to that site must leave green and red-with-
+the-fix-deleted. The two-way machine's own rows (OFFER, header,
+frames, ack, MERGE_CLOSED, timing) are new code and map to the
+remaining fences by name.
 
 ## What would make this wrong
 
