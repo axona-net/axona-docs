@@ -1,4 +1,4 @@
-# Axona Dual-Root Reconciliation — design packet v0.9
+# Axona Dual-Root Reconciliation — design packet v0.10
 
 **Status:** DESIGN, for council review. Nothing built. David's word (direct,
 04:1xZ 2026-10-17): "Yes, write it." The review bar is Vega's 8cbecf8b
@@ -108,6 +108,27 @@ transferred. Four: capacity was admitted on the OFFER's figures while L
 kept stamping until the cut, pins covered the manifest and not W's own
 baseline, and the reserve's exhaustion had no contract. v0.9 sizes at
 the cut, pins both, fails closed, and conditions the bound on admission.
+
+**v0.10 (18:4xZ 2026-10-17)** answers Aster's BLOCK affbf0c9 on v0.9,
+four obligations, each holding. One: a refused flag flip at `_set` did
+not stop the rest of the transition; `demote()` ignores `_set`'s result
+and goes on to pin upstream, arm the hold and send the SUB
+(rootClaim.js:380–394), `adoptChild` pins upstream after `_set` (491),
+and `_onAdopt` then accepts the delegated subscribers (wireHandlers.js:
+441–443). v0.10 makes the transition transactional: `_set` returns a
+result and every caller honours it. Two: epoch-first election needs a
+rule for the demoted loser, because `demote()` arms the step-down hold
+only toward a strictly closer target (390–392) and a bare-topic
+terminal request re-promotes an unheld node (353–364) with a fresh
+epoch (`_set`:220) that outranks the live winner. v0.10 arms the hold
+toward the ACCEPTED winner regardless of closeness and redirects to it
+while that acceptance is valid. Three: v0.9's generation check captured
+`gen` after an await, which is not the entry-time value. v0.10 captures
+it before the first await and compares it at every mutation. Four: the
+TTL is each manager's local clock (`_expireCache(role, now)`,
+topicStore.js:48, called with `this._now()` at repairPlane.js:244), so
+"expired by the same clock" assumed a clock the two sides do not share.
+v0.10 removes the assumption: L never releases on W's expiry claim.
 
 **Lineage:** axona.bot 71dc09d7 (the split, seq 2 on the relay-held root),
 e508b92a (the fork), 7c7f9383 (amended proposal), c5d18788 and f7260bec
@@ -655,6 +676,78 @@ sends an ADOPT to a root with custody mid-round and requires the flag
 to hold and the candidate to be queued; with the gate at `_set`
 removed, the flip goes through.
 
+**The transition is a transaction.** A refused flip is not a deferred
+transition if the rest of the transition runs anyway, and today it
+does. `demote()` calls `_set` and does not read its result, then sets
+`_upstream`, arms the hold, sends the SUB and returns `true`
+(rootClaim.js:380–394). `adoptChild` sets `_upstream` after `_set`
+(491), and `_onAdopt` then accepts the delegated subscribers and sends
+its own SUB (wireHandlers.js:441–446). So v0.10 changes the contract
+of `_set`: it returns `{committed: true}` or `{committed: false,
+reason}`, and every caller branches on it. On `committed: false`:
+`demote()` returns `false` with nothing else done, no upstream, no
+hold, no SUB; `adoptChild` returns `null` and sets no upstream;
+`_onAdopt` on a `null` role accepts no subscriber and sends no SUB,
+returning `'consumed'` so the delegating parent keeps its subscribers
+and re-delegates by its own schedule; `handoffArrived`'s yield and
+`promote()`'s flip read the result the same way. The refusal is one
+log line, `custody-refused`, with the caller's `why`. This holds
+whether or not a round is open: a root with custody that meets a
+closer beacon with no round open gets `custody-refused` from `_set`,
+and `_mergeCandidate` opens the round; none of the side effects run
+first. `fence_dual_root_transition_atomic` fires each caller at a root
+with custody, with and without an open round, and requires the flag,
+`_upstream`, the hold, the role's subscriber set and the delegated
+children all unchanged on refusal; the mutant restores the old
+`demote()` that ignores the result.
+
+**Re-promotion under the new order.** When L has demoted to W at step
+5, the shipped hold arms only if W is strictly closer (rootClaim.js:
+390–392), on the reasoning that the keyspace-closest node may always
+reclaim. Under epoch-first election that reasoning is wrong in the one
+case the order was introduced for: A closer at epoch 1 merges into B
+farther at epoch 2, A gets no hold, and the next bare-topic terminal
+request at A runs `promote()` (353–367), whose only gates are a
+beaconing closer root (359) and the hold (360), so A re-promotes,
+mints `knownEpoch + 1` (`_set`:220), and outranks the live B at once.
+v0.10 adds the accepted-winner record and arms the hold on it:
+
+- At step 5, L records `role.merge.acceptedWinner = {id: W, epoch:
+  winnerEpoch, at, exp: at + STEPDOWN_HOLD_MS}` and arms the step-down
+  hold toward W whether or not W is closer (the closeness test at
+  390–392 is replaced by "W is the accepted winner" for a
+  merge-capable loser).
+- `promote()` and `claimReachable` consult the record first: while it
+  is valid, L does not promote on a bare-topic terminal request and
+  does not fall back to a reachable self-claim; the request is
+  redirected to W by the hold intercept exactly as a held node already
+  redirects (wireHandlers.js:239–249, `holdTarget` = the accepted
+  winner, `_forwardToRoot` with its nonce and re-entry protection).
+  The keyspace terminus is L; the owner is W; the cost is one extra
+  hop on bare-topic traffic for the record's life. Placement stays a
+  hint, as the kernel already says of region (`_topicDecision`,
+  wireHandlers.js:164–177).
+- Evidence refreshes the record: a beacon from W at `winnerEpoch`
+  extends `exp`; a beacon from W at a higher epoch replaces `epoch`
+  and extends; a tombstone for W's claim (dead-root eviction) clears
+  the record and the hold at once.
+- Expiry without evidence: after `STEPDOWN_HOLD_MS` with no beacon
+  from W, the record and the hold expire together and L may promote on
+  the next terminal request, minting a fresh epoch, as today. If W was
+  alive and silent, the two claims meet again and the machine runs
+  with L's new epoch against W's; L may then win, and B merges into A.
+  Ownership is stable for the record's life and not beyond it; the
+  union is preserved either way, because every change of owner is a
+  round. The packet promises the union, not the owner.
+
+`fence_dual_root_repromotion_held` demotes A into B under the order,
+then sends a bare PUB and a bare SUB to A within the record's life:
+both must be redirected to B, A must not promote and must mint no
+epoch; the mutant keeps the closeness test at 390–392, and the fence
+fails on A's new epoch. `fence_dual_root_record_expiry` lets the record
+expire with no beacon from B and requires A to promote on the next
+request and the next contact to run a round, not a direct demote.
+
 **Mixed versions.** A legacy peer does not run this machine. The
 guarantee holds only when both roots are merge-capable, and the packet
 says what happens otherwise rather than letting a legacy peer inherit
@@ -688,23 +781,37 @@ commit, not the entry:
 - Every role carries `role.gen`, an integer. The cut increments it and
   takes the snapshot in the same synchronous run, with no await
   between.
-- Every commit path captures `gen` once, synchronously, immediately
-  before its mutation, and compares it to the value it captured at
-  entry. `_ingestPublish` does this at 536, before the stamp: if `gen`
-  moved, or `role.merge.gate` is set, the write is not stamped; it is
-  handed to the gate's forward (v0.6) as if it had arrived after the
-  cut, and the function returns a disposition the caller treats as
-  forwarded, not ingested, so no ingest ack is sent for it from L.
-  `_onKill` does the same immediately before `_applyKill`.
+- Every commit path captures `gen0 = role.gen` and `role0 = role`
+  ONCE, synchronously, before its FIRST await, at the handler's entry:
+  `_onPub` before `_ingestPublish`'s `verifyEnvelope` (501), `_onKill`
+  before `verifyKill`, `_syncIngest` before `_applyDels`. At each
+  mutation it compares, synchronously and immediately before the
+  write, `role === role0 && role.gen === gen0`. The gate is not the
+  test: a cut followed by a successful demotion clears the gate, and a
+  check against the gate alone, or against a `gen` re-read after the
+  await, would pass a write that was admitted before the cut. The
+  entry-time pair fails it, because a cut increments `gen` and nothing
+  decrements it. `_ingestPublish` compares at 536, before the stamp;
+  on mismatch the write is not stamped, it is handed to the gate's
+  forward (v0.6) if the gate is set, or to the ordinary routing walk
+  if the role has since demoted, and the function returns a
+  disposition the caller treats as forwarded, not ingested, so no
+  ingest ack is sent from L. `_onKill` compares immediately before
+  `_applyKill`.
 - Tombstones are mutations too, and they commit first. `_syncIngest`
   applies a transfer's dels before its bodies (syncEngine.js:206–207);
   `_applyDels` awaits proof verification and then calls `_applyKill`
   for each entry (topicStore.js:119–121). So the check sits at the two
   mutation points themselves: `_cachePush` and `_applyKill` each take
-  the caller's entry-time `gen` and refuse, returning a refusal the
-  caller must propagate, when `role.merge.gate` is set or `gen` has
-  moved. `_applyDels` captures `gen` after its await and immediately
-  before `_applyKill`, per entry.
+  the caller's entry-time `gen0` and `role0` and refuse, returning a
+  refusal the caller must propagate, when `role !== role0` or `gen`
+  has moved; the gate being set is a third refusal, kept for the cheap
+  path. `_applyDels` receives `gen0` from `_syncIngest`'s entry and
+  passes it to every `_applyKill`; it captures nothing after its
+  await. A refusal at any mutation marks the whole transfer refused:
+  `_syncIngest` applies no further entry, and its ack decision reads
+  the mark, HANDOFF sending nothing and REPLAYUP/REPLICATE reporting
+  every entry rejected.
 - A whole transfer at a gated L is refused before anything is applied.
   The HANDOFF branch of `_syncIngest` checks the gate synchronously at
   its top and, if set, applies no del and no body and sends NO
@@ -729,6 +836,12 @@ HANDOFF at a gated L and requires the same, with the mutant sending
 `held = sent = 0`; `fence_dual_root_migrated_delete_across_cut` pauses
 `_applyDels` inside its proof await across the cut and requires the
 delete refused at `_applyKill` and absent from L's export.
+`fence_dual_root_gen_across_awaits` runs three admitted operations, a
+body, a delete and a kill, paused in their awaits across two
+sequences: a cut with the gate still set, and a cut followed by a
+successful demotion that clears the gate; every one must be refused at
+its mutation in both sequences, and the transfer's ack must say so;
+the mutant checks the gate only, and passes the second sequence.
 
 **Retention, not count.** `_ingestStampedBatch` returns `held`, which
 counts an ingest that was newly cached, already cached or suppressed
@@ -766,10 +879,31 @@ v0.8 replaces them:
   aside the reserve. `_cachePush`'s eviction loop never evicts a pinned
   entry; the admission arithmetic guarantees pins plus reserve fit, so
   pin saturation cannot arise and no eviction runs during the round.
-  The TTL still expires entries older than the hold on both sides; a
-  manifest body the TTL has expired at W by ack time counts as
-  expired, not missing, since L's copy has expired by the same clock,
-  and the terminal check says which it counted.
+  The TTL is not a shared clock: `_expireCache(role, now)` runs on
+  each manager's own `now` (topicStore.js:48–49, called from
+  repairPlane.js:244 with `this._now()`), so a W whose clock runs
+  ahead can expire a body that is live at L, and L must not release
+  on W's say-so. v0.10's rule has two halves. At W, pinned entries
+  are exempt from `_expireCache` for the round's life, so W expires
+  nothing it was asked to hold while the round runs; after the
+  handover W expires by its own clock as today. At L, the cut
+  excludes from the manifest any body or tombstone that is within
+  `MERGE_TTL_MARGIN_MS` of expiring by L's own clock, where the margin
+  is `MERGE_TIMEOUT_MS` plus `FUTURE_TOLERANCE_MS` (constants.js:299,
+  the kernel's existing bad-clock allowance, 5 min); those entries are
+  L's to expire and are not transferred. The terminal check then has
+  no "expired" category: every manifest body is held or tombstoned at
+  W or the ack is short. A clock at W ahead by more than the allowance
+  makes rounds fail short until L's own margin excludes the entry,
+  which is safety holding under a bad clock, and the fence says so.
+  Backward or forward clock changes at W during the round touch
+  nothing, because pins are exempt; after the handover they are W's
+  problem as they are today. `fence_dual_root_ttl_skew` runs W ahead
+  of L by less than the allowance with an entry inside L's margin
+  (excluded, round completes) and with an entry outside it (pinned,
+  held, round completes), then W ahead by more than the allowance
+  (ack short, L keeps custody); the mutant lets W report expired as
+  retained.
   `fence_dual_root_full_w_unique_baseline` fills W to its cap with
   unique bodies, offers a small export, and requires W to refuse with
   its baseline intact; the mutant evicts baseline to admit.
@@ -825,9 +959,11 @@ the hold's) and `role.sync.openPulls` (map corr → {loser, loserEpoch,
 cursor, framesIn, held, sent, startedAt}). On a subscriber:
 `sub.lastWalkRoot`; `role.gen` on every role; `role.merge.pins` (the
 manifest's msgIds, pinned for the round) and `role.merge.reserve` on W;
-`role.merge.nextCandidate` and `role.merge.releaseToken` on L; a
-header frame (`header` on REPLAYUP) as the first answer under every
-`corr`. Constants: `MERGE_TIMEOUT_MS`,
+`role.merge.nextCandidate`, `role.merge.releaseToken` and
+`role.merge.acceptedWinner` ({id, epoch, at, exp}) on L; a header frame
+(`header` on REPLAYUP) as the first answer under every `corr`; `_set`
+returns `{committed, reason}` and every caller branches on it.
+Constants: `MERGE_TTL_MARGIN_MS`, `MERGE_TIMEOUT_MS`,
 `MERGE_OFFER_TIMEOUT_MS`, `MERGE_WRITE_RESERVE`, each derived or sized
 below. One new function, `_mergeCandidate`, the single entry every
 demotion path takes for a root with custody. One new handler,
@@ -923,11 +1059,11 @@ them move with S.
 
 Every fence passes with its fix and fails with the fix deleted, on the
 same tree, and the manifest records both runs. Mutants are named per
-fence as in the two-pool packet. Forty-three fences in v0.9; the four
+fence as in the two-pool packet. Forty-eight fences in v0.10; the four
 added over v0.1, the two over v0.2, the five over v0.3, the four over
 v0.4 (one replacing `tail_closed`), the four over v0.5, the two over
-v0.6, the eight over v0.7 and the seven over v0.8 come from Aster's
-eight readings.
+v0.6, the eight over v0.7, the seven over v0.8 and the five over v0.9
+come from Aster's nine readings.
 
 | Fence | Pins | Red without |
 |---|---|---|
@@ -970,6 +1106,11 @@ eight readings.
 | `fence_dual_root_growth_offer_to_cut` | (d) | the export grows past W's capacity between OFFER and cut; W must refuse on the header; the mutant admits on the offer |
 | `fence_dual_root_full_w_unique_baseline` | (d) | W at cap with unique bodies refuses a small export with its baseline intact; the mutant evicts baseline to admit |
 | `fence_dual_root_reserve_exhaustion` | (d) | W's writes past the reserve mid-round are refused, the writer recovers after the round, nothing is evicted; the mutant admits past the reserve |
+| `fence_dual_root_transition_atomic` | (d) | each demoting caller fired at a root with custody, with and without an open round; on refusal the flag, upstream, hold, subscriber set and delegated children are all unchanged; the mutant restores the old `demote()` that ignores `_set`'s result |
+| `fence_dual_root_repromotion_held` | (d) | A closer at epoch 1 demoted into B farther at epoch 2; a bare PUB and a bare SUB at A within the record's life are redirected to B, A does not promote and mints no epoch; the mutant keeps the closeness test on the hold |
+| `fence_dual_root_record_expiry` | (d) | the accepted-winner record expires with no beacon from B; A promotes on the next request and the next contact runs a round, not a direct demote; the mutant demotes directly |
+| `fence_dual_root_gen_across_awaits` | (d) | a body, a delete and a kill paused in their awaits across a cut with the gate set and across a cut then demotion then gate clear; all refused at the mutation in both; the mutant checks the gate only |
+| `fence_dual_root_ttl_skew` | (d) | W ahead of L by less than the allowance with entries inside and outside L's margin, then by more than it; the first two complete, the third acks short and L keeps custody; the mutant counts W's expired as retained |
 | `fence_probe_verdicts_awaited` | (a) | a try whose every pull resolved `consumed:false` still counts against the budget |
 | `fence_seat_reconnect_handoff_named` | Part 5.1 | a reconnecting seat's handoff leaves no record a host keeps |
 | `fence_merge_carrier_named` | Part 2b | the sim runs both candidate paths from a reconnecting seat (HANDOFF; SUB low-water SPLIT_UNION) and either leaves no retained record that distinguishes it from the other |
