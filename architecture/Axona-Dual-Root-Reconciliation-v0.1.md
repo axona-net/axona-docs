@@ -1,4 +1,4 @@
-# Axona Dual-Root Reconciliation — design packet v0.6
+# Axona Dual-Root Reconciliation — design packet v0.7
 
 **Status:** DESIGN, for council review. Nothing built. David's word (direct,
 04:1xZ 2026-10-17): "Yes, write it." The review bar is Vega's 8cbecf8b
@@ -56,6 +56,17 @@ wireHandlers.js:239–249, into `_forwardToRoot`, AxonaManager.js:909),
 with a re-entry nonce, with the helper's defer-confirmed demotion
 suppressed, and with the write discharged only by the winner's signed
 ingest ack.
+
+**v0.7 (17:4xZ 2026-10-17)** answers Aster's sixth BLOCK 93a10c3b on
+v0.6: the flight's epoch binding was asserted, not supplied. `_flightOpen`
+takes no epoch argument; it reads the local beacon record and stores 0
+when there is none (writeFlight.js:79–81), and `_flightComplete` accepts
+an ack at any epoch when the flight's epoch is 0 (121). So "keyed on
+winnerEpoch" was true only when a fresh beacon for W happened to be
+present. v0.7 gives the merge flight an explicit epoch authority: the
+`winnerEpoch` carried by the validated PULLUP, passed into the flight,
+never 0, never read from a beacon, and states what happens when W
+re-mints during the gate.
 
 **Lineage:** axona.bot 71dc09d7 (the split, seq 2 on the relay-held root),
 e508b92a (the fork), 7c7f9383 (amended proposal), c5d18788 and f7260bec
@@ -421,16 +432,43 @@ them new.
      L.
    - **Target.** The write is forwarded to W BY NAME, `via: [W]`,
      through the same dispatch `_forwardToRoot` (AxonaManager.js:909)
-     performs: a write flight is opened or joined at L, keyed on
-     (topic, W, winnerEpoch) (`_flightOpen`, writeFlight.js:75), the
-     publisher's `attemptId` is threaded so the chain stays one attempt,
-     and the forwarded write carries `ackTo`, `flightNonce` and
-     `attemptId`. One difference, and it is the whole reason this is a
-     sibling and not a call: the helper's handling of a `consumed`
-     verdict attributed to the target demotes the sender with
-     `defer-confirmed` (the lines after AxonaManager.js:944). The gated
-     forward does not demote on any verdict. A verdict is hop-local
-     evidence; the only thing that moves L's claim is step 5.
+     performs: a write flight is opened or joined at L, the publisher's
+     `attemptId` is threaded so the chain stays one attempt, and the
+     forwarded write carries `ackTo`, `flightNonce` and `attemptId`. Two
+     differences make it a sibling and not a call. First, the helper's
+     handling of a `consumed` verdict attributed to the target demotes
+     the sender with `defer-confirmed` (the lines after
+     AxonaManager.js:944); the gated forward does not demote on any
+     verdict. A verdict is hop-local evidence; the only thing that moves
+     L's claim is step 5. Second, the epoch authority. `_flightOpen`
+     (writeFlight.js:75) takes no epoch: it reads `_rootBeacons` and
+     stores 0 when no record exists (79–81), and `_flightComplete`
+     accepts an ack at ANY epoch from the right node when the flight's
+     epoch is 0 (121). A merge flight must not depend on whether a
+     beacon for W happens to be present or fresh. The sibling calls
+     `_flightOpen` with an explicit sixth argument, `expectedEpoch =
+     winnerEpoch` as carried by the validated PULLUP and held in
+     `openMerges[corr]`; when that argument is given the flight's key is
+     (topic, W, expectedEpoch), its `epoch` field is that value and is
+     never 0, and `_flightComplete`'s unversioned exemption does not
+     apply: an ack from W at any other epoch is
+     `write-flight-ack-epoch-mismatch` and discharges nothing. The
+     beacon record is not consulted for a merge flight at open or at
+     complete. The same `winnerEpoch` is what step 5 matches in the
+     `REPLAYACK`; one authority for both.
+   - **W re-mints during the gate.** A root entering ROOT takes a new
+     epoch (rootClaim.js:220). If W does so after the bind, every frame
+     and ack from the new incarnation carries the new epoch. L learns
+     of it by the first of: an ingest ack rejected as
+     `write-flight-ack-epoch-mismatch`, a `REPLAYACK` or `REPLAYUP`
+     whose `winnerEpoch` differs from the bound one (already
+     `merge-stale`), or a beacon from W with a higher epoch. On any of
+     them L aborts the round: the gate clears, `openMerges[corr]` is
+     dropped, L keeps root under its own epoch, and forwarded writes
+     that the old incarnation never acked are the publisher's to
+     re-send. The next trigger issues a NEW `MERGE_OFFER` with a new
+     `corr`, and the bind takes the new `winnerEpoch` from the new
+     PULLUP. Nothing from the old round discharges a write or demotes L.
    - **Discharge.** The forwarded write is discharged at L only by W's
      signed ingest ack arriving at `_onIngestAck` for that flight, bound
      to W and `winnerEpoch` as every flight ack is. The publisher's own
@@ -529,9 +567,12 @@ at} or null), `role.merge.gateFwd` (bounded nonce ledger, the shape of
 the hold's) and `role.sync.openPulls` (map corr → {loser, loserEpoch,
 cursor, framesIn, held, sent, startedAt}). On a subscriber:
 `sub.lastWalkRoot`. One constant, `MERGE_TIMEOUT_MS`, derived below.
-One new handler, `_mergeGateIntercept`, and one sibling of
-`_forwardToRoot` that shares its dispatch and flight and omits its
-demotion. Two new frame types, `MERGE_OFFER` and `REPLAYACK`,
+One new handler, `_mergeGateIntercept`; one sibling of `_forwardToRoot`
+that shares its dispatch and flight, omits its demotion, and passes the
+epoch; one new optional argument on `_flightOpen`, `expectedEpoch`,
+which when present overrides the beacon-derived epoch, forbids 0, and
+removes the unversioned exemption in `_flightComplete` for that flight.
+Callers that do not pass it behave as today. Two new frame types, `MERGE_OFFER` and `REPLAYACK`,
 registered beside HANDOFF and HANDOFFACK in constants.js and
 boundary1Registry.js; three fields added to `PULLUP` (`corr`,
 `winnerEpoch`, `cursor`) and four to `REPLAYUP` (`corr`, `loserEpoch`,
@@ -596,10 +637,10 @@ code already carries, and it moves if they move.
 
 Every fence passes with its fix and fails with the fix deleted, on the
 same tree, and the manifest records both runs. Mutants are named per
-fence as in the two-pool packet. Twenty-six fences in v0.6; the four
+fence as in the two-pool packet. Twenty-eight fences in v0.7; the four
 added over v0.1, the two over v0.2, the five over v0.3, the four over
-v0.4 (one replacing `tail_closed`) and the four over v0.5 come from
-Aster's five readings.
+v0.4 (one replacing `tail_closed`), the four over v0.5 and the two over
+v0.6 come from Aster's six readings.
 
 | Fence | Pins | Red without |
 |---|---|---|
@@ -625,6 +666,8 @@ Aster's five readings.
 | `fence_dual_root_gate_w_unreachable` | (d) | W is unreachable at the first gated write; L must end the round, clear the gate, keep root, and the publisher's re-send must land and be stamped at L; the mutant keeps forwarding into the void |
 | `fence_dual_root_gate_late_ack` | (d) | W's ingest ack for a gated write arrives after the gate cleared; the flight entry must close and L's claim must not move; the mutant demotes on it |
 | `fence_dual_root_gate_no_defer` | (d) | a consumed verdict attributed to W on a gated forward; L must not demote; the mutant forwards through the unmodified helper |
+| `fence_dual_root_gate_epoch_authority` | (d) | L holds no beacon for W, or a stale one at a different epoch; W's ingest ack carries the offered winnerEpoch and must discharge the write; an ack at any other epoch must not; L's claim must not move either way; the mutant lets the flight take its epoch from the beacon, so a missing record accepts any epoch |
+| `fence_dual_root_gate_w_reminted` | (d) | W re-mints after the bind and before acking; its new-epoch ack must be rejected, the round aborted, the gate cleared, L still root under its epoch, and the next offer must carry the new epoch; the mutant accepts the new-epoch ack |
 | `fence_probe_verdicts_awaited` | (a) | a try whose every pull resolved `consumed:false` still counts against the budget |
 | `fence_seat_reconnect_handoff_named` | Part 5.1 | a reconnecting seat's handoff leaves no record a host keeps |
 | `fence_merge_carrier_named` | Part 2b | the sim runs both candidate paths from a reconnecting seat (HANDOFF; SUB low-water SPLIT_UNION) and either leaves no retained record that distinguishes it from the other |
