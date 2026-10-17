@@ -1,4 +1,4 @@
-# Axona Dual-Root Reconciliation — design packet v0.12
+# Axona Dual-Root Reconciliation — design packet v0.13
 
 **Status:** DESIGN, for council review. Nothing built. David's word (direct,
 04:1xZ 2026-10-17): "Yes, write it." The review bar is Vega's 8cbecf8b
@@ -157,6 +157,18 @@ timeout with a retention LEASE on both sides, states the clock-rate and
 suspension assumptions the lease needs, and fails closed at L when they
 cannot be verified. Three: step 4 still said the ack closed the round;
 it now says the completion rule does, and there is one.
+
+**v0.13 (19:0xZ 2026-10-17)** answers Aster's BLOCK 9893153c on v0.12,
+the lease's overlap. v0.12 started W's retention at the ack's send and
+L's validity at the ack's receipt, so with perfect clocks a transit
+delay longer than half the lease let L accept an ack W was already free
+to forget. A validity window that starts when the grant arrives is a
+receipt-start lease, and the regional work rejected those for the same
+reason. v0.13 anchors L's validity at L's own bind, which precedes every
+act of W's under the round, derives W's retention from the same terms
+with the overlap written as an inequality, keeps the three deadlines
+distinct, and names what holds custody after a lost completion: L, as
+a child, under its own hold.
 
 **Lineage:** axona.bot 71dc09d7 (the split, seq 2 on the relay-held root),
 e508b92a (the fork), 7c7f9383 (amended proposal), c5d18788 and f7260bec
@@ -956,7 +968,8 @@ v0.8 replaces them:
     hold, whatever its clock says.
   - W does not close the round when it SENDS the ack. On sending the
     terminal `REPLAYACK`, `openPulls[corr]` moves to `acked` and the
-    pins stay. The ack carries `leaseMs = MERGE_LEASE_MS`.
+    pins stay. The ack carries no lease figure; both sides derive
+    their deadlines from constants and from anchors they hold.
   - **Completion is correlated.** The SUB `demote()` sends at step 5
     is an ordinary renewal on the wire (`_emitSubscribe`,
     AxonaManager.js:1316–1322: topic, via, subscriber, since, hw, lw,
@@ -975,36 +988,62 @@ v0.8 replaces them:
     `merge-stale` and completes nothing. L clears `completing` on
     `MERGE_CLOSED` and keeps re-sending the block on each renewal until
     then. There is one completion rule, this one; step 4 defers to it.
-  - **The lease, both sides.** Neither "the next renewal re-sends" nor
-    a count of intervals is evidence, so retention is bounded by a
-    lease with its assumptions named. W holds the pins from admission
-    until completion, or until `ackSentAt + MERGE_LEASE_MS +
-    FUTURE_TOLERANCE_MS` by W's clock, whichever is first; after that
-    it releases them and closes the record as failed. L may act on a
-    terminal ack only inside the lease by L's own clock: L records
-    `ackReceivedAt` from its monotonic clock when the ack arrives,
-    checks that its wall clock has not jumped since the bind by more
-    than `FUTURE_TOLERANCE_MS` against the monotonic elapsed (the test
-    the kernel's clock-jump detection already applies for
-    helloPressure), and must have completed the step-5 flip and
-    dispatched the first `merge`-bearing SUB before `ackReceivedAt +
-    MERGE_LEASE_MS / 2`. If any of that fails, including an ack that
-    arrives after a suspension, L discards the ack, logs
-    `merge-ack-expired`, keeps custody and the round ends. After the
-    flip L keeps its own export pinned and continues to serve it as a
-    child until `MERGE_CLOSED` or until `ackReceivedAt + MERGE_LEASE_MS`
-    by its monotonic clock, whichever is first; a child's cache is
-    served to its subscribers either way, so this costs L nothing it
-    was not already doing. The assumptions the lease needs, stated:
-    both clocks advance at real-time rate within `FUTURE_TOLERANCE_MS`
-    over one `MERGE_LEASE_MS`, and a suspended L detects the jump as
-    above. Under them an entry can be lost only if L flipped inside its
-    half-lease, no completion reached W inside W's lease, W expired the
-    entry after its lease by its clock, and L released its pin after
-    its lease: every one of those is bounded by the lease, and
-    `fence_dual_root_lease_cancellation` measures the conjunction
-    rather than hides it. Outside them, L fails closed and nothing is
-    released.
+  - **Three deadlines, one anchor each, and the inequality.** Let A =
+    `MERGE_TIMEOUT_MS`, E = `FUTURE_TOLERANCE_MS` (constants.js:299, the
+    kernel's clock allowance, 5 min), and P = one scheduler tick. The
+    anchors are local events, never arrivals:
+    1. **Request timeout and ack validity, at L, anchored at the bind.**
+       L records `tB` from its monotonic clock at the bind (step 3).
+       The round aborts, and a terminal ack is discarded as
+       `merge-ack-expired`, if L's monotonic clock reads past `tB + A`
+       at the instant L would act on it; and L must have committed the
+       step-5 flip and dispatched the first `merge`-bearing SUB before
+       that same instant. One deadline serves both, so an ack's arrival
+       never opens a fresh budget: a receipt-start window is what v0.12
+       had, and it is why a transit delay could outlive W's retention.
+       Before acting L also checks its wall clock against its
+       monotonic clock since `tB` by more than E (the kernel's
+       clock-jump test); a jump discards the ack as above.
+    2. **Retention, at W, anchored at the ack's send.** W records
+       `tS` from its own clock when it sends the terminal ack and keeps
+       the pins exempt from eviction and expiry until completion or
+       until its clock reads `tS + R`, where R = A + 2E + P; then it
+       releases the pins and marks the record failed. The entries stay
+       in W's cache under ordinary retention; releasing a pin deletes
+       nothing.
+    3. **Custody at L after the flip, anchored at the bind and bounded
+       by the hold.** After the committed flip L keeps its export
+       pinned against cap eviction and serves it as W's child until
+       `MERGE_CLOSED`, and otherwise until each entry expires by L's
+       own TTL. There is no third timer: a child's cache is served to
+       its subscribers anyway, and the hold is the network's promise.
+    The inequality. W cannot send the ack before L binds, in real
+    time, because the ack answers frames L sent after the bind: so
+    `tS ≥ tB` in real time. With each clock's error over any span up
+    to R bounded by E (assumption 6), L's latest permitted act is at
+    real time `tB + A + E`, and W's earliest permitted unpin is at real
+    time `tS + R − E ≥ tB + A + 2E + P − E = tB + A + E + P`. The
+    difference is P, one tick, which covers the processing between
+    L's check and its dispatch, and rounding is absorbed by choosing P
+    as a whole tick. So for every allowed A and E, L's latest release
+    precedes W's earliest unpin, and the delayed-ack trace of 9893153c
+    is excluded by construction, not by a timeout that happens to be
+    short enough. Suspend and resume at L is caught by the clock-jump
+    check in (1); at W, a suspension only lengthens retention.
+  - **What holds custody when completion is lost.** If L flipped inside
+    its deadline and no `merge`-bearing SUB ever reaches W before `tS +
+    R`, W releases its pins and the record fails; L is a child of W
+    that still holds the whole export, pinned against cap eviction,
+    and L serves it to its subscribers and re-sends the `merge` block
+    on every renewal. The holder is L, and L's only permitted release
+    of an entry is its own TTL by its own clock, which is the hold
+    every holder applies. W's entries, unpinned, are under W's
+    ordinary retention: W's TTL by W's clock and W's cap. An entry can
+    therefore leave the network only by L's TTL, which is the
+    legitimate expiry, and never by W's cap or clock alone. That is
+    the custody claim in Part 3 stated for the failure case, with a
+    holder named, and `fence_dual_root_lease_end_completion_lost`
+    checks the holder at every step.
   - The terminal check has no "expired" category: every manifest body
     is held or tombstoned at W and every manifest tombstone is active
     at W, or the ack is short. A W clock ahead of L's changes nothing
@@ -1090,10 +1129,12 @@ manifest's msgIds, pinned for the round) and `role.merge.reserve` on W;
 returns `{committed, reason}` and every caller branches on it;
 `role.pendingDelegation` on a delegating parent and one new frame,
 `ADOPTACK`; `openPulls[corr]` holds an `acked` state until completion
-or lease end; `role.merge.completing` on L and a `merge` block on the
-SUB while it is set; one new frame, `MERGE_CLOSED`; `leaseMs` on the
-terminal REPLAYACK; `ackReceivedAt` from L's monotonic clock.
-Constants: `MERGE_LEASE_MS`, `ADOPT_ACK_MS`, `MERGE_TIMEOUT_MS`,
+or retention end; `role.merge.completing` on L and a `merge` block on
+the SUB while it is set; one new frame, `MERGE_CLOSED`; `tB` on L's
+record from its monotonic clock at the bind; `tS` on W's record at the
+ack's send. Constants: `MERGE_RETENTION_MS` (= `MERGE_TIMEOUT_MS` + 2 ×
+`FUTURE_TOLERANCE_MS` + one tick, the R above), `ADOPT_ACK_MS`,
+`MERGE_TIMEOUT_MS`,
 `MERGE_OFFER_TIMEOUT_MS`, `MERGE_WRITE_RESERVE`, each derived or sized
 below. One new function, `_mergeCandidate`, the single entry every
 demotion path takes for a root with custody. One new handler,
@@ -1140,11 +1181,13 @@ needs assumptions, named:
    split persists under assumptions 1–4 alone, for as long as the
    refusal holds; it is safe, not live, and the bound does not cover
    it.
-6. **Clocks run.** Both clocks advance at real-time rate within
-   `FUTURE_TOLERANCE_MS` over one `MERGE_LEASE_MS`, and a suspended L
-   detects its jump. This is the retention lease's assumption; under
-   it the handover completes inside the lease, and outside it L fails
-   closed, which is safety and not the bound.
+6. **Clocks run.** Each clock's error against real time over any span
+   up to R = `MERGE_TIMEOUT_MS` + 2 × `FUTURE_TOLERANCE_MS` + one tick
+   is at most `FUTURE_TOLERANCE_MS`, and a suspended L detects its jump.
+   This is the retention inequality's assumption and nothing else's:
+   under it L's latest release precedes W's earliest unpin; outside it
+   L fails closed. It says nothing about delivery, and the custody
+   paragraph in 4(d) states the holder when delivery fails.
 
 Under 1–5, with V = `ROOT_VERIFY_MS`, Lk = one lookup, F the frames the
 export needs at `REPLAY_CHUNK_BYTES` (fixed at the cut), and A =
@@ -1194,12 +1237,12 @@ them move with S.
 
 Every fence passes with its fix and fails with the fix deleted, on the
 same tree, and the manifest records both runs. Mutants are named per
-fence as in the two-pool packet. Fifty-four fences in v0.12; the four
+fence as in the two-pool packet. Fifty-six fences in v0.13; the four
 added over v0.1, the two over v0.2, the five over v0.3, the four over
 v0.4 (one replacing `tail_closed`), the four over v0.5, the two over
 v0.6, the eight over v0.7, the seven over v0.8, the five over v0.9, the
-three over v0.10 (one replacing `ttl_skew`) and the four over v0.11
-come from Aster's eleven readings.
+three over v0.10 (one replacing `ttl_skew`), the four over v0.11 and
+the two over v0.12 come from Aster's twelve readings.
 
 | Fence | Pins | Red without |
 |---|---|---|
@@ -1251,7 +1294,9 @@ come from Aster's eleven readings.
 | `fence_dual_root_adopt_pending_delegation` | (d) | parent → custody-refusing child with immediate refusal, delayed refusal and lost response; each delegated subscriber has a serving parent at every step; the mutant restores delete-before-send |
 | `fence_dual_root_stale_sub_before_cut` | (d) | a renewal sent by L before the cut arrives at W after `acked`; it completes nothing and releases no pin; the mutant completes on any SUB from L |
 | `fence_dual_root_sub_other_corr` | (d) | a `merge` block naming another corr, then another epoch; both logged `merge-stale`, nothing completes; the mutant matches on corr alone |
-| `fence_dual_root_lease_cancellation` | (d) | the terminal ack reaches L after L's lease, and separately L is suspended across its half-lease; L discards the ack and keeps custody in both, W releases at its lease end with the record failed, every entry accounted for at each step; the mutant lets L act on a late ack |
+| `fence_dual_root_lease_cancellation` | (d) | the terminal ack reaches L after `tB + A`, and separately L is suspended across its deadline; L discards the ack and keeps custody in both, W releases its pins at `tS + R` with the record failed, every entry accounted for at each step; the mutant lets L act on a late ack |
+| `fence_dual_root_lease_overlap` | (d) | perfect clocks, no suspension, the ack delayed in transit beyond `tS + R` while a receipt-start window would still be fresh; for every allowed A and E, L must reject at `tB + A` and retain custody; the mutant anchors L's validity at the ack's receipt |
+| `fence_dual_root_lease_end_completion_lost` | (d) | L flips inside its deadline and the first and every later `merge`-bearing SUB is lost until W's `tS + R`; W unpins; L must still hold the whole export pinned against cap eviction and serve it, and no entry may leave before L's own TTL; the mutant releases L's pins at W's lease end |
 | `fence_dual_root_merge_closed` | (d) | L keeps re-sending the `merge` block on renewals until `MERGE_CLOSED`; a lost first SUB is recovered by the second; the mutant clears `completing` after one send |
 | `fence_probe_verdicts_awaited` | (a) | a try whose every pull resolved `consumed:false` still counts against the budget |
 | `fence_seat_reconnect_handoff_named` | Part 5.1 | a reconnecting seat's handoff leaves no record a host keeps |
