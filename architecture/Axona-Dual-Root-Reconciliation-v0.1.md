@@ -1,4 +1,4 @@
-# Axona Dual-Root Reconciliation — design packet v0.4
+# Axona Dual-Root Reconciliation — design packet v0.5
 
 **Status:** DESIGN, for council review. Nothing built. David's word (direct,
 04:1xZ 2026-10-17): "Yes, write it." The review bar is Vega's 8cbecf8b
@@ -33,6 +33,17 @@ machine with the winner as requester, an OFFER from the loser, both
 epochs on every frame, and a terminal ack the loser validates on six
 fields. The cursor's order is defined at export, not borrowed from a
 cache that has none.
+
+**v0.5 (17:1xZ 2026-10-17)** answers Aster's fourth BLOCK fcc085cf on
+v0.4: the tail. A loser that keeps stamping after its snapshot has a
+tail the terminal ack never covered, and the shipped high-water pull
+does not close it, since `_onSub` pulls only when the subscriber's `hw`
+exceeds the root's (wireHandlers.js:343–345) and a split winner can
+already hold a higher stamp. v0.5 has no tail: the loser CUTS and GATES
+when it binds the pull, forwards every later publish and kill to the
+winner by the reroute the kernel already runs for a non-root
+(wireHandlers.js:488; 1143–1145), and the export is total. The bound is
+then a sum of constants with no publisher term.
 
 **Lineage:** axona.bot 71dc09d7 (the split, seq 2 on the relay-held root),
 e508b92a (the fork), 7c7f9383 (amended proposal), c5d18788 and f7260bec
@@ -361,10 +372,10 @@ them new.
    strictly closer visited node, or a subscriber's `walkRoot` names
    one), L mints `corr` and routes `MERGE_OFFER {topicId, corr, loser,
    loserEpoch, hw, lw, count}` to W. L stays root, keeps stamping, keeps
-   serving. L records `openMerges[corr] = {winner: W, winnerEpoch: null,
-   state: 'offered', snapshot}` where `snapshot` is its export list,
-   fixed now (see the cursor below). A new OFFER to the same W with a
-   higher `loserEpoch` supersedes the old record; a lower one is stale.
+   serving; nothing is cut yet. L records `openMerges[corr] = {winner:
+   W, winnerEpoch: null, state: 'offered'}`. A new OFFER to the same W
+   with a higher `loserEpoch` supersedes the old record; a lower one is
+   stale.
 2. **PULL, W → L.** W starts its pull on any of: a `MERGE_OFFER` from a
    node strictly farther than itself; a subscriber's `walkRoot` naming a
    farther node that claims root; a replica or beacon carrying a foreign
@@ -381,7 +392,20 @@ them new.
    if `corr` matches an offer it made, L fills `winnerEpoch`; if no
    offer exists, L opens the record only when the requester is strictly
    closer than L for the topic and carries a `winnerEpoch`; anything
-   else is logged `merge-stale` and dropped. L answers `REPLAYUP
+   else is logged `merge-stale` and dropped. At the bind L CUTS and
+   GATES, in that order and in one tick: the export list is fixed from
+   the cache and the active dels as they stand (the cursor section
+   below), and `role.merge.gate = {winner: W, corr, at}` is set. While
+   the gate is set L stamps nothing. A bare PUB or KILL that reaches L
+   is rerouted to W exactly as a non-root reroutes one today
+   (wireHandlers.js:488 for PUB; 1143–1145 for KILL), and as the
+   4.102.0 step-down hold already does for a held node; the publisher's
+   pending re-send (`PENDING_PUB_TTL_MS`, constants.js:302) covers a
+   forwarded publish that W does not confirm. L's existing subscribers
+   keep receiving what L holds; a message stamped at W during the gate
+   reaches them after step 5, through L's replay as W's child. The
+   linearization point is the cut: every message is stamped either at L
+   before it or at W after it, and none at both. L answers `REPLAYUP
    {topicId, corr, loserEpoch, cursor, more, msgs, dels}` to `parentId`,
    each frame at most `REPLAY_CHUNK_BYTES` (constants.js:298, the
    budget replay already uses), from its snapshot in export order.
@@ -400,45 +424,52 @@ them new.
    all six of `topicId`, `corr`, `winner`, `winnerEpoch`, `loser`,
    `loserEpoch`, with `held` equal to `sent`, L runs `demote(W)`
    (rootClaim.js:374–395): upstream pinned to W, step-down hold armed, a
-   confirming SUB sent with L's `hw` and `lw`. The tail L stamped after
-   its snapshot was cut now reaches W by the shipped path: L's SUB
-   carries an `hw` above W's, and `_onSub` pulls that delta
-   (wireHandlers.js:343–345). W's unique bodies and tombstones reach L
-   by the shipped path too: L's since-all replay as W's child. `held <
-   sent` leaves L rooted; the trigger fires again on the next verify and
-   a NEW `corr` starts a new round. An ack with an unknown `corr`, a
-   mismatched epoch, or arriving while L's record shows frames
-   outstanding, is logged `merge-stale` and dropped. A send outcome is
-   never a step-down input.
+   confirming SUB sent with L's `hw` and `lw`, and the gate cleared with
+   the role. Nothing is outstanding at that moment: L stamped nothing
+   after the cut, and the ack covered the whole export. The `hw` pull
+   `_onSub` may run on that SUB (wireHandlers.js:343–345) is a backstop
+   and not the mechanism; the invariant does not depend on it. W's
+   unique bodies and tombstones reach L by the shipped path: L's
+   since-all replay as W's child. `held < sent` leaves L rooted; L
+   clears the gate, resumes stamping under its unchanged epoch, and the
+   trigger fires again on the next verify with a NEW `corr`. The same
+   happens if no terminal ack arrives within `MERGE_TIMEOUT_MS` of the
+   bind. An ack with an unknown `corr`, a mismatched epoch, or arriving
+   while L's record shows frames outstanding, is logged `merge-stale`
+   and dropped. A send outcome is never a step-down input.
 
 What each side holds when the machine ends: W holds the union of both
-histories minus everything tombstoned on either side; L, now a child,
-converges to the same set within one replay. The invariant in Part 3 is
-the statement about W at the moment L sheds root, and step 5 is the
-only place L sheds it.
+histories, every message forwarded during the gate included, minus
+everything tombstoned on either side; L, now a child, converges to the
+same set within one replay. The invariant in Part 3 is the statement
+about W at the moment L sheds root, and step 5 is the only place L
+sheds it. The cost of the gate is a latency bubble for L's subscribers,
+bounded by the gate's duration, which the bound below states.
 
 **The cursor.** The cache appends in ascending `publishTs`
 (topicStore.js:25–29; rootClaim.js:82) and defines no order among
 entries that share a stamp, so "cache order" is not a cursor. The export
-order is defined at step 1: L sorts a snapshot of its cache by
-(`publishTs` ascending, `msgId` ascending as a hex string) and keeps
-that list under `openMerges[corr].snapshot` for the life of the merge.
+order is defined at the cut in step 3: L sorts its cache by
+(`publishTs` ascending, `msgId` ascending as a hex string), appends the
+active dels, and keeps that list under `openMerges[corr].snapshot` for
+the life of the merge.
 The cursor carried in frames is the pair (`publishTs`, `msgId`) of the
 last entry sent, opaque to W, and L validates every incoming cursor
 against `openMerges[corr].lastCursorSent`: equal means continue,
 anything else means W restarts with a new `corr`. A frame never ends
 inside an equal-stamp group unless the group alone exceeds a frame, and
-then the pair still advances within it. Entries stamped after the
-snapshot are the tail, closed at step 5. Entries the TTL expires out of
-the live cache during the merge stay in the snapshot, so a long merge
-does not lose its own head; the snapshot is released when the record
-closes.
+then the pair still advances within it. No entry is stamped at L after
+the cut, so the export is total and there is no tail. Entries the TTL
+expires out of the live cache during the merge stay in the snapshot, so
+a long merge does not lose its own head; the snapshot is released when
+the record closes.
 
 **State added.** On every root: `role.sync.openMerges` (map corr →
 {winner, winnerEpoch, loserEpoch, state, snapshot, lastCursorSent,
-offeredAt}) and `role.sync.openPulls` (map corr → {loser, loserEpoch,
-cursor, framesIn, held, sent, startedAt}). On a subscriber:
-`sub.lastWalkRoot`. Two new frame types, `MERGE_OFFER` and `REPLAYACK`,
+offeredAt, boundAt}), `role.merge.gate` ({winner, corr, at} or null)
+and `role.sync.openPulls` (map corr → {loser, loserEpoch, cursor,
+framesIn, held, sent, startedAt}). On a subscriber: `sub.lastWalkRoot`.
+One constant, `MERGE_TIMEOUT_MS`, derived below. Two new frame types, `MERGE_OFFER` and `REPLAYACK`,
 registered beside HANDOFF and HANDOFFACK in constants.js and
 boundary1Registry.js; three fields added to `PULLUP` (`corr`,
 `winnerEpoch`, `cursor`) and four to `REPLAYUP` (`corr`, `loserEpoch`,
@@ -452,9 +483,17 @@ capped 5 s per round. With a routed path between the roots:
 
 - detection ≤ V + L from the moment the path exists, by trigger 1 or 2;
 - union ≤ one OFFER hop plus F PULLUP/REPLAYUP round trips, F the
-  number of frames the loser's snapshot needs at `REPLAY_CHUNK_BYTES`,
-  each bounded by the via-hop budget; F is 1 for a council-sized cache;
+  number of frames the loser's export needs at `REPLAY_CHUNK_BYTES`,
+  each bounded by the via-hop budget; F is fixed at the cut, since no
+  entry is stamped at L after it, so a continuing publisher does not
+  move F; F is 1 for a council-sized cache;
 - step-down ≤ A after the terminal ack lands.
+
+The gate lasts from the bind to the terminal ack or to
+`MERGE_TIMEOUT_MS`, whichever is first, so `MERGE_TIMEOUT_MS` is set
+from the same terms: (1 + F) via-hop budgets plus A, times two for one
+retry round, and never less than `HANDOFF_ACK_MAX_MS`. A subscriber of
+L sees nothing new for at most that long.
 
 So T_recon ≤ V + L + (1 + F) round trips + A, under three conditions: the
 path exists, the loser's cache fits one REPLAYUP, and the winner is
@@ -495,9 +534,10 @@ code already carries, and it moves if they move.
 
 Every fence passes with its fix and fails with the fix deleted, on the
 same tree, and the manifest records both runs. Mutants are named per
-fence as in the two-pool packet. Nineteen fences in v0.4; the four added
-over v0.1, the two over v0.2 and the five over v0.3 come from Aster's
-three readings.
+fence as in the two-pool packet. Twenty-two fences in v0.5; the four
+added over v0.1, the two over v0.2, the five over v0.3 and the four
+over v0.4 (one replacing `tail_closed`) come from Aster's four
+readings.
 
 | Fence | Pins | Red without |
 |---|---|---|
@@ -515,7 +555,10 @@ three readings.
 | `fence_dual_root_two_way_unique` | (d) | W holds {a, tomb(x)}, L holds {b, tomb(y)}; after the machine W must hold a and b minus x and y, and L as child must converge; the mutant drops L's dels from the frames |
 | `fence_dual_root_stale_round` | (d) | a REPLAYACK carrying a superseded corr or a stale loserEpoch demotes L; a PULLUP from a node not strictly closer opens a merge record |
 | `fence_dual_root_cursor_invalid` | (d) | a cursor that does not equal lastCursorSent is answered with the next frame instead of a restart; a snapshot entry expired by TTL mid-merge is dropped from the export |
-| `fence_dual_root_tail_closed` | (d) | an entry L stamped after its snapshot never reaches W after demotion; the mutant strips hw from the confirming SUB |
+| `fence_dual_root_cut_is_total` | (d) | a publish reaching L after the bind is stamped at L; the mutant removes the gate |
+| `fence_dual_root_gate_forwards_writes` | (d) | a publisher writes through L every 10 ms from before the OFFER to after the demotion; at the end W must hold every one and L none stamped after the cut; the mutant forwards nothing while gated |
+| `fence_dual_root_hw_above_export` | (d) | W's high water is above every stamp L holds; every L entry must still arrive under corr; the mutant replaces the cursor pull with the hw delta |
+| `fence_dual_root_gate_timeout` | (d) | W dies after the bind; L must clear the gate at MERGE_TIMEOUT_MS, keep root under the same epoch, and the forwarded publishes must be re-sent by their publishers; the mutant leaves the gate set |
 | `fence_probe_verdicts_awaited` | (a) | a try whose every pull resolved `consumed:false` still counts against the budget |
 | `fence_seat_reconnect_handoff_named` | Part 5.1 | a reconnecting seat's handoff leaves no record a host keeps |
 | `fence_merge_carrier_named` | Part 2b | the sim runs both candidate paths from a reconnecting seat (HANDOFF; SUB low-water SPLIT_UNION) and either leaves no retained record that distinguishes it from the other |
@@ -535,10 +578,15 @@ relay test harness then runs the hand-fork case on a real transport.
   multi-round pull in 4d uses `REPLAY_CHUNK_BYTES` and leaves the round
   bound unsized; the bound in 4d holds for one frame and grows by one
   round trip per frame after it.
-- A loser that keeps stamping faster than one SUB delta can carry after
-  step 5. The tail closes by the shipped `hw` pull, which is a delta
-  from W's high water; a tail larger than one frame needs the same
-  multi-round path on that leg, which v0.4 does not add.
+- A gate that holds longer than its bound because W answers frames
+  slowly but never stops. `MERGE_TIMEOUT_MS` is measured from the bind,
+  not from the last frame, so a slow W ends the round at the timeout
+  and L resumes; the fence for the timeout covers a W that dies, and a
+  W that merely crawls is the same case to L.
+- A publisher whose forwarded publish reaches W and is confirmed there,
+  then re-sent to L after the gate clears on a failed round. The root
+  dedups by `msgId`, so the second copy is dropped wherever it lands;
+  the cost is one duplicate send, not a duplicate message.
 - Both nodes detecting at once and each sending the other an OFFER. The
   XOR check in step 2 makes exactly one of them the requester; the
   fence for stale rounds covers the crossed offers.
