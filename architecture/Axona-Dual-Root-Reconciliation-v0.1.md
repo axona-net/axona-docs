@@ -1,4 +1,4 @@
-# Axona Dual-Root Reconciliation — design packet v0.5
+# Axona Dual-Root Reconciliation — design packet v0.6
 
 **Status:** DESIGN, for council review. Nothing built. David's word (direct,
 04:1xZ 2026-10-17): "Yes, write it." The review bar is Vega's 8cbecf8b
@@ -41,9 +41,21 @@ does not close it, since `_onSub` pulls only when the subscriber's `hw`
 exceeds the root's (wireHandlers.js:343–345) and a split winner can
 already hold a higher stamp. v0.5 has no tail: the loser CUTS and GATES
 when it binds the pull, forwards every later publish and kill to the
-winner by the reroute the kernel already runs for a non-root
-(wireHandlers.js:488; 1143–1145), and the export is total. The bound is
-then a sum of constants with no publisher term.
+winner, and the export is total. The bound is then a sum of constants
+with no publisher term.
+
+**v0.6 (17:4xZ 2026-10-17)** answers Aster's fifth BLOCK 3196ed00 on
+v0.5: the gate's forward was not a defined path. v0.5 cited the non-root
+reroute at wireHandlers.js:488, and `_reroute` (AxonaManager.js:418–421)
+pops one via and sends toward the TOPIC id, which in the split being
+repaired can come back to the loser, and the loser is still root while
+gated, so that was a new interception path, not the existing non-root
+case. v0.6 forwards to the bound winner by name through the write-flight
+path the 4.102.0 hold already uses (`_holdIntercept`,
+wireHandlers.js:239–249, into `_forwardToRoot`, AxonaManager.js:909),
+with a re-entry nonce, with the helper's defer-confirmed demotion
+suppressed, and with the write discharged only by the winner's signed
+ingest ack.
 
 **Lineage:** axona.bot 71dc09d7 (the split, seq 2 on the relay-held root),
 e508b92a (the fork), 7c7f9383 (amended proposal), c5d18788 and f7260bec
@@ -395,18 +407,64 @@ them new.
    else is logged `merge-stale` and dropped. At the bind L CUTS and
    GATES, in that order and in one tick: the export list is fixed from
    the cache and the active dels as they stand (the cursor section
-   below), and `role.merge.gate = {winner: W, corr, at}` is set. While
-   the gate is set L stamps nothing. A bare PUB or KILL that reaches L
-   is rerouted to W exactly as a non-root reroutes one today
-   (wireHandlers.js:488 for PUB; 1143–1145 for KILL), and as the
-   4.102.0 step-down hold already does for a held node; the publisher's
-   pending re-send (`PENDING_PUB_TTL_MS`, constants.js:302) covers a
-   forwarded publish that W does not confirm. L's existing subscribers
-   keep receiving what L holds; a message stamped at W during the gate
-   reaches them after step 5, through L's replay as W's child. The
-   linearization point is the cut: every message is stamped either at L
-   before it or at W after it, and none at both. L answers `REPLAYUP
-   {topicId, corr, loserEpoch, cursor, more, msgs, dels}` to `parentId`,
+   below), and `role.merge.gate = {winner: W, winnerEpoch, corr, at}`
+   is set. While the gate is set L stamps nothing. The gate's forward
+   is its own contract, stated here because v0.5 got it wrong:
+
+   - **Placement.** A `_mergeGateIntercept(topicBig, type, payload)`
+     runs in `_onPub` and `_onKill` directly after `_holdIntercept`
+     (wireHandlers.js:457; the KILL twin near 1145) and before the
+     beacon correction, for any write that reaches L while
+     `role.merge.gate` is set. `_reroute` is never called for a gated
+     write: it pops a via and sends toward the topic id
+     (AxonaManager.js:418–421), and in a split that route can return to
+     L.
+   - **Target.** The write is forwarded to W BY NAME, `via: [W]`,
+     through the same dispatch `_forwardToRoot` (AxonaManager.js:909)
+     performs: a write flight is opened or joined at L, keyed on
+     (topic, W, winnerEpoch) (`_flightOpen`, writeFlight.js:75), the
+     publisher's `attemptId` is threaded so the chain stays one attempt,
+     and the forwarded write carries `ackTo`, `flightNonce` and
+     `attemptId`. One difference, and it is the whole reason this is a
+     sibling and not a call: the helper's handling of a `consumed`
+     verdict attributed to the target demotes the sender with
+     `defer-confirmed` (the lines after AxonaManager.js:944). The gated
+     forward does not demote on any verdict. A verdict is hop-local
+     evidence; the only thing that moves L's claim is step 5.
+   - **Discharge.** The forwarded write is discharged at L only by W's
+     signed ingest ack arriving at `_onIngestAck` for that flight, bound
+     to W and `winnerEpoch` as every flight ack is. The publisher's own
+     flight, opened toward L as its suspect root, is not satisfied by an
+     ack from W, by the flight rule that an ack from a different holder
+     proves nothing about this seat; it runs its receipt-bound recovery
+     and re-sends after `INGEST_ACK_MS`. The re-send lands at W by the
+     walk if L has demoted by then, or at L's gate again, and W dedups
+     by `msgId`. That delay on the publisher's confirm is the gate's
+     cost to a writer, and it is bounded by the gate.
+   - **Re-entry.** The forwarded write carries a `gateFwd` nonce
+     recorded in a bounded ledger at L, the shape of `holdFwd`
+     (wireHandlers.js:241–246, `HOLD_FWD_MAX` entries, `HOLD_REENTRY_MS`
+     expiry). A write carrying L's own `gateFwd` that returns to L is
+     marked undeliverable with reason `merge-gate-return`, not forwarded
+     again and not stamped; the publisher's flight recovers it. A
+     ledger at capacity refuses with `merge-gate-saturated`, same
+     outcome.
+   - **Unreachable or refusing W.** A gated forward whose verdict is
+     `failed`, or whose flight passes `INGEST_ACK_MS` with no ack from
+     W, ends the round: L clears the gate as it would on
+     `MERGE_TIMEOUT_MS`, keeps root under its epoch, and the next
+     trigger takes a new `corr`. A winner that cannot take a write
+     cannot take a frame either. Writes already forwarded are W's if W
+     ingested them and the publisher's to re-send if not; a late ack
+     from W after the gate has cleared closes its flight entry and
+     changes nothing about L's claim, logged `merge-late-ack`.
+
+   L's existing subscribers keep receiving what L holds; a message
+   stamped at W during the gate reaches them after step 5, through L's
+   replay as W's child. The linearization point is the cut: every
+   message is stamped either at L before it or at W after it, and none
+   at both. L answers `REPLAYUP {topicId, corr, loserEpoch, cursor,
+   more, msgs, dels}` to `parentId`,
    each frame at most `REPLAY_CHUNK_BYTES` (constants.js:298, the
    budget replay already uses), from its snapshot in export order.
    `_syncAnswerPull` answers when the cache OR the active dels are
@@ -466,10 +524,14 @@ the record closes.
 
 **State added.** On every root: `role.sync.openMerges` (map corr →
 {winner, winnerEpoch, loserEpoch, state, snapshot, lastCursorSent,
-offeredAt, boundAt}), `role.merge.gate` ({winner, corr, at} or null)
-and `role.sync.openPulls` (map corr → {loser, loserEpoch, cursor,
-framesIn, held, sent, startedAt}). On a subscriber: `sub.lastWalkRoot`.
-One constant, `MERGE_TIMEOUT_MS`, derived below. Two new frame types, `MERGE_OFFER` and `REPLAYACK`,
+offeredAt, boundAt}), `role.merge.gate` ({winner, winnerEpoch, corr,
+at} or null), `role.merge.gateFwd` (bounded nonce ledger, the shape of
+the hold's) and `role.sync.openPulls` (map corr → {loser, loserEpoch,
+cursor, framesIn, held, sent, startedAt}). On a subscriber:
+`sub.lastWalkRoot`. One constant, `MERGE_TIMEOUT_MS`, derived below.
+One new handler, `_mergeGateIntercept`, and one sibling of
+`_forwardToRoot` that shares its dispatch and flight and omits its
+demotion. Two new frame types, `MERGE_OFFER` and `REPLAYACK`,
 registered beside HANDOFF and HANDOFFACK in constants.js and
 boundary1Registry.js; three fields added to `PULLUP` (`corr`,
 `winnerEpoch`, `cursor`) and four to `REPLAYUP` (`corr`, `loserEpoch`,
@@ -534,10 +596,10 @@ code already carries, and it moves if they move.
 
 Every fence passes with its fix and fails with the fix deleted, on the
 same tree, and the manifest records both runs. Mutants are named per
-fence as in the two-pool packet. Twenty-two fences in v0.5; the four
-added over v0.1, the two over v0.2, the five over v0.3 and the four
-over v0.4 (one replacing `tail_closed`) come from Aster's four
-readings.
+fence as in the two-pool packet. Twenty-six fences in v0.6; the four
+added over v0.1, the two over v0.2, the five over v0.3, the four over
+v0.4 (one replacing `tail_closed`) and the four over v0.5 come from
+Aster's five readings.
 
 | Fence | Pins | Red without |
 |---|---|---|
@@ -559,6 +621,10 @@ readings.
 | `fence_dual_root_gate_forwards_writes` | (d) | a publisher writes through L every 10 ms from before the OFFER to after the demotion; at the end W must hold every one and L none stamped after the cut; the mutant forwards nothing while gated |
 | `fence_dual_root_hw_above_export` | (d) | W's high water is above every stamp L holds; every L entry must still arrive under corr; the mutant replaces the cursor pull with the hw delta |
 | `fence_dual_root_gate_timeout` | (d) | W dies after the bind; L must clear the gate at MERGE_TIMEOUT_MS, keep root under the same epoch, and the forwarded publishes must be re-sent by their publishers; the mutant leaves the gate set |
+| `fence_dual_root_gate_self_return` | (d) | a gated write forwarded to W comes back to L carrying L's own gateFwd; it must be marked undeliverable, not forwarded again, not stamped; the mutant forwards it again |
+| `fence_dual_root_gate_w_unreachable` | (d) | W is unreachable at the first gated write; L must end the round, clear the gate, keep root, and the publisher's re-send must land and be stamped at L; the mutant keeps forwarding into the void |
+| `fence_dual_root_gate_late_ack` | (d) | W's ingest ack for a gated write arrives after the gate cleared; the flight entry must close and L's claim must not move; the mutant demotes on it |
+| `fence_dual_root_gate_no_defer` | (d) | a consumed verdict attributed to W on a gated forward; L must not demote; the mutant forwards through the unmodified helper |
 | `fence_probe_verdicts_awaited` | (a) | a try whose every pull resolved `consumed:false` still counts against the budget |
 | `fence_seat_reconnect_handoff_named` | Part 5.1 | a reconnecting seat's handoff leaves no record a host keeps |
 | `fence_merge_carrier_named` | Part 2b | the sim runs both candidate paths from a reconnecting seat (HANDOFF; SUB low-water SPLIT_UNION) and either leaves no retained record that distinguishes it from the other |
@@ -587,6 +653,13 @@ relay test harness then runs the hand-fork case on a real transport.
   then re-sent to L after the gate clears on a failed round. The root
   dedups by `msgId`, so the second copy is dropped wherever it lands;
   the cost is one duplicate send, not a duplicate message.
+- A writer that publishes through L during the gate and reads its own
+  confirm late: its flight toward L is not satisfied by W's ack and
+  re-sends after `INGEST_ACK_MS`. That is one ack window per write in
+  the gate, by design, and the fence for a writer through the whole
+  merge counts it. If that cost is too high for a topic, the remedy is
+  a proxied ack signed by L naming W's ingest, which v0.6 does not
+  design because it would let L vouch for an ingest it did not see.
 - Both nodes detecting at once and each sending the other an OFFER. The
   XOR check in step 2 makes exactly one of them the requester; the
   fence for stale rounds covers the crossed offers.
