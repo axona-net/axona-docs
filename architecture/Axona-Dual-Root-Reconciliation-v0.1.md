@@ -1,4 +1,4 @@
-# Axona Dual-Root Reconciliation — design packet v0.13
+# Axona Dual-Root Reconciliation — design packet v0.14
 
 **Status:** DESIGN, for council review. Nothing built. David's word (direct,
 04:1xZ 2026-10-17): "Yes, write it." The review bar is Vega's 8cbecf8b
@@ -169,6 +169,21 @@ act of W's under the round, derives W's retention from the same terms
 with the overlap written as an inequality, keeps the three deadlines
 distinct, and names what holds custody after a lost completion: L, as
 a child, under its own hold.
+
+**v0.14 (19:0xZ 2026-10-17)** answers Aster's BLOCK 9f99b47d on v0.13,
+two obligations, both holding. One: the inequality compared a name on
+both sides, and the packet itself derived `MERGE_TIMEOUT_MS` from a
+frame count and a service time, which differ by peer; and one tick was
+asserted, not shown, as the bound between the last check and the
+irreversible flip; and a remote clock-rate violation is not something L
+can detect. v0.14 makes A a constant under a timing version, binds the
+timing to `corr` on the OFFER and the PULLUP with refusal on mismatch,
+re-checks at the commit in the same synchronous run, states the
+suspension bound as an assumption, and says what a violation costs.
+Two: role cleanup at repairPlane.js:352–371 reaps a role with no
+subscribers and an empty cache without reading tombstones or merge
+state, so a tombstone-only loser could lose its custodian role. v0.14
+gives custody an explicit exemption from both reapers.
 
 **Lineage:** axona.bot 71dc09d7 (the split, seq 2 on the relay-held root),
 e508b92a (the fork), 7c7f9383 (amended proposal), c5d18788 and f7260bec
@@ -526,8 +541,7 @@ into the winner, and no authorization came back to the loser. Aster
 `winnerEpoch` and `loserEpoch` in every frame. Four messages, two of
 them new.
 
-1. **OFFER, L → W.** When the trigger fires at L (its own verify's closest visited node, a subscriber's `walkRoot`, a beacon, or any inventory row names a claim that WINS over L's own under the Part 3 relation), L mints `corr` and routes `MERGE_OFFER {topicId, corr, loser,
-   loserEpoch, hw, lw, count}` to W. L stays root, keeps stamping, keeps
+1. **OFFER, L → W.** When the trigger fires at L (its own verify's closest visited node, a subscriber's `walkRoot`, a beacon, or any inventory row names a claim that WINS over L's own under the Part 3 relation), L mints `corr` and routes `MERGE_OFFER {topicId, corr, loser, loserEpoch, hw, lw, count, timing}` to W, `timing` being `{version, A, E}` from L's constants (the shared-parameters rule in the retention section). L stays root, keeps stamping, keeps
    serving; nothing is cut yet. L records `openMerges[corr] = {winner:
    W, winnerEpoch: null, state: 'offered'}`. A new OFFER to the same W
    with a higher `loserEpoch` supersedes the old record; a lower one is
@@ -538,8 +552,7 @@ them new.
    root epoch for the topic. If the trigger reached W first, W mints
    `corr` itself. W evaluates the Part 3 relation before anything else: W pulls only from a claim it wins over; if the other claim wins over W's, W is the loser and runs step 1 toward it instead; the relation is a total order, so exactly one of the two holds. W records
    `openPulls[corr] = {loser: L, loserEpoch, cursor: null, framesIn: 0,
-   held: 0, sent: 0, startedAt}` and routes `PULLUP {topicId, corr,
-   parentId: W, winnerEpoch, cursor: null, sinceHw: 0}` to L. That
+   held: 0, sent: 0, startedAt}` and routes `PULLUP {topicId, corr, parentId: W, winnerEpoch, cursor: null, sinceHw: 0, timing}` to L, `timing` echoing the OFFER's after W has checked its version and limits; a mismatch is refused before this step. That
    `PULLUP` is the message that begins the winner's ingest; it is the
    shipped verb with three fields added.
 3. **FRAMES, L → W.** On a `PULLUP` carrying `corr`, L binds the record:
@@ -1017,19 +1030,51 @@ v0.8 replaces them:
        `MERGE_CLOSED`, and otherwise until each entry expires by L's
        own TTL. There is no third timer: a child's cache is served to
        its subscribers anyway, and the hold is the network's promise.
+    **Shared parameters, bound to the round.** The inequality below is
+    about numbers, not names: A, E and P must be the SAME numbers at
+    both ends, and a peer's constants, profile or kernel version can
+    differ. So A is a constant, `MERGE_TIMEOUT_MS`, published under a
+    timing version `MERGE_TIMING_VERSION` with its allowed limits
+    `A_MIN ≤ A ≤ A_MAX` and `E ≤ E_MAX`; it is not derived per round
+    from F or S (the derivation v0.13 carried is withdrawn below, and
+    the universal worst case it replaces is stated there). The OFFER
+    carries `timing: {version, A, E}` from L; W refuses the round with
+    `refused-timing` before any data if the version is not its own or
+    A or E is outside its limits, else it computes R from L's A and
+    BOTH tolerances, `R = A + E_L + E_W + P`, and echoes `timing` on the
+    PULLUP; L binds only if the echo equals what it offered, else it
+    refuses the round before the cut. A mismatch never reaches the gate.
     The inequality. W cannot send the ack before L binds, in real
     time, because the ack answers frames L sent after the bind: so
-    `tS ≥ tB` in real time. With each clock's error over any span up
-    to R bounded by E (assumption 6), L's latest permitted act is at
-    real time `tB + A + E`, and W's earliest permitted unpin is at real
-    time `tS + R − E ≥ tB + A + 2E + P − E = tB + A + E + P`. The
-    difference is P, one tick, which covers the processing between
-    L's check and its dispatch, and rounding is absorbed by choosing P
-    as a whole tick. So for every allowed A and E, L's latest release
-    precedes W's earliest unpin, and the delayed-ack trace of 9893153c
-    is excluded by construction, not by a timeout that happens to be
-    short enough. Suspend and resume at L is caught by the clock-jump
-    check in (1); at W, a suspension only lengthens retention.
+    `tS ≥ tB` in real time. With L's clock error over any span up to R
+    bounded by `E_L` and W's by `E_W` (assumption 6), L's latest
+    permitted act is at real time `tB + A + E_L`, and W's earliest
+    permitted unpin is at real time `tS + R − E_W ≥ tB + A + E_L + P`.
+    The difference is P. P is not one nominal tick asserted; it is the
+    bound assumption 7 states on the synchronous run between L's last
+    check and its flip, and the check is made at the commit: the test
+    `now_mono ≤ tB + A` runs again, synchronously, immediately before
+    `_set`, in the same run with no await between them. A suspension of
+    that run longer than P violates assumption 7; L cannot prevent it,
+    and detects it only after the fact, when the monotonic clock read
+    at the flip's return is past `tB + A`, logged `merge-late-flip`.
+    What a violation costs is stated, not hidden: the inequality is
+    what makes "W holds the union at the moment L flips" true, and a
+    late flip can leave W unpinned before L's completion arrives, which
+    is the lost-completion case of the next paragraph. The DATA is
+    safe there by the custodian rule regardless; only the claim that W
+    already holds it is lost. Likewise a clock-RATE violation at W is
+    not observable from L: L's jump check covers L's own clock and
+    nothing else, so assumption 6 is a guarantee assumption, and the
+    custodian rule, not detection, is what holds under its violation.
+    `fence_dual_root_timing_bound` offers with a different A, then an
+    A outside limits, then a different version: each refused before
+    the cut; the mutant compares names and binds.
+    `fence_dual_root_commit_guard` suspends L between the recheck and
+    the flip past P: the flip is logged late, no completion is claimed,
+    L holds the export as child, W's record fails at `tS + R`, and no
+    entry leaves before L's TTL; the mutant checks once at the ack and
+    not at the commit.
   - **What holds custody when completion is lost.** If L flipped inside
     its deadline and no `merge`-bearing SUB ever reaches W before `tS +
     R`, W releases its pins and the record fails; L is a child of W
@@ -1044,6 +1089,36 @@ v0.8 replaces them:
     the custody claim in Part 3 stated for the failure case, with a
     holder named, and `fence_dual_root_lease_end_completion_lost`
     checks the holder at every step.
+  - **The custodian role is pinned, not only its entries.** A holder is
+    a role, and the kernel reaps roles. `deadNow` (repairPlane.js:
+    352–355) is true for a role with no subscribers and an empty cache
+    that is not a backup seat, keyspace-pinned, metrics-leased,
+    subscribed or hosted; the reap at 356–366 logs it and the delete
+    at 367–369 removes `axonRoles[t]` and `_upstream[t]`, with a
+    `holdsHistory` test that reads the cache only. Neither test reads
+    active tombstones or merge state, so a losing root whose export is
+    tombstone-only, demoted and then left without subscribers, loses
+    its custodian role before its tombstones expire, and a killed body
+    that reappears is no longer suppressed. Cap pins do not stop role
+    deletion. v0.14: a role is CUSTODY-ALIVE while any of these holds:
+    `openMerges`, `openPulls`, `completing` or `acceptedWinner` set;
+    merge pins non-empty; a retained snapshot; or any active tombstone
+    (merge or not: a tombstone is custody of a deletion). Both reapers,
+    `idleReap` (278–281) and `deadNow`, and the delete test at 367 read
+    custody-alive and skip the role while it holds; backup retirement
+    reads the same test beside its existing seat exemption (272–276).
+    Discharge is one of two events: correlated closure (`MERGE_CLOSED`,
+    which releases the snapshot and pins), or local expiry of every
+    pinned entry and every tombstone by this node's own TTL. A
+    custody-alive role with no subscribers is served to nobody and
+    costs its cache; that is the price of holding a deletion until it
+    expires, and it is already the price a root pays today for a
+    tombstone with subscribers. `fence_dual_root_role_gc_custody` runs
+    lost completion, no subscribers, a tombstone-only export, a full
+    cleanup tick, W's retention expiry and a late reappearance of the
+    killed body at L: L's role and tombstones must survive the tick,
+    the body must be suppressed, and the role must be reaped only after
+    the tombstone's own TTL; the mutant restores the cache-only tests.
   - The terminal check has no "expired" category: every manifest body
     is held or tombstoned at W and every manifest tombstone is active
     at W, or the ack is short. A W clock ahead of L's changes nothing
@@ -1132,9 +1207,12 @@ returns `{committed, reason}` and every caller branches on it;
 or retention end; `role.merge.completing` on L and a `merge` block on
 the SUB while it is set; one new frame, `MERGE_CLOSED`; `tB` on L's
 record from its monotonic clock at the bind; `tS` on W's record at the
-ack's send. Constants: `MERGE_RETENTION_MS` (= `MERGE_TIMEOUT_MS` + 2 ×
-`FUTURE_TOLERANCE_MS` + one tick, the R above), `ADOPT_ACK_MS`,
-`MERGE_TIMEOUT_MS`,
+ack's send; `timing: {version, A, E}` on the OFFER and echoed on the
+PULLUP, bound to `corr`; a custody-alive test read by both role reapers
+and the role delete. Constants: `MERGE_TIMING_VERSION`, `A_MIN`,
+`A_MAX`, `E_MAX`, `MERGE_RETENTION_MS` (R = A + E_L + E_W + P),
+`ADOPT_ACK_MS`, `MERGE_TIMEOUT_MS` (the constant A, a universal worst
+case, not a per-round derivation),
 `MERGE_OFFER_TIMEOUT_MS`, `MERGE_WRITE_RESERVE`, each derived or sized
 below. One new function, `_mergeCandidate`, the single entry every
 demotion path takes for a root with custody. One new handler,
@@ -1182,12 +1260,17 @@ needs assumptions, named:
    refusal holds; it is safe, not live, and the bound does not cover
    it.
 6. **Clocks run.** Each clock's error against real time over any span
-   up to R = `MERGE_TIMEOUT_MS` + 2 × `FUTURE_TOLERANCE_MS` + one tick
-   is at most `FUTURE_TOLERANCE_MS`, and a suspended L detects its jump.
-   This is the retention inequality's assumption and nothing else's:
-   under it L's latest release precedes W's earliest unpin; outside it
-   L fails closed. It says nothing about delivery, and the custody
-   paragraph in 4(d) states the holder when delivery fails.
+   up to R is at most its own E, `E_L` at L and `E_W` at W, each at or
+   under `E_MAX`. This is a guarantee assumption: L can detect its own
+   jump against its monotonic clock and does, and it cannot observe
+   W's rate at all. Under the assumption L's latest release precedes
+   W's earliest unpin; outside it, the custodian rule in 4(d) is what
+   holds, not detection.
+7. **The commit run is short.** The synchronous run from L's recheck at
+   the commit to the completed flip is not suspended for longer than
+   P. L detects a violation after the fact and logs it; the cost of a
+   violation is the lost-completion case, in which the data is safe
+   and W's union is not claimed.
 
 Under 1–5, with V = `ROOT_VERIFY_MS`, Lk = one lookup, F the frames the
 export needs at `REPLAY_CHUNK_BYTES` (fixed at the cut), and A =
@@ -1198,10 +1281,7 @@ export needs at `REPLAY_CHUNK_BYTES` (fixed at the cut), and A =
 - one round ≤ S (offer) + (1 + F) × 2S (pull and frames) + S (ack);
 - T_recon ≤ detection + (1 + R) × one round.
 
-`MERGE_TIMEOUT_MS` bounds ONE gate interval, not reconciliation: it is
-2 × ((2 + 2F) × S + A), never below `HANDOFF_ACK_MAX_MS`, measured from
-the bind, and a subscriber of L sees nothing new for at most that long
-per round. If assumption 3 fails the round aborts at that timeout and
+`MERGE_TIMEOUT_MS` bounds ONE gate interval, not reconciliation. It is a CONSTANT, not a figure each peer derives: v0.13 wrote it as 2 × ((2 + 2F) × S + A) and that made it a function of a frame count and a service time two peers need not share, which is why the retention inequality could not be about numbers. The constant is the universal worst case of that expression, 2 × ((2 + 2·F_MAX) × S_MAX + A_ack) with F_MAX = ⌈`_cacheBytes` / `REPLAY_CHUNK_BYTES`⌉, S_MAX a fixed service allowance published with the timing version, and A_ack = `HANDOFF_ACK_MAX_MS`; never below `HANDOFF_ACK_MAX_MS`; measured from the bind; and a subscriber of L sees nothing new for at most that long per round. If assumption 3 fails the round aborts at that timeout and
 assumption 4 is what carries the next; if assumption 2 fails the roots
 stay two and safety holds. None of these figures is a floor and all of
 them move with S.
@@ -1237,12 +1317,13 @@ them move with S.
 
 Every fence passes with its fix and fails with the fix deleted, on the
 same tree, and the manifest records both runs. Mutants are named per
-fence as in the two-pool packet. Fifty-six fences in v0.13; the four
+fence as in the two-pool packet. Fifty-nine fences in v0.14; the four
 added over v0.1, the two over v0.2, the five over v0.3, the four over
 v0.4 (one replacing `tail_closed`), the four over v0.5, the two over
 v0.6, the eight over v0.7, the seven over v0.8, the five over v0.9, the
-three over v0.10 (one replacing `ttl_skew`), the four over v0.11 and
-the two over v0.12 come from Aster's twelve readings.
+three over v0.10 (one replacing `ttl_skew`), the four over v0.11, the
+two over v0.12 and the three over v0.13 come from Aster's thirteen
+readings.
 
 | Fence | Pins | Red without |
 |---|---|---|
@@ -1297,6 +1378,9 @@ the two over v0.12 come from Aster's twelve readings.
 | `fence_dual_root_lease_cancellation` | (d) | the terminal ack reaches L after `tB + A`, and separately L is suspended across its deadline; L discards the ack and keeps custody in both, W releases its pins at `tS + R` with the record failed, every entry accounted for at each step; the mutant lets L act on a late ack |
 | `fence_dual_root_lease_overlap` | (d) | perfect clocks, no suspension, the ack delayed in transit beyond `tS + R` while a receipt-start window would still be fresh; for every allowed A and E, L must reject at `tB + A` and retain custody; the mutant anchors L's validity at the ack's receipt |
 | `fence_dual_root_lease_end_completion_lost` | (d) | L flips inside its deadline and the first and every later `merge`-bearing SUB is lost until W's `tS + R`; W unpins; L must still hold the whole export pinned against cap eviction and serve it, and no entry may leave before L's own TTL; the mutant releases L's pins at W's lease end |
+| `fence_dual_root_timing_bound` | (d) | an OFFER with a different A, then an A outside limits, then another timing version; each refused before the cut; the mutant compares names and binds |
+| `fence_dual_root_commit_guard` | (d) | L suspended between the commit recheck and the flip past P; the flip logged late, no completion claimed, L holds as child, W's record fails at `tS + R`, nothing leaves before L's TTL; the mutant checks only at the ack |
+| `fence_dual_root_role_gc_custody` | (d) | lost completion, no subscribers, tombstone-only export, a full cleanup tick, W's retention expiry, late reappearance of the killed body; L's role and tombstones survive, the body is suppressed, the role is reaped only after the tombstone's TTL; the mutant restores the cache-only reap tests |
 | `fence_dual_root_merge_closed` | (d) | L keeps re-sending the `merge` block on renewals until `MERGE_CLOSED`; a lost first SUB is recovered by the second; the mutant clears `completing` after one send |
 | `fence_probe_verdicts_awaited` | (a) | a try whose every pull resolved `consumed:false` still counts against the budget |
 | `fence_seat_reconnect_handoff_named` | Part 5.1 | a reconnecting seat's handoff leaves no record a host keeps |
