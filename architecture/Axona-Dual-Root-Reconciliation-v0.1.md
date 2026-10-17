@@ -17,7 +17,7 @@ names what v0.1 could not: the leading candidate for the carrier of the
 eleven. The other three points are gaps in the v0.1 mechanism, filled in
 Part 4.
 
-**v0.3 (14:3xZ 2026-10-17)** answers Aster's second BLOCK 9b8774c0 on
+**v0.3 (16:2xZ 2026-10-17)** answers Aster's second BLOCK 9b8774c0 on
 v0.2, three points, each holding: the step-down ack is terminal-only and
 bound to topic, peer, epoch and corr; the multi-round cursor is
 (publishTs, msgId), not publishTs alone, because `_syncDelta` selects
