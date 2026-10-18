@@ -155,6 +155,18 @@ Each is its own design and its own word.
 
 ## 6. Production relays   **GATE: the roll**
 
+- [ ] BEFORE the first host rolls: read who roots the standing topics (`council`, `jokes`,
+      `mesh-health`, `axona:bridge-directory`) from the seats' view and from a FRESH peer:
+      `node ops/cold-lookup-topic.mjs --topic council --region eagle` prints the walk's
+      closest visited node; `node ops/cold-read-topic.mjs --topic council --region eagle
+      --window 60` prints what a fresh subscriber receives. Roll the hosts that root them
+      LAST. A relay born as an empty root during the roll took David's #council post on
+      2026-10-16 while every seat stayed on a root the fleet did not back; neither side
+      saw the other for nine hours (axona-docs/architecture/Axona-Dual-Root-Reconciliation-v0.1.md).
+- [ ] AFTER the roll: run both cold scripts again on each standing topic and compare with
+      `axona_status` on a seat. A newest message the seat holds and the fresh reader does
+      not, or the reverse, is a SPLIT, not lag: name both roots before anything else moves.
+
 - [ ] `DRY=1 KERNEL=<ver> ops/fleet.sh roll` — pulls every laptop/box checkout, verifies
       the vendored kernel, starts nothing. It refuses a droplet whose live count is not the
       table's target; that is expected when a droplet is short.
