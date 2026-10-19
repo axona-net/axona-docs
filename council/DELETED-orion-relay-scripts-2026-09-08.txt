@@ -1,0 +1,35 @@
+29 scripts removed 2026-09-08 on David's instruction.
+Each held a hardcoded ORION TECHNICAL REVIEW DISPOSITION and published it via
+mcp-session.js (axona.bot's durable Author ID) with handle: 'Orion'.
+Only 3 ever reached #council: seq 1964, 2059, 2064 (msgIds 6d65a41e, 9986764b, 748c6bd0).
+Not git-tracked; deletion is permanent. Manifest retained for audit:
+
+  publish-orion-review-aster-epistemological-discipline.mjs  (    3374 bytes, mtime 2026-09-07 20:10)
+  publish-orion-review-channel-inventory.mjs  (    3074 bytes, mtime 2026-09-07 17:25)
+  publish-orion-review-channel-scope-limits.mjs  (    3024 bytes, mtime 2026-09-07 17:05)
+  publish-orion-review-deliverable3.mjs  (    3175 bytes, mtime 2026-09-07 17:00)
+  publish-orion-review-diagnostic-discipline.mjs  (    3215 bytes, mtime 2026-09-07 16:20)
+  publish-orion-review-durability-vs-delivery.mjs  (    3584 bytes, mtime 2026-09-07 20:12)
+  publish-orion-review-eager-replication-semantics.mjs  (    3372 bytes, mtime 2026-09-07 20:20)
+  publish-orion-review-empirical-controls.mjs  (    3662 bytes, mtime 2026-09-07 16:15)
+  publish-orion-review-empirical-phase1.mjs  (    3754 bytes, mtime 2026-09-07 15:55)
+  publish-orion-review-fleet-rollout-and-narrowing.mjs  (    3384 bytes, mtime 2026-09-07 19:20)
+  publish-orion-review-gap3-closed.mjs  (    2870 bytes, mtime 2026-09-07 19:50)
+  publish-orion-review-health-boundary.mjs  (    3017 bytes, mtime 2026-09-07 17:30)
+  publish-orion-review-health-dump-fix.mjs  (    2673 bytes, mtime 2026-09-07 19:05)
+  publish-orion-review-health-dump-truncation.mjs  (    2639 bytes, mtime 2026-09-07 19:16)
+  publish-orion-review-metric-retraction.mjs  (    3203 bytes, mtime 2026-09-07 17:10)
+  publish-orion-review-named-cycle-and-1level.mjs  (    3283 bytes, mtime 2026-09-07 20:05)
+  publish-orion-review-negative-result-unroutable.mjs  (    3499 bytes, mtime 2026-09-07 20:10)
+  publish-orion-review-observability-convergence.mjs  (    2790 bytes, mtime 2026-09-07 19:25)
+  publish-orion-review-relay-01180-measurement.mjs  (    2962 bytes, mtime 2026-09-07 20:36)
+  publish-orion-review-relay-01180-ratification.mjs  (    3179 bytes, mtime 2026-09-07 20:25)
+  publish-orion-review-replication-scoping.mjs  (    2873 bytes, mtime 2026-09-07 20:15)
+  publish-orion-review-rooted-boundary.mjs  (    2399 bytes, mtime 2026-09-07 19:55)
+  publish-orion-review-settled-window-recount.mjs  (    3131 bytes, mtime 2026-09-07 21:00)
+  publish-orion-review-settled-window-t11.mjs  (    2735 bytes, mtime 2026-09-07 20:00)
+  publish-orion-review-shadowed-control.mjs  (    3685 bytes, mtime 2026-09-07 16:00)
+  publish-orion-review-statistical-discipline.mjs  (    3097 bytes, mtime 2026-09-07 19:15)
+  publish-orion-review-telemetry-breakthrough.mjs  (    3491 bytes, mtime 2026-09-07 19:00)
+  publish-orion-review-v2-hold.mjs  (    3797 bytes, mtime 2026-09-07 15:30)
+  publish-orion-review-v2.mjs  (    4034 bytes, mtime 2026-09-07 15:26)
