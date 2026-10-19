@@ -1,8 +1,8 @@
 # Objective Technical & Strategic Critique: Axona Whitepaper & The Firewall Thesis
 
 **Target Documents:**
-1. [Axona Whitepaper v0.11](file:///Users/croqueteer/Documents/claude/axona-docs/whitepaper/Axona-Whitepaper.md) (*David A. Smith, July 23, 2026*)
-2. [Axona: The Firewall Thesis and Go-to-Market v0.1](file:///Users/croqueteer/Documents/claude/axona-docs/whitepaper/Axona_Firewall_Thesis_and_GTM_v0_1.md) (*July 30, 2026*)
+1. [Axona Whitepaper v0.11](Axona-Whitepaper.md) (*David A. Smith, July 23, 2026*)
+2. [Axona: The Firewall Thesis and Go-to-Market v0.1](Axona_Firewall_Thesis_and_GTM_v0_1.md) (*July 30, 2026*)
 
 ---
 

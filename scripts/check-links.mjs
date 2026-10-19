@@ -116,15 +116,28 @@ for (const file of files) {
   }
 
   // --- 2. relative links inside this repo (markdown only) ---
+  // Code is not a link: fenced blocks and inline spans are blanked (same length,
+  // so line numbers hold) before the scan — a transcript's `peer[m](...)` or a
+  // quoted `x['on']('ghost')` is text about code, not a reference to a file.
   if (/\.md$/i.test(file)) {
+    const scan = text
+      .replace(/```[\s\S]*?```/g, (b) => b.replace(/[^\n]/g, ' '))
+      .replace(/`[^`\n]*`/g, (b) => ' '.repeat(b.length));
     MD_LINK.lastIndex = 0;
     let m;
-    while ((m = MD_LINK.exec(text))) {
+    while ((m = MD_LINK.exec(scan))) {
       const raw = m[1];
       if (/^(https?:|mailto:|#|<)/i.test(raw)) continue;
+      if (/^['"]/.test(raw) || raw === '...') continue;            // a quoted string or an ellipsis is prose, not a target
       const target = decode(raw.split('#')[0]);
       if (!target) continue;
       checked++;
+      // A path on one machine is a link for exactly one reader. It fails like a
+      // missing file, named for what it is so the fix is obvious.
+      if (/^(file:|\/Users\/|\/home\/|[A-Za-z]:\\)/.test(target)) {
+        broken.push({ file, line: lineAt(text, m.index), target, kind: 'machine-local' });
+        continue;
+      }
       if (!existsSync(resolve(dirname(file), target)))
         broken.push({ file, line: lineAt(text, m.index), target, kind: 'relative' });
     }
@@ -153,7 +166,8 @@ if (fatal.length) {
   report(fatal, `✗ ${fatal.length} broken link${fatal.length === 1 ? '' : 's'} (of ${checked} checked in ${files.length} files)`, console.error);
   console.error(`\nA link points at a file that does not exist. If a doc was renamed in`);
   console.error(`axona-docs, every repo that links to it must be updated in the same pass —`);
-  console.error(`see axona-docs/RELEASE-SURFACES.md §4.\n`);
+  console.error(`see axona-docs/RELEASE-SURFACES.md §4. A [machine-local] target is a path on`);
+  console.error(`one computer (file://, /Users/…): make it relative, or a GitHub blob URL.\n`);
   process.exit(1);
 }
 

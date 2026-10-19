@@ -44,7 +44,7 @@ PDF — see [`BUILDING.md`](BUILDING.md) for the render process.
 | [**Axona Whitepaper v0.11**](whitepaper/Axona%20Whitepaper%20v0.11.pdf) | The unified document and the best single read: the Manifesto (Part I — why a network with no owner), The Machine (Part II — the full technical exposition), and The Politics (Part III — governance and consequences). Supersedes the standalone Explainer and Manifesto. |
 | [**Axona Synopsis v0.6**](synopsis/Axona%20Synopsis%20v0.6.pdf) | A short position note: what Axona is, what is genuinely new (un-censorable assembly, ungovernable mobilization), who it is for — people and, increasingly, AI agents — and the costs of an un-censorable medium. |
 | [**Axona Pitch v0.23**](pitch/Axona%20Pitch%20v0.23.pdf) | The two-column pitch: no-owner framing, live products (axona.chat, civildefense.io), and the headline 25K-node benchmark numbers. |
-| [**Axona Manifesto**](manifesto/Axona-Manifesto.pdf) | The original manifesto as a standalone piece (now also Part I of the whitepaper): architecture is politics, at the scale of the protocol. |
+| [**Axona Manifesto**](history/manifesto/Axona-Manifesto.pdf) | The original manifesto as a standalone piece (now also Part I of the whitepaper): architecture is politics, at the scale of the protocol. |
 
 ### Research
 
@@ -52,7 +52,7 @@ PDF — see [`BUILDING.md`](BUILDING.md) for the render process.
 |---|---|
 | [**Axona Paper v0.5.0**](paper/Axona%20Paper%20v0.5.0.pdf) | Conference-format research write-up (IEEE two-column): the neuromorphic routing design and a controlled comparison against Kademlia-class baselines. |
 | [**Axona Presentation v0.3.55**](presentation/Axona%20Presentation%20v0.3.55.pdf) | The research deck — full benchmark walkthrough at 25K nodes across the protocol roster. |
-| [**Axona Explainer v0.4.29**](explainer/Axona%20Explainer%20v0.4.29.pdf) | The popular-audience explainer. *Merged into the whitepaper as of v0.4;* retained for its standalone narrative and the Symbiotic Development postscript. |
+| [**Axona Explainer v0.4.29**](history/explainer/Axona%20Explainer%20v0.4.29.pdf) | The popular-audience explainer. *Merged into the whitepaper as of v0.4;* retained for its standalone narrative and the Symbiotic Development postscript. |
 | [**Gates to Gradients**](synopsis/axona%20gates%20to%20gradients.pdf) | Companion essay: replace platform *gates* (accounts, moderation queues, bans) with *gradients* (cost, friction, reputation) — the design philosophy behind the six implementation notes in `architecture/`. |
 
 ### Architecture & applications
@@ -120,7 +120,7 @@ and others. They are cited throughout the whitepaper and architecture doc.
 - **[`red team/`](red%20team/)** — independent red-team analyses. The current consolidated view is the [punch list re-audited against 4.19.3](red%20team/red-team-punchlist-v4.19.3.md); the shipped-baseline narrative is the [Security Status & Remediation Plan](red%20team/SECURITY-STATUS-v2.43.0.md); plus the [black-hole node threat note](red%20team/black-hole-nodes-v0.1.md) and the external bridge assessment ([axona-bridge#1](https://github.com/axona-net/axona-bridge/issues/1)).
 - **[`reviews/`](reviews/)** — external AI-agent reviews of the protocol and its documentation, unedited.
 - **[`BUILDING.md`](BUILDING.md)** — how every typeset doc is rendered (source → tectonic → versioned PDF, prior PDF archived to `history/`). Read before bumping any document.
-- **[`TESTNET.md`](TESTNET.md)** — the staging-network quick reference: URLs, version matrix, running apps against the testnet bridge.
+- **[`TESTNET.md`](history/TESTNET.md)** — the staging-network quick reference: URLs, version matrix, running apps against the testnet bridge.
 - **[`RELEASE-SURFACES.md`](RELEASE-SURFACES.md)** — every place a version, install command or cross-repo link is written down, the four render pipelines, and the release checklist. Read this before a docs cycle.
 - **[`RELEASE-NOTES.md`](RELEASE-NOTES.md)** — kernel and app changes, newest-first, keyed to kernel version.
 - **[`SECURITY-CHANGELOG.md`](SECURITY-CHANGELOG.md)** — public record of resolved security-relevant changes (what's now protected, keyed to kernel version).
