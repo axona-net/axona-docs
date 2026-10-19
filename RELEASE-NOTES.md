@@ -7,6 +7,65 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.114.1 → v4.115.0 — two roots for one topic, reconciled (2026-10-18)
+
+**Deployed 2026-10-19 01:2xZ on David's word ("release it", 2026-10-18): kernel
+4.115.0 (tag v4.115.0 → 28db1bf; the build is 5daca18), relay 0.163.0 (c466ace),
+bridge 2.164.0 (f816af4), both testnet bridges, both production bridges, 48
+relays (Air 6, M1 8, Linux 5, Windows 20, droplets 3 + 2 + 2 + 2), chat 0.91.0,
+share 0.50.0, portal 0.26.0, dht-sim 0.133.0. Built on branch `dual-root` from the design packet
+`architecture/Axona-Dual-Root-Reconciliation-v0.1.md` (v0.15, 14a6bd8). The
+reconciliation is OFF by default: `mergeCapable` is a kernel option, read from
+`MERGE_CAPABLE` in the environment, and nothing in this release sets it. An
+unarmed node behaves as 4.114.1 on every path except four that ride any node:
+the custody-alive reaper guard, the ADOPT acknowledgement with pending
+delegation, the tombstone-only answer to a pull, and the pinned-tombstone
+expiry. Arming is a separate word. Deployment rows and counts are in
+`team-updates/TEAM-UPDATE-v4.115.0-dual-root.md` and in `ops/STATE.md`.**
+
+What happens when two roots hold one topic and neither can see the other? On
+2026-10-16 #council split during a relay roll: a relay born as an empty root
+took David's post while every seat stayed on a root the fleet did not back, for
+nine hours. The seat's self-verify read the LAST hop of its lookup as the
+terminus, and the walk bounced past the true root to its hop cap every 45 s.
+
+- **The verify reads the closest VISITED node of its lookup, not the last
+  hop.** The lookup never revisits a node and reports a stall with the closest
+  visited id instead of running to the cap. The 2026-10-16 split would have
+  ended on the first verify.
+- **The birth probe awaits its verdicts.** A try whose every pull reached
+  nobody is deferred, not spent, and re-arms once the node can route. The
+  Windows relay had spent its three tries inside the 20 s after its restart.
+- **A history that crosses into a root leaves a record naming its carrier**
+  (`handoff-ingested`, `split-union-pull`, both at info).
+- **One election relation between two live claims**: higher epoch wins; at
+  equal epoch the XOR-closer wins. The root flag is a transaction: a root
+  holding a body or an active tombstone sheds its claim only with a release
+  token minted at the end of a completed round; every path that used to demote
+  directly, ADOPT included, names a candidate instead.
+- **The cut is at the commit.** A write admitted before the cut cannot stamp
+  after it; a gated write is forwarded to the winner by name under the winner's
+  epoch. The exchange runs by cursor under a correlation id with a manifest,
+  one terminal ack counted against retention, a lease anchored at the loser's
+  bind, and a correlated completion. The loser holds toward the accepted winner
+  whether or not it is closer. A role holding custody is never reaped.
+- **On the simulator** a partition heals into one root holding both sides'
+  bodies. A root made by hand mints the next epoch and wins under the relation;
+  the true root merges into it. The protocol promises the union, not the owner.
+
+Forty-nine fences, each run with the fix and with the fix deleted. Suite 284/285;
+the one red is a pre-existing timing flake in the TURN credential smoke. The
+gate's bound is 191 s per round at a per-frame service allowance of 250 ms
+that is ASSUMED from one hop's median, not measured on a merge; the round
+aborts and retries at the bound, so the allowance is a ceiling, not a figure.
+
+Alongside: relay 0.163.0 vendors the kernel (0.162.0 carried the MCP change); its MCP server reports each seat's
+roles in `axona_status` and returns the leave ledger from `axona_reconnect`.
+`RELEASE-PROCEDURE.md` §6 reads who roots the standing topics before a roll and
+cold-reads them after.
+
+---
+
 ## v4.114.0 → v4.114.1 — the gate-off seed, and enforcement on (2026-10-15)
 
 **Deployed 2026-10-16 00:04Z, David's word ("Release and turn on enforcement"):
