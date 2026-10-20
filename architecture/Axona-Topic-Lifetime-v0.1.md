@@ -83,7 +83,7 @@ boundaries (848688cb; Orion 6deb9c63 confirmed each from source): a delayed
 older DELIVER of the same root rolled the attachment back, so an old notice
 matched again; the held-body evidence outlived a change of upstream, so a
 child could step down with a body only its OLD root had sent; and the held
-set was kept unarmed and never pruned. Fixed at COMMIT_SHA: the attachment
+set was kept unarmed and never pruned. Fixed: the attachment
 moves forward only within a root, the evidence is bound to the current
 upstream and generation and cleared when either changes, and the set exists
 only armed and is pruned with the cache. Then Aster's four cases at those
@@ -96,8 +96,14 @@ current-generation DELIVER, the prune runs over every role, and grants move
 forward only. Then Aster's TL-B11 (535a6741): a reply to an older request
 could still commit after a newer one had. Fixed: each nonce carries the
 holder's attempt number and a reply commits only for an attempt newer than
-the last committed, the pin following the decision. Part 10: departures 14
-to 25, fences 222, mutants 34.
+the last committed, the pin following the decision; TL-B12 (c59cb0be): the
+decision made once and three-way, commit, data only, or forward from the
+selected parent; TL-B13 (daa31e63): one attachment per topic per node and
+teardown bound per obligation. And two findings from the armed suite: the
+selected parent hands a delegated seat to its child, and the attempt window
+holds sixteen. Part 10: departures 14 to 25, fences 222, mutants 34. The
+4.4 skew sentence is corrected (c59cb0be): a skew beyond S can admit as
+well as refuse.
 
 **v0.11 (17:xxZ 2026-10-20)** closes Aster's three counterexamples on the
 build (c5adedec, REQUEST CHANGES), each confirmed from source: a delayed
@@ -656,7 +662,7 @@ and a seat that renews before its notice regenerates a root that ends by
 the same rule on the next pass (David, 2026-10-20); the residual is sized
 in 4.6.
 
-## 10. The build (branch `topic-lifetime`, COMMIT_SHA over v4.116.0; 2026-10-20)
+## 10. The build (branch `topic-lifetime`, e469e27 over v4.116.0; 2026-10-20)
 
 Built on David's word ("Build", 04:0xZ). NOT released, NOT armed: both are
 his separate words. The whole machine sits behind `TOPIC_LIFETIME` (kernel
@@ -871,8 +877,14 @@ wrong (the receiver's seat instead of the sender's lease; a stay equal to
 the thin window; a cooled node never first in line); the mutants were fixed,
 not the code.
 
-**The suite** (at COMMIT_SHA): unarmed SUITE_OFF; armed SUITE_ON. At
-ba53255 it read unarmed 293 of 293 and armed 292 of 293: smoke_interloper_convergence,
+**The suite** (at e469e27, with nothing else running on the box): unarmed
+291 of 293, the TURN credential flake and fence_merge_sim_partition; armed
+292 of 293, the TURN credential flake. Two armed runs between ba53255 and
+97b854c were not evidence: one ran while a mutant pass rewrote source files,
+the other while fences and smokes ran alongside, and smoke_restart_handoff
+(106 s on an idle Mac against the runner's 180 s limit) timed out in both;
+alone, armed, it passes. At ba53255 the runs read unarmed 293 of 293 and
+armed 292 of 293: smoke_interloper_convergence,
 an eleven-second real-time smoke, failed its late-replay check once in the
 suite and once in three runs alone, then passed twelve of twelve (six armed,
 six unarmed) under a log tap that recorded no lifetime event in any run, at
