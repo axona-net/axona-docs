@@ -1,4 +1,4 @@
-# Axona Topic Lifetime — design packet v0.5
+# Axona Topic Lifetime — design packet v0.6
 
 **Status:** DESIGN, for council review. Nothing built. David's word is a
 direction, not a build: council 6d25996a (seq 305, 23:20Z 2026-10-19), quoted
@@ -77,6 +77,26 @@ delivery bound D from the rule, makes a grant fresh only under L − S, demands
 fresh authority (a live beacon) in the band of width 2S, and keeps the record
 for L + S + D; the skewed 181 s case is a fence. 4.10's "silence reads as
 current" is gone.
+
+**v0.6 (02:3xZ 2026-10-20)** answers Aster's e32cfd6f on v0.5. (1) A first
+reply is not coverage: RECOVERING now ends early only when every queried node
+has answered, a node without a record answers "none", a late reply after
+release still applies, and the timeout is a named weakened mode with a
+fail-closed alternative for David's choice; the three traces Aster named are
+fences. (2) A receipt is a retention contract: bound to the authenticated
+backup, the generation and the backup's incarnation, a commitment to retain
+the named deletions through their expiries regardless of LEFT, closure or map
+pressure, revalidated against known invalidations before release, an old
+incarnation's receipt counting for nothing, and the crash assumption stated
+apart; CLOSED is installed before the first termination send so no write
+enters a dismantling generation. (3) The text is reconciled: one record
+window (L + S + D) everywhere, one grant rule — a grant is accepted only if
+its apparent age is within D + S, the most a conforming grant can read, and
+dropped otherwise; the uncertain band and the beacon authority are gone,
+since a cached beacon is not a challenge-response proof; the record timer is
+monotonic with wall-jump handling; the 15 s skew is an opening value with
+its failure direction stated; the closure fence names RECOVERING; 4.10's
+inventory names REPLICA_RECEIPT.
 
 CAVEAT: this packet changes a rule David set on 2026-09-24 after Orion and
 Aster, that a backup seat is exempt from both reapers. It does not drop the
@@ -208,9 +228,11 @@ and has not closed is handled by the rules of 4.2; a frame naming a generation
 the receiver has closed is dropped.
 
 Complete forgetting is accepted and stated with its assumption: no frame of
-a generation is delivered later than `DROP_MS` after it was issued (the
-grant lifetime of 4.4 enforces this for grants; the lease enforces it for
-seats). Under that assumption, when every holder of a generation is gone and
+a generation is delivered later than D (`APPOINTMENT_DELAY_MS`, 4.4) after it
+was issued, and no two relays' clocks differ by more than S. Nothing
+enforces the physical delay; 4.4's rule rejects any grant whose apparent age
+exceeds what those assumptions allow, so a delivery beyond D costs an
+appointment, never a resurrection. Under that assumption, when every holder of a generation is gone and
 every closed record (4.2) has expired, nothing of the old generation can
 still arrive, and the next subscriber forms a new generation at the terminus
 as a first subscriber does today. A frame that names no generation (an older
@@ -221,7 +243,12 @@ current principal, and never creates a role from nothing.
 ### 4.2 A holder remembers what it closed, before it creates anything
 
 A holder that leaves a generation writes one of two records, kept outside
-`axonRoles` in a bounded map with `until = now + DROP_MS` (180 s). Which one
+`axonRoles` in a bounded map with `until = mono() + L + S + D` (4.4), on the
+monotonic clock so a wall-clock jump neither shortens nor lengthens it.
+Pressure on the map evicts the OLDEST record only, never one whose `until`
+has not passed; if the map is full of live records the node refuses new
+appointments until one expires, which delays a grant and never admits a
+stale one. Which one
 depends on whether the GENERATION ended or only this holder's part in it
 (Aster 2791acd7: a branch leaving is not the root ending the topic):
 
@@ -287,25 +314,33 @@ S, the clock skew between any two relays for appointment frames
 (`APPOINTMENT_SKEW_MS`, opening value 15 s, to be measured on the fleet
 before it is read as a figure; the merge machine's `MERGE_E_MAX_MS` of 300 s
 is a different allowance for a different purpose and is not used here), and
-D, the longest a frame is in flight (`APPOINTMENT_DELAY_MS`, 60 s). The
-enforceable rule, by the receiver's clock:
+D, the longest a frame is in flight (`APPOINTMENT_DELAY_MS`, 60 s). A
+conforming grant, issued and delivered within D under skew S, reads at most
+D + S old by the receiver's clock. That is the whole rule: a REPLICATE is an
+appointment or a renewal only if its apparent age is at most D + S (75 s at
+the opening values), and is dropped otherwise, whatever it names. There is
+no uncertain band and no authority check: a cached beacon is not a
+challenge-response proof of current root authority (Aster e32cfd6f), so
+nothing rests on one. A grant older than the bound is outside the model and
+costs its sender an appointment, which the next tick's REPLICATE renews.
 
-- a grant whose stamp reads younger than L − S is FRESH: an appointment or a
-  renewal;
-- a grant whose stamp reads between L − S and L + S is UNCERTAIN: it is an
-  appointment only with fresh authority, a root beacon for the same
-  generation (same root id and epoch) received within `BEACON_TTL_MS` (50 s);
-  without one it is dropped;
-- a grant older than L + S is dropped whatever it names.
+The record of 4.2 is kept for L + S + D (255 s), longer than it needs to be:
+a grant issued before a closure is accepted only within D + S of its issue,
+and issued at the latest at the closure, so within D + S of the closure; the
+record outlives that by L. Under the assumptions, no grant of a closed
+generation is ever accepted. Aster's skewed case (a grant at a physical
+181 s reading 179 s under 2 s of skew) is dropped twice over: by the record,
+which lives 74 s more, and by age, 179 s being past 75 s. The fence is
+`fence_grant_lifetime` below.
 
-The record of 4.2 is kept for L + S + D. Under the assumptions, no grant of
-a closed generation is ever accepted: while the record lives it is dropped
-by the record, and once the record has expired every grant issued before
-the closure reads older than L + S and is dropped by age. Aster's skewed
-case (a grant at a physical 181 s reading 179 s under 2 s of skew) meets a
-record that still lives for S + D more; the fence is `fence_grant_lifetime`
-below. A skew beyond S or a delay beyond D is a stated failure of the
-assumption, not of the rule. An empty root
+S is an opening value, not a fleet bound (Aster e32cfd6f); the failure
+direction is stated: a real skew beyond S makes a conforming grant read older
+than D + S and be dropped, which delays appointments and admits nothing. A
+measured skew sets S later; a smaller S is safer in the only way that
+matters here. A wall-clock jump at the receiver moves the apparent age of
+every grant by the jump; the kernel already detects a jump against its
+monotonic clock for the merge machine, and on a jump beyond S the receiver
+drops grants for one D so nothing is accepted on a moved clock. An empty root
 replicates nothing (repairPlane.js:931), so an empty root's backups lapse one
 window after their last grant with no notice at all.
 
@@ -330,9 +365,22 @@ receipt is a new frame, REPLICA_RECEIPT `{ generation, delsHash, count }`,
 sent by a backup only after its queued ingest of a REPLICATE has COMMITTED
 the tombstones, never on enqueue; `delsHash` is a hash over the sorted
 (msgId, killTs) pairs of the backup's active tombstones for the generation.
-The root keeps the latest receipt per backup and counts one only if its
-`delsHash` equals the hash of the root's own current set. Replication
-credit does not count: `role.replicas` is written on the dispatch verdict
+The receipt is a RETENTION CONTRACT, not a hash alone: it names the backup
+(the mesh identity the frame arrived under, authenticated by the channel),
+the generation, and the backup's INCARNATION (its node id, minted per
+process start), and it commits the backup to retain the named deletions
+through their existing expiries regardless of a later LEFT, a closure, or
+pressure on its bounded maps — a closure holder's tombstones are evicted
+only by expiry. The root keeps the latest receipt per backup identity and
+counts one only if its `delsHash` equals the hash of the root's own current
+set AND no invalidation is known at the moment of counting: a receipt from
+an incarnation the root no longer has as a backup, from a backup whose lease
+has since lapsed, or from a backup that has since sent LEFT, counts for
+nothing, and the root re-reads these on the tick it would terminate, not
+earlier. The assumption stated apart: a receipt proves commitment, not
+survival; the three-copy contract tolerates the loss of two holders after
+commitment, as today's replicated tombstones do, and nothing proves a holder
+never fails. Replication credit does not count: `role.replicas` is written on the dispatch verdict
 (repairPlane.js:1082), a backup returns consumed the moment the ingest is
 queued (wireHandlers.js:1049–1050), and the credit survives a later failed
 push, so two entries there say nothing about what a backup holds (Aster
@@ -345,11 +393,15 @@ custody is not dropped. It sends TOPIC_TERMINATED, naming
 the generation, to every seat, backups, children and readers alike, once per
 tick for up to three ticks or until every backup has left, whichever is first;
 after the first send it sets `role.dismantling` and accepts no new seat for
-the generation. The reapers take the root on the tick after its last send, and
-it keeps the closure record (4.6). A stamped write arriving BEFORE the first
-send restamps `lastDemandAt` and cancels the termination; one arriving after
-it lands at a node holding the closed record and forms the next generation by
-4.2, with the deletions carried.
+the generation. The order on the terminating tick is fixed: the root installs its CLOSED
+record and sets `role.dismantling` FIRST, synchronously, then sends. From
+that point the role accepts no write and no seat: a stamped write arriving
+after the install is answered by the record and forms the next generation
+by 4.2 with the deletions carried; one arriving before it restamps
+`lastDemandAt` and cancels the termination, which never began. No write can
+enter a dismantling generation, because the generation is closed before the
+first frame that says so leaves. The reapers take the root on the tick after
+its last send; the record stays (4.6).
 
 On receipt, bound to the generation:
 
@@ -392,22 +444,36 @@ tick it forms: it sends a deletions-only pull to the `EMPTY_ROOT_PROBE_FANOUT`
 + 1 = 5 nodes nearest the topic at once, and a holder with an empty cache
 answers with its active deletions (syncEngine.js:153–163, the tombstone-only
 transfer). While RECOVERING the root ingests bodies but neither acknowledges,
-fans out nor serves them; they are held pinned. Recovery ends when a reply
-has been applied or `RECOVERY_MS` (10 s, two ticks) has passed. Deletions
-that arrive are applied first, a held body they name is dropped, and the
-rest are released. A reply's dispatch verdict is not its application; only
-an applied reply ends recovery early.
+fans out nor serves them; they are held pinned. A queried node answers one
+of two ways: its active deletions, or "none" when it holds no record for the
+topic. COVERAGE is every queried node having answered, each answer applied.
+Recovery ends early only on coverage; a first reply, or any number short of
+all, ends nothing (Aster e32cfd6f: an ordinary neighbour answering "none"
+first must not release bodies a closure holder is about to name). Deletions
+apply as they arrive; a held body a deletion names is dropped; a deletion
+arriving after release still installs its tombstone and kills the body at
+the root and down the tree, late, which is the residual stated below. A
+reply's dispatch verdict is not its application.
+
+Without coverage by `RECOVERY_MS` (10 s) there are two modes, and the choice
+is David's (Part 9): FAIL-OPEN releases the held bodies and serves, with the
+generation marked `unrecovered` in the role and in the log, and the pull
+repeated each tick until coverage or the tombstone TTL; FAIL-CLOSED keeps
+holding and keeps pulling until coverage or `RECOVERY_MAX_MS` (60 s), and
+then opens as fail-open does. Aster's recommendation, recorded: retain
+protection, which is fail-closed. Neither mode is silent; both log the
+nodes that did not answer.
 
 What this keeps and what it gives up, stated for David as Aster asked: the
 replicated deletion contract keeps its three copies, written before live
 custody is dropped (4.5), at the cost of three idle rows and no traffic; it
 survives the loss of any two of the three holders, as today's contract does,
 and a moved terminus recovers them by the RECOVERING rule. It is weaker than
-today in one case, which is larger than v0.4 stated: the terminus moves to a
-node for which NO holder among its five nearest answers within `RECOVERY_MS`
-(all three farther than four others from the topic, or all three unreachable
-for ten seconds), AND a stale holder returns inside the 24 hours. Then the
-new generation serves without the deletions and the stale body is accepted.
+today in one case: the new root reaches the end of its recovery mode without
+coverage (a holder among its five nearest has not answered within the mode's
+window, or no holder is among the five), AND a stale holder returns inside
+the 24 hours. Then the new generation serves without the deletions and the
+stale body is accepted, until a late deletion arrives and kills it.
 Today's tree would have been found by the beacon and the stale holder
 refused. The packet does not close this case; it sizes it and names it, and
 Aster's recommendation is recorded: preserve deletion protection, which
@@ -475,13 +541,13 @@ claimed across a partition.
   the next generation with the deletions in force.
 - `fence_grant_lifetime` (Aster's 181 s traces, perfect clocks and skewed):
   a REPLICATE issued before a closure and delivered at 181 s after it meets a
-  record that lives for L + S + D and creates nothing; the same under 2 s of
-  skew, where it reads 179 s old, meets the record too; one delivered at
-  L + S + D + 1 reads older than L + S and is dropped by age; a grant in the
-  uncertain band is an appointment with a live beacon for the generation
-  and is dropped without one; a fresh REPLICATE from a live root is an
-  appointment; a REPLICATE with no generation from a node that is not the
-  receiver's principal creates nothing.
+  record that lives for L + S + D and is also past D + S, and creates
+  nothing; the same under 2 s of skew, reading 179 s old, likewise; one
+  delivered at L + S + D + 1 is dropped by age alone; a grant reading 76 s
+  old is dropped and one reading 74 s old is an appointment; a wall-clock
+  jump beyond S at the receiver drops grants for one D; a fresh REPLICATE
+  from a live root is an appointment; a REPLICATE with no generation from a
+  node that is not the receiver's principal creates nothing.
 - `fence_replica_receipt`: a consumed dispatch verdict earns no receipt; a
   keepalive earns no receipt; a receipt is sent only after the queued ingest
   commits; a receipt whose hash matches an older set does not count after a
@@ -490,9 +556,20 @@ claimed across a partition.
 - `fence_recovery_before_admission`: a publish fills a new root before any
   probe would have run; a delayed deleted body then arrives and is refused,
   because the deletions were pulled in RECOVERING first; a body held during
-  recovery is released after the reply and acknowledged once; with no
-  holder answering within RECOVERY_MS the root serves and the fence records
-  the sized case, not a pass.
+  recovery is released only on coverage and acknowledged once; EMPTY-FIRST,
+  HOLDER-SECOND: a neighbour answers "none" first and a holder answers
+  within the window — the body stays held and is dropped; PARTIAL-FIRST:
+  three of five answer and the bodies stay held; LATE-AFTER-RELEASE: a
+  deletion arriving after a fail-open release installs its tombstone and
+  kills the served body; under fail-closed the same case never serves it;
+  with no coverage by the mode's window the fence records the sized case,
+  not a pass.
+- `fence_replica_receipt_contract`: a receipt from an incarnation the root
+  no longer holds as a backup does not count; one from a backup whose lease
+  lapsed since does not count; the root re-reads invalidations on the
+  terminating tick; a closure holder under map pressure evicts no tombstone
+  before its expiry; a write arriving between the CLOSED install and the
+  first send is answered by the record, never ingested.
 - `fence_left_record` (Aster's prune-with-live-root trace): a child steps
   down while the root serves twenty readers; a reader arriving at the
   stepped-down node is forwarded to the root and seated there; a stale via
@@ -519,10 +596,11 @@ claimed across a partition.
   does not renew.
 - `fence_closure_holders`: three holders keep the tombstones; with two of
   them gone a returning stale body is refused at the third; a terminus moved
-  to a node within the five nearest imports the deletions by the birth probe
-  before serving and refuses the stale body; a terminus moved to a node
-  whose five nearest hold none of the three accepts the stale body, and the
-  fence records that as the sized residual case, not a pass.
+  to a node that reaches coverage with a holder among its five nearest
+  imports the deletions in RECOVERING before serving and refuses the stale
+  body; a terminus that ends its recovery mode without coverage accepts the
+  stale body under fail-open, and the fence records that as the sized
+  residual case, not a pass.
 - `fence_child_step_down`: a thin child steps down after the window; its
   readers reattach within one fast renewal with the app's subscription
   intact and at most one renewal's gap; a body the root lacks makes the
@@ -541,8 +619,9 @@ claimed across a partition.
 
 It does not change the seat lease, the body TTL, the tombstone semantics
 (allow, forbid, revoke on a forged kill), the merge machine, local intent or
-leases. It adds a declaration to SUB, a generation to REPLICATE, and two
-frames, TOPIC_TERMINATED and REHOME, all ignored by an older kernel; an older
+leases. It adds a declaration to SUB, a generation and an issue stamp to
+REPLICATE, and three frames, TOPIC_TERMINATED, REHOME and REPLICA_RECEIPT,
+all ignored by an older kernel; an older
 kernel's bare SUB reads as demand and its generation-less REPLICATE is an
 appointment only from the receiver's current principal and never creates a
 role (4.1), so a mixed fleet retains more, never less. Under churn the
