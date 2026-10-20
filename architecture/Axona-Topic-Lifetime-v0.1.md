@@ -1,4 +1,4 @@
-# Axona Topic Lifetime — design packet v0.12
+# Axona Topic Lifetime — design packet v0.13
 
 **Status:** DESIGN, for council review. Nothing built. David's word is a
 direction, not a build: council 6d25996a (seq 305, 23:20Z 2026-10-19), quoted
@@ -78,6 +78,14 @@ fresh authority (a live beacon) in the band of width 2S, and keeps the record
 for L + S + D; the skewed 181 s case is a fence. 4.10's "silence reads as
 current" is gone.
 
+**v0.13 (20:2xZ 2026-10-20)** closes Aster's X1 and X2 on e469e27
+(b0748c4c): an appointment's end cleared every tombstone on the shared role,
+including one the live attachment had delivered from another generation; and
+the delegation handover trusted the sender instead of the decision. Fixed at
+30d8571: a tombstone carries the generation that delivered it and an
+obligation's end drops only its own; a handover rides only an accepted
+frame. Departures 26 and 27; fences 233; mutants 36.
+
 **v0.12 (17:5xZ 2026-10-20)** closes Aster's two follow-ups at the fix
 boundaries (848688cb; Orion 6deb9c63 confirmed each from source): a delayed
 older DELIVER of the same root rolled the attachment back, so an old notice
@@ -101,7 +109,7 @@ decision made once and three-way, commit, data only, or forward from the
 selected parent; TL-B13 (daa31e63): one attachment per topic per node and
 teardown bound per obligation. And two findings from the armed suite: the
 selected parent hands a delegated seat to its child, and the attempt window
-holds sixteen. Part 10: departures 14 to 25, fences 222, mutants 34. The
+holds sixteen. Part 10: departures 14 to 27, fences 233, mutants 36. The
 4.4 skew sentence is corrected (c59cb0be): a skew beyond S can admit as
 well as refuse.
 
@@ -662,7 +670,7 @@ and a seat that renews before its notice regenerates a root that ends by
 the same rule on the next pass (David, 2026-10-20); the residual is sized
 in 4.6.
 
-## 10. The build (branch `topic-lifetime`, e469e27 over v4.116.0; 2026-10-20)
+## 10. The build (branch `topic-lifetime`, 30d8571 over v4.116.0; 2026-10-20)
 
 Built on David's word ("Build", 04:0xZ). NOT released, NOT armed: both are
 his separate words. The whole machine sits behind `TOPIC_LIFETIME` (kernel
@@ -832,6 +840,21 @@ the terminated row (AxonaPeer).
     two-deep window it was not, and no reader pinned (found by the armed
     suite). The oldest attempts fall off; a reply to one of them is data
     only.
+26. (Aster X1.) A tombstone belongs to the obligation that delivered it.
+    Armed, a tombstone carries the generation that delivered it: a DELIVER
+    tags it with the accepted attachment's generation, a REPLICATE with the
+    grant's; a root's own and a legacy carrier's stay untagged. An
+    obligation's end drops only its own: the appointment's generation, or
+    the untagged ones when the appointment was legacy; the attachment's
+    generation when the attachment ends. A deletion the live attachment
+    delivered keeps suppressing its body after the appointment ends. This
+    is David's rule applied per generation, not per topic: nothing of a
+    generation survives ITS end.
+27. (Aster X2.) The handover obeys the same decision as every other control
+    effect: it rides only a frame the decision accepted, a reply to a live
+    newer attempt or fan-out from the selected parent at the current root
+    at an epoch not lower. A delayed older-epoch delegate from the pinned
+    parent, or one echoing an obsolete attempt, moves nothing.
 
 **The fences, armed by the fixture whatever the environment says** (run
 `node test/<name>.mjs`; `test/lib/lifetimeFixture.mjs` drives one manager
@@ -839,14 +862,14 @@ with wall and monotonic clocks on one manual clock):
 
 | fence | checks | what it pins |
 |---|---|---|
-| fence_topic_terminated | 104 | 4.3 demand counted once; 4.5 the whole termination: window, install before send, three rounds, the tick after, tombstones with it; what holds (seat, body, intent, lease, custody) and what does not (tombstones); write before/after the install; a dismantling root refuses seats and the next renewal forms epoch + 1; receipt at a backup, a backup with a body, a child, a reader; generation binding; T8 grace ordering; B01 the exact binding (backup same-root/new-epoch, reader attached by DELIVER, child forwards the exact generation, a renewed reader, the unversioned fallback); B04 forward-only attachment on a reader and on a relay; B07 a root switch only by a reply to this node's own SUB, a delayed old DELIVER from a previous root re-attaches nothing, a fan-out DELIVER makes no first attachment, the previous nonce still answers; B11 cross-root and same-root reorderings never replace a newer committed selection, a repeated committed reply is data only, overlap liveness kept, the same on a relay with its late body cached data-only, the pin follows the decision; B12 same generation, two parents, for a reader and a relay: an obsolete correlated reply and fan-out from an unselected parent move nothing and credit nothing, fan-out from the selected parent moves forward and credits, a nonce never issued is data only; B13 a hybrid node, child plus reader and backup plus reader, both receipt orders; B14 the delegation handover from the selected parent only, and a six-attempt burst whose first reply still commits, the window bounded at sixteen; unarmed |
+| fence_topic_terminated | 115 | 4.3 demand counted once; 4.5 the whole termination: window, install before send, three rounds, the tick after, tombstones with it; what holds (seat, body, intent, lease, custody) and what does not (tombstones); write before/after the install; a dismantling root refuses seats and the next renewal forms epoch + 1; receipt at a backup, a backup with a body, a child, a reader; generation binding; T8 grace ordering; B01 the exact binding (backup same-root/new-epoch, reader attached by DELIVER, child forwards the exact generation, a renewed reader, the unversioned fallback); B04 forward-only attachment on a reader and on a relay; B07 a root switch only by a reply to this node's own SUB, a delayed old DELIVER from a previous root re-attaches nothing, a fan-out DELIVER makes no first attachment, the previous nonce still answers; B11 cross-root and same-root reorderings never replace a newer committed selection, a repeated committed reply is data only, overlap liveness kept, the same on a relay with its late body cached data-only, the pin follows the decision; B12 same generation, two parents, for a reader and a relay: an obsolete correlated reply and fan-out from an unselected parent move nothing and credit nothing, fan-out from the selected parent moves forward and credits, a nonce never issued is data only; B13 a hybrid node, child plus reader and backup plus reader, both receipt orders; B14 the delegation handover from the selected parent only, and a six-attempt burst whose first reply still commits, the window bounded at sixteen; X1 a deletion belongs to its obligation, both orders, the reordered body still suppressed after the appointment ends; X2 the handover's two negatives and two positive controls; unarmed |
 | fence_standby_lease | 45 | 4.4 the lease: the backup's own SUB moves nothing; an empty backup lapses with no election and no further SUB; a body or tombstone keeps the election path; a reader keeps reading; the grant rule at 74 s and 76 s, Aster's 181 s traces perfect and skewed; LEFT refuses only the generation left; the wall-jump hold; the legacy grant; armed frames carry gen + issuedAt, unarmed carry neither and never lapse; B03 no stamp no grant, created or renewed; B10 a fresh older-epoch grant does not roll the appointment back and the old notice does not retire it, a different root's grant beyond S is refused, one after it re-principals |
 | fence_child_step_down | 44 | 4.7 at David's numbers: REHOME, UNSUB steppedDown, LEFT, retire; the clock clears at the floor; the stay (150 s scene); a backup and an unreachable upstream never step down; REHOME keeps the app's subscription and is ignored from a non-upstream; the parent does not re-promote a cooled node; a REHOME naming an old generation is ignored; B02 body custody (an untransferred body holds the branch; the upstream's DELIVER of it releases; a relayed body is no bar); B05 evidence cleared on re-attachment to a replacement root, kept body until that root sends it, cleared on REHOME; the set pruned with the cache; B08 an obsolete same-root DELIVER's body is cached but not credited; B09 a backup's held set is pruned to its one-entry cache; unarmed keeps no set and no attachment |
 | fence_topic_demand_stamp | 8 | the real ingress paths: a stamped publish and a fresh kill stamp; a duplicate kill, a REPLICATE union and a beacon do not; the peer stops each Subscription handle once |
 | fence_deleted_body_bound | 8 | 4.6 the residual, recorded not passed: a holder partitioned through both the kill and the notice serves the deleted body until its own TTL; one that saw the kill holds nothing |
 | fence_topic_late_renewal | 13 | a fabric of four real managers: reader, publisher, root, two cohort backups seated as standbys; the message is deleted, the reader leaves, the root dismantles after one window and the backups drop the generation with the tombstone; the LATE RENEWAL regenerates an empty root at epoch + 1 with one seat, gone within one window and two ticks; nothing referenced anywhere |
 
-**Mutants, 34 of 34 red** (scratchpad `tl-mutants.py`; each edits one
+**Mutants, 36 of 36 red** (scratchpad `tl-mutants.py`; each edits one
 source file from a scratch copy, runs the fences named, restores every
 file): a standby SUB stamps demand (15 + 8 red); the cut ignores dismantling
 (2); a tombstone holds the topic open (2 + 1 + 8); a backup with a body
@@ -870,16 +893,20 @@ attachment decision (TL-B11); an obsolete correlated reply falls through
 to the forward rule (TL-B12); fan-out from an unselected parent moves the
 pin (TL-B12); an appointment's end also ends a reader attached elsewhere
 (TL-B13); a delegate handover from a non-selected parent is accepted; the
-attempt window is two deep again. One mutant, a different root id alone re-attaching, was
+attempt window is two deep again; an appointment's end clears every
+tombstone on the shared role (X1); the handover trusts the sender instead
+of the decision (X2). One mutant, a different root id alone re-attaching, was
 dropped as subsumed by the selected-parent rule; three were retargeted
 after rewrites moved their anchors. Three of these were green on the first run because the MUTANT was
 wrong (the receiver's seat instead of the sender's lease; a stay equal to
 the thin window; a cooled node never first in line); the mutants were fixed,
 not the code.
 
-**The suite** (at e469e27, with nothing else running on the box): unarmed
-291 of 293, the TURN credential flake and fence_merge_sim_partition; armed
-292 of 293, the TURN credential flake. Two armed runs between ba53255 and
+**The suite** (at 30d8571, with nothing else running on the box):
+unarmed 291 of 293, the TURN credential flake and fence_merge_sim_partition;
+armed 293 of 293. At e469e27 it read unarmed 291 of 293,
+the TURN credential flake and fence_merge_sim_partition, and armed 292 of
+293, the TURN credential flake. Two armed runs between ba53255 and
 97b854c were not evidence: one ran while a mutant pass rewrote source files,
 the other while fences and smokes ran alongside, and smoke_restart_handoff
 (106 s on an idle Mac against the runner's 180 s limit) timed out in both;
