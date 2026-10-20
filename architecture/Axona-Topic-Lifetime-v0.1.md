@@ -1,4 +1,4 @@
-# Axona Topic Lifetime — design packet v0.3
+# Axona Topic Lifetime — design packet v0.4
 
 **Status:** DESIGN, for council review. Nothing built. David's word is a
 direction, not a build: council 6d25996a (seq 305, 23:20Z 2026-10-19), quoted
@@ -40,6 +40,23 @@ traded away. (4) The bounds are a table with a condition on every row;
 root death is one election within a side, not across a partition; REHOME is
 kernel-internal and keeps the app's subscription, and only TOPIC_TERMINATED
 ends one.
+
+**v0.4 (01:5xZ 2026-10-20)** answers Aster's 2791acd7 on v0.3, three
+concrete cases, each holding. (1) A grant now has a LIFETIME: a REPLICATE
+carries its issue stamp and is an appointment only while younger than the
+standby lease, so the replay window and the rejection window are the same
+window and a grant delivered at 181 s creates nothing; the delay assumption
+is stated instead of inferred, and a frame with no generation is never
+relabelled current. (2) A branch leaving is not the topic ending: a holder
+that leaves its own appointment writes a LEFT record, under which a reader is
+sent to the live tree, and only a root's termination writes the CLOSED record
+under which a reader forms the next generation. (3) "Survives any two"
+requires the copies to hold the deletions: a root terminates only after its
+tombstone set is credited on two backups by the verified replication path
+(repairPlane.js:1082) and otherwise keeps today's custody hold; a moved
+terminus finds the holders through the birth probe, which pulls from the five
+nearest and is answered with deletions by an empty holder (repairPlane.js:725,
+syncEngine.js:153–163); the residual case is sized and left to David.
 
 CAVEAT: this packet changes a rule David set on 2026-09-24 after Orion and
 Aster, that a backup seat is exempt from both reapers. It does not drop the
@@ -170,33 +187,52 @@ the generation in full. A frame naming a generation the receiver does not hold
 and has not closed is handled by the rules of 4.2; a frame naming a generation
 the receiver has closed is dropped.
 
-Complete forgetting is accepted and stated: when every holder of a generation
-is gone and every closed record (4.2) has expired, the next subscriber forms a
-new generation at the terminus as a first subscriber does today, and nothing
-from the old one can reach it, because nothing from the old one still exists.
+Complete forgetting is accepted and stated with its assumption: no frame of
+a generation is delivered later than `DROP_MS` after it was issued (the
+grant lifetime of 4.4 enforces this for grants; the lease enforces it for
+seats). Under that assumption, when every holder of a generation is gone and
+every closed record (4.2) has expired, nothing of the old generation can
+still arrive, and the next subscriber forms a new generation at the terminus
+as a first subscriber does today. A frame that names no generation (an older
+kernel) is never relabelled as the current one: a bare SUB is a reader and
+seats as demand; a bare REPLICATE is an appointment only from the receiver's
+current principal, and never creates a role from nothing.
 
 ### 4.2 A holder remembers what it closed, before it creates anything
 
-Every holder that leaves a generation, by termination (4.5), by lapse of its
-standby lease (4.4), by stepping down (4.7) or by the reaper, writes a
-CLOSED record `{ topic, rootId, epoch, until }` with `until = now + DROP_MS`
-(180 s), kept outside `axonRoles` in a bounded map. For the ex-root and its
-ex-backups the record also carries the generation's active tombstones until
-their own expiry (4.6).
+A holder that leaves a generation writes one of two records, kept outside
+`axonRoles` in a bounded map with `until = now + DROP_MS` (180 s). Which one
+depends on whether the GENERATION ended or only this holder's part in it
+(Aster 2791acd7: a branch leaving is not the root ending the topic):
 
-The record is consulted BEFORE any role is created or any seat is granted
+- **CLOSED** `{ topic, rootId, epoch, until, tombstones }` is written only
+  on a root's termination (4.5), by the root and by every backup and child
+  that receives the notice. It means "this generation ended". The ex-root
+  and ex-backups carry the generation's active tombstones in it until their
+  own expiry (4.6).
+- **LEFT** `{ topic, rootId, epoch, until, upstream }` is written when a
+  holder leaves its own appointment while the generation lives: a lapsed
+  standby lease (4.4), a child stepping down (4.7), a reaper taking a role.
+  It means "this generation lives elsewhere; I am not part of it".
+
+The records are consulted BEFORE any role is created or any seat is granted
 (the `_syncIngest` and `_onSub` entry points, which today create a role on
 first sight: syncEngine.js:226–237, wireHandlers.js:401):
 
-- a REPLICATE, a standby SUB or a TOPIC_TERMINATED naming a closed generation
-  is dropped. A delayed grant therefore renews nothing and creates nothing,
-  and a duplicate notice ends nothing twice.
-- a reader SUB or a publish for the topic at a node holding a closed record
-  forms a NEW generation: the node becomes root with epoch = closed.epoch + 1
-  and its own id, and the record's tombstones become the new root's
-  tombstones, so the old deletions stay in force (David's question in chat).
-- a REPLICATE naming a generation the receiver neither holds nor closed is a
-  fresh appointment and proceeds as today.
+- a REPLICATE, a standby SUB or a TOPIC_TERMINATED naming a generation under
+  either record is dropped. A delayed grant therefore renews nothing and
+  creates nothing, and a duplicate notice ends nothing twice.
+- a reader SUB or a publish at a CLOSED record forms a NEW generation: the
+  node becomes root with epoch = closed.epoch + 1 and its own id, and the
+  record's tombstones become the new root's tombstones, so the old deletions
+  stay in force (David's question in chat).
+- a reader SUB or a publish at a LEFT record is forwarded toward the record's
+  `upstream` as a non-root forwards today, and a stale via at that node is
+  answered with REHOME toward the same upstream: the live tree is served, no
+  competing root is manufactured. If the upstream is unreachable the walk
+  proceeds as a cold walk does today.
+- a REPLICATE naming a generation the receiver neither holds nor has on
+  record is an appointment only if it is within its lifetime (4.4).
 
 ### 4.3 Demand, counted once
 
@@ -224,7 +260,16 @@ A backup's appointment is granted and renewed only by a REPLICATE from the
 generation's root; `lastReplicaAt` is the stamp (its one writer is
 `becomeBackup`, rootClaim.js:391, reached only through a REPLICATE receipt,
 syncEngine.js:291) and nothing the backup sends moves it. The lease is
-`STANDBY_LEASE_MS` = `DROP_MS` = 180 s from the last REPLICATE. An empty root
+`STANDBY_LEASE_MS` = `DROP_MS` = 180 s from the last REPLICATE. A REPLICATE
+carries the generation and its own issue stamp, and it is an appointment or a
+renewal only while younger than the lease at receipt: a grant older than
+180 s by the receiver's clock is dropped whatever it names. The grant
+lifetime and the record window (4.2) are therefore the same window, and a
+grant delivered at 181 s after a closure meets a dropped record AND an
+expired grant; it creates nothing. The clock assumption is the one the merge
+machine already makes, a skew within `MERGE_E_MAX_MS` between any two nodes;
+a skew beyond it shortens or lengthens a lease by that much and nothing
+else. An empty root
 replicates nothing (repairPlane.js:931), so an empty root's backups lapse one
 window after their last grant with no notice at all.
 
@@ -243,7 +288,14 @@ The role then stands or falls on what it still is, read in this order:
 
 A root terminates its generation when all of these hold on one tick: cache
 empty; no custody except the generation's own tombstones; no local intent;
-demand zero; `now - lastDemandAt > DROP_MS`. It sends TOPIC_TERMINATED, naming
+demand zero; `now - lastDemandAt > DROP_MS`; and, when tombstones exist,
+each of them credited on at least two backups by the verified replication
+path (`role.replicas` is written only on a consumed push, repairPlane.js:1082;
+the tombstone set rides the push, syncEngine.js:160). A root whose
+tombstones are not yet so credited does not terminate: it keeps today's
+custody hold and its live backups until they are, or until the tombstones
+expire. This is the evidence Aster asked for: the three copies of 4.6 exist
+before live custody is dropped, or live custody is not dropped. It sends TOPIC_TERMINATED, naming
 the generation, to every seat, backups, children and readers alike, once per
 tick for up to three ticks or until every backup has left, whichever is first;
 after the first send it sets `role.dismantling` and accepts no new seat for
@@ -284,17 +336,30 @@ holder, a new publisher, a new reader) walks to the terminus, which is one
 of these holders with the probability the routing gives to the nearest ids,
 and the new generation forms with the deletions carried.
 
+How a moved terminus finds the holders: a node that forms an empty root
+runs the birth probe (4.115.0), which pulls from the `EMPTY_ROOT_PROBE_FANOUT`
++ 1 = 5 nodes closest to the topic (repairPlane.js:725), and a holder with an
+empty cache answers a pull with its active deletions (syncEngine.js:153–163,
+the tombstone-only transfer built for the dual-root packet). A closure
+holder answers that pull. So a terminus that moves to a node within the five
+nearest imports the deletions before it serves anything; the holders are
+discoverable by the mechanism the kernel already has, and the record's
+`until` of 4.2 does not bound this, the tombstones' own expiry does.
+
 What this keeps and what it gives up, stated for David as Aster asked: the
-replicated deletion contract keeps its three copies at the cost of three idle
-rows and no traffic; it survives the loss of any two of the three holders, as
-today's contract does. It is weaker than today in one case: if the terminus
-MOVES, a node closer to the topic appearing that holds no closure record,
-and a stale holder returns within the 24 hours, the new generation forms
-there without the deletions and the stale body is accepted. Today's tree
-would have been found by the beacon and the stale holder refused. The
-packet does not close this case; it names it. The dual-root machine, when
-armed, merges a closure holder's tombstones into such a root when the two
-meet, and the pinned tombstones travel with the merge.
+replicated deletion contract keeps its three copies, written before live
+custody is dropped (4.5), at the cost of three idle rows and no traffic; it
+survives the loss of any two of the three holders, as today's contract does,
+and a moved terminus recovers them by the probe. It is weaker than today in
+one residual case: the terminus moves to a node whose five nearest hold none
+of the three (every holder farther than four others from the topic), AND a
+stale holder returns inside the 24 hours. Then the new generation forms
+without the deletions and the stale body is accepted. Today's tree would
+have been found by the beacon and the stale holder refused. The packet does
+not close this case; it sizes it and names it, and the choice between
+accepting it and keeping today's live framework for deleted topics is
+David's, not a default. The dual-root machine, when armed, merges a closure
+holder's tombstones into such a root when the two meet.
 
 ### 4.7 A thin branch steps down, and the app never knows
 
@@ -302,9 +367,12 @@ A child counts its demand by 4.3. A child whose demand has been below
 `CHILD_MIN_READERS` for `CHILD_STEP_DOWN_MS` steps down, in this order: it
 hands off anything it owes (a body its seats have not received and the root
 holds goes with the rehome's replay; a body the root lacks makes it elect by
-4.4(1) instead of stepping down); it sends REHOME, naming the generation, to
-each of its seats; it stops answering the via extension; it stops renewing
-to its parent; it writes the closed record and drops its list. REHOME is
+4.4(1) instead of stepping down); it sends REHOME, naming the generation and
+its upstream, to each of its seats; it stops answering the via extension and
+answers a stale via with the same REHOME; it stops renewing to its parent;
+it writes a LEFT record (4.2) and drops its list. It does not write CLOSED:
+the generation lives on at the root, and a reader arriving at this node
+later is sent there, never seated as a new root. REHOME is
 kernel-internal: a receiving kernel keeps the app's subscription, walks to
 the topic again on its fast cadence (`RENEW_FAST_MS`, 5 s) and seats at the
 root or at a child the root keeps; the app sees at most one renewal's gap in
@@ -323,7 +391,10 @@ backups.
 ### 4.8 Bounds, each with its condition
 
 Counted from the last renewal of the last demand seat, in ticks under the
-published allowance; no wall-clock promise is made:
+published allowance, with the clock skew of 4.4, with delivery as each row
+says, and with the closed or left record reachable at the node a walk
+reaches; no wall-clock promise is made and no row holds outside its
+condition:
 
 | condition | the generation is gone within |
 |---|---|
@@ -346,8 +417,22 @@ claimed across a partition.
   renews nothing; a duplicate TOPIC_TERMINATED ends nothing; a reader SUB at
   a closed record forms epoch + 1 with the tombstones carried; a publish
   before the first send cancels the termination; a publish after it forms
-  the next generation with the deletions in force; the record expires at
-  `until` and a later REPLICATE is a fresh appointment.
+  the next generation with the deletions in force.
+- `fence_grant_lifetime` (Aster's 181 s trace): a REPLICATE issued before a
+  closure and delivered at 181 s after it meets an expired record and an
+  expired grant and creates nothing; one delivered at 179 s meets the record
+  and is dropped; a fresh REPLICATE from a live root is an appointment; a
+  REPLICATE with no generation from a node that is not the receiver's
+  principal creates nothing.
+- `fence_left_record` (Aster's prune-with-live-root trace): a child steps
+  down while the root serves twenty readers; a reader arriving at the
+  stepped-down node is forwarded to the root and seated there; a stale via
+  at that node is answered with REHOME; no second root exists at any tick;
+  a standby SUB naming the generation at that node is dropped.
+- `fence_termination_precondition`: a root with an uncredited tombstone does
+  not terminate and keeps its live backups; once two backups are credited
+  it terminates on the next window; a root whose pushes all fail keeps
+  today's custody hold until the tombstones expire.
 - `fence_demand_accounting`: a child declaring zero contributes zero and is
   not counted as a seat; a child declaring n contributes n; a standby seat
   contributes zero; a bare SUB counts one; no housekeeping frame stamps
@@ -364,9 +449,11 @@ claimed across a partition.
   next walk; a reader receives exactly one terminated row and its kernel
   does not renew.
 - `fence_closure_holders`: three holders keep the tombstones; with two of
-  them gone a returning stale body is refused at the third; with the
-  terminus moved to a node without a record the stale body is accepted and
-  the fence records that as the stated weakened case, not a pass.
+  them gone a returning stale body is refused at the third; a terminus moved
+  to a node within the five nearest imports the deletions by the birth probe
+  before serving and refuses the stale body; a terminus moved to a node
+  whose five nearest hold none of the three accepts the stale body, and the
+  fence records that as the sized residual case, not a pass.
 - `fence_child_step_down`: a thin child steps down after the window; its
   readers reattach within one fast renewal with the app's subscription
   intact and at most one renewal's gap; a body the root lacks makes the
