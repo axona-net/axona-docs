@@ -1,4 +1,4 @@
-# Axona Topic Lifetime — design packet v0.8
+# Axona Topic Lifetime — design packet v0.9
 
 **Status:** DESIGN, for council review. Nothing built. David's word is a
 direction, not a build: council 6d25996a (seq 305, 23:20Z 2026-10-19), quoted
@@ -77,6 +77,13 @@ delivery bound D from the rule, makes a grant fresh only under L − S, demands
 fresh authority (a live beacon) in the band of width 2S, and keeps the record
 for L + S + D; the skewed 181 s case is a fence. 4.10's "silence reads as
 current" is gone.
+
+**v0.9 (04:0xZ 2026-10-20)** takes David's four answers in chat and is the
+BUILD baseline: "1. Let's use 2 subscribers and 90 seconds. 2. Clock skew.
+That is fine. 3. Agreed. 4. Build." So: a child is thin below 2 readers for
+90 s (4.7); S is set at 15 s, not measured first (4.4); Howard's suite runs
+with its delete cache in place (Part 9); and the build starts on an
+axona-protocol branch, for council review before any release.
 
 **v0.8 (03:4xZ 2026-10-20)** takes David's decision in chat: "There is no
 need for a deletion record. After the termination message, all participating
@@ -327,8 +334,8 @@ syncEngine.js:291) and nothing the backup sends moves it. The lease is
 REPLICATE carries the generation and its own issue stamp. Two assumptions
 are stated apart from the rule and are the only things the rule rests on:
 S, the clock skew between any two relays for appointment frames
-(`APPOINTMENT_SKEW_MS`, opening value 15 s, to be measured on the fleet
-before it is read as a figure; the merge machine's `MERGE_E_MAX_MS` of 300 s
+(`APPOINTMENT_SKEW_MS`, SET at 15 s by David on 2026-10-20, not measured
+first; the merge machine's `MERGE_E_MAX_MS` of 300 s
 is a different allowance for a different purpose and is not used here), and
 D, the longest a frame is in flight (`APPOINTMENT_DELAY_MS`, 60 s). A
 conforming grant, issued and delivered within D under skew S, reads at most
@@ -349,11 +356,11 @@ appointment is ever accepted. Aster's skewed case (a grant at a physical
 which lives 74 s more, and by age, 179 s being past 75 s. The fence is
 `fence_grant_lifetime` below.
 
-S is an opening value, not a fleet bound (Aster e32cfd6f); the failure
+S is a set value, not a measured fleet bound (Aster e32cfd6f); the failure
 direction is stated: a real skew beyond S makes a conforming grant read older
 than D + S and be dropped, which delays appointments and admits nothing. A
-measured skew sets S later; a smaller S is safer in the only way that
-matters here. A wall-clock jump at the receiver moves the apparent age of
+later measurement can only widen S; a smaller S is safer in the only way
+that matters here. A wall-clock jump at the receiver moves the apparent age of
 every grant by the jump; the kernel already detects a jump against its
 monotonic clock for the merge machine, and on a jump beyond S the receiver
 drops grants for one D so nothing is accepted on a moved clock. An empty root
@@ -472,10 +479,13 @@ dropped.
 Hysteresis: promotion happens only at the parent's limit (`MAX_DIRECT`, 20);
 a new child is not thin until `CHILD_MIN_STAY_MS` has passed; a parent does
 not re-promote a node that stepped down within `CHILD_COOLDOWN_MS`. The
-opening values (3 readers, 180 s, 180 s, 300 s) and Orion's 2 to 3 and 60
-to 90 s are candidates; Aster's 23c5cfd1 and 7ddb72ea record that none is
-agreed, and the numbers are chosen together after the rule. Not applied to
-backups.
+numbers, set by David on 2026-10-20 ("2 subscribers and 90 seconds"):
+`CHILD_MIN_READERS` = 2 and `CHILD_STEP_DOWN_MS` = 90 s. A child whose
+declared demand has read 0 or 1 for 90 s steps down. The two hysteresis
+values David did not name are set to match: `CHILD_MIN_STAY_MS` = 90 s (a
+child is judged on no less than one full window) and `CHILD_COOLDOWN_MS` =
+300 s (the v0.2 value, five windows of 60 s renewal). All four are env
+overridable. Not applied to backups.
 
 ### 4.8 Bounds, each with its condition
 
@@ -580,28 +590,30 @@ role (4.1), so a mixed fleet retains more, never less. Under churn the
 standby set is bounded to generations with demand or bodies, and a roll
 re-forms only the topics someone reads or wrote to.
 
-## 9. Where David's word is still needed — the questions in full
+## 9. David's answers, in full
 
-1. **Thin-branch numbers** (4.7). A child steps down below 3 readers for
-   180 s; a new child has 180 s before it can be judged thin; a node that
-   stepped down is not re-promoted for 300 s. Orion's alternative: 2 to 3
-   readers, 60 to 90 s. Confirm or name others.
-2. **Clock skew** (4.4). The grant rule assumes relays' clocks differ by at
-   most 15 s, an opening guess. Measure it on the fleet before the build, or
-   set a value?
-3. **Howard's production tests**, deferred by David: should his suite run
-   with its delete cache in place, so its own deletions exercise the
-   teardown?
-4. **The build word.**
+The four questions of v0.8 and the answers (David, chat, 04:0xZ 2026-10-20):
 
-Answered already. The seat bound stays at today's 60 s renewal and 180 s
+1. **Thin-branch numbers** (4.7). Asked: 3 readers for 180 s, 180 s stay,
+   300 s cooldown, or Orion's 2 to 3 readers and 60 to 90 s? Answer: "Let's
+   use 2 subscribers and 90 seconds." Set: below 2 readers for 90 s; stay
+   90 s; cooldown 300 s.
+2. **Clock skew** (4.4). Asked: measure on the fleet before the build, or set
+   15 s? Answer: "That is fine." Set: 15 s.
+3. **Howard's production tests.** Asked: should his suite run with its
+   delete cache in place so its own deletions exercise the teardown? Answer:
+   "Agreed." His suite runs unchanged on the production checks.
+4. **The build word.** Answer: "Build." The build goes on an axona-protocol
+   branch under this packet, fences and mutants first, council review, and
+   nothing is released or armed without David's separate word.
+
+Answered earlier. The seat bound stays at today's 60 s renewal and 180 s
 drop (David, 2026-10-19). A terminated topic has no root; a later arrival
 forms a NEW root with its own backups and children (David, 2026-10-20). No
 deletion record survives termination: tombstones go with the generation,
 and a seat that renews before its notice regenerates a root that ends by
-the same rule on the next pass (David, 2026-10-20). The recovery-mode and
-tombstone-arrangement questions of v0.6 and v0.7 are closed by that answer,
-and the residual is sized in 4.6.
+the same rule on the next pass (David, 2026-10-20); the residual is sized
+in 4.6.
 
 ## Source map (axona-protocol `0c9ec13`)
 
