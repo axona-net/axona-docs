@@ -1,4 +1,4 @@
-# Axona Topic Lifetime — design packet v0.10
+# Axona Topic Lifetime — design packet v0.11
 
 **Status:** DESIGN, for council review. Nothing built. David's word is a
 direction, not a build: council 6d25996a (seq 305, 23:20Z 2026-10-19), quoted
@@ -77,6 +77,18 @@ delivery bound D from the rule, makes a grant fresh only under L − S, demands
 fresh authority (a live beacon) in the band of width 2S, and keeps the record
 for L + S + D; the skewed 181 s case is a fence. 4.10's "silence reads as
 current" is gone.
+
+**v0.11 (17:xxZ 2026-10-20)** closes Aster's three counterexamples on the
+build (c5adedec, REQUEST CHANGES), each confirmed from source: a delayed
+notice of an old generation ended a seat in the new one (the binding was by
+principal OR upstream, not the exact generation); a thin child stepped down
+holding a body its upstream never sent; a gen-bearing grant with no issue
+stamp passed as legacy. Fixed at ba53255: a DELIVER names the generation it
+serves and the notice and REHOME bind to it exactly; a child steps down only
+when every body it holds is one its upstream sent; no stamp, no grant. Part
+10 is updated (departures 11 to 13, fences 160, mutants 21). Retracted:
+c4a9ad5e's "as you cleared them" about the 4.4 rule and the LEFT record;
+Aster never cleared them.
 
 **v0.10 (16:0xZ 2026-10-20)** adds Part 10, the build: branch `topic-lifetime`
 088c524 over v4.116.0, behind `TOPIC_LIFETIME` (default off), six fences,
@@ -620,7 +632,7 @@ and a seat that renews before its notice regenerates a root that ends by
 the same rule on the next pass (David, 2026-10-20); the residual is sized
 in 4.6.
 
-## 10. The build (branch `topic-lifetime`, 088c524 over v4.116.0; 2026-10-20)
+## 10. The build (branch `topic-lifetime`, ba53255 over v4.116.0; 2026-10-20)
 
 Built on David's word ("Build", 04:0xZ). NOT released, NOT armed: both are
 his separate words. The whole machine sits behind `TOPIC_LIFETIME` (kernel
@@ -685,6 +697,24 @@ the terminated row (AxonaPeer).
    root's notice (4.8: a split's halves each end by their own rule).
 10. The seat lease, the body TTL, the merge machine, local intent and leases
     are untouched (4.10 holds).
+11. (Aster TL-B01.) A DELIVER names the generation it serves: a root its own,
+    a child the one its upstream named. The receiver records that attachment
+    (`role.attachedGen` on a relay, `_attachedGen` for the node's own
+    subscription), and TOPIC_TERMINATED and REHOME bind to it EXACTLY; a
+    backup binds by its appointment's exact (root, epoch); only an
+    unversioned attachment, an older-kernel upstream that named none, binds
+    by upstream. A delayed notice of (R, 1) therefore never ends a seat in
+    (R, 2). The window: a reader re-seated in the next generation is
+    attached to it on the first DELIVER after its SUB, one round trip.
+12. (Aster TL-B02.) A thin child steps down only when every body it holds is
+    one its upstream SENT (`role.upstreamHeld`, stamped in `_onDeliver`). A
+    body that arrived from below, a reader's replay-up, is held until the
+    root has pulled it and fanned it back, which marks it; the sweep logs
+    `step-down-held-body` once and the branch stands. This is 4.7's "a body
+    the root lacks" made checkable from the child's own state.
+13. (Aster TL-B03.) A gen-bearing grant with no finite issue stamp is
+    refused, as a creation and as a renewal; only a generation-less grant is
+    legacy, and that only from the current principal.
 
 **The fences, armed by the fixture whatever the environment says** (run
 `node test/<name>.mjs`; `test/lib/lifetimeFixture.mjs` drives one manager
@@ -692,14 +722,14 @@ with wall and monotonic clocks on one manual clock):
 
 | fence | checks | what it pins |
 |---|---|---|
-| fence_topic_terminated | 50 | 4.3 demand counted once; 4.5 the whole termination: window, install before send, three rounds, the tick after, tombstones with it; what holds (seat, body, intent, lease, custody) and what does not (tombstones); write before/after the install; a dismantling root refuses seats and the next renewal forms epoch + 1; receipt at a backup, a backup with a body, a child, a reader; generation binding; T8 grace ordering; unarmed |
-| fence_standby_lease | 38 | 4.4 the lease: the backup's own SUB moves nothing; an empty backup lapses with no election and no further SUB; a body or tombstone keeps the election path; a reader keeps reading; the grant rule at 74 s and 76 s, Aster's 181 s traces perfect and skewed; LEFT refuses only the generation left; the wall-jump hold; the legacy grant; armed frames carry gen + issuedAt, unarmed carry neither and never lapse |
-| fence_child_step_down | 26 | 4.7 at David's numbers: REHOME, UNSUB steppedDown, LEFT, retire; the clock clears at the floor; the stay (150 s scene); a backup and an unreachable upstream never step down; REHOME keeps the app's subscription and is ignored from a non-upstream; the parent does not re-promote a cooled node; unarmed |
+| fence_topic_terminated | 59 | 4.3 demand counted once; 4.5 the whole termination: window, install before send, three rounds, the tick after, tombstones with it; what holds (seat, body, intent, lease, custody) and what does not (tombstones); write before/after the install; a dismantling root refuses seats and the next renewal forms epoch + 1; receipt at a backup, a backup with a body, a child, a reader; generation binding; T8 grace ordering; B01 the exact binding (backup same-root/new-epoch, reader attached by DELIVER, child forwards the exact generation, a renewed reader, the unversioned fallback); unarmed |
+| fence_standby_lease | 41 | 4.4 the lease: the backup's own SUB moves nothing; an empty backup lapses with no election and no further SUB; a body or tombstone keeps the election path; a reader keeps reading; the grant rule at 74 s and 76 s, Aster's 181 s traces perfect and skewed; LEFT refuses only the generation left; the wall-jump hold; the legacy grant; armed frames carry gen + issuedAt, unarmed carry neither and never lapse; B03 no stamp no grant, created or renewed |
+| fence_child_step_down | 31 | 4.7 at David's numbers: REHOME, UNSUB steppedDown, LEFT, retire; the clock clears at the floor; the stay (150 s scene); a backup and an unreachable upstream never step down; REHOME keeps the app's subscription and is ignored from a non-upstream; the parent does not re-promote a cooled node; a REHOME naming an old generation is ignored; B02 body custody (an untransferred body holds the branch; the upstream's DELIVER of it releases; a relayed body is no bar); unarmed |
 | fence_topic_demand_stamp | 8 | the real ingress paths: a stamped publish and a fresh kill stamp; a duplicate kill, a REPLICATE union and a beacon do not; the peer stops each Subscription handle once |
 | fence_deleted_body_bound | 8 | 4.6 the residual, recorded not passed: a holder partitioned through both the kill and the notice serves the deleted body until its own TTL; one that saw the kill holds nothing |
 | fence_topic_late_renewal | 13 | a fabric of four real managers: reader, publisher, root, two cohort backups seated as standbys; the message is deleted, the reader leaves, the root dismantles after one window and the backups drop the generation with the tombstone; the LATE RENEWAL regenerates an empty root at epoch + 1 with one seat, gone within one window and two ticks; nothing referenced anywhere |
 
-**Mutants, 18 of 18 red** (scratchpad `tl-mutants.py`; each edits one
+**Mutants, 21 of 21 red** (scratchpad `tl-mutants.py`; each edits one
 source file from a scratch copy, runs the fences named, restores every
 file): a standby SUB stamps demand (15 + 8 red); the cut ignores dismantling
 (2); a tombstone holds the topic open (2 + 1 + 8); a backup with a body
@@ -710,15 +740,23 @@ creates a role (2); the lapse takes a backup with a body (2 + 2); REHOME ends
 the subscription (2); the stay dropped (1); the cooldown dropped (1); a
 child's seats counted as readers (4); the epoch high-water dropped (1 + 1);
 the reapers take a dismantling root (1); a stamped publish does not stamp
-(2). Three of these were green on the first run because the MUTANT was
+(2); the notice binds by principal or upstream instead of the exact
+generation (Aster TL-B01); a thin child steps down with a held body (TL-B02);
+a stampless gen-bearing grant is accepted (TL-B03). Three of these were green on the first run because the MUTANT was
 wrong (the receiver's seat instead of the sender's lease; a stay equal to
 the thin window; a cooled node never first in line); the mutants were fixed,
 not the code.
 
-**The suite.** Unarmed, the default suite is 291 of 293: the TURN
-credential flake, and fence_merge_sim_partition, the load-bound wall-clock
-fence that passes four of four alone (load average 10 to 11 on this Mac
-during the run). Armed (`TOPIC_LIFETIME=1 npm test`) it is 293 of 293. Seven pre-lifetime scenes
+**The suite** (at ba53255). Unarmed, the default suite is 293 of 293.
+Armed (`TOPIC_LIFETIME=1 npm test`) it is 292 of 293: smoke_interloper_convergence,
+an eleven-second real-time smoke, failed its late-replay check once in the
+suite and once in three runs alone, then passed twelve of twelve (six armed,
+six unarmed) under a log tap that recorded no lifetime event in any run, at
+load average 10 to 24 on this Mac. It is read as the same wall-clock class
+as fence_merge_sim_partition, and it is stated here, not hidden. At 088c524 the same
+runs read 291 of 293 (the TURN credential flake and fence_merge_sim_partition,
+the load-bound wall-clock fence, four of four alone at load 10 to 11) and
+293 of 293. Seven pre-lifetime scenes
 hand-build generation-less REPLICATE frames or pin the 4.94.0 standby
 contract ("a backup whose root vanished is retained for ever"); they now
 say `topicLifetime:false` and the armed contract is the two fences above.
