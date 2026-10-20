@@ -1,4 +1,4 @@
-# Axona Topic Lifetime — design packet v0.6
+# Axona Topic Lifetime — design packet v0.7
 
 **Status:** DESIGN, for council review. Nothing built. David's word is a
 direction, not a build: council 6d25996a (seq 305, 23:20Z 2026-10-19), quoted
@@ -35,7 +35,7 @@ else; a node that is also a reader, child or custodian continues as that; a
 child is counted once, by its declared demand. (3) The closure record is not
 a single copy: the root and its backups all keep the tombstones as idle
 holders, the failure assumption is stated, and the one case weaker than
-today, a moved terminus with no record, is named for David instead of
+today, a new root formed with no record in reach, is named for David instead of
 traded away. (4) The bounds are a table with a condition on every row;
 root death is one election within a side, not across a partition; REHOME is
 kernel-internal and keeps the app's subscription, and only TOPIC_TERMINATED
@@ -53,8 +53,8 @@ sent to the live tree, and only a root's termination writes the CLOSED record
 under which a reader forms the next generation. (3) "Survives any two"
 requires the copies to hold the deletions: a root terminates only after its
 tombstone set is credited on two backups by the verified replication path
-(repairPlane.js:1082) and otherwise keeps today's custody hold; a moved
-terminus finds the holders through the birth probe, which pulls from the five
+(repairPlane.js:1082) and otherwise keeps today's custody hold; a new
+root finds the holders through the birth probe, which pulls from the five
 nearest and is answered with deletions by an empty holder (repairPlane.js:725,
 syncEngine.js:153–163); the residual case is sized and left to David.
 
@@ -77,6 +77,14 @@ delivery bound D from the rule, makes a grant fresh only under L − S, demands
 fresh authority (a live beacon) in the band of width 2S, and keeps the record
 for L + S + D; the skewed 181 s case is a fence. 4.10's "silence reads as
 current" is gone.
+
+**v0.7 (02:5xZ 2026-10-20)** takes David's correction in chat: a terminated
+topic has no root, so nothing "moves". A later subscriber or publisher forms a
+NEW root at whatever node is then closest to the topic id, and that root
+appoints its own backups (the same nodes as before or others) and selects its
+own children as the subscriptions warrant. Every "moved terminus" in v0.6 now
+reads "new root"; the recovery-mode question in Part 9 is restated in those
+words. No rule changed.
 
 **v0.6 (02:3xZ 2026-10-20)** answers Aster's e32cfd6f on v0.5. (1) A first
 reply is not coverage: RECOVERING now ends early only when every queried node
@@ -430,11 +438,16 @@ At termination the root and each backup keep the generation's tombstones as
 CLOSURE HOLDERS: a role with no seats, no replication, no keepalive and no
 beacon, read only by 4.2, expiring with its last tombstone (`TTL_MS`, 24 h
 from the kill). A node reaching the topic in that window (a returning stale
-holder, a new publisher, a new reader) walks to the terminus, which is one
-of these holders with the probability the routing gives to the nearest ids,
-and the new generation forms with the deletions carried.
+holder, a new publisher, a new reader) walks to the node then closest to the
+topic id. That node is one of the three holders with the probability the
+routing gives to the nearest ids, and otherwise some other node. Either way
+what forms is a NEW root (David, chat 2026-10-20): it holds no seat from the
+terminated generation, it appoints its own backups, and it selects its own
+children; the old generation's only trace is the deletion record, held by
+three nodes without a role. When the new root is itself a holder the
+deletions are carried; when it is not, it asks for them, as follows.
 
-How a moved terminus finds the holders, as an explicit rule and not the
+How a new root finds the holders, as an explicit rule and not the
 birth probe: the probe runs 800 ms after formation and is skipped once the
 cache has filled (repairPlane.js:694, :701), so a publish that lands first
 leaves a new root with no deletions and a delayed deleted body is then
@@ -468,7 +481,7 @@ What this keeps and what it gives up, stated for David as Aster asked: the
 replicated deletion contract keeps its three copies, written before live
 custody is dropped (4.5), at the cost of three idle rows and no traffic; it
 survives the loss of any two of the three holders, as today's contract does,
-and a moved terminus recovers them by the RECOVERING rule. It is weaker than
+and a new root recovers them by the RECOVERING rule. It is weaker than
 today in one case: the new root reaches the end of its recovery mode without
 coverage (a holder among its five nearest has not answered within the mode's
 window, or no holder is among the five), AND a stale holder returns inside
@@ -595,10 +608,10 @@ claimed across a partition.
   next walk; a reader receives exactly one terminated row and its kernel
   does not renew.
 - `fence_closure_holders`: three holders keep the tombstones; with two of
-  them gone a returning stale body is refused at the third; a terminus moved
-  to a node that reaches coverage with a holder among its five nearest
+  them gone a returning stale body is refused at the third; a new root formed
+  at a node that reaches coverage with a holder among its five nearest
   imports the deletions in RECOVERING before serving and refuses the stale
-  body; a terminus that ends its recovery mode without coverage accepts the
+  body; a new root that ends its recovery mode without coverage accepts the
   stale body under fail-open, and the fence records that as the sized
   residual case, not a pass.
 - `fence_child_step_down`: a thin child steps down after the window; its
@@ -630,7 +643,9 @@ re-forms only the topics someone reads or wrote to.
 
 ## 9. Where David's word is still needed — the questions in full
 
-1. **Recovery mode.** When a topic's root moves and the new root cannot
+1. **Recovery mode.** A terminated topic has no root. When a later
+   subscriber or publisher forms a NEW root, at whatever node is then
+   closest, with its own backups and children, and that root cannot
    reach any node holding the old deletions within 10 seconds: FAIL-OPEN
    (serve, mark the topic unrecovered, keep asking every tick, and accept
    that a deleted message may return until the deletion arrives) or
