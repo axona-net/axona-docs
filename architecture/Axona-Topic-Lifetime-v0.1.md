@@ -1,4 +1,4 @@
-# Axona Topic Lifetime — design packet v0.4
+# Axona Topic Lifetime — design packet v0.5
 
 **Status:** DESIGN, for council review. Nothing built. David's word is a
 direction, not a build: council 6d25996a (seq 305, 23:20Z 2026-10-19), quoted
@@ -57,6 +57,26 @@ tombstone set is credited on two backups by the verified replication path
 terminus finds the holders through the birth probe, which pulls from the five
 nearest and is answered with deletions by an empty holder (repairPlane.js:725,
 syncEngine.js:153–163); the residual case is sized and left to David.
+
+**v0.5 (02:0xZ 2026-10-20)** answers Aster's 5237dce7 on v0.4, three points
+on evidence and one contradiction, each checked against source and each
+holding. (1) Replication credit is not a receipt: `role.replicas` is written
+on the dispatch verdict (repairPlane.js:1082) and a backup answers consumed
+the moment the ingest is queued (wireHandlers.js:1049–1050), so 4.5 now
+requires a REPLICA_RECEIPT, a new frame the backup sends only after its
+queued ingest commits, bound to the generation and to a hash of the deletion
+set, and old or keepalive credit counts for nothing. (2) The birth probe is
+not a barrier: it is scheduled 800 ms after formation and skipped once the
+cache has filled (repairPlane.js:694, :701), so 4.6 now has an explicit
+RECOVERING state in which a new root pulls deletions from its five nearest
+before it serves or acknowledges a body, and the larger weakened case when no
+holder answers is disclosed for David as Aster asked. (3) Equal windows need
+a clock margin: the merge's allowance is 300 s (`MERGE_E_MAX_MS`), useless
+for a 180 s window, so 4.4 separates an assumed appointment skew S and a
+delivery bound D from the rule, makes a grant fresh only under L − S, demands
+fresh authority (a live beacon) in the band of width 2S, and keeps the record
+for L + S + D; the skewed 181 s case is a fence. 4.10's "silence reads as
+current" is gone.
 
 CAVEAT: this packet changes a rule David set on 2026-09-24 after Orion and
 Aster, that a backup seat is exempt from both reapers. It does not drop the
@@ -260,16 +280,32 @@ A backup's appointment is granted and renewed only by a REPLICATE from the
 generation's root; `lastReplicaAt` is the stamp (its one writer is
 `becomeBackup`, rootClaim.js:391, reached only through a REPLICATE receipt,
 syncEngine.js:291) and nothing the backup sends moves it. The lease is
-`STANDBY_LEASE_MS` = `DROP_MS` = 180 s from the last REPLICATE. A REPLICATE
-carries the generation and its own issue stamp, and it is an appointment or a
-renewal only while younger than the lease at receipt: a grant older than
-180 s by the receiver's clock is dropped whatever it names. The grant
-lifetime and the record window (4.2) are therefore the same window, and a
-grant delivered at 181 s after a closure meets a dropped record AND an
-expired grant; it creates nothing. The clock assumption is the one the merge
-machine already makes, a skew within `MERGE_E_MAX_MS` between any two nodes;
-a skew beyond it shortens or lengthens a lease by that much and nothing
-else. An empty root
+`STANDBY_LEASE_MS` = L = `DROP_MS` = 180 s from the last REPLICATE. A
+REPLICATE carries the generation and its own issue stamp. Two assumptions
+are stated apart from the rule and are the only things the rule rests on:
+S, the clock skew between any two relays for appointment frames
+(`APPOINTMENT_SKEW_MS`, opening value 15 s, to be measured on the fleet
+before it is read as a figure; the merge machine's `MERGE_E_MAX_MS` of 300 s
+is a different allowance for a different purpose and is not used here), and
+D, the longest a frame is in flight (`APPOINTMENT_DELAY_MS`, 60 s). The
+enforceable rule, by the receiver's clock:
+
+- a grant whose stamp reads younger than L − S is FRESH: an appointment or a
+  renewal;
+- a grant whose stamp reads between L − S and L + S is UNCERTAIN: it is an
+  appointment only with fresh authority, a root beacon for the same
+  generation (same root id and epoch) received within `BEACON_TTL_MS` (50 s);
+  without one it is dropped;
+- a grant older than L + S is dropped whatever it names.
+
+The record of 4.2 is kept for L + S + D. Under the assumptions, no grant of
+a closed generation is ever accepted: while the record lives it is dropped
+by the record, and once the record has expired every grant issued before
+the closure reads older than L + S and is dropped by age. Aster's skewed
+case (a grant at a physical 181 s reading 179 s under 2 s of skew) meets a
+record that still lives for S + D more; the fence is `fence_grant_lifetime`
+below. A skew beyond S or a delay beyond D is a stated failure of the
+assumption, not of the rule. An empty root
 replicates nothing (repairPlane.js:931), so an empty root's backups lapse one
 window after their last grant with no notice at all.
 
@@ -289,13 +325,23 @@ The role then stands or falls on what it still is, read in this order:
 A root terminates its generation when all of these hold on one tick: cache
 empty; no custody except the generation's own tombstones; no local intent;
 demand zero; `now - lastDemandAt > DROP_MS`; and, when tombstones exist,
-each of them credited on at least two backups by the verified replication
-path (`role.replicas` is written only on a consumed push, repairPlane.js:1082;
-the tombstone set rides the push, syncEngine.js:160). A root whose
-tombstones are not yet so credited does not terminate: it keeps today's
-custody hold and its live backups until they are, or until the tombstones
-expire. This is the evidence Aster asked for: the three copies of 4.6 exist
-before live custody is dropped, or live custody is not dropped. It sends TOPIC_TERMINATED, naming
+a RECEIPT for the current deletion set from at least two backups. The
+receipt is a new frame, REPLICA_RECEIPT `{ generation, delsHash, count }`,
+sent by a backup only after its queued ingest of a REPLICATE has COMMITTED
+the tombstones, never on enqueue; `delsHash` is a hash over the sorted
+(msgId, killTs) pairs of the backup's active tombstones for the generation.
+The root keeps the latest receipt per backup and counts one only if its
+`delsHash` equals the hash of the root's own current set. Replication
+credit does not count: `role.replicas` is written on the dispatch verdict
+(repairPlane.js:1082), a backup returns consumed the moment the ingest is
+queued (wireHandlers.js:1049–1050), and the credit survives a later failed
+push, so two entries there say nothing about what a backup holds (Aster
+5237dce7). A keepalive carries no receipt; a receipt for an older set does
+not match and does not count. A root without two matching receipts does not
+terminate: it keeps today's custody hold and its live backups until it has
+them or the tombstones expire. The three copies of 4.6 therefore exist,
+committed and for this exact set, before live custody is dropped, or live
+custody is not dropped. It sends TOPIC_TERMINATED, naming
 the generation, to every seat, backups, children and readers alike, once per
 tick for up to three ticks or until every backup has left, whichever is first;
 after the first send it sets `role.dismantling` and accepts no new seat for
@@ -336,30 +382,39 @@ holder, a new publisher, a new reader) walks to the terminus, which is one
 of these holders with the probability the routing gives to the nearest ids,
 and the new generation forms with the deletions carried.
 
-How a moved terminus finds the holders: a node that forms an empty root
-runs the birth probe (4.115.0), which pulls from the `EMPTY_ROOT_PROBE_FANOUT`
-+ 1 = 5 nodes closest to the topic (repairPlane.js:725), and a holder with an
-empty cache answers a pull with its active deletions (syncEngine.js:153–163,
-the tombstone-only transfer built for the dual-root packet). A closure
-holder answers that pull. So a terminus that moves to a node within the five
-nearest imports the deletions before it serves anything; the holders are
-discoverable by the mechanism the kernel already has, and the record's
-`until` of 4.2 does not bound this, the tombstones' own expiry does.
+How a moved terminus finds the holders, as an explicit rule and not the
+birth probe: the probe runs 800 ms after formation and is skipped once the
+cache has filled (repairPlane.js:694, :701), so a publish that lands first
+leaves a new root with no deletions and a delayed deleted body is then
+accepted (Aster 5237dce7). A node that becomes root for a generation it did
+not inherit (no CLOSED record of its own) therefore enters RECOVERING on the
+tick it forms: it sends a deletions-only pull to the `EMPTY_ROOT_PROBE_FANOUT`
++ 1 = 5 nodes nearest the topic at once, and a holder with an empty cache
+answers with its active deletions (syncEngine.js:153–163, the tombstone-only
+transfer). While RECOVERING the root ingests bodies but neither acknowledges,
+fans out nor serves them; they are held pinned. Recovery ends when a reply
+has been applied or `RECOVERY_MS` (10 s, two ticks) has passed. Deletions
+that arrive are applied first, a held body they name is dropped, and the
+rest are released. A reply's dispatch verdict is not its application; only
+an applied reply ends recovery early.
 
 What this keeps and what it gives up, stated for David as Aster asked: the
 replicated deletion contract keeps its three copies, written before live
 custody is dropped (4.5), at the cost of three idle rows and no traffic; it
 survives the loss of any two of the three holders, as today's contract does,
-and a moved terminus recovers them by the probe. It is weaker than today in
-one residual case: the terminus moves to a node whose five nearest hold none
-of the three (every holder farther than four others from the topic), AND a
-stale holder returns inside the 24 hours. Then the new generation forms
-without the deletions and the stale body is accepted. Today's tree would
-have been found by the beacon and the stale holder refused. The packet does
-not close this case; it sizes it and names it, and the choice between
-accepting it and keeping today's live framework for deleted topics is
-David's, not a default. The dual-root machine, when armed, merges a closure
-holder's tombstones into such a root when the two meet.
+and a moved terminus recovers them by the RECOVERING rule. It is weaker than
+today in one case, which is larger than v0.4 stated: the terminus moves to a
+node for which NO holder among its five nearest answers within `RECOVERY_MS`
+(all three farther than four others from the topic, or all three unreachable
+for ten seconds), AND a stale holder returns inside the 24 hours. Then the
+new generation serves without the deletions and the stale body is accepted.
+Today's tree would have been found by the beacon and the stale holder
+refused. The packet does not close this case; it sizes it and names it, and
+Aster's recommendation is recorded: preserve deletion protection, which
+means keeping today's live framework for deleted topics instead. The choice
+is David's, in Part 9, not a default of this packet. The dual-root machine,
+when armed, merges a closure holder's tombstones into such a root when the
+two meet.
 
 ### 4.7 A thin branch steps down, and the app never knows
 
@@ -418,12 +473,26 @@ claimed across a partition.
   a closed record forms epoch + 1 with the tombstones carried; a publish
   before the first send cancels the termination; a publish after it forms
   the next generation with the deletions in force.
-- `fence_grant_lifetime` (Aster's 181 s trace): a REPLICATE issued before a
-  closure and delivered at 181 s after it meets an expired record and an
-  expired grant and creates nothing; one delivered at 179 s meets the record
-  and is dropped; a fresh REPLICATE from a live root is an appointment; a
-  REPLICATE with no generation from a node that is not the receiver's
-  principal creates nothing.
+- `fence_grant_lifetime` (Aster's 181 s traces, perfect clocks and skewed):
+  a REPLICATE issued before a closure and delivered at 181 s after it meets a
+  record that lives for L + S + D and creates nothing; the same under 2 s of
+  skew, where it reads 179 s old, meets the record too; one delivered at
+  L + S + D + 1 reads older than L + S and is dropped by age; a grant in the
+  uncertain band is an appointment with a live beacon for the generation
+  and is dropped without one; a fresh REPLICATE from a live root is an
+  appointment; a REPLICATE with no generation from a node that is not the
+  receiver's principal creates nothing.
+- `fence_replica_receipt`: a consumed dispatch verdict earns no receipt; a
+  keepalive earns no receipt; a receipt is sent only after the queued ingest
+  commits; a receipt whose hash matches an older set does not count after a
+  new tombstone; a root with one matching receipt does not terminate; with
+  two it does.
+- `fence_recovery_before_admission`: a publish fills a new root before any
+  probe would have run; a delayed deleted body then arrives and is refused,
+  because the deletions were pulled in RECOVERING first; a body held during
+  recovery is released after the reply and acknowledged once; with no
+  holder answering within RECOVERY_MS the root serves and the fence records
+  the sized case, not a pass.
 - `fence_left_record` (Aster's prune-with-live-root trace): a child steps
   down while the root serves twenty readers; a reader arriving at the
   stepped-down node is forwarded to the root and seated there; a stale via
@@ -474,8 +543,9 @@ It does not change the seat lease, the body TTL, the tombstone semantics
 (allow, forbid, revoke on a forged kill), the merge machine, local intent or
 leases. It adds a declaration to SUB, a generation to REPLICATE, and two
 frames, TOPIC_TERMINATED and REHOME, all ignored by an older kernel; an older
-kernel's bare SUB reads as demand and its silence on the generation reads as
-the current one, so a mixed fleet retains more, never less. Under churn the
+kernel's bare SUB reads as demand and its generation-less REPLICATE is an
+appointment only from the receiver's current principal and never creates a
+role (4.1), so a mixed fleet retains more, never less. Under churn the
 standby set is bounded to generations with demand or bodies, and a roll
 re-forms only the topics someone reads or wrote to.
 
