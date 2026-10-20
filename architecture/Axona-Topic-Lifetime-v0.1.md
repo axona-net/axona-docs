@@ -628,15 +628,31 @@ role (4.1), so a mixed fleet retains more, never less. Under churn the
 standby set is bounded to generations with demand or bodies, and a roll
 re-forms only the topics someone reads or wrote to.
 
-## 9. Where David's word is still needed
+## 9. Where David's word is still needed — the questions in full
 
-1. The bound: answered, kept at today's constants (4.4, 4.5).
-2. Tombstones: 4.6 keeps three idle holders and names the one case weaker
-   than today; David to confirm that reading of "light weight".
-3. 4.7's numbers (`CHILD_MIN_READERS`, the step-down window, the minimum
-   stay, the cooldown): David to confirm the opening values or name others.
-4. The harness: deferred by David to after this packet.
-5. The build word.
+1. **Recovery mode.** When a topic's root moves and the new root cannot
+   reach any node holding the old deletions within 10 seconds: FAIL-OPEN
+   (serve, mark the topic unrecovered, keep asking every tick, and accept
+   that a deleted message may return until the deletion arrives) or
+   FAIL-CLOSED (hold for up to 60 seconds before serving)? Aster recommends
+   fail-closed (4.6).
+2. **Thin-branch numbers** (4.7). A child steps down below 3 readers for
+   180 s; a new child has 180 s before it can be judged thin; a node that
+   stepped down is not re-promoted for 300 s. Orion's alternative: 2 to 3
+   readers, 60 to 90 s. Confirm or name others.
+3. **The tombstone arrangement** (4.6). After a topic ends its deletion
+   records stay on the root and both backups as idle entries with no
+   traffic, and the live tree goes. Is that the "light weight" you meant?
+4. **Clock skew** (4.4). The grant rule assumes relays' clocks differ by at
+   most 15 s, an opening guess. Measure it on the fleet before the build, or
+   set a value?
+5. **Howard's production tests**, deferred by David: should his suite run
+   with its delete cache in place, so its own deletions exercise the
+   teardown?
+6. **The build word.**
+
+Answered already: the seat bound stays at today's 60 s renewal and 180 s
+drop (David, 2026-10-19).
 
 ## Source map (axona-protocol `0c9ec13`)
 
