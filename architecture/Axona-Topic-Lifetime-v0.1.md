@@ -1,4 +1,4 @@
-# Axona Topic Lifetime — design packet v0.2
+# Axona Topic Lifetime — design packet v0.3
 
 **Status:** DESIGN, for council review. Nothing built. David's word is a
 direction, not a build: council 6d25996a (seq 305, 23:20Z 2026-10-19), quoted
@@ -22,6 +22,24 @@ numbers as the opening proposal). Part 6 is resolved: tombstones stay, as a
 closure record on the root alone, and the live framework does not stay for
 them (David: "tombstones are light weight"; Aster: retain a small
 expiry-bounded record, not the framework).
+
+**v0.3 (01:5xZ 2026-10-20)** answers Aster's REQUEST CHANGES 23c5cfd1 on
+v0.2, four points, each verified against source and each holding, and
+replaces Parts 4 through 8 with one rule set (Part 4, ten sections). (1) The
+epoch does not identify a generation: `_knownEpoch` (rootElection.js:35) is
+soft state and a cold node mints 1 again, so a generation is (topic, root id,
+epoch), and every holder that leaves one keeps a closed record consulted
+before any role is created; the entry points that create a role on first
+sight are named. (2) A lapsed standby lease ends the appointment and nothing
+else; a node that is also a reader, child or custodian continues as that; a
+child is counted once, by its declared demand. (3) The closure record is not
+a single copy: the root and its backups all keep the tombstones as idle
+holders, the failure assumption is stated, and the one case weaker than
+today, a moved terminus with no record, is named for David instead of
+traded away. (4) The bounds are a table with a condition on every row;
+root death is one election within a side, not across a partition; REHOME is
+kernel-internal and keeps the app's subscription, and only TOPIC_TERMINATED
+ends one.
 
 CAVEAT: this packet changes a rule David set on 2026-09-24 after Orion and
 Aster, that a backup seat is exempt from both reapers. It does not drop the
@@ -131,315 +149,255 @@ changes nothing about the first.
 It is NOT a drop of the 4.94.0 exemption. The exemption stays while the topic
 has demand or bodies. What changes is that it ends.
 
-## 4. The contract
+## 4. The contract — one rule set
 
-Definitions, each a thing the node can read in its own state:
+Everything below replaces v0.2's Parts 4, 4a, 5, 5a, 6, 7 and 8, which carried
+old and new statements side by side (Aster 23c5cfd1). Each rule names what the
+node can read in its own state. Numbers are today's constants unless a row
+says otherwise.
 
-- **Demand** at a holder: a seat whose SUB did not declare `standby`. An app,
-  a council seat, a child relay. A child relay's SUB carries its own demand
-  count, so a child with readers below it is demand and a child with only
-  standby below it is not. This is Aster's split of end-reader demand from
-  downstream aggregate demand.
-- **Standby**: a seat whose SUB declared `standby` because the sender holds
-  the topic as a backup. Standby is never demand.
-- **Bodies**: `role.cache.length > 0`.
-- **Custody**: `_custodyAlive` as shipped (an open merge or pull, pins, an
-  active tombstone). Part 6 is about the last clause.
-- **Local intent**: `peer.sub()`, `peer.host(topic)`, a metrics lease. As
-  today, never dismantled by this rule.
+### 4.1 A generation is (topic, root id, epoch)
 
-**The rule.** A ROOT whose cache is empty, whose custody is not alive, whose
-local intent is absent, and whose demand has been zero for one DROP window
-DISMANTLES its topic: it announces `demand: 0, dismantle: true` to its backups
-and children in the REPLICATE keepalive it already sends every tick, stops
-replicating, and retires itself on the next tick through `_retireRole`
-(repairPlane.js:69), the one detach site. A BACKUP that hears the announcement
-from its live principal retires through `retireBackup('dismantled')` on that
-tick and, holding no seats and no bodies, is taken by `deadNow` on the same
-tick. A CHILD that hears it unseats its subscribers' routes and is taken the
-same way. The framework goes in one window and one tick.
+A topic's live tree is a GENERATION, identified by the topic, the id of the
+root that formed it, and that root's epoch. The epoch alone does not identify
+it: `_knownEpoch` (rootElection.js:35) reads the local role, the beacon cache
+and the root-tombstone cache, all soft state, so a node that has forgotten
+everything mints epoch 1 again, and two roots formed after a full forgetting
+carry equal epochs. The root's id is minted per process start, so equal epochs
+from different roots are told apart by it. Every frame this packet adds or
+reads (the standby grant, its renewal, the termination, the rehome) names
+the generation in full. A frame naming a generation the receiver does not hold
+and has not closed is handled by the rules of 4.2; a frame naming a generation
+the receiver has closed is dropped.
 
-**Root death.** A backup whose principal stops replicating keeps the election
-obligation exactly as today: it stays subscribed, one backup self-roots at the
-SUB terminal, the others re-home under it. The new root inherits no demand
-and no bodies, and applies the rule. A dead root therefore costs one election
-and one DROP window, and nothing after. The 4.94.0 split-brain case, a
-vanished root whose backups were pruned so no root remained, cannot occur,
-because nothing here prunes a backup on its own evidence.
+Complete forgetting is accepted and stated: when every holder of a generation
+is gone and every closed record (4.2) has expired, the next subscriber forms a
+new generation at the terminus as a first subscriber does today, and nothing
+from the old one can reach it, because nothing from the old one still exists.
 
-**The numbers.** David's 30 s and four minutes were an example; the bound
-stays where it is. One constant moves so that the grace never stacks on an
-expired lease:
+### 4.2 A holder remembers what it closed, before it creates anything
 
-| constant | today | v0.2 | reason |
-|---|---|---|---|
-| `RENEW_MS` (ceiling) | 60 s | 60 s | kept (David, 2026-10-19) |
-| `DROP_MS` | 180 s (3×) | 180 s | kept; inside the ≤4× bound |
-| `ROLE_EMPTY_GRACE_MS` | 300 s | 180 s | one window, never stacked |
-| `BACKUP_EVICT_MS` | 60 s | 60 s | unchanged; the rehome discharge stays |
+Every holder that leaves a generation, by termination (4.5), by lapse of its
+standby lease (4.4), by stepping down (4.7) or by the reaper, writes a
+CLOSED record `{ topic, rootId, epoch, until }` with `until = now + DROP_MS`
+(180 s), kept outside `axonRoles` in a bounded map. For the ex-root and its
+ex-backups the record also carries the generation's active tombstones until
+their own expiry (4.6).
 
-**The drain budget**, counted from the last renewal of the last demand seat,
-with the scheduler running (a wall-clock promise is not made; this is a count
-of ticks under the published allowance, Aster's condition): the seat expires
-at 180 s; the root reads demand zero on that tick and, cache being empty,
-sends TOPIC_TERMINATED on the same tick; backups and children retire on
-receipt, within one tick; the root retires on its next tick. Under 190 s at
-a 5 s tick. A holder that never receives the notice is bounded two ways, and
-Aster's 7ddb72ea is why there are two: a READER's seat lapses at the root
-when the reader stops renewing, but a BACKUP does not stop renewing on its
-own, so its bound is the standby lease of Part 4a, which the root renews by
-replicating and the backup cannot renew by its own SUB. An empty backup that
-misses the notice retires one lease window after the root's last REPLICATE,
-without an election; a backup holding bodies elects, and the new root runs
-the rule again. Under loss or partition the drain is therefore one window
-plus one lease window, not "seconds", and the packet claims nothing faster.
-Today's arithmetic, which Aster did, is 180 s plus 300 s plus a sweep: about
-eight minutes, and only for the roots the grace sees at all.
+The record is consulted BEFORE any role is created or any seat is granted
+(the `_syncIngest` and `_onSub` entry points, which today create a role on
+first sight: syncEngine.js:226–237, wireHandlers.js:401):
 
-## 4a. The standby appointment is a lease, not a self-renewal
+- a REPLICATE, a standby SUB or a TOPIC_TERMINATED naming a closed generation
+  is dropped. A delayed grant therefore renews nothing and creates nothing,
+  and a duplicate notice ends nothing twice.
+- a reader SUB or a publish for the topic at a node holding a closed record
+  forms a NEW generation: the node becomes root with epoch = closed.epoch + 1
+  and its own id, and the record's tombstones become the new root's
+  tombstones, so the old deletions stay in force (David's question in chat).
+- a REPLICATE naming a generation the receiver neither holds nor closed is a
+  fresh appointment and proceeds as today.
 
-Today a backup renews its own seat for ever (loop 1b-bak) and the root's
-replication refreshes `lastReplicaAt` beside it; neither has an end. Aster's
-7ddb72ea names the hole in any send-once termination: the lease expires a
-seat that stops renewing, and a backup is a sender that never stops. A
-missed notice would leave a backup renewing toward a topic that no longer
-exists, and its SUB at the terminus would re-form the topic as an empty root
-with the other backup as its seat — the loop the packet exists to end.
+### 4.3 Demand, counted once
 
-**The rule.** A backup holds a STANDBY LEASE granted by the root's
-REPLICATE and renewed only by the root's REPLICATE; `lastReplicaAt` is the
-lease stamp and nothing the backup sends moves it. The lease lasts
-`STANDBY_LEASE_MS` = `DROP_MS` = 180 s from the last REPLICATE. While it
-holds, the backup renews its seat as today and is exempt from the reapers as
-today. When it lapses:
+A seat is exactly one of three kinds, declared by the SUB that renews it:
 
-- a backup with NO bodies and no tombstones retires through `retireBackup`
-  and the reapers take the role on that tick. It sends no further SUB. There
-  is nothing to elect for, so no election. An empty root replicates nothing
-  (repairPlane.js:931), so an empty root's backups lapse on their own one
-  window after their appointment even if every notice is lost; the notice
-  makes the same thing happen in one tick instead of one window.
-- a backup WITH bodies or tombstones keeps the election obligation of 4.94.0
-  unchanged: it stays subscribed, self-roots at the SUB terminal if the root
-  is gone, and the others re-home under it. History is preserved by the one
-  node that has something to preserve, and the new root applies the rule.
-
-A standby SUB and a REPLICATE both carry the epoch of the root that issued
-the appointment. A root that receives a standby SUB bearing an older epoch
-than its own refuses it: it is housekeeping from a closed generation, not
-demand, and it seats nobody. A backup that receives a REPLICATE bearing an
-older epoch than the lease it holds ignores it. A late TOPIC_TERMINATED
-bearing an older epoch than the holder's current root is ignored (Part 5).
-This is Aster's closed-generation rule: successful renewal by a reader may
-establish new demand; stale standby traffic may not revive old state or
-destroy a new generation.
-
-**A topic that holds bodies** is not dismantled while they live. A test that
-publishes 260 bodies and deletes none keeps its 92 topics, each with two
-backups, for 24 hours. That is the harness Vega named, and it is a harness
-choice: a run that deletes what it published (Howard's suite with its kill
-cache in place) leaves tombstones, which is Part 6. A test profile with a
-short body TTL is a separate change and is not proposed here.
-
-## 5. The mechanism
-
-1. **SUB carries `standby: true`** when the sender holds the topic as a
-   backup (loop 1b-bak's `_sendSubscribe`), and **`demand: n`** when the
-   sender is a child, n being its own count of non-standby seats. A root
-   counts demand as the seats whose latest SUB was not standby, plus the sum
-   of children's declared demand. A SUB that says nothing is demand: an old
-   client is a reader until it says otherwise, so a version skew fails safe
-   toward retention.
-2. **REPLICATE carries `demand`** every tick. A backup records it beside
-   `lastReplicaAt`. The field is informational until it reads zero with
-   `dismantle: true`.
-3. **The root's dismantle test** runs in refreshTick after seat eviction and
-   cache expiry, before the reapers: `isRoot && cache.length === 0 &&
-   !custodyAlive && !localIntent && demand === 0 && now - lastDemandAt >
-   DROP_MS`. `lastDemandAt` is stamped by every demand SUB and by every stamped
-   write, never by a standby SUB, a beacon, a keepalive or a duplicate kill —
-   the laundering rule from 4.116.0 applies to it.
-4. **The notice** is one frame, TOPIC_TERMINATED, carrying the topic, the
-   root's epoch and the root's id, sent by the root to every backup and every
-   child; a child forwards it to its own subscribers and apps receive it as a
-   delivery row `{ terminated: true, epoch }`, after which the app's
-   subscription is ended and it may subscribe again, which forms a new topic
-   generation at the terminus with epoch + 1. The frame is bound to the epoch:
-   a holder that has already seated under a newer root ignores an older
-   notice, so a delayed termination cannot end a topic that was re-formed
-   (Aster's generation rule). Only the root sends it; a notice from any other
-   sender is dropped. It is sent once per tick for up to three ticks or until
-   every backup has acknowledged by leaving, whichever is first; a holder that
-   never receives it is covered by its own lease, Part 4. The root then sets
-   `role.dismantling = true`, which `_custodyAlive` does not read and the
-   reapers do: on the next tick `deadNow` takes a root with no seats left, and
-   `_retireRole(t, role, 'terminated')` marks the object so a parked write is
-   refused (4.116.0's retired-role cut).
-5. **The backup's receipt**: a backup holding no bodies and no tombstones
-   runs `retireBackup(t, role, 'terminated')`, sends no further SUB, and the
-   ordinary reapers take the role on that tick. A backup that holds a body
-   the root does not (a split-union ingest can put one there) does NOT obey
-   the notice: it has something to preserve, so it keeps its election
-   obligation, self-roots when the root retires, and the new root applies
-   the rule. Aster's 7ddb72ea is right that `holdsHistory` protects root
-   bodies only (repairPlane.js:276), so a body may never be left on a role
-   that has just stopped being a backup; it is carried by the election or
-   it is not carried at all.
-6. **A seat that returns** after the dismantle re-forms the topic from nothing
-   at the routing terminus, as a new root with epoch + 1, exactly as a
-   first subscriber does today. Nothing is lost that was held: there was
-   nothing.
-7. **The grace** keeps its one job, a root born empty with no seat and no
-   body, and shortens to one window. The dismantle path never waits for it.
-
-## 5a. Thin branches step down (David d200175e)
-
-Today a relay becomes a child only because its parent was crowded: at
-`MAX_DIRECT` = 20 direct seats the parent promotes one subscriber and hands
-it up to `DELEGATE_BATCH` = 8 of the others (wireHandlers.js:386–395, :422,
-constants.js:139, :308). Nothing demotes it. A child whose readers all leave
-keeps renewing to its parent as an empty child, and the parent keeps it.
-Under churn this leaves a wide tree of thin branches, each one a seat the
-parent must manage and a hop a delivery must cross.
-
-**The rule.** A child counts its READERS: its seats that are not standby and
-not children carrying zero demand. A child whose readers have numbered fewer
-than `CHILD_MIN_READERS` for longer than `CHILD_STEP_DOWN_MS` steps down:
-it stops renewing to its parent, sends one notice to its remaining readers
-(the same TOPIC_TERMINATED frame with `rehome: true`, meaning "re-subscribe,
-the topic lives, this branch does not"), stops answering the via extension
-so no walk is routed through it, hands off anything it still owes (a body
-its readers have not received goes with the rehome notice's replay, as a
-handoff does today), and drops its list. Its readers walk to the topic again
-and are seated at the root or at a child the root still keeps. A reader that
-walks during the step-down may miss deliveries for one renewal, as it would
-under ordinary churn; nothing is lost that the root holds.
-
-**Hysteresis, so the tree does not oscillate** (Aster's two thresholds and
-cooldown):
-
-| constant | opening proposal | meaning |
+| kind | declared by | counts as demand |
 |---|---|---|
-| `MAX_DIRECT` | 20 (today) | the parent promotes a child at this many seats |
-| `CHILD_MIN_READERS` | 3 | below this a child is thin |
-| `CHILD_STEP_DOWN_MS` | 180 s | thin for one lease window before stepping down |
-| `CHILD_MIN_STAY_MS` | 180 s | a new child is not thin until it has had one window to fill |
-| `CHILD_COOLDOWN_MS` | 300 s | a parent does not re-promote a node that stepped down within this |
+| reader | an app or a seat (a SUB with no declaration) | 1 |
+| child | a child relay, `demand: n` = its own demand count | n, and 0 when n is 0 |
+| standby | a backup, `standby: true` with the generation | 0 |
 
-Promotion happens only at the parent's limit; a node that stepped down is
-re-promoted only if the parent fills again and the cooldown has passed, so
-a node that is promoted, found thin and demoted cycles at most once per
-cooldown, and only while the parent is at its limit. Orion's 2 to 3 readers
-and 60 to 90 s are the lower edge of this table; the window is set to the
-lease so that one departing reader is not mistaken for an empty branch.
-The numbers are to be chosen together once the rule is agreed, as Aster
-asked; the table is a starting point, not a measurement, and Aster's
-7ddb72ea records that the packet's 4 / 180 s and Orion's 2 to 3 / 60 to 90 s
-are competing candidates, not a policy.
+A SUB that declares nothing is a reader: an older kernel reads as demand, so a
+mixed fleet retains more, never less. `demand` at a holder is the sum over its
+seats by this table and nothing else; a child is never counted as a seat and
+again as its declared count. `lastDemandAt` is stamped by a reader SUB, by a
+child SUB with n > 0, and by a stamped write; never by a standby SUB, a
+REPLICATE, a beacon, a keepalive or a duplicate kill (the 4.116.0 rule).
+Local intent (`peer.sub()`, `peer.host(topic)`, a metrics lease) and custody
+(`_custodyAlive`: an open merge or pull, pins, an active tombstone) are read
+as today and are not demand.
 
-**Not applied to backups.** A backup's job is the root's history, not
-fan-out, and it ends by TOPIC_TERMINATED, not by a reader count.
+### 4.4 The standby appointment is a lease on one thing
 
-## 6. Tombstones: a closure record, not a framework
+A backup's appointment is granted and renewed only by a REPLICATE from the
+generation's root; `lastReplicaAt` is the stamp (its one writer is
+`becomeBackup`, rootClaim.js:391, reached only through a REPLICATE receipt,
+syncEngine.js:291) and nothing the backup sends moves it. The lease is
+`STANDBY_LEASE_MS` = `DROP_MS` = 180 s from the last REPLICATE. An empty root
+replicates nothing (repairPlane.js:931), so an empty root's backups lapse one
+window after their last grant with no notice at all.
 
-A deleted body leaves a tombstone for 24 hours so that a late replica or a
-late subscriber holding the body does not bring it back. Since 4.115.0 an
-active tombstone is custody and holds the role. Under this packet a topic
-whose test deleted everything it published is therefore NOT dismantled at
-the window: its root holds tombstones, replicates them to its backups, and
-the three roles stand for 24 hours with nothing but deletion records. Aster's
-96b00853 names this: "zero BODY cache is not zero deletion custody."
+When the lease lapses, the APPOINTMENT ends and nothing else does: the node
+runs `retireBackup`, stops its standby renewals, and writes the closed record.
+The role then stands or falls on what it still is, read in this order:
 
-Two readings, stated apart:
+1. it holds bodies or tombstones of the generation and the root is gone: the
+   4.94.0 election obligation, unchanged — it stays subscribed, self-roots at
+   the SUB terminal, and the others re-home under it;
+2. it is a child with readers, or a reader itself, or holds local intent or
+   custody: it continues in that capacity under the ordinary rules;
+3. none of the above: the reapers take it on that tick.
 
-- **A.** Keep it. A tombstone is a promise to every holder that a body is
-  gone; the framework is the holder. A deleted test topic costs three thin
-  roles for a day. The census would show them as roots with tombstones and
-  standby seats, distinguishable from today's rows by `tombstones > 0`.
-- **B.** Let tombstones die with the framework when no holder has a body and
-  demand is zero. The promise a tombstone makes is to a holder that still
-  has the body; if the root, both backups and every child retire together,
-  no such holder is in the framework. The one that can exist is outside it:
-  a child that left carrying bodies and returns after the dismantle,
-  re-forming the topic from its stale cache. That is the resurrection
-  tombstones exist for, bounded to a departed holder's cache and to the
-  24 hours that cache lives.
+### 4.5 Termination
 
-**v0.2 resolution: neither A nor B.** The tombstones stay and the framework
-does not. A root whose cache is empty, whose tombstones are active and whose
-demand is zero sends TOPIC_TERMINATED as in Part 5; its backups and children
-go. The root itself does not retire: it keeps the tombstones as a CLOSURE
-RECORD, replicates nothing, seats nobody, sends no keepalive, and retires
-through `_retireRole` when the last tombstone expires. A subscriber or
-publisher arriving in the meantime walks to the same terminus, finds the
-record, and the topic re-forms around it as a new generation (epoch + 1) with
-the old deletions still in force: the one deleted id stays refused, every
-other id lands normally, exactly as David asked in chat. A departed holder
-returning with the deleted body is refused at ingest by the record, which is
-the protection B would have given up. What A would have cost, two backups
-and two keepalive frames every tick for every deleted test topic for a day,
-is not paid; what remains is one thin role per deleted topic on one node for
-the tombstones' lifetime. Aster's 5408c64e asked for a small expiry-bounded
-deletion record and not the live framework; this is that record. The
-tombstone semantics themselves (allow, forbid, revoke on a forged kill) do
-not change.
+A root terminates its generation when all of these hold on one tick: cache
+empty; no custody except the generation's own tombstones; no local intent;
+demand zero; `now - lastDemandAt > DROP_MS`. It sends TOPIC_TERMINATED, naming
+the generation, to every seat, backups, children and readers alike, once per
+tick for up to three ticks or until every backup has left, whichever is first;
+after the first send it sets `role.dismantling` and accepts no new seat for
+the generation. The reapers take the root on the tick after its last send, and
+it keeps the closure record (4.6). A stamped write arriving BEFORE the first
+send restamps `lastDemandAt` and cancels the termination; one arriving after
+it lands at a node holding the closed record and forms the next generation by
+4.2, with the deletions carried.
 
-## 7. The regression this must not repeat, and the fences
+On receipt, bound to the generation:
 
-On 4.92.0 an empty backup was reaped on its own evidence and re-seated on the
-next keepalive, 2.8 times a second on the west bridge for 2.4 hours. The
-discharge here is the root's announcement, carried in the frame the root
-already sends; a backup never reads its own emptiness as a reason to go. The
-fence set:
+- a BACKUP with no bodies or tombstones beyond the generation's own
+  tombstones retires its appointment (4.4) and keeps the tombstones as a
+  closure holder (4.6); a backup holding a body the root lacks does NOT obey
+  and elects by 4.4(1) — `holdsHistory` protects root bodies only
+  (repairPlane.js:276), so a body is carried by an election or not at all;
+- a CHILD forwards the notice to its own seats, then retires and writes the
+  closed record;
+- a READER's kernel ends the app's subscription for that generation and
+  delivers one row `{ terminated: true, generation }`. The subscription is
+  ended, not paused: an app that still wants the topic subscribes again and
+  forms the next generation. This is the one place the app sees anything.
 
-- `fence_topic_dismantle`: a root with no demand and no bodies for one window
-  announces once and the root, two backups and a child are all retired within
-  two ticks; a root with one demand seat renewing is held; a root with one
-  body is held; a root with an active tombstone is held (A) or held one window
-  then dismantled (B); a standby SUB does not stamp `lastDemandAt`; a child
-  declaring demand holds the root and a child declaring zero does not.
-- `fence_topic_dismantle_root_death`: the principal stops; the backups elect
-  one; the new root dismantles after one window; exactly one election.
-- `fence_standby_lease`: a backup's own SUB does not move `lastReplicaAt`;
-  an empty backup whose lease lapses retires with no election and sends no
-  SUB on the following twenty ticks; a backup holding one body whose lease
-  lapses elects and the body survives on the new root; a standby SUB bearing
-  an older epoch seats nobody at a newer root; a REPLICATE and a
-  TOPIC_TERMINATED bearing an older epoch are ignored; a notice lost to
-  every backup still ends the topic within one lease window.
-- `fence_topic_dismantle_no_reseat`: a retired backup sends no SUB on the
-  next tick and is not re-granted by a keepalive from a root that is itself
-  retiring; the 4.92.0 shape is asserted absent over twenty ticks.
-- `fence_topic_dismantle_reform`: a reader returning after the dismantle
-  forms a new root at the terminus with epoch + 1 and receives nothing stale.
-- `fence_seat_lease_bounds`: `DROP_MS <= 4 * RENEW_MS` is a constant check
-  that fails the build if anyone moves one without the other.
-- Mutants: remove the standby flag (backups count as demand, nothing
-  dismantles); remove `lastDemandAt`'s stamp guard (a keepalive renews
-  demand); remove the announcement (backups never retire; the root is held
-  by its own backups); let a backup reap on its own emptiness (the 4.92.0
-  loop returns).
+Delivery is not assumed. A seat that never receives the notice is bounded by
+what it is: a reader's or child's seat lapses at the root at DROP_MS, and a
+child still renewing toward a root that is gone walks to the terminus, finds
+the closed record, and is answered with the same TOPIC_TERMINATED there; a
+backup's appointment lapses by 4.4 one window after the root's last REPLICATE.
 
-## 8. What it does not do, and churn
+### 4.6 Deletion protection survives the tree
 
-It does not touch local intent, leases, bodies or the merge machine. It does
-not shorten the body TTL. It does not reap a backup whose root is silent,
-which stays the election path. It adds one field to SUB and two to
-REPLICATE, both ignored by an older kernel, and an older kernel's silence on
-`standby` reads as demand, so a mixed fleet retains more, never less.
+Tombstones are not torn down with the tree, and they are not a single copy.
+At termination the root and each backup keep the generation's tombstones as
+CLOSURE HOLDERS: a role with no seats, no replication, no keepalive and no
+beacon, read only by 4.2, expiring with its last tombstone (`TTL_MS`, 24 h
+from the kill). A node reaching the topic in that window (a returning stale
+holder, a new publisher, a new reader) walks to the terminus, which is one
+of these holders with the probability the routing gives to the nearest ids,
+and the new generation forms with the deletions carried.
 
-Under churn the standby set is bounded to topics with demand or bodies: a
-relay roll today re-forms every root it rolled with two fresh backups, and
-those stand until the bodies expire; under this packet a topic nobody reads
-and nobody wrote to is gone one window after the roll settles. David's
-"dramatically accelerated with churn" is exactly the roll case.
+What this keeps and what it gives up, stated for David as Aster asked: the
+replicated deletion contract keeps its three copies at the cost of three idle
+rows and no traffic; it survives the loss of any two of the three holders, as
+today's contract does. It is weaker than today in one case: if the terminus
+MOVES, a node closer to the topic appearing that holds no closure record,
+and a stale holder returns within the 24 hours, the new generation forms
+there without the deletions and the stale body is accepted. Today's tree
+would have been found by the beacon and the stale holder refused. The
+packet does not close this case; it names it. The dual-root machine, when
+armed, merges a closure holder's tombstones into such a root when the two
+meet, and the pinned tombstones travel with the merge.
+
+### 4.7 A thin branch steps down, and the app never knows
+
+A child counts its demand by 4.3. A child whose demand has been below
+`CHILD_MIN_READERS` for `CHILD_STEP_DOWN_MS` steps down, in this order: it
+hands off anything it owes (a body its seats have not received and the root
+holds goes with the rehome's replay; a body the root lacks makes it elect by
+4.4(1) instead of stepping down); it sends REHOME, naming the generation, to
+each of its seats; it stops answering the via extension; it stops renewing
+to its parent; it writes the closed record and drops its list. REHOME is
+kernel-internal: a receiving kernel keeps the app's subscription, walks to
+the topic again on its fast cadence (`RENEW_FAST_MS`, 5 s) and seats at the
+root or at a child the root keeps; the app sees at most one renewal's gap in
+delivery, as under ordinary churn. REHOME is not a termination and ends no
+subscription; a REHOME naming a generation the receiver no longer holds is
+dropped.
+
+Hysteresis: promotion happens only at the parent's limit (`MAX_DIRECT`, 20);
+a new child is not thin until `CHILD_MIN_STAY_MS` has passed; a parent does
+not re-promote a node that stepped down within `CHILD_COOLDOWN_MS`. The
+opening values (3 readers, 180 s, 180 s, 300 s) and Orion's 2 to 3 and 60
+to 90 s are candidates; Aster's 23c5cfd1 and 7ddb72ea record that none is
+agreed, and the numbers are chosen together after the rule. Not applied to
+backups.
+
+### 4.8 Bounds, each with its condition
+
+Counted from the last renewal of the last demand seat, in ticks under the
+published allowance; no wall-clock promise is made:
+
+| condition | the generation is gone within |
+|---|---|
+| every notice delivered | one DROP window + two ticks (~190 s at a 5 s tick) |
+| notices lost to backups | + one standby lease (4.4): ~370 s |
+| notices lost to a child that keeps renewing | the child's next walk reaches a closed record: + one renewal (~60 s) |
+| the root dies before terminating, bodies on a backup | one election, then the rule: + one election + one window |
+| a partition | each side ends by its own rules: a side with the root terminates; a side with a backup holding bodies elects once; a side with neither lapses. Two roots that meet at the heal are the dual-root machine's case, and until it is armed they stand as two generations until each ends by this rule |
+
+"Root death is one election" holds within one connected side and is not
+claimed across a partition.
+
+### 4.9 The fences, negative cases first
+
+- `fence_generation_identity`: two roots with equal epochs and different ids
+  are different generations; a grant, a REPLICATE and a termination from the
+  wrong id are dropped; after complete forgetting a new generation forms and
+  nothing old reaches it.
+- `fence_closed_record`: a delayed REPLICATE after lapse creates no role and
+  renews nothing; a duplicate TOPIC_TERMINATED ends nothing; a reader SUB at
+  a closed record forms epoch + 1 with the tombstones carried; a publish
+  before the first send cancels the termination; a publish after it forms
+  the next generation with the deletions in force; the record expires at
+  `until` and a later REPLICATE is a fresh appointment.
+- `fence_demand_accounting`: a child declaring zero contributes zero and is
+  not counted as a seat; a child declaring n contributes n; a standby seat
+  contributes zero; a bare SUB counts one; no housekeeping frame stamps
+  `lastDemandAt`.
+- `fence_standby_lease`: the backup's own SUB does not move `lastReplicaAt`;
+  an empty backup lapses with no election and no further SUB over twenty
+  ticks; a backup with one body lapses into an election and the body
+  survives on the new root; a backup that is also a reader keeps its reader
+  seat after the appointment lapses.
+- `fence_topic_terminated`: a root with no demand and no bodies terminates
+  after one window and the root, two backups and a child are gone within
+  two ticks; one demand seat renewing holds it; one body holds it; a child
+  that never receives the notice is answered by the closed record on its
+  next walk; a reader receives exactly one terminated row and its kernel
+  does not renew.
+- `fence_closure_holders`: three holders keep the tombstones; with two of
+  them gone a returning stale body is refused at the third; with the
+  terminus moved to a node without a record the stale body is accepted and
+  the fence records that as the stated weakened case, not a pass.
+- `fence_child_step_down`: a thin child steps down after the window; its
+  readers reattach within one fast renewal with the app's subscription
+  intact and at most one renewal's gap; a body the root lacks makes the
+  child elect instead; a node that stepped down is not re-promoted within
+  the cooldown; a new child is not thin within its minimum stay.
+- `fence_no_reseat`: the 4.92.0 shape (a backup reaped on its own evidence
+  re-seating on the next keepalive) is asserted absent over twenty ticks.
+- Mutants: drop the root id from the generation (equal epochs collide); drop
+  the closed-record check before role creation (a late REPLICATE re-forms the
+  topic); count a child twice; let the standby SUB stamp the lease; remove
+  the election exception for a backup with a body (data lost); make REHOME
+  end the app's subscription (the reader is gone for good); remove the
+  closure holders (a stale body returns).
+
+### 4.10 What it does not do
+
+It does not change the seat lease, the body TTL, the tombstone semantics
+(allow, forbid, revoke on a forged kill), the merge machine, local intent or
+leases. It adds a declaration to SUB, a generation to REPLICATE, and two
+frames, TOPIC_TERMINATED and REHOME, all ignored by an older kernel; an older
+kernel's bare SUB reads as demand and its silence on the generation reads as
+the current one, so a mixed fleet retains more, never less. Under churn the
+standby set is bounded to generations with demand or bodies, and a roll
+re-forms only the topics someone reads or wrote to.
 
 ## 9. Where David's word is still needed
 
-1. The bound: answered, kept at today's constants (v0.2 Part 4).
-2. Tombstones: resolved in v0.2 Part 6 as a closure record on the root alone;
-   David to confirm that reading of "light weight".
-3. Part 5a's numbers (`CHILD_MIN_READERS`, the step-down window, the minimum
+1. The bound: answered, kept at today's constants (4.4, 4.5).
+2. Tombstones: 4.6 keeps three idle holders and names the one case weaker
+   than today; David to confirm that reading of "light weight".
+3. 4.7's numbers (`CHILD_MIN_READERS`, the step-down window, the minimum
    stay, the cooldown): David to confirm the opening values or name others.
 4. The harness: deferred by David to after this packet.
 5. The build word.
