@@ -7,6 +7,20 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.119.0 → v4.120.0 — a trace for the dials that never open, and early candidates kept on Node (2026-10-22)
+
+**Deployed 2026-10-22 on David's word ("Add the logging and the polyfill fix, then roll it", after 18:51Z): kernel 4.120.0 (tag → 027a431, three commits over 4.119.0 on branch `signal-trace`); relay 0.168.0 (12d4c40, vendor only); bridge 2.169.0 (369c477, pin and README) on B1, B2, east and west, `STRICT_MIN_KERNEL` left at 4.118.0; 48 relays rolled with no reset between 19:34Z and 19:40Z, Air 6, M1 8, Linux 5, Windows 20 (services, RESULT=OK) and droplets 3+2+2+2; chat 0.96.0 (e8114d8, bundle index-v6FY_oW9.js), share 0.55.0 (bbdd40d), portal 0.31.0 (c2860a3), dht-sim 0.138.0 (16dcffa). No wire change.**
+
+Where does a dial that never opens stop? The relay logs could not say. Between 15:20Z and 18:50Z the six LAN relays read logged 177 negotiation timeouts, every one of them ICE checking with no candidate pair after 30 s, and the far end's log could not be matched to any of them: an answered channel is logged under a three-character bridge id and named only after it binds, so the far end's silence meant nothing. This release adds the lines that join the two ends. The dialer logs `offer-sent` with its connection's incarnation and the wire attempt id; the answering side logs `offer-recv` with the same attempt id, before any drop or refusal; the dialer logs `answer-recv` when the answer arrives, `answer-applied` when it takes, and `first-remote-candidate` once per attempt; the transport logs `signal-path`, which way each offer and answer left: the mesh relay, the door, the bridge, or nowhere. No line carries an SDP, an address or a port.
+
+The fix rode with it. node-datachannel 0.33.4's polyfill answers `remoteDescription` with a new, empty, TRUTHY object before any SDP is set; a browser answers null. The transport queued early candidates only when that answer was falsy, so on every Node peer a candidate that beat the offer or answer went straight to libdatachannel, which threw "Got a remote candidate without remote description", and the candidate was lost. The test is now the description's type. This is not the cause of the 177: 11 candidates were lost that way in the same window, none of them on a failed dial.
+
+**What else rode.** Nothing beyond the change and the version. The E0 and E2 registration manifests moved by line numbers only.
+
+**Proof.** `fence_signal_trace`, 21 checks: early candidates queued and flushed on both the polyfill's shape and a browser's, each trace line present with its join key, an offer that is then dropped still traced, no SDP in any line. Six mutants each turn it red. Suite 294 of 295; the one failure, smoke_turn_cred_refresh, passes alone 24 of 24, cause unconfirmed and the logs kept.
+
+**What would make this wrong.** A trace that cannot be joined. The join key is the attempt id that every offer, answer and candidate already carries; a legacy peer that sends no attempt id leaves its dials unjoinable, and none is admitted at the 4.118.0 floor.
+
 ## v4.118.0 → v4.119.0 — a metric topic keeps only its newest snapshot (2026-10-22)
 
 **Deployed 2026-10-22 on David's word ("Release the metric-snapshot fix", 13:4xZ): kernel 4.119.0 (tag → 2cf25a7, two commits over 4.118.0 on branch `metric-latest-only`, the change 2ff27b3); relay 0.167.0 (d02af1f, vendor only); bridge 2.168.0 (3a1ff63, pin and README) on B1, B2, east and west, east first at 14:19Z, `STRICT_MIN_KERNEL` left at 4.118.0; 48 relays rolled with no reset between 14:49Z and 15:16Z, Air 6, M1 8, Linux 5, Windows 20 (services, RESULT=OK) and droplets 3+2+2+2; chat 0.95.0 (9a7f15d, bundle index-CExhP3n1.js), share 0.54.0 (739dd60), portal 0.30.0 (23dd273), dht-sim 0.137.0 (5480c57). No wire change. The MCP seats run 4.118.0 until their owners restart them; 4.118.0 is still admitted.**
