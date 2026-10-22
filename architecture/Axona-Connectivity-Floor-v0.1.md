@@ -1,4 +1,18 @@
-# Axona Connectivity Floor — design packet v0.1
+# Axona Connectivity Floor — design packet v0.2
+
+**v0.2 (18:22Z 2026-10-22)** answers Aster's DESIGN REQUEST CHANGES 87d42cca
+on v0.1 (b33a8ec), four findings, each checked against the packet and each
+holding, and carries Orion's review 95b7c3c9. F1: the known − 1 clamp left a
+cold node that knows only itself and a bridge with a target of 1, so it never
+sought; seeking now engages on the floor alone and only the dials are bounded
+by supply. F2: the keep guard tested the count BEFORE the close and so allowed
+40 → 39; it now tests the count AFTER the close, re-read at close time. F3:
+outbound dials fill M only, so a leaf's floor of 12 was not reachable by
+dialing; the deficit is now split into dialable, supply-exhausted and
+class-blocked, and none of them grows a cap. F4: the seek paths now share one
+bounded seeker with one budget, hysteresis, a generation fence and a strict
+meaning for "fresh supply". The whole change sits behind a flag, OFF by
+default. Part 6 records both reviews per question; Vega's is open.
 
 **Status:** PROPOSAL, for council review. Nothing built. David's direction,
 council 5340c376 (17:18Z 2026-10-22): "With a small population of nodes in the
@@ -91,16 +105,27 @@ it. There is no notion of an inbound threshold anywhere in the code.
 
 ## Part 4. The proposal
 
-**T, the floor.** One number, `CONNECTIVITY_FLOOR`, default 40. It counts
-**unique usable peers across both pools**, M ∪ I, as `_usablePeers()`
-(AxonaPeer.js:1877) already does. Not inbound alone: a node cannot make
-anyone dial it, and 40 inbound is not 40 total. A profile clamps it,
-`T_eff = min(T, M + I, H)`, so a leaf profile (M 6, I 6) floors at 12, not 40.
-And it never asks for more than exists: `T_target = min(T_eff, known − 1)`,
-where `known` is the distinct eligible identities the node has heard of.
+Everything in this part sits behind one flag, `CONNECTIVITY_FLOOR`, OFF by
+default. Off, every site behaves as 4.119.0 does, and today's fences keep
+pinning that.
 
-**K. Keep everything below T.** While usable < T_eff, no elective close picks
-a victim. Five sites take the guard:
+**The counts.**
+
+- **U**, usable peers: unique identities with a bound, authenticated channel
+  that is not closing, across both pools, as `_usablePeers()`
+  (AxonaPeer.js:1877) counts them. An attempt in flight, an unbound channel
+  and a proposed replacement are NOT in U. Two channels to one identity count
+  once.
+- **T**, the floor: 40.
+- **T_eff** = min(T, M + I, H). A ceiling set by the profile's budget. A leaf
+  (M 6, I 6, H 12) has T_eff 12. T_eff is not a promise that 12 is reachable
+  (see the deficit classes below), and nothing raises a cap to meet it.
+
+**K. Keep: never cross the floor by choice.** At each elective close, compute
+**U_after**, the usable count if this close goes ahead, at the moment of the
+close and not when it was scheduled. If U_after < T_eff, the close does not
+happen. A refused-grace close re-reads U when its grace timer fires; a peer
+lost during the grace counts. Five sites take the check:
 
 1. the gate swap in `_gateDecision` (AxonaPeer.js:3122 onward);
 2. the refusal close in `_seedSynaptomeWithSponsor` (AxonaPeer.js:2770;
@@ -110,73 +135,125 @@ a victim. Five sites take the guard:
 4. `_enforceDegree` (mesh.js:823), bridge;
 5. `retireForNewcomer` (mesh.js:1245), bridge.
 
-On a relay today the guard changes nothing, because all three kernel sites
-already wait for 48 or 50. It exists so that a smaller profile, a bridge, or a
-future cap cannot take a node below T by choice. Liveness, security,
-duplicate and departure closes are untouched (Part 2).
+Two things are NOT elective and keep their rules: replacing one route to an
+identity with another route to the same identity (U does not change), and
+every health, authentication, duplicate and departure teardown. On a relay
+today K changes nothing, because all three kernel sites already wait for 48 or
+50. It exists so that a bridge, a smaller profile or a future cap cannot take
+a node below its floor by choice.
 
-**S. Seek harder below T.** While usable < T_target:
+**S. Seek: one bounded seeker below the floor.** The seeker ENGAGES when
+U < T_eff and RELEASES when U ≥ T_eff has held for two consecutive ticks. It
+engages on the floor alone. What the node happens to know does not decide
+whether it looks; it decides only how many dials it can make. A cold node that
+knows itself and one bridge is below its floor, so it seeks, and its first
+act is to ask the directory.
 
-- **S1 tick.** 5 000 ms instead of 15 000.
-- **S2 dials per tick.** `min(8, 3 + ⌈(T_target − usable) / 5⌉)`, so 3 at the
-  floor and 8 at 25 or more short.
-- **S3 in flight.** `pPending` stays 8. The ledger already bounds it, and the
-  per-identity guard (4 attempts, 30 s × 2) keeps a peer that will not answer
-  from being hammered.
-- **S4 backoff ceiling.** `DeficitBackoff` gets a ceiling of 60 s while below
-  T, and resets whenever fresh supply arrives (a peer list, a presence record,
-  a bridge directory answer).
-- **S5 directory.** Ask the bridge directory as soon as the deficit is seen,
-  then every 60 s drawn in [30 s, 90 s] while below T, back to 10 min at T.
-- **S6 self-integrate.** Allow dialing through existing peers
-  (`connectViaRelay`) while below T, as the guarded path already does.
-- **S7 browsers and apps.** A light seeker in `connect()`: on a timer, ask the
-  bridge for its peer list and dial what is not held, bounded the same way.
-  Or arm the full fill there. Council to choose (Part 6).
+- **S1 tick.** 5 000 ms while engaged, instead of 15 000.
+- **S2 dial budget per tick.** min(8, 3 + ⌈(T_eff − U) / 5⌉), further bounded
+  at the moment each dial is issued by: free M slots, the ledger's in-flight
+  bound (`pPending` 8), and the number of eligible candidates not already held
+  or in flight. A candidate is eligible when it is a verified identity, not
+  self, not held, not dead-marked and not inside its per-identity backoff
+  (4 attempts, 30 s × 2, unchanged).
+- **S3 one budget.** The fill, the re-warm, self-integrate, peer-list dials
+  and the browser seeker draw from this one per-tick budget. No path dials
+  around it. Candidates are deduplicated by identity across all of them.
+- **S4 backoff.** The tick that finds nobody to dial backs off, 30 s × 2 as
+  today, with a ceiling of 60 s while engaged. The backoff resets only on
+  FRESH supply: a verified identity the node has not seen before, or a known
+  identity whose backoff has expired. A repeated peer list, a stale presence
+  record or an unverified hint resets nothing.
+- **S5 directory.** On engaging, ask the bridge directory at once; then every
+  60 s drawn in [30 s, 90 s] while engaged; back to 10 min on release.
+- **S6 self-integrate.** Dialing through existing peers (`connectViaRelay`)
+  is allowed while engaged, inside the S3 budget.
+- **S7 browsers and apps.** A light seeker in `connect()`: it runs on
+  connect and on foreground thaw (`visibilitychange` to visible), asks the
+  bridge for its peer list and dials inside the same S2/S3 bounds. No timer
+  runs while the page is hidden. (Orion 95b7c3c9, from the PWA runtime
+  findings: background timers freeze and sockets die.)
+- **S8 generation fence.** Every seeker run carries a generation number.
+  Stop, sleep, `leave()` and a peer restart bump it, and a decision taken
+  under an old generation is dropped when it lands. Every cap check happens
+  when the dial is issued, never only when the timer fired.
 
-Above T, every knob returns to today's value. The floor changes behaviour
-only while a node is short.
+**The deficit, reported in three classes.** Each tick that the seeker is
+engaged, the node reports T_eff − U split into:
+
+- **dialable**: free M slots with eligible candidates to fill them;
+- **supply-exhausted**: free M slots and no eligible candidate;
+- **class-blocked**: the rest, which only inbound (I) can fill, or which the
+  node's resources forbid.
+
+Only the dialable part drives dialing. A class-blocked deficit is reported,
+never answered by dialing harder, by borrowing across pools or by raising a
+cap. A node with U at T_eff that is all class-blocked reports itself as such,
+not as "at floor".
 
 ## Part 5. How we would know
 
 **Offline, before any build is merged.** New fences, each asserting its
 precondition and turned red by deleting its fix:
 
-- floor crossing: a node at T − 1 refuses to pick a victim at every K site; at
-  T + 1 the site behaves as today;
-- a smaller profile (M 6, I 6) floors at 12, never at 40;
-- `T_target` never exceeds `known − 1`;
-- S1 to S5 engage below T and return at T, including after a sleep;
-- remote full: a far end at its cap refuses, and the near end defers instead of
-  retrying faster;
-- two nodes dialing each other at once still end with one channel.
+- **K boundary**: U = 39, 40 and 41 at every K site; at 40 a close that
+  would leave 39 is refused; at 41 one close is allowed and the next refused.
+- **K grace**: a refused-grace close whose peer count drops during the grace
+  re-reads U and does not close.
+- **K identity**: a duplicate-route replacement for the same identity still
+  happens at U = 40; a health or departure teardown still happens below T.
+- **S cold start**: a node that knows only itself and one bridge engages and
+  asks the directory on its first tick.
+- **S leaf**: M 6, I 6, H 12 with U 6 reports a class-blocked deficit of 6
+  and makes no extra dials.
+- **S supply**: a repeated peer list does not reset the backoff; a new
+  verified identity does.
+- **S budget**: fill, re-warm, self-integrate and peer-list dials together
+  never exceed one tick's budget.
+- **S fence**: a stop or sleep between decision and dial drops the dial.
+- **S release**: hysteresis holds the seeker at U = T_eff for one tick and
+  releases on the second.
+- **Remote full**: a far end at its cap refuses; the near end defers and does
+  not retry faster.
+- **Simultaneous dials** end with one channel.
+- **Flag off**: every existing fence passes unchanged.
 
-About 25 existing fences pin today's numbers (fill tick, re-warm gaps of 120,
-240, 480, 600 s, deficit backoff, gate and lane, degree, close classes). Each
-moves in the same change, named in the build's notes.
+About 25 existing fences pin today's numbers. They stay as the flag-off
+fences. New profile-specific fences cover the flag-on numbers, so nothing is
+"fixed" by editing an expected value.
 
-**In the field, after a release.** The same census as 17:19Z, at T0, +10 and
-+30 minutes after a roll: per relay, usable peers, with median and minimum.
-Beside it, the negotiation-timeout rate per relay per hour, reported
-separately so that more dialing is not mistaken for more connecting.
+**In the field, after a release and only on David's word.** The same census
+as 17:19Z, at T0, +10 and +30 minutes after a roll: per relay, U, with median
+and minimum, and the three deficit classes. Beside it, the negotiation-timeout
+rate per relay per hour, reported separately, so that more dialing is not
+read as more connecting.
 
-## Part 6. Open questions for council
+## Part 6. Questions, with the reviews so far
 
-1. **What is 40 a floor on?** Total usable peers across both pools (this
-   packet), or the incoming pool alone (David's word "inbound")? Total is what
-   a node can measure and pursue; inbound alone is what it cannot cause.
-2. **Fixed 40, or a share of the population?** Fixed 40 with
-   `min(40, known − 1)` (this packet), or a fraction such as 80% of known?
-3. **Browsers and apps:** a light seeker in `connect()`, the full fill armed
-   there, or out of scope for this round?
-4. **The seek numbers:** 5 s tick, up to 8 dials per tick, 60 s backoff
-   ceiling, 60 s directory while short. Are these the opening values, or
-   should they come from a run first?
-5. **Liveness while short:** keep 20 s silence and 30 s unbound as today, or
-   allow a longer silence while below T, so that a stalled but healthy peer is
-   not lost when it is hardest to replace?
-6. **The failed negotiations:** diagnose them before building the seek half,
-   or build both and measure them side by side?
+1. **What is 40 a floor on?** Unique usable peers across both pools, M ∪ I
+   (this packet), or the incoming pool alone (David's word "inbound")?
+   Orion: total. Aster: total, since I is 0 on every relay today and an
+   I-only floor would do nothing, subject to David confirming that reading.
+   **David to confirm.**
+2. **Fixed 40, or a share of the population?** v0.1 capped the target at
+   known − 1; Aster's F1 shows that cap stops a cold node from seeking, so
+   v0.2 removes it from the trigger and keeps supply only as a bound on
+   dials. Orion: fixed 40. Aster: no percentage-of-known threshold. Settled
+   at fixed 40 unless David says otherwise.
+3. **Browsers and apps.** Orion: light seeker on connect and on foreground
+   thaw, no continuous fill. Carried as S7.
+4. **The seek numbers** (5 s, up to 8, 60 s, 60 s directory). Orion: accept.
+   Aster: opening settings, not measured optima; any field study is
+   separately authorised. Carried as opening settings.
+5. **Liveness while short.** Orion and Aster: keep 20 s silence and 30 s
+   unbound unchanged in this change. Carried.
+6. **The failed negotiations.** Orion: build alongside, with the timeout rate
+   reported separately, and triage the M1 `datachannel-opening` stalls in
+   parallel. Aster: classify them separately before any stronger performance
+   claim. Carried in Part 5. Whether the triage runs before or beside a build
+   is **David's call**.
+
+Vega's review is open.
 
 ## Part 7. What would make this wrong
 
