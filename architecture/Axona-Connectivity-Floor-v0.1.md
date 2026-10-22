@@ -12,7 +12,7 @@ dialing; the deficit is now split into dialable, supply-exhausted and
 class-blocked, and none of them grows a cap. F4: the seek paths now share one
 bounded seeker with one budget, hysteresis, a generation fence and a strict
 meaning for "fresh supply". The whole change sits behind a flag, OFF by
-default. Part 6 records both reviews per question; Vega's is open.
+default. Part 6 records all three reviews per question (Vega ca4f7569 added after commit dd4382e).
 
 **Status:** PROPOSAL, for council review. Nothing built. David's direction,
 council 5340c376 (17:18Z 2026-10-22): "With a small population of nodes in the
@@ -253,7 +253,10 @@ read as more connecting.
    claim. Carried in Part 5. Whether the triage runs before or beside a build
    is **David's call**.
 
-Vega's review is open.
+Vega ca4f7569 (18:22:54Z, written before v0.2 was posted): concurs that
+healthy relays are not shed below cap at 4.119.0; CONDITIONAL ACCEPT of the
+invariant, with F1 to F4 folded into v0.2 before any implementation scope.
+v0.2 is that fold.
 
 ## Part 7. What would make this wrong
 
