@@ -7,6 +7,22 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.122.0 → v4.123.0 — the lookup walk is acked per step (2026-10-23)
+
+**Deployed 2026-10-23 on David's word ("Make the lookup iterative, then roll it"; "Roll it now, and send council the merge fix"): kernel 4.123.0 (tag → 5fe975d, two commits over 4.122.0 on branch `lookup-fail-reason`); relay 0.172.0 (4f8b3e6, vendor only); bridge 2.172.0 (ac0e9d0, pin and README) on B1, B2, east and west, `STRICT_MIN_KERNEL` left at 4.118.0; 48 relays rolled with no reset, Air 6, M1 8 and Linux 5 at 18:17Z, Windows 20 at 18:31Z (services, RESULT=OK), droplets 3+2+2+2 at 19:23Z; chat 0.99.0 (6913abc, bundle index-B0plYDSj.js), share 0.58.0 (a8b6b44), portal 0.34.0 (bd4ce51), dht-sim 0.141.0 (490ec86). Two new wire frames, `lookup_walk` and `lookup_done`; a node without them is still served.**
+
+Why did a lookup to a node one hop away fail after five seconds? 4.122.0 named it: 234 of 303 failed lookups ended "timeout awaiting lookup_step" at the first hop, median 5,090 ms. The walk was recursive. Each hop answered its caller only when the rest of the walk had answered it, so the originator's single 5 s request timeout had to cover the whole walk, and a slow walk read as "not found" whether the target existed or not.
+
+The walk cannot be driven from the originator: a node can send only to nodes it holds a channel to. So each step is acked instead. A hop answers `lookup_walk` with an ack as soon as it has taken the walk, then forwards on its own. The result comes back as a one-way `lookup_done`, one predecessor at a time along the walk's path. A request's timeout now covers one step. The originator gives the whole walk `LOOKUP_WALK_DEADLINE_MS`, 12 s, and a walk that runs out ends with reason `walk-deadline`. A next hop with no `lookup_walk` handler, a seat or an app on an older kernel, gets the old recursive `lookup_step` for that hop. `LOOKUP_WALK=false` is the 4.122.0 walk.
+
+The first half hour with every relay on 4.123.0, 19:27Z to 19:57Z: 212 relayed offers and answers left our relays, 31 were withheld on a lookup's "not found", and 4 of those were the 5 s `lookup_step` timeout, each at a hop the walk handed to the recursive step. None ended at the walk deadline. 26 carried no reason, which is what a hop on an older kernel returns. This is NOT yet a comparison with 4.122.0: that sample was taken in the 23 minutes right after its roll, 2,059 records, and this one starts an hour after the laptops rolled, at a tenth of the volume.
+
+**What else rode.** Boundary-5 has two more rows, and the registration manifests moved by those two sites plus line numbers.
+
+**Proof.** `fence_lookup_walk`, 9 checks on a chain of six real AxonaPeers over the sim transport, bound-only, with a 300 ms request timeout and every hop slowed 120 ms: the recursive walk fails at hop 1 with a timeout, the acked walk finds the target past one timeout with all six nodes on its path, an older next hop gets `lookup_step`, a hop that takes the walk and drops it ends at the deadline, a send failure deep in the walk comes back with that hop's facts, and the walk is the default. Four mutants each turn it red. Suite 297 of 298: `fence_merge_sim_partition`'s hand-fork scene. In that scene the true root's route to the fork sometimes stops one hop out at a node with no closer neighbour, which the fixture's random ids decide. The true root then cannot answer the fork, and the fork falls back. Walk on, that scene failed 4 of 10 runs; walk off, 2 of 10. That does not separate the two.
+
+**What would make this wrong.** A walk that ends at the deadline because a hop dropped it, not because the target is absent. A dropped `lookup_done` is not retried; the deadline is the only bound.
+
 ## v4.121.0 → v4.122.0 — a failed lookup says why (2026-10-23)
 
 **Deployed 2026-10-23 on David's word ("Log why each lookup fails, then roll it"): kernel 4.122.0 (tag → 67bc0f2, two commits over 4.121.0 on branch `lookup-fail-reason`); relay 0.171.0 (d5686f1, vendor only); bridge 2.171.0 (12b5e81, pin and README) on B1, B2, east and west, `STRICT_MIN_KERNEL` left at 4.118.0; 48 relays rolled with no reset between 04:04Z and 04:09Z, Air 6, M1 8, Linux 5, Windows 20 (services, RESULT=OK) and droplets 3+2+2+2; chat 0.98.0 (3c604c0, bundle index-8Eteaeoj.js), share 0.57.0 (b39e195), portal 0.33.0 (16733bd), dht-sim 0.140.0 (a4dec35). No wire change.**
