@@ -7,6 +7,20 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.120.0 → v4.121.0 — every hop says what it did with a relayed offer (2026-10-22)
+
+**Deployed 2026-10-22 on David's word ("Trace the relayed signal hop by hop first"): kernel 4.121.0 (tag → a99b2c6, two commits over 4.120.0 on branch `signal-hop-trace`); relay 0.170.0 (ef125bb, vendor only); bridge 2.170.0 (fc51564, pin and README) on B1, B2, east and west, `STRICT_MIN_KERNEL` left at 4.118.0; 48 relays rolled with no reset between 23:30Z and 23:35Z, Air 6, M1 8, Linux 5, Windows 20 (services, RESULT=OK) and droplets 3+2+2+2; chat 0.97.0 (c873b82, bundle index-CrMIsnsg.js), share 0.56.0 (99bb35f), portal 0.32.0 (76a7490), dht-sim 0.139.0 (193ba3d). No wire change.**
+
+Where does a relayed offer go missing? 4.120.0 answered half of it. Joined by attempt id across all 48 relays between 20:09Z and 21:09Z, 337 of 449 failed dials to our relays never produced an offer at the target, and the target logs every offer that reaches it. This release logs the other half. The node that sends an offer or answer now logs `relay-signal-origin`: the reachability verdict that gates the send, and what the route returned. Every node it passes through logs `relay-signal-hop`: delivered, forwarded and to whom, or stopped and why. Offers and answers only; no SDP, address or port.
+
+The first five minutes on M1 already read differently from the guess. The origin does not send a relayed signal at all unless an iterative lookup first finds the target, and the lookup's "not found" was cached for five seconds and logged nowhere. On M1's eight relays, 240 offers and 32 answers stopped there, against 374 delivered, while only 28 routes ended at a node that was not the target and 9 hops failed to send.
+
+**What else rode.** Nothing beyond the change and the version. The E0 and E2 registration manifests moved by line numbers only.
+
+**Proof.** `fence_signal_hop_trace`, 12 checks on real AxonaPeers over the sim transport: a forward names its next hop and whether it held a channel to it, the target logs delivered, a walk to an id nobody holds ends terminal-not-target, candidates and other routed types are not traced, and each origin verdict is named. Six mutants each turn it red. Suite 294 of 296. smoke_turn_cred_refresh fails alone as well, 2 of 4 on the untouched 4.119.0 tree. fence_merge_sim_partition passed 4 of 6 on both 4.121.0 and 4.120.0 run interleaved, with the machine at a load of about 7. Both are timing failures this release does not touch.
+
+**What would make this wrong.** A lookup that is right to say "not found": a target that left, or one the dialer learned about from a stale hint. The trace says the send was withheld, not that the target was there.
+
 ## v4.119.0 → v4.120.0 — a trace for the dials that never open, and early candidates kept on Node (2026-10-22)
 
 **Deployed 2026-10-22 on David's word ("Add the logging and the polyfill fix, then roll it", after 18:51Z): kernel 4.120.0 (tag → 027a431, three commits over 4.119.0 on branch `signal-trace`); relay 0.168.0 (12d4c40, vendor only); bridge 2.169.0 (369c477, pin and README) on B1, B2, east and west, `STRICT_MIN_KERNEL` left at 4.118.0; 48 relays rolled with no reset between 19:34Z and 19:40Z, Air 6, M1 8, Linux 5, Windows 20 (services, RESULT=OK) and droplets 3+2+2+2; chat 0.96.0 (e8114d8, bundle index-v6FY_oW9.js), share 0.55.0 (bbdd40d), portal 0.31.0 (c2860a3), dht-sim 0.138.0 (16dcffa). No wire change.**
