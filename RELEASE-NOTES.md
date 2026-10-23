@@ -7,6 +7,20 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.121.0 → v4.122.0 — a failed lookup says why (2026-10-23)
+
+**Deployed 2026-10-23 on David's word ("Log why each lookup fails, then roll it"): kernel 4.122.0 (tag → 67bc0f2, two commits over 4.121.0 on branch `lookup-fail-reason`); relay 0.171.0 (d5686f1, vendor only); bridge 2.171.0 (12b5e81, pin and README) on B1, B2, east and west, `STRICT_MIN_KERNEL` left at 4.118.0; 48 relays rolled with no reset between 04:04Z and 04:09Z, Air 6, M1 8, Linux 5, Windows 20 (services, RESULT=OK) and droplets 3+2+2+2; chat 0.98.0 (3c604c0, bundle index-8Eteaeoj.js), share 0.57.0 (b39e195), portal 0.33.0 (16733bd), dht-sim 0.140.0 (a4dec35). No wire change.**
+
+Why does a lookup say "not found" for a node another relay is talking to that same minute? 4.121.0 showed the relay gate withholding 42% of relayed offers on that verdict, and 599 of 1,234 withheld signals went to a target another relay reached within 60 s. A lookup returned only true or false. It now returns why: `stalled` (nothing closer left to try), `max-hops`, `node-down`, or `send-failed`, and for a failed send it names the hop that failed, the next hop it tried, whether it held a channel to it, whether the bound-only open made one, how that next hop entered its table, and whether it was the target itself. The reason travels back over the `lookup_step` replies to the node that asked, and the gate's `relay-signal-origin` line now carries it.
+
+The first five minutes on M1 named the cause. Of 103 withheld signals with a reason, 80 failed at the FIRST hop with "timeout awaiting lookup_step", to a peer the originator was connected to. The walk is recursive: each hop answers only when the rest of the walk has answered, and the originator waits 5 s (`DEFAULT_REQUEST_TIMEOUT_MS`) for all of it. A walk longer than 5 s is reported as not found, whether the target exists or not. Another 133 carried no reason, which is what a hop on an older kernel returns.
+
+**What else rode.** Nothing beyond the change and the version. The E0 and E2 registration manifests moved by line numbers only.
+
+**Proof.** `fence_lookup_fail_reason`, 7 checks on real AxonaPeers over the sim transport with a bound-only open, as the web transport does: found, stalled, a table entry with no channel behind it failing at hop 1, the same failure one hop away carried back over the wire, and the gate's line naming it. Four mutants each turn it red. `max-hops` and `node-down` are tagged and not fenced. Suite 296 of 297; smoke_turn_cred_refresh fails alone on the untouched 4.119.0 tree as well.
+
+**What would make this wrong.** A timeout that is right: a target that left mid-walk. The five-minute sample is one host; the fleet-wide count comes next.
+
 ## v4.120.0 → v4.121.0 — every hop says what it did with a relayed offer (2026-10-22)
 
 **Deployed 2026-10-22 on David's word ("Trace the relayed signal hop by hop first"): kernel 4.121.0 (tag → a99b2c6, two commits over 4.120.0 on branch `signal-hop-trace`); relay 0.170.0 (ef125bb, vendor only); bridge 2.170.0 (fc51564, pin and README) on B1, B2, east and west, `STRICT_MIN_KERNEL` left at 4.118.0; 48 relays rolled with no reset between 23:30Z and 23:35Z, Air 6, M1 8, Linux 5, Windows 20 (services, RESULT=OK) and droplets 3+2+2+2; chat 0.97.0 (c873b82, bundle index-CrMIsnsg.js), share 0.56.0 (99bb35f), portal 0.32.0 (76a7490), dht-sim 0.139.0 (193ba3d). No wire change.**
