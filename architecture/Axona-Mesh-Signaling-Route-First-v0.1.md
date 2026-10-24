@@ -1,4 +1,6 @@
-# Axona Mesh Signaling: Route First, Repair Through Peers — design packet v0.2
+# Axona Mesh Signaling: Route First, Repair Through Peers — design packet v0.2.1
+
+**v0.2.1 (18:38Z 2026-10-24)** corrects v0.2 on one source fact (Aster 362a9ff6, SIGR-001): the mesh has no replay guard for an offer that repeats the SAME attempt. `offer-on-open-ignored` refuses a DIFFERENT attempt on an opened state; an equal attempt with an existing connection re-enters `_handleOffer` and `setRemoteDescription` (mesh.js:993-1038, 1526-1542). So a `mesh:signal` is not a class with an idempotency key today, R2 withholds its re-send too until the mesh ignores an equal-attempt duplicate, Q8 widens, and the as-built 4.125.0 re-sends offers. Also: "368 post-wait" is "368 after a send threw", pre-wait or post-wait undistinguished until R3.
 
 **v0.2 (18:30Z 2026-10-24)** records B1 as SHIPPED and what its first read
 taught. B1 is kernel 4.125.0 (David "Ship B1 first", Q1(a) of v0.1), on all 48
@@ -185,7 +187,8 @@ prints `arm SUB_TERMINAL_VERIFY=1 LOOKUP_RESELECT=1`; the roll was staggered
 over nine minutes with two Windows restarts, so this window's shape differs
 from the two before it). Send failures at our relays with `connected:false`
 read 1, from 34. `lookup-reselect` fired 466 times: 368 after a send threw
-(243 route, 110 walk, 9 step, 6 origin) and 98 on the re-read before a send.
+(243 route, 110 walk, 9 step, 6 origin; the throw's timing, before or after
+a wait, is not in the line until R3) and 98 on the re-read before a send.
 Every send-threw re-selection sits in the same relay section within two
 logged seconds of a `peer-died-evicted` for that peer; 110 dead peers were
 re-selected up to nine times each inside those two seconds, with no
@@ -223,12 +226,21 @@ that shape; their restart is their owners' and David's.
    bound on a re-selection is not "a candidate, not time": it is one request
    timeout per candidate at most, plus the lookahead, promotion and open
    waits outside it (Aster 4db46bc1, c0cb3c6c). Whether the re-send is safe
-   depends on the message class. A `mesh:signal` offer carries an attempt id
-   the responder dedups on (mesh.js:993, "offer-on-open-ignored"). A pub/sub
-   body carries a msgId the ingest dedups on. A `lookup_walk` carries
-   nothing: a duplicated walk schedules a second step at the next hop and the
-   origin settles on whichever `lookup_done` arrives first. Other routed
-   types hold whatever their handler holds.
+   depends on the message class, and today NO class on the relayed-signal
+   path has one. A `mesh:signal` offer carries an attempt id, but the mesh's
+   guard (`offer-on-open-ignored`, mesh.js:993) refuses only a DIFFERENT
+   attempt on an opened state; an offer repeating the SAME attempt at a
+   responder that holds a connection re-enters `_handleOffer` and calls
+   `setRemoteDescription` again (:1035, :1526-1542), with no cached outcome
+   and no body-hash check (Aster SIGR-001). What the provider does with a
+   repeated description is its own contract. A pub/sub body carries a msgId
+   the ingest dedups on. A `lookup_walk` carries nothing: a duplicated walk
+   schedules a second step at the next hop and the origin settles on
+   whichever `lookup_done` arrives first. Other routed types hold whatever
+   their handler holds. In the first read, 243 of the 368 send-threw
+   re-selections were route re-selections, and relayed offers are what the
+   forwarder carries; how many re-sent an offer the responder had already
+   taken is Part 5's next read.
 3. *The walk's completion is accepted from any bound neighbour.* The
    `lookup_done` handler reads neither the transport sender nor the expected
    predecessor; it settles the pending walk on the claimed sourceId and the
@@ -287,11 +299,12 @@ Two layers, both bounded, both over ordinary peers.
   returned record then names every hop that was sent to.
 - **R2, re-send only with an idempotency key.** After a post-wait rejection
   the step re-selects only for a message class whose receiver dedups: a
-  `mesh:signal` by attempt id, a pub/sub body by msgId, a `lookup_walk` once
-  the receiver holds a per-walk `(walkId, hop)` set (Q8 chooses whether to
-  add it or to forbid the re-send). A class with no key ends `send-failed` as
-  4.124.0 did. Pre-wait edge losses re-select for every class, because
-  nothing left.
+  pub/sub body by msgId; a `mesh:signal` once the mesh ignores an offer or
+  answer that repeats the attempt it already holds for that peer (today it
+  does not, SIGR-001); a `lookup_walk` once the receiver holds a per-walk
+  `(walkId, hop)` set. Q8 chooses, per class, whether to add the guard or to
+  forbid the re-send. A class with no key ends `send-failed` as 4.124.0 did.
+  Pre-wait edge losses re-select for every class, because nothing left.
 - **R3, the trace carries the error.** `lookup-reselect` adds the thrown
   text (60 chars, as `fail.err` does) and whether the rejection was pre-wait
   or post-wait, so the next read separates the two.
@@ -434,11 +447,13 @@ stage, OFF reproducing the 4.124.0 record).
 - **F9 charge at invocation (R1).** A send that times out after transmission
   leaves the hop in `path` and `hops`; a pre-wait edge loss leaves it out.
   Mutants: charge on return; never reverse.
-- **F10 re-send by class (R2).** A post-wait rejection re-sends a
-  `mesh:signal` and the responder applies it once; re-sends a `lookup_walk`
-  only when the receiver's per-walk set exists, and that receiver schedules no
-  second step; ends `send-failed` for a routed type with no key. Mutants:
-  re-send the keyless type; drop the receiver set.
+- **F10 re-send by class (R2).** A post-wait rejection re-sends a pub/sub
+  body and the ingest holds it once; re-sends a `mesh:signal` only when the
+  mesh's equal-attempt guard exists, and the responder's `_handleOffer` runs
+  once for that attempt; re-sends a `lookup_walk` only when the receiver's
+  per-walk set exists, and that receiver schedules no second step; ends
+  `send-failed` for a type with no key. Mutants: re-send a keyless type; drop
+  either guard.
 - **F11 completion attribution (C2).** A `lookup_done` from a bound neighbour
   that is not the sent-to hop is dropped and logged; one from the sent-to hop
   settles the walk; the origin's `done` settles at the deadline while its
@@ -452,7 +467,9 @@ tally.py` over equal windows at equal positions after a roll: relayed signals
 not sent, and failure marks over offers sent, plus, since 4.125.0, send
 failures at our relays with `connected:false` and `lookup-reselect` by kind
 and reason. The 4.125.0 window is the baseline for R1 to R4: 466
-re-selections, 368 post-wait, the class at 1. With `SIGNAL_ROUTE_FIRST` on,
+re-selections, 368 post-wait, the class at 1; the next read counts, per responder and attempt id, offers
+received more than once (`offer-recv` twice for one attempt) against the
+4.124.0 window. With `SIGNAL_ROUTE_FIRST` on,
 `not-sent` is replaced by the route's own outcomes (`delivered`,
 `terminal-not-target`, `exhausted`, `send-failed`), so the number to watch is
 offers that reached the target (`offer-recv` at the far end, joined by attempt
@@ -517,13 +534,17 @@ them; (b) wait for A, which removes the question the old hops cannot answer;
 (c) both. The packet recommends (a): it is the one lever that costs no code.
 The Claude app restart is David's to trigger.
 
-**Q8. What does a `lookup_walk` re-send need (R2)?** Choices: (a) a per-walk
-`(walkId, hop)` set at the receiver, bounded and aged by the walk deadline, so
-a duplicate schedules no second step; (b) forbid the re-send for `lookup_walk`
-and end `send-failed` after a post-wait rejection, as 4.124.0 did; (c) leave
-the duplicate, since the origin settles on the first `lookup_done` and the
-cost is one extra step downstream. The packet recommends (a); (c) is the
-as-built 4.125.0 behaviour and is what the fleet runs today.
+**Q8. What does a re-send need, per class (R2)?** For `mesh:signal`: (a) the
+mesh ignores an offer or answer repeating the attempt it holds for that peer
+(one guard at mesh.js:993, before `_handleOffer`); (b) forbid the re-send and
+end `send-failed` after a post-wait rejection, as 4.124.0 did; (c) leave it,
+and let the provider decide what a repeated `setRemoteDescription` does. For
+`lookup_walk`: (a) a per-walk `(walkId, hop)` set at the receiver, bounded
+and aged by the walk deadline; (b) forbid; (c) leave it, since the origin
+settles on the first `lookup_done`. The packet recommends (a) for both. (c)
+is the as-built 4.125.0 behaviour for both and is what the fleet runs today;
+if (a) waits, (b) is the safe interim and costs the 34-class back only for
+the post-wait case.
 
 Standing reviews: Aster b316b4b2, aaba1e33 (A1), c2ff06ce (A2), 0eb14d98 (A3),
 f0012884, 4db46bc1, c0cb3c6c, 9051c5a0 (corrections, applied); Orion e9862f68,
@@ -548,9 +569,10 @@ migration challenge Aster asked of Vega is still open).
   there. The budget bounds each request, not the sum; a dialer that nominates
   many dead candidates spends many requests. The Floor's C1 and the dead-mark
   automaton are the bound on that, and neither is measured here.
-- B1's re-send after a post-wait rejection duplicates frames today for the
-  classes without a key. If a duplicated `lookup_walk` or routed frame is
-  shown to do more than cost a step, R2 moves ahead of A.
+- B1's re-send after a post-wait rejection duplicates frames today for every
+  class on the signal path, offers included. If the next read shows
+  responders taking an attempt's offer twice and the provider doing anything
+  with it beyond an error, R2 moves ahead of A, and (b) of Q8 ships at once.
 - No control arm has been run. Part 5's half-fleet arm is the first.
 - A probe hit is a path that existed when probed. A channel on it can die
   before the reply; F6 bounds the wait, it does not make the path hold.
