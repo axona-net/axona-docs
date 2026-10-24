@@ -7,6 +7,22 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## v4.123.0 → v4.124.0 — a root answers an offer from a claim that outranks it (2026-10-24)
+
+**Deployed 2026-10-24 on David's word ("Let's merge"), after council review (Aster accept a0716415, Orion 5adb4c51, Vega f35059f2): kernel 4.124.0 (tag → 7d65378, three commits over 4.123.0, the change 1d1bc95 with comment corrections a2a5cfd); relay 0.173.0 (a14fea7, vendor only); bridge 2.173.0 (b855f0b, pin and README) on B1, B2, east and west, `STRICT_MIN_KERNEL` left at 4.118.0; 48 relays rolled with no reset, Air 6, M1 8 and Linux 5 at 02:02Z, Windows 20 at 02:03Z (services, RESULT=OK), droplets 3+2+2+2 at 02:07Z; chat 0.100.0 (cedc29c, bundle index-dxUx8iOL.js), share 0.59.0 (ffd34c5), portal 0.35.0 (87d3e7a), dht-sim 0.142.0 (0c4a251). No new frame: one new value of an existing field.**
+
+What does a root say to an offer from a claim that outranks its own? Until now, nothing. A dual-root merge offer comes from the claim that believes it loses. When it in fact wins, a higher epoch against a closer root, the receiving root logged `merge-offer-loses`, took the offerer as its own candidate, and sent no reply. The offer had reached it, so after `MERGE_OFFER_TIMEOUT_MS` the offerer's sweep read the silence as a legacy winner and ran `merge-legacy-fallback`: the higher-epoch claim stepped down toward the root it outranks, by the delta-only SPLIT_UNION path. The fleet logs hold 6 such fallbacks against 598 completed rounds in a 4.121.0 window and 2 against 396 in a 4.122.0 window. They do not say which of those were this silence and which were routes that failed.
+
+The root now answers with the refusal it already sent when it holds no claim, carrying the new disposition `outranked`. The offerer closes the offer, keeps its claim and drops the candidate. The root's own offer then runs the round the relation calls for.
+
+This is NOT a fix for a lost answer. A root that cannot route to the offerer loses the answer the way it loses its own offer, and the offerer still falls back. Whether an unanswered offer should ever license a step down is a separate design, open in council.
+
+**What else rode.** Nothing beyond the change and the version. The REPLAYACK row's error contract names `not-root` and `outranked`.
+
+**Proof.** `fence_merge_offer_outranked`, three fully linked real AxonaPeers, the higher-epoch root's announcement held so that it offers first: the receiving root logs `merge-offer-loses` and the offerer logs the refusal; the offerer keeps its claim with no fallback after a sweep past the offer timeout; the round then completes and the higher-epoch root holds both bodies. Two mutants each turn all three checks red. Aster ran it and four neighbouring merge fences from a clean archive of the commit, with seven further handler checks of her own. Suite 298 of 299: smoke_turn_cred_refresh, which fails alone 2 of 3 on the untouched 4.123.0 tree as well.
+
+**What would make this wrong.** A receiving root whose epoch the offerer cannot compare, so that both sides believe they outrank the other. The relation is total over (epoch, distance), and the fence does not test a tie.
+
 ## v4.122.0 → v4.123.0 — the lookup walk is acked per step (2026-10-23)
 
 **Deployed 2026-10-23 on David's word ("Make the lookup iterative, then roll it"; "Roll it now, and send council the merge fix"): kernel 4.123.0 (tag → 5fe975d, two commits over 4.122.0 on branch `lookup-fail-reason`); relay 0.172.0 (4f8b3e6, vendor only); bridge 2.172.0 (ac0e9d0, pin and README) on B1, B2, east and west, `STRICT_MIN_KERNEL` left at 4.118.0; 48 relays rolled with no reset, Air 6, M1 8 and Linux 5 at 18:17Z, Windows 20 at 18:31Z (services, RESULT=OK), droplets 3+2+2+2 at 19:23Z; chat 0.99.0 (6913abc, bundle index-B0plYDSj.js), share 0.58.0 (a8b6b44), portal 0.34.0 (bd4ce51), dht-sim 0.141.0 (490ec86). Two new wire frames, `lookup_walk` and `lookup_done`; a node without them is still served.**
