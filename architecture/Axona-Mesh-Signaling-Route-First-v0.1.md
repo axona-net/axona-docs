@@ -467,7 +467,7 @@ tally.py` over equal windows at equal positions after a roll: relayed signals
 not sent, and failure marks over offers sent, plus, since 4.125.0, send
 failures at our relays with `connected:false` and `lookup-reselect` by kind
 and reason. The 4.125.0 window is the baseline for R1 to R4: 466
-re-selections, 368 post-wait, the class at 1; the next read counts, per responder and attempt id, offers
+re-selections, 368 after a send threw (timing unmarked until R3), the class at 1; the next read counts, per responder and attempt id, offers
 received more than once (`offer-recv` twice for one attempt) against the
 4.124.0 window. With `SIGNAL_ROUTE_FIRST` on,
 `not-sent` is replaced by the route's own outcomes (`delivered`,
