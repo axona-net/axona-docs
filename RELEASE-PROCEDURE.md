@@ -220,6 +220,7 @@ with `RESULT=OK` or `RESULT=FAIL <reason>`.
 | A relay crashes | nothing; the service restarts it after 10 s, 30 s, then 60 s | `status` 20/20 |
 | Changed `windows/relaysvc.cs` | the roll builds `C:\axona\relaysvc-<hash>.exe`; each service takes it at its restart | — |
 | Fewer or more relays | David's word, then change `services.count` in the manifest, `relayctl install`, start the new slots | — |
+| Changed relay env on axona-win | David's word, then change `relay.env` in `axona-relay/hosts/axona-win.json`, commit, push `testnet` AND `main`, then `KERNEL=<current> ops/fleet.sh roll axona-win` TWICE: the roll that pulls the change runs the controller it had before the pull, so the first pass only pulls and the second (relayctl ≥ 0.183.0, which re-defines every service from the manifest before restarting) applies it. Before 0.183.0 only `relayctl install` wrote the service environment and a roll never did (2026-10-31) | every `svc-NN.log` prints `arm … <VAR>=<value>` at its newest start |
 
 What it is, so a failure can be read:
 - Each relay is service `axona-relay-NN`, run by `relaysvc.exe` as LocalSystem, delayed
