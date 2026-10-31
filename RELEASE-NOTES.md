@@ -7,6 +7,18 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## bridge 2.174.0 → 2.175.0 on kernel 4.125.0 — a switched door channel counts as bound, and the socket is released (2026-10-31)
+
+**Deployed 2026-10-31 on David's word ("Build the rule-4 fix and recreate both bridges"): bridge 2.175.0 (3df4e48), kernel pin unchanged at 4.125.0, no env change. Testnet B1 and B2 first, then east, then west, each a container recreate: every socket closed with 1001 and the clients reconnected by name. The hour-mark reading follows in a later entry.**
+
+Why did a bridge with the door armed release no socket? Rule 4 of socket-is-bootstrap v0.5 closes a client's bootstrap socket once its door channel has bound and the client's own mesh report reads four or more. The bridge learned "bound" from one place, the bind policy, and the composite consults that policy only when a bind would admit a NEW route. A production client says hello over the socket first, because the socket is all it has; the door channel it dials next is a SWITCH of an identity already admitted, verdict (b), and no policy runs for a switch. So the mark was never set. East from 03:26Z to 05:19Z: 34 routes admitted, 20 switched, doorChannelsBound 0, twelve standing clients holding both the socket and the channel, sockets at the cap of 15. West read the same shape at 23 admitted and 2 switched.
+
+The fix is one listener. The composite announces every route change with the new token. A token that is one of this bridge's own door keys means that door channel is now the identity's admitted route, and that is what rule 4 means by bound: the connection is marked, its bind deadline is cleared, and the heartbeat's next fresh report at or above the floor closes the socket with 4200. A channel-first admission still marks through the policy, and the listener leaves a mark it finds. Nothing else moved: no new env, no wire change, the kernel pin stays at 4.125.0.
+
+Proof. `fence_socket_bootstrap` 61 checks, up from 58: E2c the switch marks the channel bound, once, with its deadline cleared; E3b the socket's close forgets the mark; G7 the handler accepts only a door key of its own epoch. With the mark deleted, E2c and G7 fail and nothing else does. The full bridge suite, 24 files, exits 0 on the pinned kernel.
+
+What this does not do: it does not change who is offered the reserved id, when a socket is admitted, or the make-room rule. A client whose mesh report never reaches the floor keeps its socket, as before.
+
 ## v4.126.0 → v4.127.0 — the path backoff lives in the guard; a no-handler channel is skipped (2026-10-31)
 
 **Deployed 2026-10-31 on David's word ("Roll 4.127.0 to Air and M1"), after council review of the 4.126.0 implementation (Vega e303764e) and the first live reading of it armed: kernel 4.127.0 (tag → cfbe91c, two commits over 4.126.0 on branch `path-backoff`, the change 5cd3075); relay 0.182.0 (abbea5a, the vendor) on Air 6 at 01:38Z and M1 8 at 01:38Z, 84 seconds for both. NOTHING ELSE MOVED: both bridges, both apps, the portal, dht-sim, the four droplets, axona-linux (0 of 5 live) and axona-win stay on 4.125.0, and `release.sh check 4.127.0` reads INCOMPLETE with those seven rows named. No wire change. Both flags stay OFF by default and ARMED on the 14 Air and M1 relays only.**

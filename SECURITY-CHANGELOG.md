@@ -16,6 +16,10 @@ always visible in each app's version row and at the bridge's `/healthz`.
 
 ---
 
+## Bridge v2.175.0 — 2026-10-31 (production) — a bootstrap socket is released once the door channel binds, whichever came first
+
+**What's protected:** the bridge's socket budget. With socket-is-bootstrap armed on both production bridges (2026-10-31), a client that bound its door channel after a socket hello kept both for the life of the session, and the bridge never released the socket: east held fourteen of its fifteen sockets for clients that were already meshed, so a newcomer at the cap waited for someone to leave. Rule 4 now reads the composite's route change as the bind, and a meshed client's socket closes with 4200 at its next fresh report, returning the slot to the door. No new trust is introduced: the client is identified as before, by its signed hello and its bound channel.
+
 ## Kernel 4.68.2 — 2026-08-26 — the refusal stands, the door closes later (opt-in; default off)
 
 What does a refusal-time close cost? The 4.65.0 admission gate
