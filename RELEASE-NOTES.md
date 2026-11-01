@@ -7,6 +7,18 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## relay 0.186.0 → 0.187.0 — the seat is freed at the start of the teardown, and a dying server can no longer sign (2026-11-01)
+
+**Built 2026-11-01 on David's word ("Build 0.187.0"), from Orion's carry note on 0.186.0 (council 59fa7625). Not deployed: a seat picks it up only when its host next restarts its MCP server, David's call. Kernel unchanged.**
+
+When does a replacement server get its seat? In 0.186.0 the author-key lock was released at the end of shutdown, after the in-flight publishes were read back, the watches unsubscribed and the peer closed, which takes two hundred to eight hundred milliseconds on a live seat and up to fourteen seconds when the close stalls. An editor host that restarts spawns the replacement about a tenth of a second after it closes the pipe. So the replacement arrived inside that window, was refused with "already held by pid", logged "startup connect failed (will retry on tool call)", and sat connected:false with its standing watches and inbox unarmed until its first tool call.
+
+0.187.0 moves the release to the first line of shutdown. That is safe only if the dying process can never sign as the author afterwards, so the same line turns on a refusal in the three places that sign or would open a session: ensureSession, setAuthorClass and publish each throw "refused: this server is shutting down; its seat is released and a replacement may hold it". What remains of the teardown, reading back in-flight publishes, unsubscribing, closing, needs no author key. The late release in the finally stays and is idempotent: it unlinks only a lock that names its own pid, so a replacement's lock is never touched.
+
+Fences, both in `npm test`. The lifecycle test gains a fourth case: the first server is held in its teardown for three seconds by a test seam (`MCP_TEST_SHUTDOWN_STALL_MS`, off unless set, bounded by the hard exit), a replacement is spawned on the same author file inside that window, and the lock must name the replacement while the first server still runs; both then exit 0 and the lock is gone. With the entry release removed the case fails on "lock released at shutdown entry timed out". A new unit test calls shutdown in-process, with no session and no network, and asserts the three refusals and their wording; with the publish guard removed, the wording test fails because the refusal then comes from ensureSession. The test's temporary author directories are now removed when it ends.
+
+What this does not change: the one-key-one-process rule, the drain budget, the hard-exit timer, any wire behaviour.
+
 ## relay 0.185.0 → 0.186.0 — the MCP server has one exit path; a closed stdin or a SIGHUP ends it and frees the seat (2026-11-01)
 
 **Built 2026-11-01 on David's word ("Build the orphan fix as relay 0.186.0"). Not deployed: a seat picks this up only when its host next restarts its MCP server, and that restart is David's call. Kernel unchanged.**
