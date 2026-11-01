@@ -7,6 +7,18 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## relay 0.187.0 → 0.188.0 — the last three ways a dying server could still sign are closed (2026-11-01)
+
+**Built 2026-11-01 on David's word ("Build 0.188.0"), from Orion's three carry notes on 0.187.0 (council 97e3b896). Not deployed: a seat picks it up only when its host next restarts its MCP server, David's call. Kernel unchanged.**
+
+0.187.0 freed the seat on the first line of shutdown and refused to open a session, declare a class or publish from that line on. Three paths were left. A file send that was already past its session check and suspended reading the file would go on to sign the share after the lock was free. A connect still in flight when shutdown ran would, on resolving, become the session and arm the standing watches on a seat that no longer belonged to the process. And a reconnect overlapping shutdown would close the session before the in-flight publishes had been read back.
+
+0.188.0 closes them. sendFile refuses at entry and again after the read; a connect that resolves after shutdown closes the peer it just opened and refuses; reconnect refuses at entry. The refusals carry the same wording as before and name their call. One correction to the second note as it was raised: the late peer did not live until the fourteen-second hard exit, since terminate exits the process the moment shutdown returns; it lived for milliseconds and left ungracefully, which the guard now prevents.
+
+Fences: the guard test gains a case asserting that sendFile and reconnect are refused by name after shutdown, and it removes its temporary author directory when it ends. With the reconnect guard or the sendFile entry guard removed, the call falls through to ensureSession's refusal and the wording assertion fails. The post-read sendFile guard and the late-connect guard are reviewed, not fenced: a fence would need a session, and a session needs a bridge that completes a handshake, which the offline suite does not have.
+
+What this does not change: the one-key-one-process rule, the drain budget, the hard-exit timer, any wire behaviour.
+
 ## relay 0.186.0 → 0.187.0 — the seat is freed at the start of the teardown, and a dying server can no longer sign (2026-11-01)
 
 **Built 2026-11-01 on David's word ("Build 0.187.0"), from Orion's carry note on 0.186.0 (council 59fa7625). Not deployed: a seat picks it up only when its host next restarts its MCP server, David's call. Kernel unchanged.**
