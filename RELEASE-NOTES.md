@@ -7,6 +7,18 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## relay 0.188.0 → 0.189.0 — nothing but JSON-RPC can reach the MCP server's stdout (2026-11-01)
+
+**Built 2026-11-01 on David's word ("Build 0.189.0"), from Orion's finding on the restarted seats (council b91784d9, MCP-STDOUT-POLLUTION). Not deployed: a seat picks it up only when its host next restarts its MCP server, David's call. Kernel unchanged.**
+
+What else writes the MCP server's stdout? One thing: `src/polyfill.js` logs a line that begins `[date time] ice-pair {…}` with `console.log` on every RTCPeerConnection state change, and under Node `console.log` is `process.stdout`, which for this server is the JSON-RPC channel to the host. The relay daemon needs that line on its stdout, where the negotiation triage tool reads it; the MCP server must never carry it. On the seat that restarted at 18:19Z the Claude Code client logged "Ignoring non-JSON line on stdout: JSON Parse error: Expected ']'" twenty-two times in the first minute, the mesh join, and once or twice a minute after that, sixty-four by 18:41Z, and carried on. Antigravity's client dropped the stdio pipe at the first one, twice, as soon as its seat's lock was free; while the lock was still held, the startup connect was refused and no pair ever formed, which is why the same seat had looked healthy before.
+
+0.189.0 adds `src/mcp-console.js` and imports it as the first line of `src/mcp.js`. It rebinds `console.log`, `info`, `debug` and `warn` to stderr. ESM evaluates imports in order before the importing module's body, so every later import, `ops.js`, the polyfill, the kernel, already sees the rebound console when it loads; a rebinding written in the body of `mcp.js` would run after all of them. `console.error` already writes stderr and is untouched. `polyfill.js` is untouched, so the relay daemon's output is as before.
+
+Fence, in `npm test`: a new test spawns the real `src/mcp.js` with a `--require` preload that calls all four console methods from a timer after the server has loaded, the shape of the polyfill's callback; sends one `initialize` request so stdout carries a real frame; closes stdin; and asserts that every stdout line parses as a JSON-RPC frame, that the initialize response is among them, and only then that the probe's text arrived on stderr. With the import removed from `src/mcp.js` the test fails on "non-JSON line on stdout: [2026-11-01 18:19:43] ice-pair …". The test never opens the network: startup connect is off and the bridge URL is a refused loopback port.
+
+What this does not change: the relay daemon's stdout, the ice-pair line and its reader, the one exit path, any wire behaviour. What would make the claim wrong: a module that writes `process.stdout.write` directly rather than through `console`; none in the MCP server's import graph does today, and the fence would catch a `console` one, not that.
+
 ## relay 0.187.0 → 0.188.0 — the last three ways a dying server could still sign are closed (2026-11-01)
 
 **Built 2026-11-01 on David's word ("Build 0.188.0"), from Orion's three carry notes on 0.187.0 (council 97e3b896). Not deployed: a seat picks it up only when its host next restarts its MCP server, David's call. Kernel unchanged.**
