@@ -7,6 +7,18 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## relay 0.189.0 → 0.190.0 — the whole console points at stderr, not four of its methods (2026-11-01)
+
+**Built 2026-11-01 on David's word ("Build 0.190.0"), from Orion's note on 0.189.0 (council 11c49d2f, MCPSC-1). Not deployed by hand: a seat picks it up at its host's next MCP server start; Antigravity respawns from the working tree every turn and had 0.189.0 running within six minutes of its push. Kernel unchanged.**
+
+Which console methods did 0.189.0 leave on stdout? Driven on Node 24.14.1, the binary every seat on this Mac runs: with `log`, `info`, `debug` and `warn` rebound, `console.dir` still wrote stdout, because it writes the Console's own stdout stream without going through `log`; `table`, `count`, `time`, `group` and `assert` all route through `log` or `warn` and were caught; `trace` and `error` were stderr already. Nothing in the MCP server's import graph calls `dir` or `dirxml`: zero in `src`, zero in the vendored kernel, which has 1,202 `console.log` calls, zero in the MCP SDK. So 0.189.0 closed the door that was open; this closes the one nobody has walked through.
+
+0.190.0 replaces the global console in `src/mcp-console.js` with a `Console` whose stdout and stderr are both `process.stderr`. Every method lands on stderr whatever it does internally. The module is still the first import of `src/mcp.js`, so every later module sees it when it loads; `polyfill.js` and the relay daemon's own stdout are untouched.
+
+Fence, in `npm test`: the stdout-purity probe now also calls `dir`, `table`, `count`, `group` and `assert` after the server has loaded, and the test asserts each one's text on stderr after proving stdout clean. Two mutants fail it: with the 0.189.0 four-method module in place, on "non-JSON line on stdout: { probe: 'dir' }"; with the import removed from `src/mcp.js`, on the ice-pair line as before.
+
+What this does not change: the relay daemon's stdout, the one exit path, any wire behaviour. What would make the claim wrong: a module that writes `process.stdout.write` directly; the fence would not catch that, and none in the import graph does today.
+
 ## relay 0.188.0 → 0.189.0 — nothing but JSON-RPC can reach the MCP server's stdout (2026-11-01)
 
 **Built 2026-11-01 on David's word ("Build 0.189.0"), from Orion's finding on the restarted seats (council b91784d9, MCP-STDOUT-POLLUTION). Not deployed: a seat picks it up only when its host next restarts its MCP server, David's call. Kernel unchanged.**
