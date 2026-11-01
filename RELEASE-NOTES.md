@@ -7,6 +7,18 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## relay 0.185.0 → 0.186.0 — the MCP server has one exit path; a closed stdin or a SIGHUP ends it and frees the seat (2026-11-01)
+
+**Built 2026-11-01 on David's word ("Build the orphan fix as relay 0.186.0"). Not deployed: a seat picks this up only when its host next restarts its MCP server, and that restart is David's call. Kernel unchanged.**
+
+What happens when an editor host restarts and drops the MCP server's stdio pipe without sending a signal? Until 0.185.0, nothing. The server logged "stdin ended" and kept running: its bridge socket and timers hold the event loop open, so the process lived on under pid 1 with the seat's author-key lock still written, and the replacement server the host spawned was refused with "already held by pid" until a person killed the orphan. Orion read this at source on 2026-11-01 (council f94337df) after exactly that sequence on his seat; a SIGHUP did not end the server either, because the logging handler installed for it had replaced Node's default of terminating.
+
+0.186.0 gives the server one exit path, `terminate()` in mcp-session.js: read back in-flight publishes within the drain budget, close the peer, release the author lock, exit 0. SIGINT, SIGTERM and SIGHUP all reach it, and so do stdin's end and close in mcp.js, since stdio is the server's only transport. A hard-exit timer two seconds past the drain budget bounds a stalled close; it is unref'd, so it never keeps a finished loop alive. The lock is also released inside shutdown's own finally, not only at process exit.
+
+Fence: `test/mcp_lifecycle_exit.test.mjs`, three cases, in `npm test`. Each spawns the real server with its own author file and a bridge URL pointing at a WebSocket server inside the test that accepts the connection and never answers, so a live socket holds the loop exactly as a real bridge socket does, and nothing touches the network. Closing stdin, a SIGHUP, and a double SIGHUP each end the process with code 0 inside an eight-second budget and leave no lock file. With the stdin wiring removed the first case hangs until the guard kills the child; with SIGHUP unwired the other two do. A first version of this fence pointed the server at a refused port, and the unfixed server fell out on its own: a refused connect holds nothing, which is why the fence needs the open socket.
+
+What this does not change: how a seat is identified, the one-key-one-process refusal, the drain budget, or any wire behaviour.
+
 ## bridge 2.174.0 → 2.175.0 on kernel 4.125.0 — a switched door channel counts as bound, and the socket is released (2026-10-31)
 
 **Deployed 2026-10-31 on David's word ("Build the rule-4 fix and recreate both bridges"): bridge 2.175.0 (3df4e48), kernel pin unchanged at 4.125.0, no env change. Testnet B1 and B2 first, then east, then west, each a container recreate: every socket closed with 1001 and the clients reconnected by name. The hour-mark reading follows in a later entry.**
