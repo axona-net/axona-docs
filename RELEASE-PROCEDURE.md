@@ -421,6 +421,28 @@ is not "done", and "the tool said ✓" is not "verified".
   and read `git -C axona-protocol reflog -5` before trusting the tree a tool is about to
   vendor from.
 
+- A gate written before a feature keeps failing healthy nodes after it. `roll-fleet.sh`'s
+  per-slot proof demanded `state=open`; since the bridge degree cap, a relay the bridge
+  retires at its cap (close 4200) prints `state=graduated` and never `state=open`. On
+  2026-11-02 15:51Z the m1 slot-2 replacement bound 4/4 peers in 3 s and the gate killed
+  it as "did not integrate (mesh=0)", aborting a roll with the fleet intact, while the
+  relay's own log showed a bound mesh for the whole settle. `relayctl.ps1` and
+  `fleet-cadence.sh` had accepted `graduated` for weeks; `roll-fleet.sh` and
+  `add-relays.sh` had not (fixed, relay 0.191.0). When a gate reads a counter at zero,
+  read the log it grepped before believing the zero: "mesh=0" was a pattern miss.
+- A fresh-peer root read can say "not ready". On 2026-11-02 all four
+  `cold-lookup-topic.mjs` runs ended `not ready`; `cold-read-topic.mjs` still printed each
+  topic's upstream id. An upstream id is the node the reader bonded to, not proven to be
+  the root. Map an id to a host by the `] node <id>` banner line of each relay's log
+  (m1: `relay-logs/*.log`; axona-win: `svc-NN.log`; droplets: the unit journal), and
+  write the per-droplet ssh calls out in full: a `for spec in "ip unit"; set -- $spec`
+  loop prints nothing under zsh.
+- A deploy branch is not the branch you commit on. `axona-relay` is committed on
+  `release-0.161`; Mac, Linux and Windows hosts pull `testnet` and the droplets pull
+  `main`. A version pushed only to the working branch is on no host's pull path. Push
+  `<sha>:refs/heads/testnet` and `<sha>:refs/heads/main` explicitly (2026-11-02: both
+  were five versions behind).
+
 ## What this procedure does not cover
 
 Growing or shrinking a fleet. Anything that changes a bridge's region, a DNS record or a
