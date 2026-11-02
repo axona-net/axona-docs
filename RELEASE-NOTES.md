@@ -7,6 +7,20 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## kernel 4.127.0 → 4.128.0 and bridge 2.175.0 → 2.176.0 — the introduction carries a sample of the graduated, and a graduation gate (2026-11-02)
+
+**Built 2026-11-02 on David's word ("Proceed with Q1-Q4" on "The introduction represents the mesh, not the socket" v0.1, c7b0230). Not deployed, not tagged, not pinned: both live on branch `graduated-sample` (bridge 6033aa3, kernel 3f4b063); both flags default off, and a bridge or kernel without the other is byte-identical to the previous release. Promotion is a separate word.**
+
+What does a newcomer learn of the mesh when the bridge has already graduated the nodes that know it? Today nothing: after graduation the bridge's connection table forgets a node, and its id survived only in a sixty-second cooldown map. A cohort that restarts together is introduced to itself (the 2026-10-28 partition). Both doors have been on since 2026-10-31, and on 2026-11-02 their meshes read 42 of 50 on west and 49 of 50 on east against a fleet of 52 relays, which is the case the packet names for P1.a: a fleet above the bridge's cap.
+
+Bridge 2.176.0, P1.a, `BRIDGE_GRADUATED_SAMPLE`: the bridge keeps a registry of the ids it has graduated, written at both graduation sites, each validated as 66-hex, kept for 24 hours and never refreshed, bounded at 4096 entries with the oldest evicted. Every peer-list carries `graduated`, a field of its own with 16 ids drawn uniformly without replacement, minus the newcomer when the bridge knows it; `peers` stays connection handles. The operator `/healthz` carries the registry's size and counters and never an id. The registry is bootstrap state and does not survive a restart (Q4). P1.b, `BRIDGE_GRADUATION_GATE`: a peer is graduated on vitality or uptime only if its introduction reached outside its cohort, by an anchor admitted more than 60 s before it, a `graduated` id on its list, or a bound channel to the bridge with the door on; otherwise it is held until the nursery ceiling and then graduated with a `graduated-cohort-only` line naming the cohort's size.
+
+Kernel 4.128.0, P1.a: the field is sanitised (lowercase 66-hex, no duplicates, at most 64 read) and handed to the peer-list handlers, which nominate each id into the candidate cache as source `directory`; `peers` alone reaches the mesh's dial list. An id is not a connection handle (Orion, MPSH-3): the mesh never dials the field, and the fill dials nominations under its budget through whatever path the node holds.
+
+Fences, in each `npm test`. Bridge, 34 checks: the resolver; the registry; a real bridge child with kernel clients graduating into the registry and a later raw client reading the field; off byte-identical; the gate holding a cohort and releasing it at the ceiling; statics. Kernel, 10 checks: the sanitiser; a real peer on a stub transport nominating strangers as `directory` and nothing else; the peer-list split. Mutants run by hand fail at the named sections: the sample written into `peers`, the registry write dropped, the gate filter dropped, the mesh handed the sample, nomination as `pex`.
+
+What this does not establish: that a bridge's sample reaches a newcomer in production, which needs the bridge pinned to 4.128.0 and the flag armed; that the sampled ids are alive, which costs the newcomer one dial per dead id under P3's backoff; the bridge's own mesh filling, which the door reads were taken to measure. What would make the claim wrong: a bridge build whose peer-list is assembled anywhere but the two sites the fence pins; a kernel whose handlers receive the field before the sanitiser.
+
 ## relay 0.189.0 → 0.190.0 — the whole console points at stderr, not four of its methods (2026-11-01)
 
 **Built 2026-11-01 on David's word ("Build 0.190.0"), from Orion's note on 0.189.0 (council 11c49d2f, MCPSC-1). Not deployed by hand: a seat picks it up at its host's next MCP server start; Antigravity respawns from the working tree every turn and had 0.189.0 running within six minutes of its push. Kernel unchanged.**
