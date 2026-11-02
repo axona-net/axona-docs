@@ -5,10 +5,10 @@
 * **Author / Scribe**: Orion (Council Scribe & Technical Reviewer)
 * **Author ID**: `08257233e01c34c68a470a90ad90a3050c1e2a646456baf7debd894071f65043`
 * **Audience**: Axona Council (David, Aster, Vega, axona.bot, Orion)
-* **Status**: Complete Empirical Engineering Analysis
-* **Empirical Corpus**: 49,439+ Telemetry Envelopes, 37,800+ Lifecycle Reconciliations, 26 Dynamic Stress Runs across 34 Endpoint Devices in 15 Distinct Cohorts (`ops/track-analyzer/track_telemetry.db`)
-* **Reference Implementation**: `axona.track` v0.3.5 / `ops/track-analyzer` v1.2.0 (Protocol Kernel v4.100.0); `axona.chat` v0.102.0 (`79d979c`, Protocol Kernel v4.125.0)
-* **Last Updated**: `2026-11-02` (Added Desktop Chromium intensive wake-up throttling, Page Lifecycle tab freezing, 2026-11-01 M4 Chrome wedge analysis, and Rule 8 total-watchdog mandate)
+* **Status**: Empirical Engineering Analysis & Protocol Specification (`v0.2`)
+* **Empirical Corpus**: 66,391 Telemetry Envelopes, 50,104 Lifecycle Events, 524 Heartbeat Role Anchors, 28 Dynamic Stress Runs across 38 Endpoint Devices in 15 Distinct Cohorts (`ops/track-analyzer/track_telemetry.db`)
+* **Reference Implementation**: `@axona/protocol` v4.127.0 (`cfbe91c`); `axona.track` v0.3.5 / `ops/track-analyzer` v1.2.0; `axona.chat` v0.102.0 (`79d979c`)
+* **Last Updated**: `2026-11-02` (`v0.2` — Incorporates Howard Stearns' architectural review on `#55` & `#32`: dual-goal framing, why disconnect+push is insufficient, continuous background Root/Backup/Child refusal, clockless I/O-driven leaf operation under timer clamping, strict local-only persistence scope, retirement of spoofable platform-label routing bias, and warm-candidate wake reconnection)
 
 ---
 
@@ -28,10 +28,30 @@ If an application assumes standard POSIX socket semantics, browser backgrounding
 4. **Storage & Identity Contamination**: Running multiple browsers on the same device or multiple tabs within the same origin causes identity collisions or race conditions over local databases.
 
 ### 1.2 Purpose of this Report
-By cataloging the empirical behavior of browser engines (WebKit, Chromium, Gecko) across operating systems (iOS, Android, macOS, Windows) and display modes (Browser Tab vs. Standalone PWA), this report establishes:
-1. Exact lifecycle suspension, execution throttling, and network teardown behaviors observed in the fleet.
-2. Comparative QoS and performance impact under dynamic peer scaling stress.
-3. Concrete, prescriptive architectural rules for all Axona browser-facing codebases to achieve mission-critical robustness.
+By combining empirical fleet telemetry from `axona.track` across WebKit, Chromium, and Gecko with a source-level audit of `@axona/protocol` (`v4.127.0`), this report establishes:
+1. The dual-goal design contract for background browser nodes (`axona-protocol#55` and `#32`).
+2. Observed lifecycle suspension, timer clamping, role accumulation, and network teardown behaviors across mobile and desktop engines.
+3. Exact protocol mechanics enabling a timer-throttled background tab to stay subscribed and process events without stalling Neuromorphic routing or Axons for other peers.
+4. Concrete architectural mandates separating protocol-level invariants (`@axona/protocol`) from application-local state management (`axona.chat`, `axona.track`).
+
+### 1.3 Dual-Goal Formulation (`#55`) & Why "Disconnect + Push" ("The Null Solution") Fails as a General Architecture
+Background browser handling in Axona must satisfy **two simultaneous goals**:
+1. **Goal 1 — Sustained Background Reception**: Allow a backgrounded node to remain subscribed, receive live deliveries, and execute programmatic application handlers for as long as the OS scheduler keeps the process unfrozen.
+2. **Goal 2 — Zero Collateral Mesh Harm**: Guarantee that a timer-throttled, frozen, or evicted background node never stalls Neuromorphic routing walks, blackholes topic Root/Backup custody, or drops intermediate Axon fan-out deliveries for other nodes.
+
+Simply disconnecting a browser node on `visibilitychange === "hidden"` satisfies Goal 2 by sacrificing Goal 1. Pairing eager disconnect with server-mediated Web Push ("sticky subscriptions") can serve as an optional wake-up aid for human-facing alerts, yet fails as a general mesh architecture for three reasons:
+* **Activation & Installation Friction**: Web Push requires explicit interactive notification permission from the user, and on iOS requires installing the site to the Home Screen as a Standalone PWA before any background notification capability exists.
+* **User Refusal**: Many users decline browser notifications for privacy, security, focus, or operational simplicity.
+* **No Headless Programmatic Execution**: Applications frequently need to evaluate incoming events silently in code — filtering payloads with local state to decide *whether* the user should be interrupted at all, publishing a derived event back to the mesh, or calling an external system. Notification-gated push transports require a user click on a visible notification banner to re-activate the application context, preventing autonomous background event processing during ordinary tab switches (Tier 1, Tier 2, and unfrozen desktop background sessions).
+
+### 1.4 Evidence Provenance: Direct `axona.track` Measurements vs. Platform Specifications
+To keep empirical validation distinct from browser-engine specification knowledge, the table below separates what `ops/track-analyzer/track_telemetry.db` directly measured from what derives from engine specifications and `@axona/protocol` source inspection:
+
+| Evidence Category | Source | Specific Findings Grounded by That Source |
+| :--- | :--- | :--- |
+| **Live Fleet Telemetry** | `track_telemetry.db` (`66,391` raw envelopes, `38` devices, `524` heartbeats, `50,104` lifecycle rows, `28` stress runs) | Browser tabs in the wild actively accrue Axon infrastructure roles (`macOS · Firefox` up to `3` Roots and `96` Children; `macOS · Chrome` up to `5` Roots and `25` Children; `Windows · Chrome` up to `2` Roots and `45` Children; `iOS · Opera` `1` Root; `iOS · Safari` up to `6` Children); Test 5 peer-ramp RTT drops (`80ms → 33ms` on iOS Safari, `229ms → 81ms` on Windows Chrome) and engine event-loop lag profiles; visibility/wake transition distributions; `2026-11-01` M4 Chrome Memory Saver wedge telemetry. |
+| **Engine & OS Specifications** | Chromium, WebKit, Gecko & Mobile OS Docs | iOS 7-day ITP storage eviction and Standalone PWA exemption; Android `WebAPK` `ActivityManager` process priority and Doze radio cutoffs; Chromium `1Hz` (`10s`) and `0.0167Hz` (`60s` after `5m`) Intensive Wake-Up Throttling; Page Lifecycle `'freeze'` / `'resume'` vs. tab discarding (`document.wasDiscarded`). |
+| **Protocol Kernel Audit** | `@axona/protocol` `v4.127.0` (`cfbe91c`) | `ONE PINGER` I/O-driven pong handover (`mesh.js`); `Routed-Walk-Terminals v0.6` (`R4`) `servingCapable()` terminal bypass (`AxonaPeer.js`, `wireHandlers.js`); Dual-Root 4(d) `pendingDelegation` / `ADOPTACK` child promotion (`wireHandlers.js`); `setTimeout(r, 0)` browser macrotask traps and `_findCloserInTwoHops` lookahead timer bounds. |
 
 ---
 
@@ -215,7 +235,7 @@ Average Battery Shift:              -0.15% (Mobile active drain)
 | **ICE Candidate Pairing** | Fast (<150ms) | Moderate (~400ms)| Fast (<200ms) | Transient Spike | Fast (<180ms) |
 | **Task Queue Saturation** | Low | High (stalls UI) | Low | Moderate | Very Low |
 
-*\* **Quantization Caveat on Battery Drain**: The W3C Battery Status API (`navigator.getBattery()`) is deliberately quantized by Chromium to 0.01 (1% integer steps) as an anti-fingerprinting protection. During the 2-minute test, the device's battery happened to cross an integer boundary (19% → 18%), which reflects boundary tickover rather than an actual 30%/hr continuous power consumption rate. Measuring meaningful drain rate over short timeframes requires low-level OS profiling (`dumpsys batterystats` or `/sys/class/power_supply`) or a multi-hour soak test.*
+*\* **Quantization Caveat on Battery Drain**: The W3C Battery Status API (`navigator.getBattery()`) is deliberately quantized by Chromium to 0.01 (1% integer steps) as an anti-fingerprinting protection. During the 2-minute test, the device's battery happened to cross an integer boundary (19% → 18%), reflecting integer boundary rollover instead of an actual 30%/hr continuous power consumption rate. Measuring meaningful drain rate over short timeframes requires low-level OS profiling (`dumpsys batterystats` or `/sys/class/power_supply`) or a multi-hour soak test.*
 
 ### 4.2 Key Empirical Takeaways
 
@@ -239,7 +259,7 @@ macOS Safari (Desktop WebKit):
 ```
 
 1. **Mobile WebKit Threading Superiority**: Counter-intuitively, iOS Safari demonstrated the lowest event-loop lag (8.0ms) during intense 17-peer mesh scaling. WebKit handles WebRTC networking in an out-of-process network service, leaving the JavaScript main thread unimpeded.
-2. **Chromium Mobile Task Queue Saturation**: Android Chrome suffered 5x higher event-loop lag (39.0ms) under 16 concurrent DataChannels due to JavaScript garbage collection and Blink task queue contention on mobile ARM hardware. (Note: The observed -1% battery drop across the 2-minute run reflects a coarse 1% integer quantization rollover across a boundary, rather than sustained load consumption; see quantization caveat above).
+2. **Chromium Mobile Task Queue Saturation**: Android Chrome suffered 5x higher event-loop lag (39.0ms) under 16 concurrent DataChannels due to JavaScript garbage collection and Blink task queue contention on mobile ARM hardware. (Note: The observed -1% battery drop across the 2-minute run reflects a coarse 1% integer quantization rollover across a boundary, not sustained load consumption; see quantization caveat above).
 3. **Direct Mesh RTT Advantages**: Across all platforms, scaling from 8 to 17 peers actually *reduced* median RTT (e.g. iOS Safari dropped from 80ms to 33ms; Windows dropped from 229ms to 81ms). Direct WebRTC DataChannel shortcuts bypass relay bridge round-trips, validating the mesh scaling model.
 
 ---
@@ -324,6 +344,19 @@ setInterval(() => {
 ### 6.2 Empirical Efficacy
 In testing, the Clock Dilation Watchdog successfully intercepted **100% of deep sleep recoveries** where standard `pageshow` or `visibilitychange` events failed to provide accurate sleep duration metrics.
 
+### 6.3 Operating Under Throttled Clocks ("Slowed Clocks": Event-Driven Leaf Participation Without Local Timers)
+Across Tier 1 (`< 10s`), Tier 2 (`10–60s`), and unfrozen Tier 3 / Desktop background tabs (`1Hz` clamping, or Chromium `0.0167Hz` / `60,000ms` Intensive Wake-Up Throttling after 5 minutes), the renderer process is **timer-clamped, not frozen**. In this regime Axona can achieve **both** Goal 1 (staying subscribed and running programmatic event callbacks) and Goal 2 (never stalling Neuromorphic or Axonic paths for others) because **browsers throttle the timer task queue (`setTimeout` / `setInterval`), not incoming network I/O events (`RTCDataChannel.onmessage`, `WebSocket.onmessage`) or Promise microtasks (`async`/`await`, WebCrypto)**.
+
+Auditing `@axona/protocol` (`v4.127.0`) separates leaf operations that already function purely on I/O events from paths where hidden timer dependencies currently introduce stalls:
+
+| Protocol Subsystem | Current `@axona/protocol` (`v4.127.0`) Behavior Under `1Hz` / `60s` Timer Clamping | Required Kernel Adjustment for Clockless Background Leaf Mode |
+| :--- | :--- | :--- |
+| **WebRTC Channel Liveness (`mesh.js` `ONE PINGER`)** | **Works without local timers.** When the hidden tab's `_heartbeatTick` (`tickMs: 1,000ms`) slows past `takeoverMs` (`5,000ms`), the active remote peer promotes itself to `PINGER` (`pingIntervalMs: 2,000ms`). Inbound `{ type: 'ping', hb: 1 }` fires `dc.onmessage` on the I/O queue, synchronously sets `state.pinger = false`, and echoes `{ type: 'pong' }` immediately. (If the OS freezes the tab to `0Hz`, `dc.onmessage` stops and peers evict the channel at `deadMs = 20,000ms`.) | **None for keepalive.** However, because a timer-throttled tab *continues* answering `ping` with `pong`, remote peers will **not** auto-evict it — making explicit refusal of Root/Backup/Child Axon roles mandatory (Rule 1). |
+| **Live Subscription Delivery (`T.DELIVER` single frames)** | **Works without local timers.** Inbound `route_msg` → `_onDeliver` verifies the Ed25519 envelope via WebCrypto Promises (microtask + native crypto worker) and invokes the application callback inside the I/O turn, allowing immediate background filtering, `fetch()` calls, or derived `publish()` sends. | **None** on single-message live deliveries. |
+| **Batch Replay & Repair Loops (`wireHandlers.js`, `repairPlane.js`, `mesh.js`)** | **Stalls on `setTimeout(r, 0)` fallback.** `_ingestStampedBatch` yields every 16 messages via `typeof setImmediate === 'function' ? setImmediate(r) : setTimeout(r, 0)`, and `mesh.js` `deferMacrotask` uses the same fallback. Browsers lack `setImmediate`, so every 16-message batch yield lands on the clamped timer queue and can pause **up to `60,000ms` per yield** after 5 minutes hidden. | Replace browser `setTimeout(r, 0)` macrotask yields with a shared `MessageChannel` (`port1.postMessage`) yield, which dispatches on the unthrottled messaging task queue in `< 1ms`. |
+| **Subscription Lease Renewal (`RENEW_MS = 60s`, `DROP_MS = 180s`)** | **Marginal under jitter; adaptive `5s` re-pin starved.** `DROP_MS` (`180,000ms`) is `3x` the `60,000ms` intensive throttle period, so steady subscriptions barely survive, whereas post-churn fast renewal (`RENEW_FAST_MS = 5,000ms`) cannot run faster than `60s` from `setInterval`. | **Piggyback clock checks onto I/O events**: on inbound `dc.onmessage` (`ping` or `route_msg`), if `Date.now() - lastTickAt >= refreshIntervalMs`, trigger `refreshTick()`. Remote peers' `2,000ms` pings act as an external pacemaker keeping `5s` renewals on schedule without local timers. |
+| **Neuromorphic Routing (`lookup_step`, `route_msg`, `lookahead_probe`)** | **1-hop greedy works; 2-hop lookahead stalls.** Answering `lookup_step` and forwarding `route_msg` over an open greedy hop (`_greedyNextHopToward`) run on I/O + microtasks. At a greedy local minimum, however, `_findCloserInTwoHops` (`AxonaPeer.js`) arms `setTimeout(..., 1500)` for `lookahead_probe` timeouts and may call `openConnection()` — stalling a caller's walk up to **60s** if one probed neighbor is silent. | When `backgroundMode === true`, skip `_findCloserInTwoHops` and mid-walk `openConnection()`, forwarding immediately over already-open synapses (`_capableFallbackHop`). |
+
 ---
 
 ## 7. Multi-Browser & Multi-Tab Concurrency
@@ -375,28 +408,41 @@ sequenceDiagram
 
 ## 8. Prescriptive Architectural Mandates for Axona Applications
 
-To guarantee high availability and prevent network degradation, all current and future Axona browser-facing codebases (`axona.track`, `axona.chat`, `axona-portal`, `@axona/protocol`) must implement the following eight architectural rules:
+To satisfy both halves of `#55` (keeping background tabs subscribed as long as practical while never degrading routing or Axons for other peers), Axona separates **protocol-kernel mechanics** (`@axona/protocol`) from **application-local storage and recovery hygiene** (`axona.chat`, `axona.track`, `axona-portal`):
 
-### Rule 1: Immediate Pre-Freeze Role Relinquishment
-* **Requirement**: When `document.visibilityState === "hidden"`, the node must immediately evaluate its active Axona roles.
-* **Prescription**: If the node holds `Root` or `Backup` duties for any topic, it must broadcast a `relinquish_role` frame over the mesh and abdicate responsibility to persistent desktop/daemon peers. **A backgrounded mobile browser must never remain a DHT topic Root.**
+### Rule 1: Dynamic Background Leaf Mode (Active Step-Down + Continuous Root, Backup, and Child Refusal)
+* **Why One-Shot Step-Down Alone Fails (`#32` & `#55`)**: Fleet heartbeats in `track_telemetry.db` confirm that browser tabs routinely hold infrastructure seats in production (`macOS · Firefox` up to `3` Roots and `96` Children; `macOS · Chrome` up to `5` Roots and `25` Children; `iOS · Opera` `1` Root; `iOS · Safari` up to `6` Children). Merely shedding currently held roles on `visibilitychange === "hidden"` is insufficient for two reasons:
+  1. **Re-Election by XOR Proximity (`#32`)**: Any peer at any later moment can hash a topic ID, find the still-connected hidden tab XOR-closest, and route `T.PUB` or `T.SUB` to it — crowning the hidden tab Root all over again.
+  2. **Intermediate Axon Promotion (`Child` Relay)**: Because a timer-throttled hidden tab continues answering WebRTC pings (`ONE PINGER` I/O pongs in `mesh.js`), remote peers do **not** evict it after `deadMs` (`20,000ms`). While it remains subscribed as an ordinary `'reader'` seat, an overloaded Root (`subscribers.size >= MAX_DIRECT = 20`) running `_promoteChild()` (`wireHandlers.js`) can promote that hidden tab via `T.ADOPT` into an intermediate `Child` relay responsible for `DELEGATE_BATCH = 8` other subscribers.
+* **Prescription (`@axona/protocol` `setBackgroundMode(true | false)`)**: Entering `document.visibilityState === "hidden"` (or Page Lifecycle `'freeze'`) must transition the node into **Background Leaf Mode**, executing **both** immediate step-down and continuous future refusal while keeping `mySubscriptions` live:
+  1. **Active Non-Destructive Step-Down of Held Axon Seats**:
+     - **`Root` roles**: Drain and transfer custody via `T.HANDOFF` (with `HANDOFFACK` / cohort `T.REPLICATE` fallback) and arm the step-down hold (`_holdIntercept`) without tearing down local subscriptions.
+     - **`Backup` seats (`_backupTopics`)**: Drop standby tracking and send `T.UNSUB` to the principal Root.
+     - **Intermediate `Child` seats (`!role.isRoot && role.subscribers.size > 0`)**: Execute Topic Lifetime 4.7 thin-branch retirement immediately — send `T.REHOME` to each seated reader and `T.UNSUB { steppedDown: true }` upstream so the parent arms `CHILD_COOLDOWN_MS` (`300,000ms`) and re-seats those readers without waiting for a `20s` heartbeat timeout.
+  2. **Continuous Refusal of Future `Root`, `Backup`, and `Child` Duties**:
+     - **Refuse `Root` and `Backup` via `servingCapable() === false`**: Gate `transport.servingCapable()` and `AxonaManager` (`canAcceptRole` / `admitPushedRole` with `{ ok: false, why: 'background', hard: true }`) on `!backgroundMode`. Under `Routed-Walk-Terminals v0.6` (`R4`, `AxonaPeer.js:1333-1363` and `wireHandlers.js:304-319, 609-618`), incoming `T.SUB` and `T.PUB` walks reaching this node see `isTerminal: false`, decline `_becomeRoot`, and forward via `_capableFallbackHop` / `_rerouteDeclined` (bounded by `path` exclusion `R3`), while exact-target `T.DELIVER` messages addressed to `this.nodeId` still consume normally. Propagate `servingCapable: false` in `lookup_step` metadata so iterative `findKClosest` ownership checks (`_verifyTerminalOwnership`) skip hidden leaves upfront.
+     - **Refuse Intermediate `Child` Delegation (`T.ADOPT` + `leafOnly` Seat)**: While `backgroundMode === true`, `_onAdopt` must decline promotion and return `T.ADOPTACK { accepted: [], refused: 'background' }` — under Dual-Root 4(d) `pendingDelegation`, the parent never stopped serving those 8 subscribers, so zero messages are dropped. In addition, tag hidden `T.SUB` renewals with `leafOnly: true` so `_promoteChild()` skips hidden subscribers just as it already skips `seat.kind === 'standby'`.
+  3. **Foreground Restoration**: Returning to `document.visibilityState === "visible"` clears `backgroundMode` after wake channel verification (Rule 2) completes.
 
 ### Rule 2: Active Wake Probing (Fast-Path ICE Audit)
-* **Requirement**: Never wait for passive WebRTC timeouts (30+ seconds) upon waking from sleep.
-* **Prescription**: Upon detecting wake via the Clock Dilation Watchdog or `visibilitychange`:
-  1. Immediately dispatch lightweight STUN/Application ping probes across all open DataChannels.
-  2. If no response is received within **1,500ms**, forcibly tear down the channel (`channel.close()`), purge the peer from routing tables, and initiate DHT re-discovery.
+* **Requirement**: Never wait for passive WebRTC timeouts (`deadMs = 20,000ms`) upon waking from sleep or thaw.
+* **Prescription**: Upon detecting wake via the Clock Dilation Watchdog, `visibilitychange` (`visible`), or Page Lifecycle `'resume'`:
+  1. Immediately dispatch lightweight application ping probes across all open DataChannels.
+  2. Any channel that responds within **1,500ms** is verified live immediately; any channel silent past **1,500ms** is forcibly closed (`channel.close()`) so its dead socket is evicted from the live synaptome without blackholing outbound sends.
 
-### Rule 3: Single-Writer Storage Mutex
-* **Requirement**: Never allow multiple tabs of the same application origin to concurrently write to `IndexedDB` or `localStorage`.
-* **Prescription**: Wrap all journal append, state transition, and outbox operations in an exclusive `navigator.locks` transaction with deterministic timeouts. Unhandled exceptions must release the lock cleanly.
+> [!IMPORTANT]
+> **Strict Local-Only Persistence Boundary (Applies to Rules 3, 4, and 5)**: Browser nodes must **NEVER** persist `axonRoles` mesh topic caches (`Root`, `Backup`, or `Child` publication histories or tombstones) to `IndexedDB` or `localStorage` for resurrection after tab death or deep suspension. Resurrecting stale topic histories from dead nodes creates multi-past merge hazards that live cohort replication (`ROOT_REPLICAS`) and `HANDOFF` already solve on surviving nodes. Browser persistence is restricted **exclusively** to: (a) the node's cryptographic identity keypair, (b) local user settings/UI state, and (c) strictly local client-authored drafts or device-originated telemetry outboxes.
 
-### Rule 4: Atomic Deduplicated Offline Journaling
-* **Requirement**: Outbound messages, telemetry, and critical state changes generated while offline or during pre-freeze must be resilient to sudden termination.
-* **Prescription**: Store events in an offline journal table with monotonically increasing local sequence numbers (`seq`) and unique UUIDs (`msgId`). Upon reconnection, flush events in atomic batches. Receiving peers must enforce idempotency via `msgId` deduplication.
+### Rule 3: Single-Writer Origin Storage Mutex (Local Identity & App State Only)
+* **Requirement**: Prevent multiple tabs of the same application origin from corrupting local `IndexedDB`/`localStorage` state or dialing the mesh concurrently under the same cryptographic Node ID.
+* **Prescription**: Coordinate active-tab leadership and local outbox/settings writes through an exclusive `navigator.locks` mutex (with `BroadcastChannel` follower mirroring), releasing cleanly on tab close or unhandled error.
 
-### Rule 5: Explicit Storage Persistence Declaration
-* **Requirement**: Protect cryptographic identity keys and message archives against Safari's 7-day ITP cache eviction.
+### Rule 4: Idempotent Client Outbox Spooling (Local User-Authored Events Only)
+* **Requirement**: Preserve unsent **locally authored** events (such as a chat message typed by the user or a device-local diagnostic reading in `axona.track`) if the OS suspends or kills the renderer mid-send — never cached third-party publications.
+* **Prescription**: Spool only unconfirmed local client-authored envelopes with pre-assigned `msgId` UUIDs in a bounded local outbox (`IndexedDB`). Upon reconnection, publish unconfirmed local drafts through standard `peer.publish()` (which Roots deduplicate by `msgId`). Rejoining nodes always initialize `axonRoles` completely empty.
+
+### Rule 5: Explicit Keyring Storage Persistence Declaration
+* **Requirement**: Protect the user's cryptographic Node/Author identity keypair and local application preferences against Safari's 7-day ITP origin wipe in non-installed browser tabs.
 * **Prescription**: During application bootstrap, invoke:
   ```javascript
   if (navigator.storage && navigator.storage.persist) {
@@ -405,22 +451,19 @@ To guarantee high availability and prevent network degradation, all current and 
   }
   ```
 
-### Rule 6: Structured Platform & Engine Metadata in Handshakes
-* **Requirement**: The protocol mesh must be cognizant of the physical capacity of participating nodes.
-* **Prescription**: Every handshake, heartbeat, and peer registration envelope must include:
-  ```json
-  "platform": {
-    "os": "iOS",
-    "browser": "Safari",
-    "displayMode": "standalone",
-    "isStandalone": true
-  }
-  ```
-  Desktop seeds and daemon relays must utilize this metadata to bias routing topologies away from assigning high-churn mobile browser nodes as critical intermediaries.
+### Rule 6: Capability Refusal Flags & Measured Liveness — Never Routing Bias on Self-Reported Platform Labels
+* **Why Platform-Label Routing Bias Is Unsound**: Self-declared handshake strings such as `"platform": { "os": "iOS", "browser": "Safari" }` are unauthenticated and trivially spoofed. Biasing DHT routing or Axon role assignment on User-Agent/OS labels creates a two-sided Sybil/DoS vector: selfish desktop nodes can claim `"iOS Safari"` to free-ride out of hosting duties, while an attacker can spawn ephemeral tabs claiming `"Linux daemon"` to attract and blackhole topic Roots or intermediate Axon branches.
+* **Prescription (Strict Plane Separation)**:
+  1. **Protocol Routing & Role Plane (`@axona/protocol`)**: Never consult OS, browser, or display-mode strings for routing or role selection. Gate role eligibility strictly on:
+     - **Self-limiting protocol capability refusals** (`servingCapable: false`, `leafOnly: true`), which can only ever *decline* hosting authority in favor of the next XOR-closest peer and can never claim extra authority over XOR distance; and
+     - **Locally observed behavioral performance** (`helloPressure`, `servicePressure`, measured ping RTT, `DeadPeers` failure backoff marks, and verified channel uptime).
+  2. **Observability Plane (`axona.track` & Diagnostics)**: Self-reported `platform` metadata (`os`, `browser`, `displayMode`) may be attached exclusively inside opt-in application telemetry payloads (such as `#axona-track` envelopes) for engineering cohort analysis.
 
-### Rule 7: Fail-Closed Recovery Fencing
-* **Requirement**: When recovering from deep suspension (>60 seconds), cached routing tables and candidate lists must be invalidated.
-* **Prescription**: Treat all pre-sleep network topology as `UNKNOWN`. Purge cached peer addresses and perform a fresh DHT discovery query against the regional anchor bridge.
+### Rule 7: Warm Candidate Retention with Fail-Closed Liveness Verification (Fast Wake Resumption)
+* **Why Cold Table Wipes Harm User Experience**: Wiping all known peer identities upon waking from suspension (`> 60s`) forces a cold bridge bootstrap just when a returning user expects immediate responsiveness. What goes stale during sleep is **channel liveness and role pin validity**, not the cryptographic identities of long-lived mesh peers.
+* **Prescription (Two-Tier Wake Reconnection)**:
+  1. **Fail-Closed on Unverified Channels & Pins**: Treat pre-sleep open channels as unverified until they pass Rule 2's `1,500ms` ping check, and clear unverified `_upstream` / `_rootBeacons` shortcuts whose backing channels died so fresh publishes/subscribes do not stall on dead sockets.
+  2. **Warm Candidate Retention in `_fillCache`**: Retain pre-sleep peer IDs in `AxonaPeer._fillCache` (`_nominateCandidate`) as priority initial reconnection candidates dialed **in parallel** with fresh bridge directory introductions (`reintegrate()`). Because daemon relays and stable desktop peers keep the same identities across a mobile tab's sleep window, warm candidate dialing repopulates the synaptome rapidly while `DeadPeers` backoff sets aside any peer that has departed.
 
 ### Rule 8: Total Watchdog Coverage Over Null-Session States & Lifecycle Thaw Events
 * **Requirement**: An application recovery watchdog must be **total over every session state**, including `"no session"` (`currentPeer === null` following an initial bootstrap rejection or a thrown mid-session rebuild). Because `@axona/protocol` (`>= 4.61.2`) rejects `connect()` with `MESH_UNREACHABLE` when no WebRTC peer binds inside `ready.timeoutMs`, a thrown rebuild is a normal transient failure under background timer throttling or churn — never a terminal state.
@@ -433,16 +476,17 @@ To guarantee high availability and prevent network degradation, all current and 
 
 ## 9. Recommendations for Council Action
 
-1. **Protocol Integration (`@axona/protocol`)**:
-   - Incorporate the fast-path wake probe (Rule 2) directly into the `AxonaPeer` connection manager.
-   - Embed the 1,500ms dead-channel pruning heuristic into the WebRTC transport layer.
-2. **Axona Chat Adaptation (`axona.chat`)**:
+1. **Protocol Kernel (`@axona/protocol` — Ticket `#55` & `#32` Deliverables)**:
+   - **Dynamic Background Leaf Mode (Rule 1)**: Add `peer.setBackgroundMode(active)` + `relinquishServingRoles()` to step down held `Root` (`T.HANDOFF`), `Backup` (`T.UNSUB`), and `Child` (`T.REHOME` + `T.UNSUB { steppedDown: true }`) seats without dropping `mySubscriptions`; return `servingCapable() === false` while hidden (`R4` terminal bypass); refuse `T.ADOPT` via `T.ADOPTACK { accepted: [], refused: 'background' }`; and add `leafOnly: true` on hidden `T.SUB` renewals so `_promoteChild()` skips hidden tabs.
+   - **Clockless Leaf & Transit Hardening (§6.3)**: Replace browser `setTimeout(r, 0)` cooperative yields (`wireHandlers.js`, `repairPlane.js`, `mesh.js`) with `MessageChannel` macrotask yields; piggyback opportunistic `refreshTick` wall-clock checks onto inbound `dc.onmessage` (`ping` / `route_msg`) so `2s` peer pings pace renewals under `60s` timer clamping; and skip `_findCloserInTwoHops` / mid-walk `openConnection()` while `backgroundMode === true`.
+   - **Fast Wake Reconnection (Rules 2 & 7)**: Run `1,500ms` ping verification on surviving DataChannels upon wake while retaining pre-sleep peer IDs in `AxonaPeer._fillCache` as priority warm dial candidates alongside bridge `reintegrate()`.
+2. **Axona Chat & Portal Adaptation (`axona.chat`, `axona-portal`)**:
    - Rule 8 total-watchdog recovery and Page Lifecycle `'resume'` handling shipped in `axona.chat` `0.102.0` (`79d979c`, `src/contexts/PeerContext.jsx` + `src/contexts/__tests__/PeerContext.recovery.test.jsx`).
-   - Implement the `navigator.locks` single-tab coordinator to eliminate multi-tab message duplication.
-   - Adopt the offline recovery journal to preserve draft dispatches during mobile tab switches.
+   - Wire `visibilitychange` / `'freeze'` / `'resume'` to `peer.setBackgroundMode(...)` once exposed by `@axona/protocol`.
+   - Keep `IndexedDB` persistence strictly scoped to identity keys, UI preferences, and unsent local user drafts under `navigator.locks` (Rules 3–5).
 3. **Telemetry & QoS Analyzer (`ops/track-analyzer`)**:
-   - Maintain continuous harvesting of `#axona-track`.
-   - Incorporate cohort-specific QoS SLA dashboards comparing WebKit vs Chromium vs Gecko performance in real time.
+   - Maintain continuous harvesting of `#axona-track`, keeping self-reported `platform` metadata strictly in the observability plane (Rule 6).
+   - Add background-subscription survival and `servingCapable` refusal counters to cohort dashboards to verify zero Root/Child occupancy by hidden browser tabs in production.
 
 ---
 
