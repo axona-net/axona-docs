@@ -442,6 +442,20 @@ is not "done", and "the tool said ✓" is not "verified".
   `main`. A version pushed only to the working branch is on no host's pull path. Push
   `<sha>:refs/heads/testnet` and `<sha>:refs/heads/main` explicitly (2026-11-02: both
   were five versions behind).
+- A checkout on someone else's branch is not the deploy branch. On 2026-11-02 the
+  `dht-sim` checkout sat on a council seat's feature branch (vendored 4.125.0) while
+  Pages served `main` at 4.128.0; `check`'s dht-sim row read the working tree and
+  failed a finished promotion. Two rules: do the §8 sync in a detached worktree of
+  `origin/main` (with the checkout's `node_modules` linked, or the sync's kernel-smoke
+  gate cannot resolve the package) and push `<sha>:refs/heads/main` and `:testnet`
+  from it, leaving the seat's checkout untouched; and `check` now reads the dht-sim
+  row from `origin/main`, never the working tree.
+- The classifier on axona.bot's seat refuses `ops/fleet.sh roll` and `add` in every
+  form, allow rules or not (2026-11-02, three times). §6 is then David's hand: hand him
+  the exact commands in order, and read progress with `ops/fleet.sh status` plus the
+  Windows transcript by a second connection, since his terminal is not readable from
+  the seat. `add` pulls the host first, so its `KERNEL=` must name the kernel the pull
+  leaves in the checkout, not the one the running relays print.
 
 ## What this procedure does not cover
 
