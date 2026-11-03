@@ -388,9 +388,21 @@ default off:
   closest node either visited. On a bound-only chain it names a closer
   holder four channel-hops away, and with cutover and the return routes the
   handover to it completes with no stubbed lookup.
+- 2252915, 3d's hint refresh under option hintRefresh: a subscriber
+  unattached for ROOT_CLAIM_MS asks the network (the DHT walk where the
+  adapter has one) and takes the closest node visited when it beats the
+  local guess and itself. On a bound-only chain the hint moves from a
+  nearer node to the root four channel-hops away.
+- 4e11021, Orion's VW-1..3 on the walk paths. CB-1 and the hint refresh
+  read the transport's real bridge id and never nominate the bridge; the
+  adapter's bridgeId() stays null everywhere else. A walk settles at
+  peer.stop() or leave(), and a verify cleared by either acts on nothing.
+  A walk toward a topic id never hop-caches the topic id on any hop that
+  runs this kernel.
 
-Not built: 3c, 3d's network-lookup hint refresh past the claim window, 6b,
-and Part 7's capability gate.
+Not built: 3c, 6b, and Part 7's capability gate. Before a relay runs
+verifyWalk or hintRefresh, its lifecycle allowlist needs the 'verify-walk'
+and 'hint-refresh' rows.
 
 ## Part 5 — product question for David, answered
 
