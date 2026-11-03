@@ -464,8 +464,16 @@ default off:
 
 Parts 3 and 7 are built, each behind its own option, default off. Part 6
 is not complete:
-- 6a: not built on this branch. The kernel's handoff on leave exists; no
-  relay SIGTERM or browser unload path was changed to call it.
+- 6a: built where it was missing, on branches, not deployed. Seats
+  (mcp-session close -> stopRelay -> peer.leave) and Linux and macOS relays
+  (SIGTERM -> shutdown -> stopRelay) already handed off. axona-win's
+  service stop TERMINATED THE JOB and handed nothing off: axona-relay
+  closer-born-6a 525bfa1 (relay 0.193.0) makes the wrapper write
+  RELAY_STOP_FILE and wait up to 30 s (4 s at system shutdown) for the relay
+  to leave before it terminates the job; it takes effect at the next Windows
+  roll, which compiles the wrapper. axona-chat closer-born-6a 0f82943
+  (0.104.0) calls leave() on pagehide, best effort: the handoff awaits
+  lookups that a closing page may never run.
 - 6b: built as a REPORT, not as the gate its fence describes. An app-held
   root with no current successor says `degraded: no-successor` and
   re-seats; it does not stay a replica until a second node has pulled, and
