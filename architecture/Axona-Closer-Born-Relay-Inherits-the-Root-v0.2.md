@@ -1,4 +1,4 @@
-# Axona Closer-Born Relay Inherits the Root — design packet v0.1
+# Axona Closer-Born Relay Inherits the Root — design packet v0.2
 
 **Status:** DESIGN, for council review. Nothing built. David's word (direct,
 01:1xZ 2026-11-03): "Analysis seems to be complete. Let's move forward with the
@@ -9,19 +9,29 @@ through Orion's source reading (council ae6d73d2) and axona.bot's verification
 of it (3442b125). The live #council split of 2026-11-02 is the fence this
 packet must pass, and it stays untouched until the fix is driven against it.
 
+**v0.2 (01:2xZ 2026-11-03)** answers Part 5 by David's word: "Every node can hold
+a topic root or backup." The qualifier "serving-capable" is gone from the
+invariant and from every mechanism. Role placement is XOR closeness among
+ALL nodes that hold a role for the topic or that its walk reaches; a seat
+born closer inherits from a relay and a relay from a seat by the same
+machine; no node answers not-root to an offer that names it the winner from
+a loser with custody; the R4 serving-capable gate no longer decides where a
+role sits. The reply route of 80fe76eb carries every kind of node, which is
+why it is built first.
+
 ## What question this packet answers
 
-When a relay is born XOR-closer to a standing topic than the node that holds
-its root, how does the role, and the history under it, move to the newborn
-without a restart, a re-subscribe, or a hand?
+When a node is born XOR-closer to a standing topic than the node that holds
+its root, whatever kind either node is, how does the role, and the history
+under it, move to the newborn without a restart, a re-subscribe, or a hand?
 
 ## What this is NOT
 
 This is NOT a change to where history is stored, to the wire format, or to
 who may publish. It is NOT the cross-island signalling remedy of 80fe76eb,
 though it depends on the same fact: a reply must travel the route the request
-arrived on. It does NOT decide whether a council seat should be allowed to
-hold a root at all; that is a product question for David, named in Part 5.
+arrived on. It does NOT decide whether a council seat may hold a root; David decided
+that in Part 5: every node may.
 It is NOT a restart of Windows slot 19 or a reload of Aster's seat.
 
 ## Part 1 — what happened, read from logs
@@ -54,15 +64,13 @@ termination). Nothing leases council.
 
 For a standing topic T:
 
-I1. ROOT for T is held by the serving-capable node closest to T, by XOR
-    distance, among the nodes that hold any role for T or that T's walk
-    reaches. A node that is not serving-capable holds ROOT only while no
-    serving-capable node closer than it exists.
+I1. ROOT for T is held by the node closest to T, by XOR distance, among the
+    nodes that hold any role for T or that T's walk reaches. Every node
+    kind may hold it: relay, seat, client.
 
-I2. The replica set for T is the next-closest serving-capable nodes, as many
-    as the kernel's replica count names. A serving-capable node born closer
-    than the farthest replica takes that slot; the displaced replica is
-    released.
+I2. The replica set for T is the next-closest nodes, as many as the kernel's
+    replica count names. A node born closer than the farthest replica takes
+    that slot; the displaced replica is released.
 
 I3. History follows the role. A node that takes ROOT or a replica slot pulls
     the holder's cache before it serves a single subscriber, and the holder
@@ -71,9 +79,10 @@ I3. History follows the role. A node that takes ROOT or a replica slot pulls
 I4. A subscriber whose root moved re-pins to the new root within one renewal
     period without re-subscribing.
 
-The precondition for every mechanism below is the same: a serving-capable
-relay R exists with d(R, T) < d(H, T), where H is the current holder of the
-role, and R and H can route to each other by at least one direction.
+The precondition for every mechanism below is the same: a node R exists
+with d(R, T) < d(H, T), where H is the current holder of the role, and R
+and H can route to each other by at least one direction. R and H may each
+be a relay, a seat or a client.
 
 ## Part 3 — the mechanisms
 
@@ -94,7 +103,7 @@ answer returns over the route the PULLUP arrived on, with the own lookup as
 the fallback, so an island that can be reached in one direction is answered
 in the other (the 80fe76eb mechanism, built once, used here).
 
-### 3b. The holder hands off to a closer serving-capable node
+### 3b. The holder hands off to a closer node
 
 Today `_verifyRoots` (rootElection.js:380-394) nominates any strictly closer
 visited node, plants a verified beacon for it before it accepts, and ignores
@@ -106,21 +115,25 @@ answers not-root for any node without an isRoot role (mergeMachine.js:380).
 Change, in four parts. The beacon is written only when the nominee's
 acceptance arrives, and a refusal deletes any beacon for that node. The
 verify consults the tombstone set and does not re-nominate a tombstoned
-node inside its window. A serving-capable node that receives a MERGE_OFFER
+node inside its window. A node of any kind that receives a MERGE_OFFER
 naming it the winner, for a topic it holds no role in, from a loser with
 custody, ACCEPTS: it creates the root role at the loser's epoch plus one and
-runs the existing merge pull. Only a node that is not serving-capable keeps
-answering not-root. The offer travels the verify walk's route, own lookup
-as fallback.
+runs the existing merge pull. The not-root refusal is retired for an offer
+that names a winner; it stays only for a malformed or stale offer. The R4
+serving-capable gate (transport/web/index.js, AxonaPeer.js, AxonaManager.js
+per ae6d73d2) stops deciding role placement: a node below the graduation
+floor still routes and still takes a role when it is the closest. The offer
+travels the verify walk's route, own lookup as fallback.
 
 ### 3c. Replicas inherit the same way
 
-On each verify the root recomputes the replica set from its walk. A
-serving-capable node closer than the farthest current replica is sent the
-replicate request the kernel already uses to seat a backup; the displaced
-backup is released with the existing release path. A newborn that finds
-itself closer than a replica but not closer than the root takes the replica
-slot and does not claim root.
+On each verify the root recomputes the replica set from its walk. A node
+closer than the farthest current replica is sent the replicate request the
+kernel already uses to seat a backup; the displaced backup is released with
+the existing release path. A newborn that finds itself closer than a
+replica but not closer than the root takes the replica slot and does not
+claim root. A seat or a client takes a replica slot by the same rule and
+serves pulls from it.
 
 ### 3d. Subscribers follow the root
 
@@ -144,9 +157,9 @@ Unit, each one a mutant that today's suite would pass:
 - rootElection: no beacon before acceptance; a not-root refusal deletes the
   beacon; a tombstoned node is not re-nominated; root-verify-demote is logged
   only on a demotion.
-- mergeMachine: a serving-capable node with no role, offered the win by a
-  loser with custody, creates the root and pulls; a non-serving node still
-  answers not-root; the loser keeps its cache until the terminal ack.
+- mergeMachine: a node of any kind with no role, offered the win by a loser
+  with custody, creates the root and pulls; a malformed or stale offer is
+  still refused; the loser keeps its cache until the terminal ack.
 - repairPlane and wireHandlers: a role-less PULLUP answers NACK and is not
   counted; the candidate order is holder evidence first; the REPLAYUP
   returns on the inbound route.
@@ -165,17 +178,17 @@ different code until David's hand reloads a seat:
   slot 19 on its next verify; the seats re-pin to slot 19 within one renewal
   period; a post from any seat reaches a fresh reader. This proves 3b and
   3d. The 159 journal's six-event cycle, replayed in the simulator against
-  a non-serving closer node, must end at the first refusal.
+  a closer node that holds no role, must end at the first offer with the
+  closer node as root and the loser's cache under it.
 
-## Part 5 — product question for David
+## Part 5 — product question for David, answered
 
-Should a council seat be serving-capable for standing topics at all? Today
-it is: Aster's seat has held council's root for two days. If seats are not,
-their history lives as child caches that serve pulls (3a) and a seat never
-holds a root that relays cannot find; if they are, I1 lets a seat hold root
-only until a closer relay is born, and 3b must work across islands every
-time. The packet is written for the second case and gets simpler under the
-first.
+Asked in v0.1: should a council seat be serving-capable for standing topics
+at all? David, 01:2xZ 2026-11-03: "Every node can hold a topic root or
+backup." So a seat holds root until a closer node of any kind is born, and
+3b must work across islands every time, in both directions. That is the
+case the packet is written for, and it puts the reply route of 80fe76eb
+first in the build order.
 
 ## What would make this wrong
 
