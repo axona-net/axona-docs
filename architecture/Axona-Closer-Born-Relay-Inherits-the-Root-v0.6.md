@@ -434,6 +434,12 @@ default off:
   hop can strip it (safe: the candidate refuses) or add it to an old
   loser's offer (the hazard). Binding it to the loser's identity is not done.
 
+- f5d4229, Orion's SG-1, P7-1 and RI-3: the winner records the loser's host
+  from the loser's completing SUB, so a same-host loser does not count; a
+  refused staged-without-handoff round (and a timing refusal) closes its
+  corr and clears the candidate, so the next verify offers again; the
+  refusal memory of 3c is swept past RENEW_MS.
+
 Not built, and missing from this list before 0db60c0: 3a's role-less
 PULLUP NACK and its holder-evidence candidate order, and so Part 7's NACK
 probe budget and `degraded: no-holder-found`, which rest on that NACK. 3a's
