@@ -440,14 +440,20 @@ default off:
   corr and clears the candidate, so the next verify offers again; the
   refusal memory of 3c is swept past RENEW_MS.
 
-Not built, and missing from this list before 0db60c0: 3a's role-less
-PULLUP NACK and its holder-evidence candidate order, and so Part 7's NACK
-probe budget and `degraded: no-holder-found`, which rest on that NACK. 3a's
-born-empty STAGING holds under cutover (fence 852036f, red at birth, now
-passes). Before a relay runs verifyWalk, hintRefresh, replicaInherit,
-successorGate or cutover, its lifecycle allowlist needs the 'verify-walk',
-'hint-refresh', 'replica-inherit', 'degraded', 'successor-current' and
-'merge-stage-legacy' rows.
+- bd5fd7e, 3a under option holderProbe, with the Part 7 probe budget it
+  needs. A probe PULLUP carries a nonce; a node with no role for the topic
+  answers REPLAYACK `no-role`; a try every target of which answered no-role
+  is not counted, and those nodes are not asked again. Candidates rank the
+  nodes a SUB to this empty root named as holding history first, then the
+  lookup path, then findKClosest. Refunds unbound the try cap, so 32 pulls
+  and 300 s from the first try bound the probe; then the root reports
+  `degraded: no-holder-found` once, cleared when a holder fills it.
+
+Not built: binding `handoff` to the loser's identity. Before a relay runs
+verifyWalk, hintRefresh, replicaInherit, successorGate, holderProbe or
+cutover, its lifecycle allowlist needs the 'verify-walk', 'hint-refresh',
+'replica-inherit', 'degraded', 'successor-current', 'merge-stage-legacy',
+'empty-root-probe-refunded' and 'holder-found' rows.
 
 ## Part 5 — product question for David, answered
 
