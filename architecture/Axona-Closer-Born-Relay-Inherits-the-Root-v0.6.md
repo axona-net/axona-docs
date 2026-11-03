@@ -457,6 +457,11 @@ default off:
   offer no longer makes a candidate stage. Not bound: the staged PULLUP's
   `staged` and `handoff` in the winner-to-loser direction.
 
+- 304ca14, Orion's HB-1, HB-2, HP-1 and HP-2: a candidate that roots while
+  verifying a signed offer answers it root to root; a superseded offer is
+  not sent after its signature resolves; an unreached target does not block
+  a no-role refund; 3a's budget is checked before any lookup.
+
 Parts 3 and 7 are built, each behind its own option, default off. Part 6
 is not complete:
 - 6a: not built on this branch. The kernel's handoff on leave exists; no
