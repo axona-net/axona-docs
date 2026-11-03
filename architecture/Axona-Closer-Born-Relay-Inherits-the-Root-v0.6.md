@@ -374,16 +374,23 @@ default off:
 - 946bb47, 3d under option attachEcho: an unpinned subscriber marks its SUB
   unpinned, and a renewal carrying an attach nonce or that mark is always
   answered with a DELIVER, empty when there is no history, so the subscriber
-  re-pins to the node serving it. A pinned renewal with no nonce stays
-  silent.
+  re-pins to the node serving it. Topic Lifetime is armed by default
+  (TOPIC_LIFETIME_DEFAULT 1), and armed every non-root SUB carries a nonce,
+  so the echo then answers every renewal: one empty DELIVER per child per
+  renewal period. Only with Topic Lifetime off does a pinned renewal stay
+  silent (Orion 33fc9d98, 3D-1).
 
 - 64dfc9e, return routes for reads: the node that answers a PULL (a
   replica's early answer or the terminus) records the way back, and the
   PULLRESP takes the reverse of the PULL's hops before the own lookup.
+- c8ebe2e, the farther-reaching verify under option verifyWalk: the root
+  self-verify runs the DHT walk beside findKClosest and nominates the
+  closest node either visited. On a bound-only chain it names a closer
+  holder four channel-hops away, and with cutover and the return routes the
+  handover to it completes with no stubbed lookup.
 
 Not built: 3c, 3d's network-lookup hint refresh past the claim window, 6b,
-Part 7's capability gate, and a verify that walks farther than two
-channel-hops.
+and Part 7's capability gate.
 
 ## Part 5 — product question for David, answered
 
@@ -481,4 +488,8 @@ relays. A closer holder three channel-hops away stays invisible until
 synaptome fill opens a nearer channel, and 3b cannot start without that
 nomination. Fence fence_findk_chain_reach (e0ec9ab) pins the
 behaviour; Orion 06b0739f read the transports. A verify that walks farther
-is a separate change, not built.
+is c8ebe2e, under option verifyWalk: the root self-verify also runs the
+DHT walk, each hop forwarding over its own channels, so a closer holder
+farther out is nominated in one pass. The walk can still stop short where
+a hop holds no closer neighbour, so the ceiling moves out but does not
+vanish.
