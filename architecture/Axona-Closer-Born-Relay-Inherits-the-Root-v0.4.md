@@ -1,4 +1,4 @@
-# Axona Closer-Born Relay Inherits the Root — design packet v0.3
+# Axona Closer-Born Relay Inherits the Root — design packet v0.4
 
 **Status:** DESIGN, for council review. Nothing built. David's word (direct,
 01:1xZ 2026-11-03): "Analysis seems to be complete. Let's move forward with the
@@ -26,6 +26,23 @@ signal its platform gives it. Vega's seat approves v0.2 for build on David's
 word. Vega's node id is the upstream a fresh read found for #mesh-health
 after the roll, so a seat holds that root too; the packet applies to it.
 
+**v0.4 (02:1xZ 2026-11-03)** answers Aster's REVISE BEFORE BUILD (council
+a6f27bb2), five points, each holding, and records the 01:38Z event that
+proved the second of them on production before the packet was built: an
+axona.chat client carried council's history to the closer relay by a merge
+pull that timed out and left a second root serving a frozen copy (Part 1).
+The promises are now convergence under named assumptions (Part 2); the
+handoff is a state machine whose incumbent releases nothing before a
+correlated terminal ack covering a named high-water mark (Part 3e); 6b's
+successor must stay current, and a holder with no reachable successor keeps
+the root rather than pretending to a durability it lacks (Part 6); the wire
+and rollout contract is stated (Part 7); offline multi-node fences come
+before the live split is touched (Part 4). Aster reviewed against `9e66eb5`
+mergeMachine.js and syncEngine.js; the existing merge refuses a role-less
+winner and warns that silence reads as a legacy winner, and 3b is rewritten
+so that retiring not-root cannot turn a lost reply into an authority
+transfer.
+
 ## What question this packet answers
 
 When a node is born XOR-closer to a standing topic than the node that holds
@@ -34,7 +51,7 @@ under it, move to the newborn without a restart, a re-subscribe, or a hand?
 
 ## What this is NOT
 
-This is NOT a change to where history is stored, to the wire format, or to
+This is NOT a change to where history is stored, or to
 who may publish. It is NOT the cross-island signalling remedy of 80fe76eb,
 though it depends on the same fact: a reply must travel the route the request
 arrived on. It does NOT decide whether a council seat may hold a root; David decided
@@ -67,7 +84,24 @@ an open app kept its empty relay root alive long enough for a re-walking
 holder to fill it (topicLifetime.js: `role.metricsOn > now` blocks
 termination). Nothing leases council.
 
+At 01:38:02Z on 2026-11-03, with no hand on any seat or relay, the state
+moved. An axona.chat 0.103.0 client (east bridge, 01:24:22Z, namespace
+peer-app, node 896d6df698) held council's history as a root at epoch 1;
+slot 19, born root on a fresh read at 01:01Z and not terminated this time,
+ran merge-pull-start from it with 79 offered, logged merge-pull-timeout at
+01:41:17Z, and nonetheless holds the 79. A fresh reader at 02:01Z receives
+history through 01:35:54Z and nothing after: Aster's seat stays root at
+epoch 2 with the live stream; slot 19 is a second root with a frozen copy.
+A partial pull became a root that serves. Part 3e exists to make that
+impossible.
+
 ## Part 2 — the invariant
+
+These are convergence properties, NOT finite-time guarantees. No node can
+know the global closest node through a partition, asymmetric routing, loss
+or churn. Each property below holds once the conditions stated after I4
+have held long enough; while they do not, the topic is in a named degraded
+state and says so.
 
 For a standing topic T:
 
@@ -83,8 +117,21 @@ I3. History follows the role. A node that takes ROOT or a replica slot pulls
     the holder's cache before it serves a single subscriber, and the holder
     does not drop its cache until the pull is acknowledged.
 
-I4. A subscriber whose root moved re-pins to the new root within one renewal
-    period without re-subscribing.
+I4. A subscriber whose root moved re-pins to the new root, without
+    re-subscribing, within one renewal period after the conditions below
+    hold.
+
+Conditions. (C1) Candidate set: the nodes that hold a role for T plus the
+nodes on T's lookup path as observed by the holder; closeness is computed
+over that set only, never assumed global. (C2) Stable reachability: the
+request and its reply each have a route, in the direction they travel, for
+the length of one handoff; a one-way route helps only when the request
+travels that way AND an authenticated, bounded return path exists for the
+reply, which is the reverse of the request's own hops (80fe76eb), bounded
+by a TTL and refused when expired. (C3) No concurrent second handoff for T
+at either node. While any condition fails the holder stays authoritative,
+the candidate stays a stager, and the role row reports `handoff: pending`
+or `degraded: <reason>`.
 
 The precondition for every mechanism below is the same: a node R exists
 with d(R, T) < d(H, T), where H is the current holder of the role, and R
@@ -157,6 +204,44 @@ there is no history to send. A node unattached past the claim window
 refreshes its hint through the network lookup. A root that completed a
 handoff tells its subscribers the winner's id on their next renewal.
 
+### 3e. The cutover state machine
+
+Two nodes, incumbent H (holds ROOT, custody) and candidate R (closer).
+States at R: NONE, STAGING, PULLING, READY, ROOT. States at H: ROOT,
+OFFERED, DRAINING, RELEASED.
+
+1. H nominates R from its verify walk and sends OFFER(topic, H, R, epochH,
+   corr). H stays ROOT and keeps accepting publications.
+2. R, with no role or a non-root role, enters STAGING: it creates a staged
+   role that serves NO subscriber and stamps NO publication. A stale,
+   duplicate or reordered OFFER (epoch below one already staged, or a corr
+   already closed) is refused with a reason; a second contender for T while
+   R is STAGING is refused `busy`.
+3. R pulls a consistent snapshot: bodies AND tombstones, cut at a named
+   high-water mark HW = (publishTs, msgId), the export order the Dual-Root
+   packet defines. R then pulls the tail above HW until a pull returns
+   empty. Every frame carries topic, corr, both epochs.
+4. R sends ACK(corr, HW', bodies, dels), where HW' covers everything it
+   holds. H validates the ack on all six fields and that HW' is at or above
+   its own high-water at the moment of the ack; if H stamped more since,
+   R pulls again (step 3).
+5. On a valid terminal ack H enters DRAINING: it redirects new publications
+   to R with R's id, tells subscribers on their next renewal, and only then
+   demotes to a replica of R; R enters ROOT at epochH plus one.
+6. Timeouts never transfer authority. A pull that times out leaves R in
+   STAGING or discards the staged role; H stays ROOT. A lost or late ACK is
+   retried with the same corr; H never demotes on silence. The legacy
+   fallback that reads silence as a winner is removed for this path.
+
+The 01:38Z event is step 3 timing out while the staged copy was already
+serving: in this machine the copy could not serve before step 5.
+
+What retiring not-root means, precisely. A node offered the win for a
+topic it holds no role in enters STAGING instead of refusing. It does NOT
+become authoritative on the offer alone, and a lost reply or partial pull
+leaves it a stager. Not-root remains the answer to an OFFER that fails
+validation.
+
 ## Part 4 — fences
 
 Unit, each one a mutant that today's suite would pass:
@@ -179,7 +264,8 @@ different code until David's hand reloads a seat:
 
 - Leg 1, relays only: with the fix rolled to the Windows fleet and no seat
   touched, a fresh reader of #council bonds to slot 19 and receives every
-  body Aster's seat holds, within one probe cycle of the read. This proves
+  body Aster's seat holds up to the HW its handoff names, within one probe
+  cycle of the read, once C1 to C3 hold. This proves
   3a with the reply route.
 - Leg 2, seats reloaded by their owners: Aster's seat hands council off to
   slot 19 on its next verify; the seats re-pin to slot 19 within one renewal
@@ -187,6 +273,18 @@ different code until David's hand reloads a seat:
   3d. The 159 journal's six-event cycle, replayed in the simulator against
   a closer node that holds no role, must end at the first offer with the
   closer node as root and the loser's cache under it.
+
+Offline multi-node, deterministic, in the simulator, BEFORE the live split
+is touched (Aster a6f27bb2 point 5). Each is a scenario with a seeded clock:
+one-way route in each orientation (offer arrives, ack lost; offer lost);
+partition during STAGING and heal; publish and delete concurrent with
+PULLING, each landing before and after HW; ACK missed, delayed, duplicated
+and reordered; incumbent crash in DRAINING; candidate crash in PULLING;
+replica loss during 6b; a mixed-version peer at each position (old H, old
+R, old subscriber); a field of role-less nodes that NACK forever, which
+must end at the probe's own budget (Part 7). A fence asserts no message
+is lost or duplicated relative to HW and that exactly one node stamps
+publications at every instant.
 
 ## Part 5 — product question for David, answered
 
@@ -211,14 +309,17 @@ paths (5e8e1fa5); this packet takes all three, in this order.
     the browser the unload path, which Chrome throttles and freezes (PWA
     report, 11-02) and which is therefore a best effort, not the guarantee.
 
-6b. Hold the root only with a seated successor. A holder that cannot
-    promise the ack, which today means any node whose process is not a
-    service (a browser tab, a seat without a persistent host), accepts ROOT
-    under 3b only after one replica is seated with the cache pulled; until
-    then it serves as a replica itself and the offer stands open. A holder
-    that can promise the ack accepts at once. This keeps David's rule, every
-    node may hold a root, and adds the one condition under which an
-    ephemeral node holds it: there is somewhere for the history to go.
+6b. Hold the root only with a current successor. A holder that cannot
+    promise the pull ack, which today means any node whose process is not a
+    service, accepts ROOT under 3e only while at least one replica is
+    CURRENT: it acknowledged a pull at or above the holder's high-water
+    within one renewal period. The replica's failure domain is named in its
+    seat record (host, process kind); a replica on the same host as the
+    holder does not count. If the replica falls behind or disappears, the
+    holder re-seats one before stamping beyond one renewal of lag, and if
+    none is reachable it keeps the root and reports `degraded: no-successor`
+    rather than promising a durability it lacks. A service can crash too:
+    6b states availability while a successor is current, not durability.
 
 6c. A lease for standing topics. Jokes healed because an open app's metrics
     lease kept its empty root alive long enough to be filled; council has no
@@ -230,6 +331,26 @@ paths (5e8e1fa5); this packet takes all three, in this order.
 The fence for 6b: in the simulator, a closer ephemeral node offered the win
 stays a replica until a second node has pulled the cache, then takes the
 root; the loser's cache is released only after that pull's terminal ack.
+
+## Part 7 — wire and rollout compatibility
+
+This packet changes the wire. Named so that leg 1 can run with old seats.
+
+- New frames or fields: OFFER gains `hw` and a `stage` disposition; a
+  PULLUP NACK `no-role` (a new disposition on the existing REPLAYACK);
+  ACK gains `hwCovered`; the return route is a `path` field on PULLUP and
+  OFFER, reversed for the reply (the R3 path field already on route_msg
+  carries it; no new frame).
+- Versioning: each new field is ignored by an old node by construction
+  (unknown fields are dropped). A node advertises `handoff:1` in its
+  capability attest; a holder runs 3e only toward a candidate that
+  advertises it, and the existing merge path otherwise. Old seats in leg 1
+  therefore keep today's behaviour, and slot 19 running new code must not
+  stage from an old incumbent.
+- Budgets: a NACK does not consume the useful-holder try budget but does
+  consume a separate bounded probe budget of time and frames per topic;
+  when it is spent the probe stops and the root reports
+  `degraded: no-holder-found`. A field of role-less nodes ends there.
 
 ## What would make this wrong
 
