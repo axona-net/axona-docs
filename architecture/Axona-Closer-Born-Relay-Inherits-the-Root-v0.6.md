@@ -424,10 +424,24 @@ default off:
   not consume REPLICATE, and a seated or walked candidate whose push failed
   is not re-picked for RENEW_MS.
 
-Not built: Part 7's capability gate. Before a relay runs verifyWalk,
-hintRefresh, replicaInherit or successorGate, its lifecycle allowlist needs
-the 'verify-walk', 'hint-refresh', 'replica-inherit', 'degraded' and
-'successor-current' rows.
+- 0db60c0, Part 7's capability gate. A cutover loser's MERGE_OFFER carries
+  `handoff: 1`; a candidate with no root role stages only from such a loser
+  and otherwise refuses not-root as before (`merge-stage-legacy`); the
+  staged PULLUP carries `staged` and `handoff`; a loser refuses a staged
+  pull without `handoff` before any cut, so it never runs one unstaged. The
+  field rides the handoff frames, not CAP_ATTEST, which is per channel while
+  a candidate is usually hops away. It is unsigned like the return route: a
+  hop can strip it (safe: the candidate refuses) or add it to an old
+  loser's offer (the hazard). Binding it to the loser's identity is not done.
+
+Not built, and missing from this list before 0db60c0: 3a's role-less
+PULLUP NACK and its holder-evidence candidate order, and so Part 7's NACK
+probe budget and `degraded: no-holder-found`, which rest on that NACK. 3a's
+born-empty STAGING holds under cutover (fence 852036f, red at birth, now
+passes). Before a relay runs verifyWalk, hintRefresh, replicaInherit,
+successorGate or cutover, its lifecycle allowlist needs the 'verify-walk',
+'hint-refresh', 'replica-inherit', 'degraded', 'successor-current' and
+'merge-stage-legacy' rows.
 
 ## Part 5 — product question for David, answered
 
