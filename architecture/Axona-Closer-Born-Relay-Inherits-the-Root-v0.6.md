@@ -354,12 +354,18 @@ default off:
   b7a2827, Orion's three defects in it.
 - 06a5ed0, Orion's CUT-1 and CUT-2 in the cutover: a transient refusal
   and a winner re-minted mid-round are each offered again.
+- a9ee5d5, the return routes for pub/sub (manager `returnRoute`, domain
+  `RETURN_ROUTE`): a SUB, MERGE_OFFER or PULLUP leaves a breadcrumb keyed by
+  its originator and the node it names, and frames sent back to that node
+  go by the reverse of its hops before the own lookup. A SUB re-sent by an
+  intermediate returns to its subscriber through the re-sender.
 - d105ceb, the first cut of 3e step 6 (`cutover`): an aborted merge round
   is offered again, and an unanswered offer never demotes the loser.
 
-Not built: merge and pull frames on the return route (what the live split
-needs), 3b's role-less winner and its STAGING role, 3c, 3d, 6b, and Part 7's
-capability gate.
+Not built: 3b's role-less winner and its STAGING role, 3c, 3d's attach
+echo on every attach renewal, 6b, and Part 7's capability gate. The return
+routes are proven on a one-way island in the simulator, not yet against a
+merge round crossing one end to end.
 
 ## Part 5 — product question for David, answered
 
