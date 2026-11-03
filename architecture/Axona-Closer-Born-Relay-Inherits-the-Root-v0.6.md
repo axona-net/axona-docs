@@ -480,7 +480,12 @@ is not complete:
   until a second holder is current: a successor of the loser that is not
   the winner and not on the winner's host. Past the round's lease the
   round aborts and the loser keeps the root.
-- 6c: a product choice for David, not decided.
+- 6c: built on David's word (94891d2), option standingLease. A
+  subscription made with { standing: true } declares a 6 h lease on its
+  SUB; the root holds at most 24 h; a leased root is exempt from the
+  empty-role reaper and from Topic Lifetime termination; the lease rides a
+  full REPLICATE and a promoted backup inherits it. The 6 h and 24 h are
+  product parameters. No app declares { standing: true } yet.
 Before a relay runs any of these options, its lifecycle allowlist needs the
 'verify-walk', 'hint-refresh', 'replica-inherit', 'degraded',
 'successor-current', 'merge-stage-legacy', 'empty-root-probe-refunded',
