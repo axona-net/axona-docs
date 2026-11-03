@@ -1,4 +1,4 @@
-# Axona Closer-Born Relay Inherits the Root — design packet v0.2
+# Axona Closer-Born Relay Inherits the Root — design packet v0.3
 
 **Status:** DESIGN, for council review. Nothing built. David's word (direct,
 01:1xZ 2026-11-03): "Analysis seems to be complete. Let's move forward with the
@@ -18,6 +18,13 @@ machine; no node answers not-root to an offer that names it the winner from
 a loser with custody; the R4 serving-capable gate no longer decides where a
 role sits. The reply route of 80fe76eb carries every kind of node, which is
 why it is built first.
+
+**v0.3 (01:4xZ 2026-11-03)** adds Part 6, the vanishing holder, from Vega's
+second reading (council 5e8e1fa5): a holder that cannot promise the pull ack
+holds the root only with a seated successor, and hands off on any shutdown
+signal its platform gives it. Vega's seat approves v0.2 for build on David's
+word. Vega's node id is the upstream a fresh read found for #mesh-health
+after the roll, so a seat holds that root too; the packet applies to it.
 
 ## What question this packet answers
 
@@ -189,6 +196,40 @@ backup." So a seat holds root until a closer node of any kind is born, and
 3b must work across islands every time, in both directions. That is the
 case the packet is written for, and it puts the reply route of 80fe76eb
 first in the build order.
+
+## Part 6 — the vanishing holder
+
+Every node may hold a root (Part 5). A root that is about to vanish, a
+closing chat tab or a seat whose host app quits, cannot keep I3's promise
+that its cache survives until the pull is acknowledged. Vega named three
+paths (5e8e1fa5); this packet takes all three, in this order.
+
+6a. Hand off on the shutdown signal. A seat already does: `stopRelay` awaits
+    `peer.leave()` before `peer.stop()` (Dual-Root packet, Part 2a). The same
+    handoff runs for any ROOT or replica holder that receives a shutdown
+    signal its platform gives it: the seat's stop, a relay's SIGTERM, and in
+    the browser the unload path, which Chrome throttles and freezes (PWA
+    report, 11-02) and which is therefore a best effort, not the guarantee.
+
+6b. Hold the root only with a seated successor. A holder that cannot
+    promise the ack, which today means any node whose process is not a
+    service (a browser tab, a seat without a persistent host), accepts ROOT
+    under 3b only after one replica is seated with the cache pulled; until
+    then it serves as a replica itself and the offer stands open. A holder
+    that can promise the ack accepts at once. This keeps David's rule, every
+    node may hold a root, and adds the one condition under which an
+    ephemeral node holds it: there is somewhere for the history to go.
+
+6c. A lease for standing topics. Jokes healed because an open app's metrics
+    lease kept its empty root alive long enough to be filled; council has no
+    lease. A standing topic may carry a lease that keeps its root alive
+    across the gap between a vanished holder and the next fresh read. This
+    is a product choice with a cost in idle roots, and it is named here for
+    David, not decided.
+
+The fence for 6b: in the simulator, a closer ephemeral node offered the win
+stays a replica until a second node has pulled the cache, then takes the
+root; the loser's cache is released only after that pull's terminal ack.
 
 ## What would make this wrong
 
