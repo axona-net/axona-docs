@@ -399,10 +399,18 @@ default off:
   peer.stop() or leave(), and a verify cleared by either acts on nothing.
   A walk toward a topic id never hop-caches the topic id on any hop that
   runs this kernel.
+- 21ef1ca, 3c under option replicaInherit: the root's backup cohort is the
+  closest of discovery (findKClosest or the neighbour table), the nodes
+  seated on the topic with it, of any kind, and the nodes its last verify
+  visited. A seated node closer than the farthest replica takes the slot
+  though it sits beyond findKClosest's two channel-hops. The displaced
+  replica is pushed to no more and lapses on its standby lease. No wire
+  change: REPLICATE already seats a backup on any node kind, and a backup
+  answers a pull.
 
-Not built: 3c, 6b, and Part 7's capability gate. Before a relay runs
-verifyWalk or hintRefresh, its lifecycle allowlist needs the 'verify-walk'
-and 'hint-refresh' rows.
+Not built: 6b and Part 7's capability gate. Before a relay runs
+verifyWalk, hintRefresh or replicaInherit, its lifecycle allowlist needs
+the 'verify-walk', 'hint-refresh' and 'replica-inherit' rows.
 
 ## Part 5 — product question for David, answered
 
