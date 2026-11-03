@@ -377,9 +377,13 @@ default off:
   re-pins to the node serving it. A pinned renewal with no nonce stays
   silent.
 
+- 64dfc9e, return routes for reads: the node that answers a PULL (a
+  replica's early answer or the terminus) records the way back, and the
+  PULLRESP takes the reverse of the PULL's hops before the own lookup.
+
 Not built: 3c, 3d's network-lookup hint refresh past the claim window, 6b,
-Part 7's capability gate, PULL and PULLRESP on the return route, and a
-verify that walks farther than two channel-hops.
+Part 7's capability gate, and a verify that walks farther than two
+channel-hops.
 
 ## Part 5 — product question for David, answered
 
@@ -475,6 +479,6 @@ So one verify pass names a closer holder only if it sits within the node's
 neighbours' neighbours, counting a bridge as the channel for the peers it
 relays. A closer holder three channel-hops away stays invisible until
 synaptome fill opens a nearer channel, and 3b cannot start without that
-nomination. Fence characterize_findk_chain_reach (e0ec9ab) pins the
+nomination. Fence fence_findk_chain_reach (e0ec9ab) pins the
 behaviour; Orion 06b0739f read the transports. A verify that walks farther
 is a separate change, not built.
