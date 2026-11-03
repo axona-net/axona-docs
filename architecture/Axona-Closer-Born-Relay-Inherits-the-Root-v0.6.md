@@ -408,9 +408,26 @@ default off:
   change: REPLICATE already seats a backup on any node kind, and a backup
   answers a pull.
 
-Not built: 6b and Part 7's capability gate. Before a relay runs
-verifyWalk, hintRefresh or replicaInherit, its lifecycle allowlist needs
-the 'verify-walk', 'hint-refresh' and 'replica-inherit' rows.
+- 322a09e, 6b under option successorGate: a node that declares
+  processKind 'app' and holds a root counts its successors (replicas,
+  standby seats, the loser of a staged handover it won). One is current
+  when its SUB arrived within RENEW_MS, its hw is at or above the root's
+  high-water as of RENEW_MS ago, and its host tag is not the root's own.
+  With none current the root keeps the root, reports `degraded:
+  no-successor`, and re-seats with a full push on entering, then at most
+  one per RENEW_MS. An armed SUB carries `fd { kind, host }`. No ack frame:
+  the SUB's hw is the possession evidence. Embedders that are apps (chat,
+  seats) must declare processKind 'app'; none does yet.
+- 27e6767, Orion's HR-1/2 and RI-1/2: a local hint guess that is the bridge
+  is dropped; the heal SUB after a refresh names the hint; the verify's
+  visited set is ranked before its bound of 16; a bridge (neverRoot) does
+  not consume REPLICATE, and a seated or walked candidate whose push failed
+  is not re-picked for RENEW_MS.
+
+Not built: Part 7's capability gate. Before a relay runs verifyWalk,
+hintRefresh, replicaInherit or successorGate, its lifecycle allowlist needs
+the 'verify-walk', 'hint-refresh', 'replica-inherit', 'degraded' and
+'successor-current' rows.
 
 ## Part 5 — product question for David, answered
 
