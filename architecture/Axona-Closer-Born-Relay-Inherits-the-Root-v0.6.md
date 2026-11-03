@@ -449,11 +449,27 @@ default off:
   and 300 s from the first try bound the probe; then the root reports
   `degraded: no-holder-found` once, cleared when a holder fills it.
 
-Not built: binding `handoff` to the loser's identity. Before a relay runs
-verifyWalk, hintRefresh, replicaInherit, successorGate, holderProbe or
-cutover, its lifecycle allowlist needs the 'verify-walk', 'hint-refresh',
-'replica-inherit', 'degraded', 'successor-current', 'merge-stage-legacy',
-'empty-root-probe-refunded' and 'holder-found' rows.
+- 2e5c24e, binding `handoff` to the loser's identity under option
+  handoffBinding. A cutover loser with a node identity signs domain, corr,
+  topic, loser, winner and its epoch; an armed candidate stages only when
+  the signature verifies and the key hashes into the loser's node id, and
+  otherwise refuses not-root. A hop that adds `handoff` to an old loser's
+  offer no longer makes a candidate stage. Not bound: the staged PULLUP's
+  `staged` and `handoff` in the winner-to-loser direction.
+
+Parts 3 and 7 are built, each behind its own option, default off. Part 6
+is not complete:
+- 6a: not built on this branch. The kernel's handoff on leave exists; no
+  relay SIGTERM or browser unload path was changed to call it.
+- 6b: built as a REPORT, not as the gate its fence describes. An app-held
+  root with no current successor says `degraded: no-successor` and
+  re-seats; it does not stay a replica until a second node has pulled, and
+  it takes the root as soon as its staged round completes.
+- 6c: a product choice for David, not decided.
+Before a relay runs any of these options, its lifecycle allowlist needs the
+'verify-walk', 'hint-refresh', 'replica-inherit', 'degraded',
+'successor-current', 'merge-stage-legacy', 'empty-root-probe-refunded',
+'holder-found' and 'merge-stage-unbound' rows.
 
 ## Part 5 — product question for David, answered
 
