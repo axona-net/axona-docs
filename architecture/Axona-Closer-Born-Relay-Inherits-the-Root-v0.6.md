@@ -474,10 +474,12 @@ is not complete:
   roll, which compiles the wrapper. axona-chat closer-born-6a 0f82943
   (0.104.0) calls leave() on pagehide, best effort: the handoff awaits
   lookups that a closing page may never run.
-- 6b: built as a REPORT, not as the gate its fence describes. An app-held
-  root with no current successor says `degraded: no-successor` and
-  re-seats; it does not stay a replica until a second node has pulled, and
-  it takes the root as soon as its staged round completes.
+- 6b: the report (322a09e) and now the GATE (8f4dc8b). An app-process
+  winner says so on its staged pull (`ephemeral`, `fdHost`); the loser
+  accepts the terminal ack but holds step 5 (demote, release, promotion)
+  until a second holder is current: a successor of the loser that is not
+  the winner and not on the winner's host. Past the round's lease the
+  round aborts and the loser keeps the root.
 - 6c: a product choice for David, not decided.
 Before a relay runs any of these options, its lifecycle allowlist needs the
 'verify-walk', 'hint-refresh', 'replica-inherit', 'degraded',
