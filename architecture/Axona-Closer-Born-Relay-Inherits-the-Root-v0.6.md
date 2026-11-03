@@ -362,10 +362,18 @@ default off:
 - d105ceb, the first cut of 3e step 6 (`cutover`): an aborted merge round
   is offered again, and an unanswered offer never demotes the loser.
 
-Not built: 3b's role-less winner and its STAGING role, 3c, 3d's attach
-echo on every attach renewal, 6b, and Part 7's capability gate. The return
-routes are proven on a one-way island in the simulator, not yet against a
-merge round crossing one end to end.
+- 1016d18, a whole merge round crossing a one-way island end to end in the
+  simulator; 4ad9480, Orion's RR-1..3 in the return routes.
+- 0ff547b and fb383b0, 3b under cutover: a closer node with no root role
+  (or a CHILD or BACKUP) stages, pulls, and takes ROOT only when the loser's
+  merge-bearing SUB completes the round, at one above the larger of its
+  known epoch and the loser's. The loser keeps stamping through a staged
+  round. A staged role takes no PUB or KILL, and a role created only to
+  stage serves no SUB. Orion's 3B-1..4 are in fb383b0.
+- e0ec9ab, a characterization of the verify's reach (below).
+
+Not built: 3c, 3d's attach echo on every attach renewal, 6b, Part 7's
+capability gate, and PULL and PULLRESP on the return route.
 
 ## Part 5 — product question for David, answered
 
@@ -450,3 +458,17 @@ for the same hours, and 16 rows of its journal are read in council
 ea3d8e60. Leg 1 of
 the integration test needs a Windows roll, which is David's hand, and a
 roll is itself the event that produced the split.
+
+The verify sees two channel-hops, no farther. On a standalone peer (every
+seat, browser and relay built on the default adapter) the lookup the root's
+self-verify calls is findKClosest, not the DHT walk. It asks only peers this
+node holds an open channel to, and learns the ids their answers name. None
+of the four production transports (WebRTC, composite, bridge, Node
+WebSocket) opens a channel on send; each refuses an unbound peer at once.
+So one verify pass names a closer holder only if it sits within the node's
+neighbours' neighbours, counting a bridge as the channel for the peers it
+relays. A closer holder three channel-hops away stays invisible until
+synaptome fill opens a nearer channel, and 3b cannot start without that
+nomination. Fence characterize_findk_chain_reach (e0ec9ab) pins the
+behaviour; Orion 06b0739f read the transports. A verify that walks farther
+is a separate change, not built.
