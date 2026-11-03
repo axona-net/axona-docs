@@ -1,6 +1,9 @@
-# Axona Closer-Born Relay Inherits the Root — design packet v0.4
+# Axona Closer-Born Relay Inherits the Root — design packet v0.5
 
-**Status:** DESIGN, for council review. Nothing built. David's word (direct,
+**Status:** DESIGN, for council review, and BUILDING on axona-protocol branch
+`closer-born-root` piece by piece on David's word for each piece (Part 4
+names what is built). Nothing merged, nothing deployed, every flag default
+off. David's word (direct,
 01:1xZ 2026-11-03): "Analysis seems to be complete. Let's move forward with the
 fix. If a relay is born closer, it should inherit the root - or backup if it
 closer than a backup." Every line number below is read from axona-protocol at
@@ -42,6 +45,21 @@ mergeMachine.js and syncEngine.js; the existing merge refuses a role-less
 winner and warns that silence reads as a legacy winner, and 3b is rewritten
 so that retiring not-root cannot turn a lost reply into an authority
 transfer.
+
+**v0.5 (03:1xZ 2026-11-03)** folds in Orion's review of v0.4 and the reply
+route (council 34db5e6d). C2 calls the return route a hint, not an
+authenticated path: a route_msg hop is unsigned and can forge both path and
+originator, so no authority rests on the route (Part 2). A newly minted root
+epoch is one above the larger of the loser's epoch and every epoch the
+minting node already knows for the topic, its own ended generations
+included (3b, 3e step 5). Bridges and saturated nodes stay exempt from the
+root and from 3b's acceptance, and the verify skips the bridge (3b). A
+born-empty role filled by a subscriber's SUB stays STAGING (3a). A renewal
+carrying attach is answered with the attach echo whether or not the sender
+says it is pinned, because an unpinned SUB with a warm hint reads exactly
+like a pinned one (3d). Part 6b's failure-domain fields are named as open
+wire work in Part 7. Orion's three return-route defects are fixed on the
+branch (b7a2827).
 
 ## What question this packet answers
 
@@ -126,9 +144,11 @@ nodes on T's lookup path as observed by the holder; closeness is computed
 over that set only, never assumed global. (C2) Stable reachability: the
 request and its reply each have a route, in the direction they travel, for
 the length of one handoff; a one-way route helps only when the request
-travels that way AND an authenticated, bounded return path exists for the
-reply, which is the reverse of the request's own hops (80fe76eb), bounded
-by a TTL and refused when expired. (C3) No concurrent second handoff for T
+travels that way AND a return path exists for the reply: the reverse of
+the request's own hops (80fe76eb), loop-free, bounded by a TTL and by hop
+count, refused when expired. It is a HINT. A hop on it is unsigned and can
+forge the path and the originator alike; authority and history rest on
+signed envelopes, corr and peer identity, never on the route. (C3) No concurrent second handoff for T
 at either node. While any condition fails the holder stays authoritative,
 the candidate stays a stager, and the role row reports `handoff: pending`
 or `degraded: <reason>`.
@@ -157,6 +177,14 @@ answer returns over the route the PULLUP arrived on, with the own lookup as
 the fallback, so an island that can be reached in one direction is answered
 in the other (the 80fe76eb mechanism, built once, used here).
 
+A born-empty role that receives a SUB whose high-water is above its own
+does not pull from that subscriber into a serving ROOT, which is what the
+legacy fallback's demote-and-SUB did to slot 19 at 01:38Z. It enters
+STAGING and treats the subscriber and that subscriber's upstream as the
+first holders to ask. A staged role created only for that purpose is
+discarded when its pull times out; the incumbent's candidate gate clears
+without tombstoning the stager, so the next verify offers again.
+
 ### 3b. The holder hands off to a closer node
 
 Today `_verifyRoots` (rootElection.js:380-394) nominates any strictly closer
@@ -171,12 +199,21 @@ acceptance arrives, and a refusal deletes any beacon for that node. The
 verify consults the tombstone set and does not re-nominate a tombstoned
 node inside its window. A node of any kind that receives a MERGE_OFFER
 naming it the winner, for a topic it holds no role in, from a loser with
-custody, ACCEPTS: it creates the root role at the loser's epoch plus one and
-runs the existing merge pull. The not-root refusal is retired for an offer
+custody, ACCEPTS: it enters STAGING under 3e and, on the terminal ack,
+takes the root at one above the larger of the loser's epoch and its own
+known epoch for the topic, which already folds its role, beacons,
+tombstones and the generations it ended (`_knownEpoch`, rootElection.js).
+A bare loser-plus-one can mint at or below a generation this node ended
+earlier. The not-root refusal is retired for an offer
 that names a winner; it stays only for a malformed or stale offer. The R4
 serving-capable gate (transport/web/index.js, AxonaPeer.js, AxonaManager.js
 per ae6d73d2) stops deciding role placement: a node below the graduation
-floor still routes and still takes a role when it is the closest. The offer
+floor still routes and still takes a role when it is the closest. Two
+exemptions stay, because neither is about serving capacity. A bridge never
+holds a root or a backup (`_neverRoot`, AxonaManager.js); `_verifyRoots`
+does not skip the bridge today though `_bestKnownClosest` does, and it will.
+A saturated node refuses through `admitPushedRole` as now. Either refusal
+deletes any beacon naming the refuser. The offer
 travels the verify walk's route, own lookup as fallback.
 
 ### 3c. Replicas inherit the same way
@@ -198,9 +235,12 @@ lost its pin never receives the attach echo that would re-pin it; and
 local closest is null or self, so a child with a closer local neighbour never
 learns of a new root.
 
-Change: a renewal from a subscriber with no pin, or whose pin names a node
-that has handed off, is answered with an attach-echoing DELIVER even when
-there is no history to send. A node unattached past the claim window
+Change: a renewal that carries `attach` is answered with an attach-echoing
+DELIVER even when there is no history to send. The receiver cannot tell an
+unpinned sender from a pinned one: an unpinned SUB with a warm hint sends
+`via` naming that hint (AxonaManager.js `_sendSubscribe`), which is what a
+pinned SUB sends. The cost is one small DELIVER per direct child per
+renewal period. A node unattached past the claim window
 refreshes its hint through the network lookup. A root that completed a
 handoff tells its subscribers the winner's id on their next renewal.
 
@@ -227,7 +267,9 @@ OFFERED, DRAINING, RELEASED.
    R pulls again (step 3).
 5. On a valid terminal ack H enters DRAINING: it redirects new publications
    to R with R's id, tells subscribers on their next renewal, and only then
-   demotes to a replica of R; R enters ROOT at epochH plus one.
+   demotes to a replica of R; R enters ROOT at one above the larger of
+   epochH and R's own known epoch for T (3b). H seats its replicas at once
+   rather than on the next refresh tick.
 6. Timeouts never transfer authority. A pull that times out leaves R in
    STAGING or discards the staged role; H stays ROOT. A lost or late ACK is
    retried with the same corr; H never demotes on silence. The legacy
@@ -286,6 +328,22 @@ must end at the probe's own budget (Part 7). A fence asserts no message
 is lost or duplicated relative to HW and that exactly one node stamps
 publications at every instant.
 
+Built on `closer-born-root` (kernel 4.129.0), each on David's word, each
+default off:
+
+- 9ee9391 and 852036f, the two red fences: a partial pull never serves, and
+  a subscriber's fill is not authority. 852036f's first scene was wrong and
+  is corrected in d105ceb; a third root cut from the winner both ways is
+  condition C2 failing, recorded in the fence and not asserted.
+- f8489bc, the reply route for mesh:signal (`SIGNAL_RETURN_ROUTE`), and
+  b7a2827, Orion's three defects in it.
+- d105ceb, the first cut of 3e step 6 (`cutover`): an aborted merge round
+  is offered again, and an unanswered offer never demotes the loser.
+
+Not built: merge and pull frames on the return route (what the live split
+needs), 3b's role-less winner and its STAGING role, 3c, 3d, 6b, and Part 7's
+capability gate.
+
 ## Part 5 — product question for David, answered
 
 Asked in v0.1: should a council seat be serving-capable for standing topics
@@ -338,9 +396,13 @@ This packet changes the wire. Named so that leg 1 can run with old seats.
 
 - New frames or fields: OFFER gains `hw` and a `stage` disposition; a
   PULLUP NACK `no-role` (a new disposition on the existing REPLAYACK);
-  ACK gains `hwCovered`; the return route is a `path` field on PULLUP and
-  OFFER, reversed for the reply (the R3 path field already on route_msg
-  carries it; no new frame).
+  ACK gains `hwCovered`; the return route rides route_msg as built for
+  mesh:signal: the request's R3 `path` (a signal frame keeps 16 ids, other
+  frames PATH_MEMORY) is reversed at the terminal into `rpath` on the reply.
+  No new frame.
+- 6b's failure domain is not on the wire today. A capability field naming
+  a service process and a host hash is needed before 6b can count a
+  successor on a distinct host; until it exists 6b cannot be built.
 - Versioning: each new field is ignored by an old node by construction
   (unknown fields are dropped). A node advertises `handoff:1` in its
   capability attest; a holder runs 3e only toward a candidate that
@@ -360,6 +422,7 @@ the packet then rests entirely on the 80fe76eb reply route, which is not
 built. The replica count and the renewal period are named by the kernel and
 not quoted here; a fence that assumes a number must read it from source. The
 159 loop is read from one journal; a second root on 143 ran the same code
-for the same hours and its journal has not been read row by row. Leg 1 of
+for the same hours, and 16 rows of its journal are read in council
+ea3d8e60. Leg 1 of
 the integration test needs a Windows roll, which is David's hand, and a
 roll is itself the event that produced the split.
