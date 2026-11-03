@@ -1,4 +1,4 @@
-# Axona Closer-Born Relay Inherits the Root — design packet v0.5
+# Axona Closer-Born Relay Inherits the Root — design packet v0.6
 
 **Status:** DESIGN, for council review, and BUILDING on axona-protocol branch
 `closer-born-root` piece by piece on David's word for each piece (Part 4
@@ -60,6 +60,17 @@ says it is pinned, because an unpinned SUB with a warm hint reads exactly
 like a pinned one (3d). Part 6b's failure-domain fields are named as open
 wire work in Part 7. Orion's three return-route defects are fixed on the
 branch (b7a2827).
+
+**v0.6 (04:0xZ 2026-11-03)** takes two refinements from Orion's reading of
+the 03:47Z state (council c0a842d2). A fresh reader bonded to 898ee95b13,
+Orion's own fresh seat: closer than every holder, a CHILD of Aster's root
+with all 90 bodies, after losing the epoch comparison to Aster. The reader
+pinned it and received nothing, so the SUB crossed and the replay did not.
+The replay and the attach echo a SUB earns therefore return by the SUB's
+route, like REPLAYUP (3a), and every frame that may carry a return route
+keeps 16 path ids (Part 7). 3b now matches 3e step 2: a closer node
+offered the win with no role OR a non-root role enters STAGING. Orion's
+CUT-1 and CUT-2 are fixed on the branch (06a5ed0).
 
 ## What question this packet answers
 
@@ -175,7 +186,11 @@ of holding: the upstream named by the SUB that birthed the root, then the
 lookup path's nodes closer than self, then direct neighbours. The REPLAYUP
 answer returns over the route the PULLUP arrived on, with the own lookup as
 the fallback, so an island that can be reached in one direction is answered
-in the other (the 80fe76eb mechanism, built once, used here).
+in the other (the 80fe76eb mechanism, built once, used here). The same
+holds for a SUB: its replay DELIVER, and the attach echo of 3d, go back by
+the SUB's route with the own lookup as fallback. On 2026-11-03 03:47Z a
+fresh reader's SUB reached a holder of all 90 council bodies and the
+reader received none.
 
 A born-empty role that receives a SUB whose high-water is above its own
 does not pull from that subscriber into a serving ROOT, which is what the
@@ -198,8 +213,8 @@ Change, in four parts. The beacon is written only when the nominee's
 acceptance arrives, and a refusal deletes any beacon for that node. The
 verify consults the tombstone set and does not re-nominate a tombstoned
 node inside its window. A node of any kind that receives a MERGE_OFFER
-naming it the winner, for a topic it holds no role in, from a loser with
-custody, ACCEPTS: it enters STAGING under 3e and, on the terminal ack,
+naming it the winner, for a topic it holds no role in or only a non-root
+role (a CHILD or a BACKUP), from a loser with custody, ACCEPTS: it enters STAGING under 3e and, on the terminal ack,
 takes the root at one above the larger of the loser's epoch and its own
 known epoch for the topic, which already folds its role, beacons,
 tombstones and the generations it ended (`_knownEpoch`, rootElection.js).
@@ -337,6 +352,8 @@ default off:
   condition C2 failing, recorded in the fence and not asserted.
 - f8489bc, the reply route for mesh:signal (`SIGNAL_RETURN_ROUTE`), and
   b7a2827, Orion's three defects in it.
+- 06a5ed0, Orion's CUT-1 and CUT-2 in the cutover: a transient refusal
+  and a winner re-minted mid-round are each offered again.
 - d105ceb, the first cut of 3e step 6 (`cutover`): an aborted merge round
   is offered again, and an unanswered offer never demotes the loser.
 
@@ -399,7 +416,8 @@ This packet changes the wire. Named so that leg 1 can run with old seats.
   ACK gains `hwCovered`; the return route rides route_msg as built for
   mesh:signal: the request's R3 `path` (a signal frame keeps 16 ids, other
   frames PATH_MEMORY) is reversed at the terminal into `rpath` on the reply.
-  No new frame.
+  No new frame. Every frame that may carry a return route (mesh:signal,
+  MERGE_OFFER, PULLUP, SUB) keeps 16 path ids; others keep PATH_MEMORY.
 - 6b's failure domain is not on the wire today. A capability field naming
   a service process and a host hash is needed before 6b can count a
   successor on a distinct host; until it exists 6b cannot be built.
