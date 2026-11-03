@@ -371,9 +371,15 @@ default off:
   round. A staged role takes no PUB or KILL, and a role created only to
   stage serves no SUB. Orion's 3B-1..4 are in fb383b0.
 - e0ec9ab, a characterization of the verify's reach (below).
+- 946bb47, 3d under option attachEcho: an unpinned subscriber marks its SUB
+  unpinned, and a renewal carrying an attach nonce or that mark is always
+  answered with a DELIVER, empty when there is no history, so the subscriber
+  re-pins to the node serving it. A pinned renewal with no nonce stays
+  silent.
 
-Not built: 3c, 3d's attach echo on every attach renewal, 6b, Part 7's
-capability gate, and PULL and PULLRESP on the return route.
+Not built: 3c, 3d's network-lookup hint refresh past the claim window, 6b,
+Part 7's capability gate, PULL and PULLRESP on the return route, and a
+verify that walks farther than two channel-hops.
 
 ## Part 5 — product question for David, answered
 
