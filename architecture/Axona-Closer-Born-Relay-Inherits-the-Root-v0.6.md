@@ -471,9 +471,13 @@ is not complete:
   closer-born-6a 525bfa1 (relay 0.193.0) makes the wrapper write
   RELAY_STOP_FILE and wait up to 30 s (4 s at system shutdown) for the relay
   to leave before it terminates the job; it takes effect at the next Windows
-  roll, which compiles the wrapper. axona-chat closer-born-6a 0f82943
-  (0.104.0) calls leave() on pagehide, best effort: the handoff awaits
-  lookups that a closing page may never run.
+  roll, which compiles the wrapper; 30c0271 adds Orion's CB6A-WIN-1/2. The
+  same branch at 0578e32 (relay 0.194.0) vendors kernel 4.129.0 from
+  closer-born-root 7dcef5f, so a relay built from it can run every option
+  here; the hosts' pull branches stay on 0.192.0. axona-chat closer-born-6a
+  0f82943 (0.104.0) calls leave() on pagehide, best effort: the handoff
+  awaits lookups that a closing page may never run. 31cb85a closes
+  Orion's CB6A-CHAT-2: the watchdog is disarmed before leave().
 - 6b: the report (322a09e) and now the GATE (8f4dc8b). An app-process
   winner says so on its staged pull (`ephemeral`, `fdHost`); the loser
   accepts the terminal ack but holds step 5 (demote, release, promotion)
@@ -485,11 +489,14 @@ is not complete:
   SUB; the root holds at most 24 h; a leased root is exempt from the
   empty-role reaper and from Topic Lifetime termination; the lease rides a
   full REPLICATE and a promoted backup inherits it. The 6 h and 24 h are
-  product parameters. No app declares { standing: true } yet.
-Before a relay runs any of these options, its lifecycle allowlist needs the
-'verify-walk', 'hint-refresh', 'replica-inherit', 'degraded',
-'successor-current', 'merge-stage-legacy', 'empty-root-probe-refunded',
-'holder-found' and 'merge-stage-unbound' rows.
+  product parameters. No app declares { standing: true } yet. 7dcef5f
+  closes Orion's 6C-1/2/3: peer.sub carries { standing: true } to the
+  wire, the 24 h idle reaper reads the lease, and an uncompleted SUB does
+  not lease a stager. 42ec031 closes 6BG-3.
+A relay needs no log allowlist rows for these options. Its LIFECYCLE list
+gates only debug events. Every event this branch adds logs at info or warn
+and prints as pubsub:<name> (council 719a7a3b, confirmed by Orion
+e935dd48). A relay needs the kernel instead: relay 0.194.0 above.
 
 ## Part 5 — product question for David, answered
 
