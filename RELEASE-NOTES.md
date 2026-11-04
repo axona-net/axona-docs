@@ -7,6 +7,30 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## kernel 4.128.0 → 4.129.0, relay 0.194.0, bridge 2.177.0 — a node born closer inherits the root, every mechanism OFF (2026-11-04)
+
+**Merged and promoted 2026-11-04 on David's word ("Merge the three closer-born branches. Release throughout the mesh."). Tag v4.129.0 at 129c483; relay 0.194.0 at 7ffb563, vendored tree equal to the tag; bridge 2.177.0 at 9c4a6f2; dht-sim 0.145.0 at c3c5ce4. Every closer-born option ships OFF. Arming is a separate word, per option and per host.**
+
+Where it runs, read back 19:48–20:11Z: testnet bridges B1 and B2, production east and west, each `/healthz` 2.177.0 with kernel 4.129.0; relays 48 of 48 (Air 6, M1 8, Linux 5, four droplets 9, Windows 20 with its controller transcript ending `RESULT=OK`); axona-chat 0.104.0 (serving `index-DFa86FLu.js`), axona-share 0.62.0, axona-portal 0.39.0. `ops/release.sh check 4.129.0` read COMPLETE at 20:05Z. MCP seats take the kernel at their owners' next reload. The deploy commands were typed into David's terminal on his word; this seat's classifier refuses the fleet tool from its own shell.
+
+What happens to a topic's root when a node is born closer to its address than the node that holds it? Before 4.129.0 the newcomer could claim the root empty, and two roots could serve one topic. 4.129.0 carries the mechanisms of "Closer-Born Relay Inherits the Root" v0.6 (axona-docs 3320126), each behind its own option, each with its fence:
+
+- `CUTOVER`: an aborted merge round is retried; silence never demotes the holder. A closer node with no root role stages, pulls the history, and takes the root only on a handoff. The Part 7 gate stages only toward a loser that runs the staged handover.
+- `RETURN_ROUTE`: a SUB, MERGE_OFFER, PULLUP or PULL leaves a breadcrumb, and its reply returns over the same hops. `SIGNAL_RETURN_ROUTE` does the same for a WebRTC answer. This is the remedy for the one-way island of 2026-11-02, where offers crossed and answers did not.
+- `ATTACH_ECHO`, `HINT_REFRESH`: a subscriber that has lost its root hears an echo that pins it, or asks the network for the root after the claim window.
+- `VERIFY_WALK`: the root's self-verify also walks the DHT hop by hop, past the two channel-hops `findKClosest` reaches.
+- `REPLICA_INHERIT`: the backup cohort is drawn from discovery, the topic's seated nodes and the last verify walk, closest first.
+- `SUCCESSOR_GATE`: an app-held root reports `no-successor` while no replica is current, and re-seats. Under `CUTOVER`, an ephemeral winner takes the root only once a second holder is current.
+- `HOLDER_PROBE`: role-less nodes NACK, and the probe asks holders first under a frame and time budget.
+- `HANDOFF_BINDING`: a candidate stages only on a handoff the loser signed with the key its node id hashes.
+- `STANDING_LEASE`: a standing topic's root survives the gap between a vanished holder and the next fresh read. `peer.sub(…, { standing })` carries the lease, and the 24 h idle reaper reads it.
+
+Fences, in the kernel's `npm test`: 326 of 328 in the full run, with the two failures passing alone (log in `ops/evidence/suite-4129-release-326of328.log`). The 6c findings fence is 7 of 7, with six mutants red. Orion reviewed every step on council; the findings and closures are named in the commit subjects.
+
+What the roll showed: a topic whose root and backups were all relays empties when they restart. `axona:bridge-directory` held 49 messages via a Windows relay at 10:05Z, read 0 right after the roll, and 1 at 20:11Z. It refills on the bridges' hourly beat. This is the behaviour the unarmed kernel has. `STANDING_LEASE` and `REPLICA_INHERIT` are the options aimed at it.
+
+What this does not establish: that any mechanism heals a split in production, because none is armed; that return routes cross the island in the field, which so far has been shown in the sim fence (1016d18) and not on hosts. What would make the claim wrong: a node on 4.129.0 whose behaviour differs from 4.128.0 with every option unset. The fences run each path off as well as on.
+
 ## kernel 4.127.0 → 4.128.0 and bridge 2.175.0 → 2.176.0 — the introduction carries a sample of the graduated, and a graduation gate (2026-11-02)
 
 **Built 2026-11-02 on David's word ("Proceed with Q1-Q4" on "The introduction represents the mesh, not the socket" v0.1, c7b0230). Promoted the same day on his word ("promote p1", 19:55Z): tag v4.128.0 at 9e66eb5 (3f4b063 plus a regenerated E2 coverage artifact, source identical); bridge 2.176.0 at 942ac12 (6033aa3 plus the kernel pin, source identical); relay 0.192.0 at c67cd4f, vendored tree identical to the tag. Both flags ship OFF on every bridge; arming either is a separate word.**
