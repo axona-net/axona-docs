@@ -7,6 +7,24 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## kernel 4.129.0 → 4.129.1, relay 0.195.0, bridge 2.178.0 — a write recovery flight ends (2026-11-04)
+
+**Built on David's word ("go ahead with 4.129.1") and released on his word ("release 4.129.1"). Tag v4.129.1 at c33b12b; relay 0.195.0 at c67e469, vendored tree equal to the tag; bridge 2.178.0 at c14bbfe; dht-sim 0.146.0 at 4c1bd4f; axona-chat 0.105.0, axona-share 0.63.0, axona-portal 0.40.0. Orion approved 16e06db (council 646119bc). Default on: bug fixes, no option. The closer-born arming is unchanged.**
+
+Where it runs, read back 23:10–23:45Z: testnet bridges B1 and B2, production east and west, each `/healthz` 2.178.0 with kernel 4.129.1; axona.chat serving `index-CX_ZSZAL.js`, axona-share serving five `?v=4.129.1` and `APP_VERSION` 0.63.0. The relays are NOT rolled: David held them ("hold the rolls, ship the apps") while two topics show two principals after the closer-born arming (council f3bc02d3). All 48 relays run 4.129.0, armed; axona-linux reads 4 of 5 after its slot 5 stalled 30 s and was killed at 22:59:18Z.
+
+What happens to a write no root will ingest? In 4.129.0 it never stopped moving. A PUB older than MAX_PUBLISH_SKEW_MS is dropped `drop-stale` at every root, which sends no ack, so every flight is evicted and the write promoted to the next candidate. One tombstone per topic let the second eviction re-admit the first root, and the write ping-ponged between two neighbours. Seen live on axona-win svc-15 from 20:40Z: one undeliverable every 8 to 10 s, 250 by 21:16Z. New writes landed throughout. It continues on the relays until they roll.
+
+Three changes in `src/pubsub/writeFlight.js`:
+
+- A chain of promotions stops at FLIGHT_MAX_PROMOTIONS = 4, and a PUB whose envelope ts is outside the skew ends at its first eviction. A missing ts is left to the root's own check.
+- A promotion skips every root the chain was evicted from, not only the one just convicted.
+- A per-node chain ledger, keyed by topic|msgId|op, carries the chain into any later flight for the same write, whichever path re-forwards it (Orion WF-1: a held node's promotion to SELF re-forwarded through its hold and restarted the count). The ledger holds 1024 entries and expires after ROOT_TOMBSTONE_TTL_MS. A held node's hop-local `holdFwd` is no longer stored with the write.
+
+Fence `test/fence_write_flight_bound.mjs`, 23 checks. The 4.129.0 file fails 11 of the first 15; its promotion targets read 1002,1001,1002,1001, the svc-15 pattern. Nine mutants, one per mechanism, each fail it. Full suite 328 of 329; the failure, `smoke_turn_cred_refresh`, fails on 4.129.0 too and opens no write flight.
+
+What this does not establish: that no other path re-forwards a write past the ledger, which the fence covers for the hold, a reroute and a live closer root and no further. What would make the claim wrong: a write whose correlation key changes between hops, which would start a fresh chain.
+
 ## kernel 4.128.0 → 4.129.0, relay 0.194.0, bridge 2.177.0 — a node born closer inherits the root, every mechanism OFF (2026-11-04)
 
 **Merged and promoted 2026-11-04 on David's word ("Merge the three closer-born branches. Release throughout the mesh."). Tag v4.129.0 at 129c483; relay 0.194.0 at 7ffb563, vendored tree equal to the tag; bridge 2.177.0 at 9c4a6f2; dht-sim 0.145.0 at c3c5ce4. Every closer-born option ships OFF. Arming is a separate word, per option and per host.**
