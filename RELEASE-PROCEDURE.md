@@ -456,6 +456,18 @@ is not "done", and "the tool said ✓" is not "verified".
   Windows transcript by a second connection, since his terminal is not readable from
   the seat. `add` pulls the host first, so its `KERNEL=` must name the kernel the pull
   leaves in the checkout, not the one the running relays print.
+- A KERNEL option armed by env (the Closer-Born eleven, `CUTOVER` … `STANDING_LEASE`,
+  2026-11-04) never appears in the relay's `armed-modules` or `armed-ledger` lines: those
+  list only the relay's own `RELAY_*` fill flags. So §6a's "every `svc-NN.log` prints
+  `arm … <VAR>`" cannot hold for them. The proof is the process environment: `ps -wwE`
+  on each `node src/index.js` (Mac), `/proc/<MainPID>/environ` (Linux, droplets), and
+  on axona-win each service's `Environment` registry value read beside its wrapper's
+  start time, which must fall after the roll that re-defined it.
+- The terminal tab now carries David's commands under his word (2026-11-04). A script
+  sent to a host by `ssh -n … bash -s <<EOF` runs NOTHING: `-n` replaces the heredoc
+  with /dev/null and the remote bash exits 0. A verify loop over an empty unit list
+  also exits 0. Both happened on the first droplet arming pass; read the per-unit lines,
+  never the closing OK.
 
 ## What this procedure does not cover
 
