@@ -7,6 +7,26 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## kernel 4.129.1 → 4.130.0, relay 0.196.0, bridge 2.179.0 — a backup keeps its principal; an aborted merge is offered again (2026-11-05)
+
+**Built on David's word ("go ahead and build the kernel fix") and released on his word ("release 4.130.0"). Tag v4.130.0 at d8ccde5; relay 0.196.0 at 3ef6bd6, vendored tree equal to the tag; bridge 2.179.0 at db70d3e; dht-sim 0.147.0 at 606f5e5; axona-portal 0.41.0 at 485f346. Review closed 3 of 3 on 7b2c8d5: Orion APPROVE (council fbdcbdb1), Vega CONCUR (85b7a639), Aster CLEAR (bbcd0a08). Default on: bug fixes, no option.**
+
+Where it runs: the origin side above, read back 20:02–20:06Z. The bridge deploys, the apps and the relay rolls are by David's hand; this entry is amended when each is read back.
+
+What does a backup do when two live roots both claim it? Through 4.129.1 it followed whichever REPLICATE arrived last. On 2026-11-04 Orion's seat and armed axona-win svc-04 both rooted two topics, and one relay re-principaled 7,356 times, strictly alternating (Orion 1f81ed10). The grant rule's only cross-root guard was the issue-stamp skew, and two live roots pass it on every tick. And the loser never offered the merge again: with cutover off, an aborted round kept `role.merge.candidate`, and `_mergeCandidate` refuses the same winner twice.
+
+Five changes, in `src/pubsub/syncEngine.js` and `src/pubsub/mergeMachine.js`:
+
+- Inside a live `STANDBY_LEASE_MS`, a grant from a different root is refused (`grant-refused why:outranked`) unless `RootClaim.claimWins` ranks it above the current principal: a higher epoch, or a closer root at the same epoch. Once the lease lapses, any surviving root may appoint.
+- A grant naming epoch 0, or no epoch, is refused (`invalid-epoch`). Every root incarnation mints epoch 1 or higher, and `claimWins` compares epochs only when both sides are above 0, so an epoch-0 grant could usurp a higher-epoch principal and three roots could cycle (Orion SCW-1).
+- `_mergeAbort` clears the candidate on every abort, not only under cutover.
+- With cutover off, an offer whose route failed, is still unresolved at `MERGE_OFFER_TIMEOUT_MS`, or returned a `violation` verdict is NOT a reach. The loser keeps its root and the next trigger offers again. Only a confirmed reach takes the legacy fallback (Orion SCW-2, Aster 80e77561, Orion d9c11a54). The unresolved case is reachable in production: the offer times out at 10 s, and a first-hop channel open can wait 15 s.
+- `refused-export-bound` frees the candidate (Orion SCW-3).
+
+Fence `test/fence_standby_claimwins.mjs`, 30 checks. The 4.129.1 files fail 5 of the first 13, with 20 flips and one offer. Each mechanism has a mutant that fails it. Three existing fences now expect the new behaviour: `fence_standby_lease` B10, `fence_cbr_cutover_retries` C4 and `fence_cbr_sub_fill_is_not_authority` F2, where a cutover-off scene that stopped at merge-abort with two roots now ends with one. Full suite 329 of 330 on the released head; the failure, `fence_cbr_verify_walk` V3, also fails 1 in 8 runs alone on the previous commit and runs with cutover on, where the changed field is only logged.
+
+What this does not establish: that the transient-refusal path (CUT-2) retries without cutover; it still does not. What would make the claim wrong: a legitimate root that sends a grant carrying a generation without an epoch, which this release now refuses. A grant from a kernel before Topic Lifetime carries no generation at all and still goes through the legacy rule.
+
 ## kernel 4.129.0 → 4.129.1, relay 0.195.0, bridge 2.178.0 — a write recovery flight ends (2026-11-04)
 
 **Built on David's word ("go ahead with 4.129.1") and released on his word ("release 4.129.1"). Tag v4.129.1 at c33b12b; relay 0.195.0 at c67e469, vendored tree equal to the tag; bridge 2.178.0 at c14bbfe; dht-sim 0.146.0 at 4c1bd4f; axona-chat 0.105.0, axona-share 0.63.0, axona-portal 0.40.0. Orion approved 16e06db (council 646119bc). Default on: bug fixes, no option. The closer-born arming is unchanged.**
