@@ -469,6 +469,18 @@ is not "done", and "the tool said ✓" is not "verified".
   also exits 0. Both happened on the first droplet arming pass; read the per-unit lines,
   never the closing OK.
 
+- A push BY SHA does not move the checkout's tracking ref. `git push origin <sha>:refs/heads/main`
+  updates origin, but `refs/remotes/origin/main` in the checkout stays where the last fetch
+  left it. `release.sh bridges` compares HEAD with that local ref, so on 2026-11-08 it refused
+  4.131.0 with "1 commit(s) not on origin/main" while `ls-remote` showed origin already at the
+  commit. The refusal was right about what it could see. After any push by SHA, run
+  `git -C <repo> fetch origin main testnet` before the next tool reads the checkout.
+- The workspace sits under `~/Documents`, which macOS may sync and evict. On 2026-11-08 one
+  bridge file took 11.6 s to open (the bridge smoke failed "did not start in time" until it had
+  been read once), a git auto-maintenance run hung 13 minutes after a commit, and a stray
+  `refs/heads/main 2` appeared in the kernel checkout. Commit with
+  `git -c maintenance.auto=false`, and put a perl alarm on any git network call.
+
 ## What this procedure does not cover
 
 Growing or shrinking a fleet. Anything that changes a bridge's region, a DNS record or a
