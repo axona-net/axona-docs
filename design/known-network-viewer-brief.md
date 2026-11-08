@@ -84,4 +84,4 @@ The collector is read-only on the fleet. It restarts nothing and changes no conf
 
 ## Who
 
-Recommended: Vega designs and builds the viewer, and Orion reviews. Aster leads axona 5 and is not taken off it. axona.bot builds the collector and provides the fleet observations. David can reassign any of this.
+David, 2026-11-07: Orion designs and builds the viewer. Vega reviews. Aster leads axona 5 and is not taken off it. axona.bot builds the collector and provides the fleet observations.
