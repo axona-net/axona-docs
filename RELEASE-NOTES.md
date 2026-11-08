@@ -7,6 +7,26 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## kernel 4.130.0 → 4.131.0, relay 0.197.0, bridge 2.182.0 — an author can publish again what it killed (2026-11-08)
+
+**Built on David's word ("Fix the bug. Try again.") and released on his word (council 5a9884ac, confirmed in chat: "release 4.131.0 without their feedback"). Tag v4.131.0 at eecad10; relay 0.197.0 at 4c8e735, vendored tree equal to the tag; bridge 2.182.0 at b90068e; dht-sim 0.148.0 at 3b9b248; axona-portal 0.42.0 at 2d9f048. Review: Orion CONCUR on eecad109 (council 87f3a3da), Vega CONCUR AS SCOPED on the same commit (bc3625bb). Aster's last read, claims against the S2 design, was still open when David released without it. Proof carriage is ON by default (`KILL_PROOFS=1`); no other option.**
+
+Where it runs: the origin side above. Testnet bridges B1 and B2 on 2.182.0 / 4.131.0 at 20:05–20:06Z, and both production bridges at 20:11Z, by David's hand. The apps and the relay rolls follow; this entry is amended when each is read back.
+
+Can an author publish the same text twice if it killed the first copy? Through 4.130.0 it could not. A msgId is `sha256(publisher, message)` and carries no time, so the republication has the killed message's id, and the tombstone dropped it at every hop. Howard's alert-bot suite does exactly this: run 2 kills run 1's 2,999 messages, then republishes identical alerts, and 438 to 618 topics received nothing.
+
+What changed, in `src/pubsub/wireHandlers.js`, `topicStore.js`, `durability.js` and `mergeMachine.js`:
+
+- A same-author copy stamped after the kill is a new message. Each comparison uses two stamps from one clock: the root's stamp against the root's kill stamp, or the envelope against the author's own signed kill time. A copy from before the kill stays dead, whatever its envelope says.
+- A tombstone carries the signed kill. Every node that holds one can check it, so a backup, a handoff heir or a merge winner decides the same way the root did. A node with no proof never lifts a kill on a stamp it cannot vouch for.
+- A tombstone keeps its signer. Verified kills from other signers ride along as claims, and the held body's author decides.
+- A kill older than the held body is refused everywhere, and a subscriber's app drops its kill record when the republication passes.
+- The bridge hello builds its acknowledgement before the late-hello check, with no await between the check and the socket opening.
+
+Evidence, with its conditions: full suite 334 of 335 on the released commit. The failure, `fence_cbr_verify_walk` V3, failed 3 of 20 runs on this commit and 3 of 20 on its parent, alternating between the two trees. Alert-bot localhost twoshot: 0 publications and 0 kills mismatched on both runs, 2,319 publications and 2,277 previous kills. Orion's hostile probes against two earlier heads and this one reproduce no defect.
+
+What this does not establish: behaviour on a mesh where some nodes run 4.130.0 and drop a republication their 4.131.0 neighbours accept. That window lasts until the relay rolls finish. What would make the claim wrong: a republication lost on a fully 4.131.0 path, or a killed body served again after its kill.
+
 ## kernel 4.129.1 → 4.130.0, relay 0.196.0, bridge 2.179.0 — a backup keeps its principal; an aborted merge is offered again (2026-11-05)
 
 **Built on David's word ("go ahead and build the kernel fix") and released on his word ("release 4.130.0"). Tag v4.130.0 at d8ccde5; relay 0.196.0 at 3ef6bd6, vendored tree equal to the tag; bridge 2.179.0 at db70d3e; dht-sim 0.147.0 at 606f5e5; axona-portal 0.41.0 at 485f346. Review closed 3 of 3 on 7b2c8d5: Orion APPROVE (council fbdcbdb1), Vega CONCUR (85b7a639), Aster CLEAR (bbcd0a08). Default on: bug fixes, no option.**
