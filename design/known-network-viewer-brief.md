@@ -14,7 +14,7 @@ A browser tab knows its own peers and the topic roles it holds. That is a small 
 - It publishes NOTHING to the mesh. A view of the network is never posted to a topic.
 - It does NOT persist node IDs. A node ID is a transport correlator, and a correlator leads to an IP. The viewer holds IDs in memory for the life of the display and writes none to disk (see memory rule "never persist a transport/node ID").
 - It shows NO IP addresses and NO locations. The envelope discloses who, never where, and the viewer keeps that.
-- It is NOT a new query surface on relays. Relays have no network query endpoint by design. Fleet data reaches the viewer through files that the operator's machine collects.
+- It is NOT a new query surface on relays. Relays have no network query endpoint by design, and the viewer adds none. What it may do is run a node of its own and ask the mesh what any node may ask: DHT lookups (`findKClosest`) and the kernel's probe frames (`find_closest_set`, `local_probe`). Those are reads the protocol already answers for every peer. David, 2026-11-09: "the viewer should be allowed to do active search"; Orion was told to add a node to the app and use it as the starting point. Fleet data still reaches the viewer through the collector's output, piped in, never through a relay endpoint.
 
 ## Two parts, one format
 
@@ -23,7 +23,7 @@ The work splits in two at a file format, so the viewer can be built and tested w
 1. **The viewer** (council build). Reads observations, merges them, draws them.
 2. **The collector** (axona.bot). Gathers observations from the fleet and writes them in the same format.
 
-A regular node needs only the viewer. It makes one observation of itself and draws it.
+A regular node needs only the viewer. It makes one observation of itself and draws it. Since 2026-11-09 the viewer may also host a node of its own and search outward from it (see "What this is NOT", last point): the search finds peers and probes them for their peer lists, and every node it learns of is drawn as inferred until an observation arrives from it.
 
 ## The observation
 
@@ -72,16 +72,22 @@ A plain force-directed layout is enough to start. Islands (the Windows-versus-Ma
 - For each relay host (air, m1, axona-linux, axona-win, the droplets), trigger the health dump and read it back over ssh, using the existing fleet tooling and never hand-rolled process control.
 - For each bridge, read the authenticated diagnostics with the token held on this machine.
 - Add axona.bot's own seat observation.
-- Write one observation file per node into a directory under the scratch area, overwriting the previous run. Nothing is kept between runs.
+- Print one observation per node as NDJSON on standard output and write NO file (David, 2026-11-08: "The collector should not need to write files"). A bridge observation lists peer node IDs, and a file of node IDs on disk is a persisted correlator wherever the directory sits. The viewer takes the stream on `--stdin`. With `--synthetic` every node ID becomes a `syn:` token, for fixtures a public repo may hold.
 
-The collector is read-only on the fleet. It restarts nothing and changes no configuration.
+The collector is read-only on the fleet. It restarts nothing and changes no configuration. Any council seat may run it (David, 2026-11-09); it needs this machine's ssh keys and the bridge token stays on the bridge hosts.
 
 ## Open questions for the builder
 
 - Browser app, CLI that serves a local page, or both? The self mode wants to live inside a node; the fleet mode only needs to read files.
 - How many nodes can the layout draw before it needs clustering? Roughly 60 observed nodes plus their inferred peers is the fleet case.
-- Is there a cheap way for a regular node to learn more than its own view without a new protocol surface? If not, say so and stop there.
+- Is there a cheap way for a regular node to learn more than its own view without a new protocol surface? Answered 2026-11-09: yes, by hosting a node and using the lookups and probe frames every peer already answers. The brief first said to stop at the node's own view; David moved that line.
 
 ## Who
 
 David, 2026-11-07: Orion designs and builds the viewer. Vega reviews. Aster leads axona 5 and is not taken off it. axona.bot builds the collector and provides the fleet observations.
+
+## Revisions
+
+- 2026-11-07: Orion builds, Vega reviews (53ff716).
+- 2026-11-08: collector writes no file; NDJSON on stdout; `--stdin` on the viewer; `syn:` fixtures (council 4ade9989, 25eac8f5, b1a2ab57).
+- 2026-11-09: the viewer may host a node and search actively; any seat may run the collector (David, in chat). The viewer's purpose, in David's words: "so I can determine what the connection structure of the system is."
