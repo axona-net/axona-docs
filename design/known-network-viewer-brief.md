@@ -70,7 +70,8 @@ A plain force-directed layout is enough to start. Islands (the Windows-versus-Ma
 `ops/known-network-collect.mjs` on David's machine:
 
 - For each relay host (air, m1, axona-linux, axona-win, the droplets), trigger the health dump and read it back over ssh, using the existing fleet tooling and never hand-rolled process control.
-- For each bridge, read the authenticated diagnostics with the token held on this machine.
+- For each bridge, read the authenticated diagnostics inside one remote shell on the bridge host. The token never leaves that host.
+- For each relay, list the nodes it is connected to (David, 2026-11-09: "do you also list the connected nodes to each node you query? Please do that"). A relay on 0.198.0 or later answers the dump trigger with a second log line, `peer-dump`: its own node ID and one row per bound channel, with the link kind and the RTT. The collector turns that into `observer.nodeId`, `peers` and `complete.peers: true`. A relay on an older version gives a count and no list, and its record says `complete.peers: false`. A mesh channel whose candidate types are not yet read has `link: null`. It is never called direct.
 - Add axona.bot's own seat observation.
 - Print one observation per node as NDJSON on standard output and write NO file (David, 2026-11-08: "The collector should not need to write files"). A bridge observation lists peer node IDs, and a file of node IDs on disk is a persisted correlator wherever the directory sits. The viewer takes the stream on `--stdin`. With `--synthetic` every node ID becomes a `syn:` token, for fixtures a public repo may hold.
 
@@ -91,3 +92,4 @@ David, 2026-11-07: Orion designs and builds the viewer. Vega reviews. Aster lead
 - 2026-11-07: Orion builds, Vega reviews (53ff716).
 - 2026-11-08: collector writes no file; NDJSON on stdout; `--stdin` on the viewer; `syn:` fixtures (council 4ade9989, 25eac8f5, b1a2ab57).
 - 2026-11-09: the viewer may host a node and search actively; any seat may run the collector (David, in chat). The viewer's purpose, in David's words: "so I can determine what the connection structure of the system is."
+- 2026-11-10: relay records list connected nodes. The collector reaches air, m1, axona-linux and axona-win through `ops/fleet.sh dump`, and names every host it could not read on standard error. Relay side: branch `peer-dump`, relay 0.199.0 (8cd8947), not released. OPEN, David's word: `peer-dump` writes peer node IDs into the relay's own log on the relay host, and this brief says the viewer persists none. Until a relay runs 0.198.0 or later it gives a count only.
