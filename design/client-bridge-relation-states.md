@@ -8,9 +8,18 @@ When a client's WebRTC channel to a bridge replaces its WebSocket, what states
 can the relation between that client and that bridge be in, and does every state
 have a way out?
 
-One state does not. A client can hold an OPEN socket to a bridge and NO channel
-to it, and stay there. This note lists the states, shows the one with no exit,
-and says what put a node into it.
+One state does not, for some nodes. A client can hold an OPEN socket to a bridge
+and NO channel to it. An ordinary client with fewer than 3 mesh peers leaves that
+state through a recovery path already in the kernel. A bridge acting as a client
+does not leave it, and neither does a client holding exactly 3 mesh peers. This
+note lists the states, shows where the exit is missing, and says what put a node
+there.
+
+**Corrected 2026-11-12 22:45Z.** The first version of this note (`b1ea8c4`) said
+state E had no exit at all. That was wrong. I had read the socket's state
+machine and not the repair plane. Orion's review (council `0125fac2`) found the
+exit and the two cases without one, and traced the request I could not. The
+corrections are marked where they fall.
 
 ## What this note is NOT
 
@@ -50,11 +59,32 @@ door, and a WebRTC channel to the bridge's node.
 | B | open, admitted | none yet | welcome and hello done | channel binds → C. Socket closes → A, reconnect |
 | C | open, **superseded** | bound | the switch, mesh under 4 | bridge sees mesh ≥ 4 → 4200 → D. Socket closes → reconnect. Channel dies → **E** |
 | D | none | bound | released by 4200, watch armed | mesh under 3 → re-dial → C. Seen: run NW1 |
-| E | open, **superseded** | **dead** | channel death in C | **none found.** Seen: run NW2 |
+| D' | none | **dead** | channel death in D with 3 or more other peers | none until the mesh falls under 3. Found by Orion |
+| E | open, **superseded** | **dead** | channel death in C | mesh under 3 on an ordinary client → rewarm → C. **None** for a bridge as client (seen: NW2) or at exactly 3 peers |
 
-State E is the state with no exit. The socket did not close, so no reconnect
-runs. The node was never released, so no watch is armed. The route record says
-the socket is retired, so nothing carries the relation.
+State E has one exit, and it is a recovery path. When a node's mesh stays under
+`MESH_REWARM_MIN` (3) for 3 maintenance ticks, the repair plane asks the bridge
+for introductions on the open socket, at most once a minute and backing off to
+ten. The bridge's answer names its reserved id first, the client dials it, and
+the route record admits the new channel because the admitted route is empty.
+(`src/pubsub/repairPlane.js` 462–486, `src/dht/AxonaPeer.js` 5338–5341, bridge
+`src/server.js` 1562–1578. Traced by Orion; I read the first two after.)
+
+Two kinds of node never take that exit:
+
+- **A bridge acting as a client.** The bridge's engine gives the repair plane no
+  `reintegrate` hook, so the rewarm never runs. And an armed bridge points
+  `requestPeerIntroductions` at its own local directory feed
+  (`src/bridge_axona_node.js` 206), so its fill "asks" itself. This is NW2.
+- **A client with exactly 3 mesh peers.** Three is not under the rewarm minimum
+  of 3, and it is under the release floor of 4. Neither rule fires.
+
+State D' is Orion's. A released node whose channel to the bridge dies while 3 or
+more other peers remain has no link to the bridge and no reason to re-dial until
+its mesh thins. Orion also found that the bridge forgets a door channel only
+when the SOCKET closes (`src/bridge_axona_node.js` 669), so for a node in state
+E the bridge still believes the door channel is bound and will release the
+socket on that stale belief if the node later reports 4 peers.
 
 By the way, the socket in state E is not dead. On 2026-11-12 between 20:43Z and
 20:47Z the second testnet bridge, sitting in state E, received WebRTC offers
@@ -112,11 +142,13 @@ pause. Any pause of the bridge that long enters it.
 
 - Whether the 13 hours the second bridge spent with no channel
   (06:33Z to 19:51Z) was state E. No transport rows were written then.
-- What became of the 19:59:09Z introduction request. The client recorded it as
-  sent. The first bridge has no `peer-list-rerequest` row for it. The first
-  bridge was inside an 80 s stall at that moment.
-- Whether a client in state E that does receive the bridge's reserved id again
-  would dial it. Not read, not tried.
+- What became of the 19:59:09Z introduction request: ANSWERED by Orion. It never
+  left the second bridge. Its `requestPeerIntroductions` is wired to its own
+  directory feed, which returned true. The first bridge's 80 s stall had nothing
+  to do with it.
+- Whether a client in state E that receives the bridge's reserved id again would
+  dial it: by Orion's source trace, yes. Not tried on a running node.
+- How often an ordinary client sits at exactly 3 mesh peers. Not measured.
 
 ## Questions this leaves, for David and the council
 
