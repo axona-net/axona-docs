@@ -33,6 +33,16 @@ and not for a fleet of relays all taking it. Orion also traced the two things I
 listed as unknown or unread. The corrections are marked where they fall, and I
 checked each cited line before repeating it.
 
+**Corrected again 2026-11-13 after Aster's read (council `cd1da075`), which
+makes three reads of three.** Four of my statements were too strong or too
+narrow, and each is fixed where it stands: what a rejected foreign beacon may
+still be used for, the node choosing ITSELF as a retry target, the election
+with a no-epoch claim in a triple, and the drain of a bridge's roots, which I
+had written as a consequence and is a migration requirement. Aster also caught
+an expression in Orion's read: the region test is on the top 8 of 264 bits, a
+shift of 256. A shift of 248 wrongly excludes same-region ids. I checked the
+counterexample. This note never carried the expression.
+
 ## This rule has been in the kernel before
 
 The kernel carried this rule from 4.13.0 as the "region lock". From 4.15.0 it
@@ -88,13 +98,21 @@ Three failures on the record are a root born outside the topic's region:
   topic, and cross-region delivery was 0%. The 4.17.1 fix asked the network
   first. The rule removes the case.
 
-The "never select 0xFF" rule of 2026-11-12 becomes a corollary. So does its
-open question about a topic in region 0xFF: the mint allows one topic there,
-the bridge directory, and under this rule the bridges are its correct holders.
+The "never select 0xFF" rule of 2026-11-12 becomes a corollary for every
+ordinary topic. **Corrected:** I wrote that bridges become the correct holders
+of the one topic the mint allows in region 0xFF. Read that way, region equality
+quietly reverses "a bridge holds no role". The running bridges do not use that
+region, so nothing depends on it today. The corner has to be closed in words:
+0xFF stays excluded whatever the topic, unless David says otherwise.
 
-Bridges that already hold roots also get a way out. An out-of-region claim
-loses the election to any in-region claim, so the first in-region root pulls
-the bridge's history and the bridge's claim ends.
+Bridges that already hold roots lose the election to any in-region claim.
+**Corrected:** I wrote that the first in-region root then pulls the bridge's
+history and the bridge's claim ends, as if it followed. It does not follow. It
+is a migration REQUIREMENT, and "A bridge cannot hand over a root today" below
+says why it is not met. Until a verified transfer, the old holder keeps its
+role, its history stays pullable across regions, and the custody gate that
+refuses to shed a claim holding messages stays in force. A role is not deleted
+to satisfy placement.
 
 ## Where it applies
 
@@ -107,14 +125,29 @@ the topic's region". In short:
 | The walk's end (`AxonaPeer.js` 1343–1387, 6825–6861) | Routing is untouched: greedy and the lookahead still use every peer. A node outside the topic's region that finds nobody closer does NOT become the root and does NOT climb. The walk stops there, reported as not delivered, and the sender retries. Corrected; see "The walk's end". |
 | Root birth and promotion (`wireHandlers.js` 316, 631, 1669, 1915; `rootClaim.js` 480) | Unchanged for an in-region node. Unreachable for any other. |
 | Reachable-root claim (`rootClaim.js` 248, 611) | Only for a topic in this node's own region. |
-| Defer to a closer root, beacon acceptance, yield (`rootClaim.js` 198; `rootElection.js` 77–146) | A beacon naming an out-of-region root is not recorded and not deferred to. |
+| Defer to a closer root, beacon acceptance, yield (`rootClaim.js` 198; `rootElection.js` 77–146) | An out-of-region root is not deferred to and not yielded to. **Corrected:** its beacon is still EVIDENCE. The epoch it carries, the tombstones against it and the fact that an old holder exists are kept, because the beacon is what starts the merge that drains that holder (`rootElection.js` 139–145). |
 | Root hint and terminal verify (`rootElection.js` 237; `AxonaManager.js` 1017) | Out-of-region ids are dropped from the answer. |
 | Backup cohort (`repairPlane.js` 990–1012, 1154, 1194) | In-region candidates only. |
 | Heir of a leaving root (`repairPlane.js` 1304, 1453) | In-region candidates only. |
-| Write retry target (`writeFlight.js` 333) | In-region neighbours only. |
+| Write retry target (`writeFlight.js` 331–349) | In-region neighbours only. **Corrected:** the same code then adds THIS node as a candidate (345–347). A foreign sender with no eligible neighbour must not pick itself. |
 | Verify nominee (`rootElection.js` 404) | In-region nodes only. |
 | The election (`rootClaim.js` 284) | In-region beats out-of-region, before epoch and before distance. |
 | Child relay, if a child is a role (`wireHandlers.js` 266–337, 570) | See decision 1. |
+
+## The guard is on self as well as on lists
+
+Aster's point, and it is the general form of the retry row above. Filtering
+the lists is not enough. Every place a node takes a role ITSELF needs the same
+test: root birth, promotion, the reachable-root claim, the self retry, and on
+the receiving side the commit of an ADOPT, a REPLICATE or a staged handover.
+
+One place must NOT get it. The "am I alone?" guard (`rootClaim.js` 231) has no
+topic argument and measures whether this node can reach anyone. Foreign peers
+are the route INTO the region. A region filter there would call a
+well-connected node alone.
+
+Same region is necessary and it is not sufficient. Seating, capacity and the
+serving test still apply to an in-region node.
 
 ## The walk's end
 
@@ -139,7 +172,9 @@ So the rule at the walk's end is narrower than I wrote:
    in-region peer is closer than the node itself. Greedy takes it today.
 3. **A node outside the region that finds nobody closer, after greedy and the
    lookahead, stops the walk.** No root, no climb. The walk is reported NOT
-   delivered and the sender's retry or renewal carries it.
+   delivered and the sender's retry or renewal carries it. A walk that TIMES
+   OUT is a different fact: delivery is unknown, and it must go on being
+   reported as unknown.
 4. **The leaf that cannot serve keeps its one hop to its bridge.** That path
    is unchanged and is not a precedent for relays.
 
@@ -156,7 +191,9 @@ From where it stands the region cannot be reached.
 ## What it costs
 
 **1. A region needs three serving nodes to be durable.** `ROOT_REPLICAS` is 2.
-A root and two backups, all in region. With two nodes the root has one backup.
+A root and two backups, all in region. Three PROCESSES fill the three slots.
+Three processes on one machine are not three failure domains, and eight of the
+eagle relays share one Mac. With two nodes the root has one backup.
 With one, none. With zero there is no root: a publish retries until its TTL and
 a subscribe holds its seat and renews.
 
@@ -238,9 +275,14 @@ order, as closer-born did.
    compares raw distance (`rootClaim.js` 287–288), and distance already puts
    every in-region claim first. So the region term changes the winner in ONE
    case: both claims carry an epoch and the out-of-region one is higher. Among
-   claims with epochs it stays a total order. With a no-epoch claim in a triple
-   it is exactly as it is today. Vega has no objection in principle. Aster's
-   read is open.
+   claims with epochs it stays a total order. **Corrected:** I wrote that a
+   triple with a no-epoch claim is exactly as today. That holds only when all
+   three claims are on the same side of the region test, where today's cycles
+   remain. When the triple straddles the region test, the cycles go. Aster ran
+   the kernel's own comparison over 1,188 pairs and 35,640 ordered triples and
+   the assertions held; that is a finite check, not a proof of convergence on a
+   fleet. The existing rule that a node with no epoch takes no part in a merge
+   has to stay. All three reads concur.
 6. **I-16 is reversed for roles.** The invariant, six source comments and
    `smoke_region_hint.mjs` say the opposite today. They change in the same
    change or the next reader restores the old rule. Council.
