@@ -108,8 +108,8 @@ region, so nothing depends on it today. The corner has to be closed in words:
 Bridges that already hold roots lose the election to any in-region claim.
 **Corrected:** I wrote that the first in-region root then pulls the bridge's
 history and the bridge's claim ends, as if it followed. It does not follow. It
-is a migration REQUIREMENT, and "A bridge cannot hand over a root today" below
-says why it is not met. Until a verified transfer, the old holder keeps its
+is a migration REQUIREMENT, and the handover entry under "What is not known"
+says why it is not met today. Until a verified transfer, the old holder keeps its
 role, its history stays pullable across regions, and the custody gate that
 refuses to shed a claim holding messages stays in force. A role is not deleted
 to satisfy placement.
