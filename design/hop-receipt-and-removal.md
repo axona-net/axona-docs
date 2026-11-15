@@ -1,6 +1,6 @@
 # A receipt at every hop, and removal on silence
 
-Design note v0.1, 2026-11-15. Author: axona.bot, at David's word. Read against
+Design note v0.2, 2026-11-15. Author: axona.bot, at David's word. Read against
 kernel 4.146.0 (`fab49d2`, branch `region-roles`). Nothing here is built.
 
 ## The question
@@ -177,10 +177,84 @@ no timer of its own.
 - A node with one peer loses it. Assert what the node does next.
 - Remove the receipt check. Each test above fails.
 
+## What review found (v0.2)
+
+Orion read v0.1 against the transports on 2026-11-15 (council `5f1abc6e`). Four
+findings change what must be built first. I checked the sites marked "read"
+against `d60ce3d` myself; the others are his reading.
+
+### Removal on silence must close the channel
+
+`_peerDeath` closes nothing. Its two callers today run after the channel is
+already gone. Called on an open channel it leaves the peer bound. On WebRTC the
+reconcile pass puts the peer back in the table within a tick while its dead
+mark stays. On the bridge link `closeConnection` is empty (`bridge.js:230`,
+read), so a one-peer node that marks its bridge dead during a stall keeps the
+socket, never reconnects, and holds the mark for the life of the process. The
+WebSocket transport unbinds and does not close (`wstransport.js:346`, read).
+
+So "one removal path" in v0.1 was wrong as written. Silence must tear down the
+physical channel, and the death body then runs as it does now.
+
+### There is no measured round trip to derive from
+
+`getLatency` returns the constant 50 on the bridge and WebSocket transports
+(`bridge.js:318`, `wstransport.js:439`, both read). On the mesh it returns −1
+until the first heartbeat pong at 2,000 ms and one unsmoothed sample after.
+A deadline derived from round trip needs a real, smoothed measurement on every
+transport and a rule for a channel too new to have one.
+
+### The gate for old peers is a capability claim
+
+A wire-version bump closes 4.131.0 peers outright, and the mesh handshake does
+not exchange the wire version. The claim has to be additive, in the mesh hello
+and in the socket hello. This settles decision 4 unless David says otherwise.
+
+### Three routed frames are not safe to deliver twice
+
+Rule 5 holds for publishes, kills, deliveries, pulls and beacons. Orion names
+three frames it does not hold for:
+
+- the routed fallback of a direct send (`__tunneled_direct__`): no message id,
+  delivered twice to the app;
+- a second `sdp-offer` of the same attempt on a live connection;
+- a second merge header (`T.REPLAYUP`), which rewinds the merge cursor.
+
+Each needs its own guard, or an exemption from retry, before the retry is
+built.
+
+### Where it lives
+
+Receipt, channel teardown and a fast failed send belong in the transport, on
+every request frame. Choosing another peer stays in routing. A request to one
+named peer (`lookahead_probe`, `find_closest_set`) has no other peer to try; it
+fails at the receipt deadline in place of 5,000 ms. Cost by his count: a
+request today is two frames per hop and becomes three.
+
+### A cause this note did not know
+
+Orion names why a dead member can stay in a table: two channels to one node
+bound under two ids, the second wins, and the death of the second is discarded
+as stale (`composite.js:375–379`; the counter `routeStats.deathStaleToken` is
+there, read). On testnet at 06:15Z on 2026-11-15 my 4.131.0 seat named a host
+36 s after its hard stop, 5,038 times. Whether that counter moved on the seat
+is not read. If it did, that defect is a cause in its own right and is not
+fixed by a receipt.
+
+## Build order this implies
+
+1. Round trip measured and smoothed on every transport.
+2. The capability claim.
+3. Guards on the three frames.
+4. Receipt and teardown in the transport.
+5. Retry in routing.
+
+Each is a separate review. None is started.
+
 ## Decisions for David
 
 1. The deadline: the multiple of measured round trip, and the floor.
 2. Transport-wide, or `route_msg` only.
 3. The bridge: accept removal during a stall, or fix the bridge host first.
-4. The gate for old peers: wire version or a capability bit.
+4. The gate for old peers: a capability claim, per review, unless you say otherwise.
 5. Whether the answer-path liveness test is built with this or before it.
