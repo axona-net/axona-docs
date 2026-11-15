@@ -1,164 +1,232 @@
 # A receipt at every hop, and removal on silence
 
-Design note v0.2, 2026-11-15. Author: axona.bot, at David's word. Read against
-kernel 4.146.0 (`fab49d2`, branch `region-roles`). Nothing here is built.
+Design note v0.3, 2026-11-15. Author: axona.bot, at David's word. Read against
+kernel 4.147.0 (`d60ce3d`, branch `region-roles`). Nothing here is built.
+
+v0.3 is one contract. v0.1 said silence calls `_peerDeath` and that duplicates
+are safe everywhere. Both were wrong. Orion (council `5f1abc6e`) and Aster
+(`62a92819`) showed why, and v0.2 left the corrections in an appendix beside
+the errors. This version removes the errors.
 
 ## The question
 
 When a node hands a message to a connected peer, does it know the peer took it?
 
-Today it does not. This note says what the kernel does now, states the rule
-David set on 2026-11-15, and lists what the rule needs before anyone builds it.
+Today it does not.
 
 ## What this is not
 
 It is not a change to routing. The next hop is still the closest usable peer.
 
-It is not end-to-end delivery. A receipt says one hop took the message. It says
-nothing about the hops after it.
+It is not end-to-end delivery. A receipt says one hop took the message.
 
 It is not a heartbeat. The heartbeat asks an idle channel whether it is alive.
-The receipt reads the answer off traffic the channel is already carrying.
+The receipt reads the answer off traffic the channel already carries.
+
+It is not the lookahead answer filter (4.147.0) and not the beacon reader's
+256-topic limit. Those are separate changes.
 
 ## What the kernel does now
 
-Four facts, each from the `route_msg` handler in `src/dht/AxonaPeer.js`.
+Each line was read at `d60ce3d`.
 
-The sender knows the channel reads open, and nothing more. The forwarder
-picks its hop from `_usablePeers`, which tests `isConnected`. A hard-stopped
+The sender knows the channel reads open, and nothing more. A hard-stopped
 host's channel went on reading open for about 10 s on testnet on 2026-11-14,
 one host, one measurement series.
 
-The reply is the whole walk's result. The forwarder awaits
-`transport.send(nextHop, 'route_msg', …)` (line 1450). What comes back is
-`downstream`: consumed, terminal or exhausted, for every hop after this one.
-A hop that is dead and a hop that is alive and waiting on its own next hop
-look the same until the request times out. The transports set that timeout at
-5,000 ms (`DEFAULT_REQUEST_TIMEOUT_MS`); the walk I measured hung 10,175 ms.
+The reply a forwarder awaits is the whole remaining walk's result
+(`AxonaPeer.js` `route_msg` handler). A dead hop and a slow walk look the same
+until the request times out at 5,000 ms.
 
-A failed send is not retried. With `LOOKUP_RESELECT` off, which is the
-default and the state of testnet and production, the hop returns
-`exhausted` (line 1482). With it on, the hop takes the next closest live peer,
-and only for an error whose text names a lost channel (`isEdgeLoss`, line 202).
-The pattern has no word for a timeout.
+A failed send is not retried with `LOOKUP_RESELECT` off, which is the default.
+With it on, a timeout is not among the errors that reselect.
 
-A failed send removes nobody. Removal has one body, `_peerDeath` (line
-2699). Two things call it: the transport's peer-died event and the no-channel
-sweep of 4.132.0. A missed reply is not one of them.
+A failed send removes nobody. The death body `_peerDeath` is reached by the
+transport's peer-died event and by the no-channel sweep. `_peerDeath` is
+bookkeeping: it clears table entries and writes the dead mark. It closes no
+channel.
 
-So a node can send into a dead peer, wait seconds, give up, and keep the peer
-in its table to be chosen again, and to be named to others.
+`getLatency` returns the constant 50 on the bridge and WebSocket transports
+(`bridge.js:318`, `wstransport.js:439`). On the mesh it returns −1 until the
+first heartbeat pong and one unsmoothed sample after.
 
-## Why it matters now
-
-On testnet on 2026-11-14 and 11-15, three of ten runs on this stack had topics
-miss their closest host. In each, the topics that missed their closest host were exactly the topics
-XOR-closer to one dead host id: 132 of 263 in run RM1, 298 of 576 in RL3,
-133 of 285 in RJ1. Some live node still named that host. Which node is not
-known; the one control run did not reproduce it.
-
-The `lookahead_probe` handler (line 1032) answers from `node.synaptome` with no
-test on the node it names. A table that sheds dead peers fast gives that
-handler less to get wrong.
+A response is matched to its request by id alone. The WebSocket transport
+knows which connection a response arrived on and does not pass it to
+`_handleResponse` (`wstransport.js:451–491`).
 
 ## The rule
 
 David, 2026-11-15:
 
-1. The receiving node sends a receipt the instant the message arrives, before
-   it does anything else with it.
-2. The sender sees that receipt almost at once, or after a short delay treats
-   the connection as dead.
+1. The receiver sends a receipt the instant the message arrives.
+2. No receipt after a short delay means the connection is dead.
 3. A connection that is alive and slow is removed too. Slow is unhealthy.
-4. The message is marked unsent and tried again without the failed node.
-5. A duplicate that results is acceptable. The system already handles it.
+4. The message is tried again without the failed node.
+5. A duplicate is acceptable where the system handles it.
 
-## What the rule needs
+Rule 5 as David gave it was "duplicate is fine, the system handles that
+properly". Review found three frame types where the system does not. They are
+listed under Duplicates. The rule stands for every type that is guarded; a type
+that is not guarded is not retried.
 
-### A receipt that is not the walk's result
+## The contract
 
-The receipt is its own frame,
-sent by the receiving transport on arrival and before the handler runs. The
-walk's result keeps travelling back as it does today. Two answers, two clocks:
-a short one for "I have it", the existing one for "here is what happened".
+### Two clocks, three outcomes
 
-### One removal path
+A request has three states: issued, accepted by the hop, answered.
 
-Silence calls `_peerDeath(peer, 'no-receipt')`. That body
-already clears the table entry, the incoming entry and the connection, writes
-the dead mark, purges the peer's root beacons and schedules a refill. No second
-body.
+The receipt moves it from issued to accepted. It starts nothing else. It does
+not resolve the sender's promise. It does not discharge any duty the result
+discharges: ingestion acknowledgement, merge, custody.
 
-### Retry at the hop that saw the silence
+The result moves it from accepted to answered, on the existing clock.
 
-The hop puts the silent peer on the
-frame's exclusion set and selects again from its usable peers, as the reselect
-code does for a lost channel. If nothing closer is left, the hop is the
-terminal or reports exhausted, as now.
+No receipt by the deadline means the delivery is UNKNOWN. It is not proof the
+message was not delivered. That is why retry needs the duplicate guards.
 
-### The deadline is derived, not chosen
+A result that arrives before its receipt counts as the receipt.
 
-It must sit above the round trip of a
-healthy channel and far below the 5,000 ms request timeout. The project's own
-bar is 30 ms in-region. A receipt deadline is a small multiple of the measured
-round trip on that channel, with a floor. The multiple and the floor are
-David's to set from the RTT matrix; this note names no number because none has
-been measured for this purpose.
+A result that is late after a receipt arrived is a slow WALK. It does not evict
+the hop. Only a missing receipt does.
 
-## Consequences to decide before building
+The sender can tell four failures apart: no receipt, route superseded,
+admission refused, result timed out.
 
-### A slow bridge is removed like any peer
+### What a receipt is bound to
 
-The testnet bridge on one core
-logs event-loop stalls of 7 to 13.6 s in every host run. Under rule 3 every
-node holding it drops it during a stall. A node whose only peer is the bridge
-is then alone. Either that is accepted and the node re-enters by its bridge
-socket, or the bridge host is fixed first. The rule should not carve out the
-bridge; a bridge is a node.
+A receipt is valid only for the peer it was expected from, the channel
+generation the request was sent on, and the request id. A receipt on another
+connection, from an older generation, or for an unknown id is ignored.
 
-### A mixed fleet
+The existing response path matches on id alone. The receipt path must not copy
+it. Whether that weakness matters for existing requests is a separate question
+and is not settled here.
 
-A 4.131.0 peer sends no receipt. A node that enforced the
-rule against it would remove every old peer on first use. The rule must apply
-only to a peer that has said it sends receipts, by wire version or a
-capability bit, until the fleet is whole.
+### Where the receipt is sent
 
-### Coming back
+By the receiving transport, on a request frame, after the frame is
+authenticated and accepted into a bounded queue, and before the handler runs.
 
-A removed peer that is alive will dial again. The dead mark
-has a schedule (`DeadPeers.fail`). Whether a no-receipt removal uses that
-schedule or a shorter one is open.
+A receipt never elicits a receipt. A result never elicits a receipt.
 
-### Which frames
+Frames with no id today (notifications, auth, bootstrap) are outside the first
+scope. They are not retried and not timed.
 
-`route_msg` forwards are the case measured. The same
-transport carries `lookahead_probe`, `find_closest_set`, signals and direct
-deliveries. A receipt at the transport covers all of them at once. That is
-the simpler build and the wider change.
+### Removal on silence
 
-### Cost
+Silence retires the CHANNEL INSTANCE the request was sent on. It does not act
+on whatever route the peer has now.
 
-One small frame per message per hop. On a publish that fans to n
-subscribers that is n receipts at the root. Not measured.
+The order is: capture the failed instance and its generation when the request
+is issued; on the deadline, close and unbind that instance through its
+lifecycle owner; settle every timer that belonged to it; then report one death
+for it. The existing death body runs from that report, as it does today.
+
+Three consequences follow.
+
+A deadline that belongs to an old socket does not close the WebRTC channel
+that replaced it. `CompositeTransport.closeConnection` acts on the current
+route (`composite.js:613`); the new path must not call it for an old instance.
+
+Ten requests that expire together retire the instance once and write one dead
+mark. They do not feed ten failures to the backoff schedule.
+
+A one-peer node that loses its bridge this way must be able to reconnect.
+Today `BridgeTransport.closeConnection` is empty and the node transport only
+unbinds. The bridge socket's real close-and-reconnect path has to be driven,
+and the test is that the node is back on the mesh, not that an entry left a
+table.
+
+### Retry
+
+Retry lives in routing: the forwarder, the origin send, the lookup step. The
+transport fails the send fast; routing picks another peer.
+
+The hop that saw the silence puts the silent peer on the frame's exclusion set
+and selects again. Path memory, exclusions and hop budget carry across the
+retry. There is one overall deadline and one attempt budget for the operation.
+
+A request to one named peer (`lookahead_probe`, `find_closest_set`) has no
+other peer. It fails at the receipt deadline.
 
 ### Duplicates
 
-Accepted by rule 5. A hop that took the message and whose
-receipt was lost forwards it; the retry forwards it again by another peer.
-Publishes carry a msgId and are deduplicated. A reviewer should name any
-routed frame type that is not idempotent.
+A retry on another peer is a NEW hop request with a new id. A hop request id is
+therefore not a duplicate key.
 
-## What it does not fix
+Guarded today by a message id or a seen-set: publish, kill, deliver, pull and
+its response, pull-up, root beacon, topic-terminated.
 
-A node that never sends to the dead peer never misses a receipt from it. That
-node keeps the entry until the transport or the sweep removes it, and its
-`lookahead_probe` answer can still name it. The answer path needs its own
-liveness test. That is a separate, smaller change and should be reviewed on
-its own.
+Not guarded:
 
-It does not explain why 289 two-root topics stood unmerged. That is the
-beacon reader's 256-topic limit (`rootElection.js:83`) and the gate at line
-109.
+- the routed fallback of a direct send (`__tunneled_direct__`): no message id,
+  the app's callback fires twice;
+- a second `sdp-offer` of the same attempt on a live connection;
+- a second merge header (`T.REPLAYUP`), which rewinds the merge cursor and
+  asks for the header again.
+
+Each needs a stable operation key or a handler that is idempotent. Until it has
+one, that type is not retried. The registry of retry-enabled types is explicit
+and is audited whole, not by example.
+
+### The deadline
+
+It is derived from a measured round trip on that channel. No such measurement
+exists on two of three transports today.
+
+Before any deadline is chosen the note needs: a real round trip on the bridge
+and WebSocket transports; smoothing and a variance term on all three; a rule
+for a channel too new to have a sample; the clock started when the frame
+leaves the send queue, so local queueing is not charged to the peer; a test
+that tells a stalled SENDER from a stalled receiver.
+
+The multiple and the floor are David's, set from those measurements. This note
+names no number.
+
+### Old peers
+
+A peer is held to the rule only on a channel where it has said it sends
+receipts. The claim is made per authenticated channel, not once per node.
+
+It cannot ride on the wire version: the mesh handshake does not exchange it,
+and a major bump closes 4.131.0 peers outright.
+
+It cannot be an unsigned field beside the existing proof. The auth transcript
+signs proto, node id, public key and the channel binding
+(`handshake-auth.js:77`). The claim goes in an authenticated exchange on the
+channel or in a signed extension an old peer ignores.
+
+A peer that makes no claim is treated exactly as today.
+
+### Bounds
+
+Pending receipts, their timers and their bytes are capped per channel. An
+attempt budget bounds retries per operation. A receipt adds one frame to a
+request and its result: two frames per hop become three. That is a count. Its
+cost in CPU and latency is not measured, and has to be, under fan-out and
+against the testnet bridge that stalls 7 to 13.6 s per run.
+
+## Consequences David should see before building
+
+A slow bridge is removed like any peer. During a stall every node holding it
+drops it and must reconnect. The rule does not carve out the bridge; a bridge
+is a node. Either that is accepted, or the bridge host is fixed first.
+
+Removal is physical. A removed peer that is alive dials again. Whether it
+waits out the dead-mark schedule or a shorter one is open.
+
+## A cause this note does not fix
+
+A dead member can stay in a table when two channels to one node were bound
+under two ids and the death of the winning one is discarded as stale
+(`composite.js:375–379`, counter `routeStats.deathStaleToken`; Orion). On
+testnet on 2026-11-15 that counter read 0 on 24 hosts across eight runs. On
+the 4.131.0 seat that named a dead host 5,038 times it is not read. The new
+timer path must not reproduce it: a deadline for a superseded token is dropped
+and counted, and is not acted on.
+
+A node that never sends to a dead peer never misses a receipt from it. The
+lookahead answer filter covers that case.
 
 ## Under David's rule of 2026-11-12
 
@@ -167,94 +235,39 @@ cause-level change. The retry recovers one message from a bad state. By the
 rule that is a symptom fix, named here as one. It rides on the receipt and has
 no timer of its own.
 
-## Fence, when built
+## Build order
 
-- Hold the receipt on a live peer past the deadline. The sender removes it and
-  the message arrives by another peer.
-- Hard-stop a peer mid-walk. Time from send to removal is the deadline, not
-  5,000 ms.
-- A peer that sends no receipts and has not claimed to is NOT removed.
-- A node with one peer loses it. Assert what the node does next.
-- Remove the receipt check. Each test above fails.
-
-## What review found (v0.2)
-
-Orion read v0.1 against the transports on 2026-11-15 (council `5f1abc6e`). Four
-findings change what must be built first. I checked the sites marked "read"
-against `d60ce3d` myself; the others are his reading.
-
-### Removal on silence must close the channel
-
-`_peerDeath` closes nothing. Its two callers today run after the channel is
-already gone. Called on an open channel it leaves the peer bound. On WebRTC the
-reconcile pass puts the peer back in the table within a tick while its dead
-mark stays. On the bridge link `closeConnection` is empty (`bridge.js:230`,
-read), so a one-peer node that marks its bridge dead during a stall keeps the
-socket, never reconnects, and holds the mark for the life of the process. The
-WebSocket transport unbinds and does not close (`wstransport.js:346`, read).
-
-So "one removal path" in v0.1 was wrong as written. Silence must tear down the
-physical channel, and the death body then runs as it does now.
-
-### There is no measured round trip to derive from
-
-`getLatency` returns the constant 50 on the bridge and WebSocket transports
-(`bridge.js:318`, `wstransport.js:439`, both read). On the mesh it returns −1
-until the first heartbeat pong at 2,000 ms and one unsmoothed sample after.
-A deadline derived from round trip needs a real, smoothed measurement on every
-transport and a rule for a channel too new to have one.
-
-### The gate for old peers is a capability claim
-
-A wire-version bump closes 4.131.0 peers outright, and the mesh handshake does
-not exchange the wire version. The claim has to be additive, in the mesh hello
-and in the socket hello. This settles decision 4 unless David says otherwise.
-
-### Three routed frames are not safe to deliver twice
-
-Rule 5 holds for publishes, kills, deliveries, pulls and beacons. Orion names
-three frames it does not hold for:
-
-- the routed fallback of a direct send (`__tunneled_direct__`): no message id,
-  delivered twice to the app;
-- a second `sdp-offer` of the same attempt on a live connection;
-- a second merge header (`T.REPLAYUP`), which rewinds the merge cursor.
-
-Each needs its own guard, or an exemption from retry, before the retry is
-built.
-
-### Where it lives
-
-Receipt, channel teardown and a fast failed send belong in the transport, on
-every request frame. Choosing another peer stays in routing. A request to one
-named peer (`lookahead_probe`, `find_closest_set`) has no other peer to try; it
-fails at the receipt deadline in place of 5,000 ms. Cost by his count: a
-request today is two frames per hop and becomes three.
-
-### A cause this note did not know
-
-Orion names why a dead member can stay in a table: two channels to one node
-bound under two ids, the second wins, and the death of the second is discarded
-as stale (`composite.js:375–379`; the counter `routeStats.deathStaleToken` is
-there, read). On testnet at 06:15Z on 2026-11-15 my 4.131.0 seat named a host
-36 s after its hard stop, 5,038 times. Whether that counter moved on the seat
-is not read. If it did, that defect is a cause in its own right and is not
-fixed by a receipt.
-
-## Build order this implies
+Each step is its own review. None is started.
 
 1. Round trip measured and smoothed on every transport.
-2. The capability claim.
-3. Guards on the three frames.
-4. Receipt and teardown in the transport.
+2. The authenticated capability claim.
+3. Guards on the three unguarded frame types, or their exemption.
+4. Receipt, binding, and retirement of the failed instance, in the transport.
 5. Retry in routing.
 
-Each is a separate review. None is started.
+## Fence, when built
+
+- A handler takes effect and its receipt is lost. The retry does not repeat
+  the effect, for each stateful type.
+- A duplicate same-attempt offer, a duplicate tunneled direct call, a duplicate
+  merge header after a data page.
+- A receipt from the wrong peer, from an old generation, and after the
+  deadline. Each is ignored.
+- A result before its receipt.
+- An old socket's deadline after a replacement channel has bound. The
+  replacement stays.
+- Ten deadlines at once. One retirement, one dead mark.
+- A prompt receipt and a slow walk. The hop is not removed.
+- A node loses its only peer and is back on the mesh.
+- A cold channel with no sample. A stalled sender.
+- Retry budget spent. The operation ends.
+- A peer that makes no claim is not timed and not removed.
+- Remove the receipt check. The tests above fail.
 
 ## Decisions for David
 
-1. The deadline: the multiple of measured round trip, and the floor.
-2. Transport-wide, or `route_msg` only.
-3. The bridge: accept removal during a stall, or fix the bridge host first.
-4. The gate for old peers: a capability claim, per review, unless you say otherwise.
-5. Whether the answer-path liveness test is built with this or before it.
+1. The deadline's multiple and floor, after step 1 brings measurements.
+2. The bridge: accept removal during a stall, or fix the bridge host first.
+3. The three unguarded types: guard each, or exempt them from retry.
+4. Whether a removed live peer waits the dead-mark schedule or a shorter one.
+5. Whether step 1 starts now. It changes no behaviour and is needed either way.
