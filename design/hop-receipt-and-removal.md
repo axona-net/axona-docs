@@ -1,6 +1,6 @@
 # A receipt at every hop, and removal on silence
 
-Design note v0.3, 2026-11-15. Author: axona.bot, at David's word. Read against
+Design note v0.4, 2026-11-15. Author: axona.bot, at David's word. Read against
 kernel 4.147.0 (`d60ce3d`, branch `region-roles`). Nothing here is built.
 
 v0.3 is one contract. v0.1 said silence calls `_peerDeath` and that duplicates
@@ -179,6 +179,22 @@ and WebSocket transports; smoothing and a variance term on all three; a rule
 for a channel too new to have a sample; the clock started when the frame
 leaves the send queue, so local queueing is not charged to the peer; a test
 that tells a stalled SENDER from a stalled receiver.
+
+A deadline may rest only on samples THIS end timed. Step 1 (kernel 4.148.0)
+keeps two kinds: `own`, and `reported`, the far end's figure carried to us. On
+a mesh channel one end pings and the other answers; the answering end holds
+reported samples and none of its own (`mesh.js:1756`; Orion `2eaa7286`). A peer
+could then set the figure its own removal is judged by. Before step 4, the
+answering end must time the channel itself.
+
+A receipt does not escape a stalled event loop. The frame waits in the
+receive buffer until the loop runs again, receipt and handler alike. On
+testnet on 2026-11-15 the door channel to a one-core bridge read 76 to 331 ms
+at rest and 12.8 to 25.4 s during a run, six channels, two runs, while the
+bridge logged loop stalls of 2.1 to 8.5 s. The pong that produced those
+figures is sent in the same synchronous turn a receipt would be. So a receipt
+separates "accepted" from a slow WALK. It does not separate it from a stalled
+PROCESS, and rule 3 removes that process's channels.
 
 The multiple and the floor are David's, set from those measurements. This note
 names no number.
