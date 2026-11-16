@@ -7,6 +7,37 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## kernel 4.131.0 → 4.151.0, relay 0.201.0, bridge 2.192.0 — a week of testnet work on production, every new option off (2026-11-16)
+
+**Released on David's word ("Let's push all of the testnet fixes into production now. Update all nodes, relays, bridges, applications, MCP servers."), kernel 4.151.0, code only: arming is a later word. Tag v4.151.0 at 722bd8d; relay 0.201.0 at 0c02328, vendored tree equal to the tag; bridge 2.192.0 at 55e0b04; axona-chat 0.108.0 at 679b540; axona-share 0.66.0 at 1964f59; axona-portal 0.43.0 at 681aa38; dht-sim 0.149.0 at 794ad9b.**
+
+Where it runs, each read back on 2026-11-16: testnet bridges B1 and B2 at 15:04Z; both production bridges at 15:06Z through their public names; the Air's six relays started on it at 15:19Z (they had been down since a reboot at 05:37Z); M1 8 and Linux 5 at 15:21Z; nine droplet units at 15:24Z; the 20 Windows services at 15:26Z, transcript `RESULT=OK`. `ops/fleet.sh status` reads 48 of 48 on relay 0.201.0; the droplets' kernel is inferred from their restart after the pull, not seen. `ops/release.sh check 4.151.0` reads COMPLETE. axona.chat serves the bundle that was built; axona-share serves five `?v=4.151.0` and `APP_VERSION` 0.66.0.
+
+What does production do differently today? Almost nothing. That is the design of this release. Twenty kernel versions and eight bridge builds made on testnet between 11-09 and 11-16 are now in the code every node runs, and each change that alters behaviour sits behind an option that is OFF until armed by env.
+
+What is NOT in it: any armed option, any new bridge env, any change to a bridge's region. A node that held a role yesterday holds it today.
+
+The options carried, all off:
+
+- `REGION_ROLES`: a role goes only to a node in the topic's region.
+- `BOUND_TARGET_DELIVER`: a hop that holds an open channel to the target sends there.
+- `LOOKAHEAD_ANSWER_LIVE`: a look-ahead answer names only a peer the answerer could send to now. On testnet a neighbour named a host that had been stopped, 5,038 times in one run.
+- `ANNOUNCE_NEW_ONLY`: a root claim announces the one new topic. Until now each claim re-sent the node's whole list.
+- `BEACON_CHUNK`: a beacon lists at most 256 topics, the number a receiver reads; a longer list goes out as several.
+- `BEACON_VERDICT`: the node a beacon was addressed to reports it consumed, so `routed-outcomes` stops counting delivered beacons as failures.
+- `ROUTE_TYPE_TALLY`: a diagnostic count of routed sends and received frames by type.
+- The No-Channel Sweep, Bootstrap Sample Dial, Close a Retired Socket and the two-sided release, the last two gated on the bridge by `BRIDGE_SOCKET_IS_BOOTSTRAP`.
+
+Carried with no option, and changing no decision: a smoothed round trip per channel (`getRtt`), read by nothing; a region check that counts a node that answered and never an id; `REGION_UNPOPULATED` raised only after the routed walk has decided.
+
+Evidence, with its conditions. Kernel suite 344 of 344 on the released commit. On testnet, three hosts in one region and about 3,041 publications a run: with the three beacon options off the one-core bridge stalled in 3 of 3 runs, 6.8 to 7.7 s at the longest; with `ANNOUNCE_NEW_ONLY` alone, and with all three, 0 of 6. Delivery was clean in all nine. Three runs a side, one small mesh.
+
+Review at release: 4.147.0 and 4.148.0 two of two; 4.149.0 and 4.150.0 one of two; 4.151.0 none. David released as the gate. The reviews stay open and can still return a commit.
+
+What went wrong during the promotion. A council seat on the old kernel lost its upstream in the roll: its first publish afterwards was not delivered (`confirmed:false` after 40 s), and the identical retry was (323 ms). Every seat is in that position until it posts or reloads.
+
+What this does not establish: how any option behaves on production. None is armed. What would make the "almost nothing" claim wrong: an unguarded change among the twenty-one commits that alters a decision with every option off. The suite and nine testnet runs did not find one; they were not written to look for it.
+
 ## kernel 4.130.0 → 4.131.0, relay 0.197.0, bridge 2.182.0 — an author can publish again what it killed (2026-11-08)
 
 **Built on David's word ("Fix the bug. Try again.") and released on his word (council 5a9884ac, confirmed in chat: "release 4.131.0 without their feedback"). Tag v4.131.0 at eecad10; relay 0.197.0 at 4c8e735, vendored tree equal to the tag; bridge 2.182.0 at b90068e; dht-sim 0.148.0 at 3b9b248; axona-portal 0.42.0 at 2d9f048. Review: Orion CONCUR on eecad109 (council 87f3a3da), Vega CONCUR AS SCOPED on the same commit (bc3625bb). Aster's last read, claims against the S2 design, was still open when David released without it. Proof carriage is ON by default (`KILL_PROOFS=1`); no other option.**
