@@ -171,7 +171,4 @@ register).
 
 ## License
 
-Documents in this repository are released under the same terms as the protocol
-implementation. See the LICENSE file in
-[axona-protocol](https://github.com/axona-net/axona-protocol/blob/main/LICENSE)
-for the canonical terms.
+Copyright 2026 Axona.net. Documents in this repository are released under the Apache License, Version 2.0 — see [LICENSE](LICENSE) and [NOTICE](NOTICE). Provided "as is", without warranty of any kind.
