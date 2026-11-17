@@ -7,6 +7,33 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## kernel 4.152.0 → 4.154.0, relay 0.202.0, bridge 2.193.0 — write-flight frames go where they are addressed, a publish stops aiming at a node with no channel; four options, all off (2026-11-17)
+
+**Released on David's word ("Let's promote the fixes as well as the test for liveness fix."), kernel 4.154.0, code only: arming is a later word. Tag v4.154.0 at 3691260; relay 0.202.0 at 3ccee4e, vendored tree equal to the tag; bridge 2.193.0 at 2d9422d; axona-chat 0.113.0 at 1704788; axona-share 0.67.0 at 734b2a1; axona-portal 0.44.0 at f2d7efc; dht-sim 0.150.0 at ca6cc57. `ops/release.sh check 4.154.0` printed COMPLETE at 04:53Z.**
+
+Where it runs, each read back on 2026-11-17: both testnet bridges and both production bridges answer ok on 2.193.0 / 4.154.0 at 04:53Z; the 48 relays rolled between 04:40Z and 04:48Z in the order Air, droplets, Windows alone (transcript `RESULT=OK`), Linux, M1, and `ops/fleet.sh status` reads 48 of 48 on relay 0.202.0 at 04:53Z. Council seats still run the kernel they started with.
+
+What does production do differently today? Nothing, until an option is armed. Three kernel versions add four options, each OFF by default.
+
+What is NOT in it: an armed option, a new bridge env, a fix that is live. The chime to `jokes` that has gone unconfirmed since 16:24Z 11-16 is not fixed by this release as deployed.
+
+The options, all off:
+
+- `FLIGHT_ADDRESS_GUARD` (4.152.0): a node handles a write-flight ack, probe or refusal only when the frame is addressed to it. Without it the SENDER consumed its own frame at hop 0: an ack never left the root, a probe never left the asker, a backup that held the message acked itself, and the root was evicted for a receipt it had sent.
+- With the same option (4.153.0): a probe carries what a signed ack needs, and the root answers the node that asked. Before, it answered the last relay that handed the probe on.
+- `PUB_HINT_LIVE` (4.154.0): a publish is pinned to a guessed root only while this node holds an open, answering channel to it. A root named by a fresh beacon is always used.
+- `STEPPED_HOLD` (4.154.0): a node that failed is set aside for 2 minutes, and for 10 minutes if it fails again within 10 minutes of the first. The fixed 10-minute tombstone stays when the option is off.
+
+Evidence, with its conditions. Kernel suite 347 of 347 on the released commit. Three new tests run real peers on the simulated network: the address guard (20 checks), a publisher, a relay and a root in a line (16), the publish hint and holds (36). On testnet with the guard armed on both bridges, four alert-bot runs of about 3,041 publications each showed 0 mismatched and 0 two-root topics; those runs use three meshed hosts and never open a write flight, so they show the guard does no harm and nothing more. `PUB_HINT_LIVE` and `STEPPED_HOLD` have run in tests only.
+
+Review at release: 4.152.0 and 4.153.0 one of two (Orion); 4.154.0 none. David released as the gate. The reviews stay open and can still return a commit.
+
+What went wrong during the promotion. Windows service 09 stopped answering its event loop 2.5 minutes after it started on the new kernel (04:46:40Z). Its watchdog killed it and the service manager restarted it in 10 s; 20 of 20 a minute later. One freeze of this class per roll has been seen before on that host. The cause was not read; a dump was kept.
+
+What this does not establish: that any of the four options behaves on production as it does in tests. What would make "nothing changes" wrong: a path in the three commits that runs with every option off. The suite ran with them off and found none.
+
+---
+
 ## kernel 4.131.0 → 4.151.0, relay 0.201.0, bridge 2.192.0 — a week of testnet work on production, every new option off (2026-11-16)
 
 **Released on David's word ("Let's push all of the testnet fixes into production now. Update all nodes, relays, bridges, applications, MCP servers."), kernel 4.151.0, code only: arming is a later word. Tag v4.151.0 at 722bd8d; relay 0.201.0 at 0c02328, vendored tree equal to the tag; bridge 2.192.0 at 55e0b04; axona-chat 0.108.0 at 679b540; axona-share 0.66.0 at 1964f59; axona-portal 0.43.0 at 681aa38; dht-sim 0.149.0 at 794ad9b.**
