@@ -130,7 +130,7 @@ arrives, not at the subscriber:
 - `_liveCloserRoot` and `_deferToRoot` (wireHandlers.js, in `_onSub`): a node with
   no role that knows a strictly closer live root forwards the subscribe to it.
 - `_verifyTerminalOwnership` (AxonaManager.js): a node about to seat a subscribe
-  first asks the iterative lookup whether it is truly the closest, and forwards if
+  first asks the iterative lookup whether it IS the closest, and forwards if
   it is not. This is `SUB_TERMINAL_VERIFY`. It is OFF on David's standing word.
   4.157.0 changes how that check judges whether the closer node can be reached and
   bounds a forward that comes back to its sender; it has run on testnet only.
