@@ -7,6 +7,34 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## kernel 4.154.0 → 4.157.0, relay 0.204.0, bridge 2.194.0 — a forward that comes back to its sender is stopped; a relay with no open channel no longer spins (2026-11-21)
+
+**Released on David's word ("Yes, proceed with the 4.157.0 production legs"), kernel 4.157.0, code only: nothing is armed by this release. Tag v4.157.0 at f348b7a; relay 0.204.0 at cb83885, vendored tree equal to the tag; bridge 2.194.0 at a4f7063.**
+
+What does a relay do when every channel it holds closes at once? On 4.154.0 it could stop answering for 30 seconds and be killed by its own watchdog. That happened to four Windows relays on 2026-11-21, twice, when their host changed networks. This release is the fix for that, and it was already written when the fault was traced.
+
+What it is NOT: a fix for #council's several roots. That is kernel 4.159.0, in review. It is NOT an arming. And it does NOT prove the stall is gone from production; see the last paragraph.
+
+Where it runs, each read back on 2026-11-21. Both production bridges answer ok on 2.194.0 / 4.157.0 since 18:39Z. The 48 relays rolled between 20:24Z and 20:28Z: Air 6 of 6, M1 8 of 8, Linux 5 of 5 and Windows 20 of 20 print kernel 4.157.0; the four droplets restarted 3, 2, 2 and 2 units after pulling it, and their version is INFERRED from that restart, not seen. No host dropped below its count. axona.chat 0.114.0 serves the bundle that was built locally. axona-share 0.68.0 serves five kernel tags at 4.157.0. axona-portal 0.45.0 and dht-sim 0.151.0 are pushed. `ops/release.sh check 4.157.0` printed COMPLETE at 18:48Z.
+
+What changes, with no option set:
+
+- 4.156.0: a publish or a kill waiting to be retried is kept by topic AND message id. Before, two topics carrying the same message id shared one retry slot.
+- 4.157.0: the check a node runs before it claims a topic defers only to a node it holds a live channel to.
+- 4.157.0: a node that forwards a message to a closer root tags the forward. If its own forward comes back, the node consumes it, drops the beacon record that named that root, and logs `root-forward-returned`. The same guard is on publish, kill, subscribe and metrics.
+
+The third change is the one that matters this week. On 4.154.0 a relay with table members and no open channel still counted those members as reachable. A publish for a topic whose known root was one of them was forwarded to that root, landed back on the relay, was sent on toward the topic, landed back again, and went round. Nothing between the rounds waited on anything. The only end was the beacon record expiring, 50 seconds after it arrived.
+
+Evidence, with its conditions. Three crash dumps from the Windows host show the relay's main thread running JavaScript under a timer, with no thread waiting on a lock or a name lookup. The two relays that recovered each counted about one million delivered sends in the interval that spanned the stall; no other interval in the log reads above a thousand. A reproduction with one node, one beacon and one publish, on a simulated transport with no usable peer, gives 20,000 sends in 33 ms on 4.154.0, stopped by the test's own cap, and 1 send on 4.157.0 (`ops/repro_defer_cycle.mjs` in the workspace). The message type on the real relays was not measured.
+
+Review at release: Orion, Aster and Vega concur on the tag.
+
+What went wrong during the promotion. The first Pages run for axona.chat built and then lost its artifact at the deploy step; a re-run of the same run passed. The relay roll is refused on the bot's seat, dry pass included, so David ran its three commands by hand; the bridges and apps were on 4.157.0 for 1 hour 45 minutes while every relay ran 4.154.0. And the bot told the council the fault was still present after 4.157.0, having checked that the old lines exist and not that the path runs. Corrected within the hour, by running the case on both versions.
+
+What this does not establish: that no other loop contributed to the stalls. The proof is a relay on 4.157.0 that loses every channel and stays up, with `root-forward-returned` in its log. Until a host changes networks again, that row has not been written. One leftover is known: a relay still counts a bound channel that is not open as reachable. With the guard in place that costs one wasted forward.
+
+---
+
 ## kernel 4.152.0 → 4.154.0, relay 0.202.0, bridge 2.193.0 — write-flight frames go where they are addressed, a publish stops aiming at a node with no channel; four options, all off (2026-11-17)
 
 **Released on David's word ("Let's promote the fixes as well as the test for liveness fix."), kernel 4.154.0, code only: arming is a later word. Tag v4.154.0 at 3691260; relay 0.202.0 at 3ccee4e, vendored tree equal to the tag; bridge 2.193.0 at 2d9422d; axona-chat 0.113.0 at 1704788; axona-share 0.67.0 at 734b2a1; axona-portal 0.44.0 at f2d7efc; dht-sim 0.150.0 at ca6cc57. `ops/release.sh check 4.154.0` printed COMPLETE at 04:53Z.**
