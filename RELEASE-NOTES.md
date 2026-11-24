@@ -7,6 +7,35 @@ build is always visible in each app's version row and at the bridge's
 
 ---
 
+## kernel 4.157.0 → 4.159.0, relay 0.206.0, bridge 2.195.0 — a merge that finishes leaves nothing behind to block the next one (2026-11-24)
+
+**Released on David's word ("Let's move all testnet and production to 4.159.0.", and for the last relays "Roll everything to 4.159.0"), kernel 4.159.0, code only: nothing is armed by this release. Tag v4.159.0 at 67aafcf; relay 0.206.0 at f7ff477, carrying the vendored kernel 4.159.0; bridge 2.195.0 at c166fc7; axona-chat 0.115.0 at acd30a1; axona-share 0.69.0 at 67713dd; axona-portal 0.46.0 at e206f0c; dht-sim 0.152.0 at 77d563e. `ops/release.sh check 4.159.0` printed COMPLETE at 17:54Z.**
+
+What happens to a topic with two roots after the two have merged once? On 4.157.0 the loser's merge record for that winner stayed in place after the merge completed. Every later merge toward the same winner was refused against that record. On 2026-11-21 a Windows relay stood as a second root of #council for 33 hours that way.
+
+What it is NOT: an arming, and NOT kernel 4.160.0, which is tagged and deployed nowhere. It is NOT a fix for the fault described under "What went wrong" below. And it has NOT been seen to work on production; see the last paragraph.
+
+What changes, with no option set:
+
+- 4.159.0: a completed merge removes its candidate record.
+- 4.159.0: the pins a merge takes belong to the round that took them, and are rebuilt from the rounds still open.
+- 4.159.0: custody of a topic during a merge is tracked, and `axona_status` prints it as `custodyAlive`.
+- relay 0.205.0, shipped inside 0.206.0: a relay writes its health and peer dumps when a request file changes. No process is signalled. `ops/fleet.sh dump <host>` is the reader.
+
+Where it runs, each read back on 2026-11-24. Both testnet bridges and both production bridges answer ok on 2.195.0 / 4.159.0; the production pair restarted at 00:10Z and 00:11Z. The 48 relays rolled in four stages: Air 6 of 6 and Windows 20 of 20 by 06:44Z, the Windows transcript ending `RESULT=OK`; M1 8 of 8 and Linux 5 of 5 by 17:15Z; the four droplets restarted 3, 2, 2 and 2 units between 17:44Z and 17:46Z after pulling it, and their version is INFERRED from that restart, not seen. A dump request answered on every relay of Air, M1 and Linux. Council seats still run the kernel they started with, and no seat's version was read.
+
+Review at release: Aster and Orion approved the head before it was merged.
+
+What went wrong during the promotion. The bridges and apps ran 4.159.0 for 17 and a half hours while relays still ran 4.157.0, and for the first 6 and a half of those hours every relay did. In that window a NEW subscriber to #council received nothing, and a new subscriber to #jokes received nothing posted after 23:24Z on 11-23. Subscribers already attached kept receiving everything, so every seat's read-back passed while a browser opening the channel saw an empty room. A fresh reader's lookup ended at a Windows relay that held no messages, and the reader then claimed the topic for itself. The fault began between 00:01Z and 00:24Z and ended between 06:20Z and 06:42Z, across the restart of the Windows relays. The cause is NOT shown. A restart cleared it. The #council root through all of it was a node that is neither a relay nor a seat, first seen on 2026-11-18, and what that node is has not been read.
+
+Two smaller things. The bot told David a relay roll would probably not close the fault, and it closed at the roll. And a check that posts as a seat and reads back as the same seat cannot see this kind of fault at all: the hourly chime confirmed in under a second for six hours of it. The hourly set now includes a read by a peer that has never subscribed.
+
+What else happened on this kernel, on testnet. Lyra's night of 83 runs finished 82 clean with 249,462 publications and 0 mismatched; the one failure was a connect timeout between the LAN and the droplet. At 15:48Z the testnet bridge ran out of JavaScript heap at about 254 MB and was restarted by systemd. It had taken 108 short-lived connections in 48 minutes from clients on kernel 4.160.0, and logged 7,305 replies it could not send because the asker's channel had already closed. That is a 512 MB droplet on Node's default heap limit, so the figure says nothing about a production bridge; what held the memory was not read.
+
+What this does not establish: that a second root now merges away. The proof is a production log in which one loser merges into a winner, a second root for the same topic appears later, and that one merges too. No such pair has been read since the release. Until it has, the fix rests on the kernel's own tests and on review.
+
+---
+
 ## kernel 4.154.0 → 4.157.0, relay 0.204.0, bridge 2.194.0 — a forward that comes back to its sender is stopped; a relay with no open channel no longer spins (2026-11-21)
 
 **Released on David's word ("Yes, proceed with the 4.157.0 production legs"), kernel 4.157.0, code only: nothing is armed by this release. Tag v4.157.0 at f348b7a; relay 0.204.0 at cb83885, vendored tree equal to the tag; bridge 2.194.0 at a4f7063.**
